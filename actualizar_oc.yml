@@ -1,0 +1,29 @@
+name: Actualizar OC desde Mercado Público
+
+on:
+  schedule:
+    # Corre todos los días a las 3am hora Chile (6am UTC)
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # También permite ejecutarlo manualmente
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase
+
+      - name: Ejecutar script de actualización
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MP_TICKET:    ${{ secrets.MP_TICKET }}
+          MP_RUT:       ${{ secrets.MP_RUT }}
+        run: python actualizar_oc.py

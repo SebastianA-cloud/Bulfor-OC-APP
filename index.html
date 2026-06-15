@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulfor — Buscador de OC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --border: #E5E3DD;
+    --border-strong: #C8C5BC;
+    --text: #1A1917;
+    --text-2: #6B6860;
+    --text-3: #9E9B94;
+    --accent: #1B4F8A;
+    --accent-light: #EAF1FB;
+    --green: #2D6A4F;
+    --green-light: #D8F3DC;
+    --amber: #92400E;
+    --amber-light: #FEF3C7;
+    --red: #991B1B;
+    --red-light: #FEE2E2;
+    --font: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+  /* Layout */
+  .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; z-index: 100; }
+  .logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+  .logo-title { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .nav { padding: 12px 10px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; transition: all .15s; margin-bottom: 2px; }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+  .sync-status { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .main { margin-left: 220px; padding: 28px 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Page header */
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.4px; }
+  .page-sub { color: var(--text-2); font-size: 13px; margin-top: 4px; }
+
+  /* Stats row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+  .stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
+  .stat-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+
+  /* Search + filters */
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .search-wrap { position: relative; flex: 1; min-width: 260px; }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 15px; pointer-events: none; }
+  input[type=text], select {
+    width: 100%; padding: 9px 12px 9px 34px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); font-size: 13px;
+    font-family: var(--font); outline: none; transition: border-color .15s;
+  }
+  select { padding-left: 12px; min-width: 160px; width: auto; cursor: pointer; }
+  input[type=text]:focus, select:focus { border-color: var(--accent); }
+
+  /* Table */
+  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { cursor: pointer; transition: background .1s; }
+  tbody tr:hover td { background: #FAFAF8; }
+  tbody tr.expanded td { background: var(--accent-light); }
+
+  .detail-row td { padding: 0; }
+  .detail-inner { padding: 16px 14px; background: var(--accent-light); border-bottom: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 13px; }
+  .detail-field label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 3px; }
+  .detail-field span { color: var(--text); font-weight: 500; }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .badge-gray { background: #F1F0EC; color: var(--text-2); }
+
+  /* Mono text */
+  .mono { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  /* Pagination */
+  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+  .page-btns { display: flex; gap: 4px; }
+  .page-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text-2); transition: all .1s; }
+  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .page-btn:disabled { opacity: .4; cursor: default; }
+
+  /* Import */
+  .drop-zone { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 48px; text-align: center; cursor: pointer; transition: all .2s; background: var(--surface); }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: var(--accent-light); }
+  .drop-icon { font-size: 36px; color: var(--text-3); margin-bottom: 12px; }
+  .drop-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .drop-sub { font-size: 13px; color: var(--text-2); }
+  .import-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); }
+  .import-btn:disabled { opacity: .5; cursor: default; }
+  .progress-wrap { margin-top: 20px; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width .3s; }
+  .log { margin-top: 16px; background: #1A1917; border-radius: var(--radius); padding: 14px; font-family: var(--mono); font-size: 12px; color: #A8A29E; max-height: 200px; overflow-y: auto; }
+  .log-line { margin-bottom: 4px; }
+  .log-ok { color: #6EE7B7; }
+  .log-err { color: #FCA5A5; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* Loading spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; vertical-align: middle; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; }
+    .logo-title, .logo-sub, .nav-item span { display: none; }
+    .main { margin-left: 60px; padding: 20px 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-title">Bulfor OC</div>
+    <div class="logo-sub">Mercado Público</div>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" onclick="showPage('oc',this)">
+      <span class="nav-icon">📋</span><span>Órdenes de compra</span>
+    </div>
+    <div class="nav-item" onclick="showPage('items',this)">
+      <span class="nav-icon">💊</span><span>Productos</span>
+    </div>
+    <div class="nav-item" onclick="showPage('hospitales',this)">
+      <span class="nav-icon">🏥</span><span>Hospitales</span>
+    </div>
+    <div class="nav-item" onclick="showPage('estadisticas',this)">
+      <span class="nav-icon">📊</span><span>Estadísticas</span>
+    </div>
+    <div class="nav-item" onclick="showPage('importar',this)">
+      <span class="nav-icon">⬆️</span><span>Importar Excel</span>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="sync-status">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncText">Conectando…</span>
+    </div>
+  </div>
+</nav>
+
+<main class="main">
+
+  <!-- OC PAGE -->
+  <div class="page active" id="page-oc">
+    <div class="page-header">
+      <div class="page-title">Órdenes de compra</div>
+      <div class="page-sub" id="oc-subtitle">Cargando datos…</div>
+    </div>
+    <div class="stats" id="oc-stats">
+      <div class="stat"><div class="stat-label">Total OC</div><div class="stat-val" id="s-oc">—</div></div>
+      <div class="stat"><div class="stat-label">Monto neto total</div><div class="stat-val" id="s-monto">—</div></div>
+      <div class="stat"><div class="stat-label">Hospitales</div><div class="stat-val" id="s-hosp">—</div></div>
+      <div class="stat"><div class="stat-label">Última OC</div><div class="stat-val" id="s-fecha" style="font-size:15px">—</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="oc-search" placeholder="Buscar por hospital, N° OC, descripción…" oninput="filterOC()">
+      </div>
+      <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
+      <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
+      <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>N° OC</th><th>Tipo</th><th>Descripción</th><th>Fecha</th>
+          <th>Hospital</th><th>Región</th><th>Total neto</th><th>Estado</th>
+        </tr></thead>
+        <tbody id="oc-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="oc-info"></span>
+        <div class="page-btns" id="oc-pages"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ITEMS PAGE -->
+  <div class="page" id="page-items">
+    <div class="page-header">
+      <div class="page-title">Productos</div>
+      <div class="page-sub">Historial de precios y ventas por producto</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="items-search" placeholder="Buscar producto, familia, hospital…" oninput="filterItems()">
+      </div>
+      <select id="items-familia" onchange="filterItems()"><option value="">Todas las familias</option></select>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Producto normalizado</th><th>Familia</th><th>Hospital</th>
+          <th>Cantidad</th><th>Precio unit.</th><th>Total</th><th>Fecha</th>
+        </tr></thead>
+        <tbody id="items-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="items-info"></span>
+        <div class="page-btns" id="items-pages"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOSPITALES PAGE -->
+  <div class="page" id="page-hospitales">
+    <div class="page-header">
+      <div class="page-title">Hospitales</div>
+      <div class="page-sub">Resumen de ventas por cliente</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="hosp-search" placeholder="Buscar hospital, región, comuna…" oninput="filterHosp()">
+      </div>
+      <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Hospital</th><th>Región</th><th>N° OC</th>
+          <th>Primera compra</th><th>Última compra</th><th>Total comprado</th>
+        </tr></thead>
+        <tbody id="hosp-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="hosp-info"></span>
+        <div class="page-btns" id="hosp-pages"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESTADÍSTICAS PAGE -->
+  <div class="page" id="page-estadisticas">
+    <div class="page-header">
+      <div class="page-title">Estadísticas</div>
+      <div class="page-sub">Resumen general de ventas</div>
+    </div>
+    <div id="stats-content"><div class="empty"><div class="empty-icon">📊</div><p>Cargando estadísticas…</p></div></div>
+  </div>
+
+  <!-- IMPORTAR PAGE -->
+  <div class="page" id="page-importar">
+    <div class="page-header">
+      <div class="page-title">Importar Excel</div>
+      <div class="page-sub">Carga tu archivo .xlsm para actualizar la base de datos</div>
+    </div>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="handleDrop(event)">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Arrastra tu Excel aquí</div>
+      <div class="drop-sub">O haz clic para seleccionar el archivo .xlsm o .xlsx</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xlsm" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+    <div id="import-area" style="display:none">
+      <div class="progress-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)">
+          <span id="import-status">Preparando…</span>
+          <span id="import-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="import-bar" style="width:0%"></div></div>
+      </div>
+      <div class="log" id="import-log"></div>
+      <button class="import-btn" id="import-btn" onclick="startImport()" disabled>⬆️ Importar a base de datos</button>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = window.SUPABASE_URL || 'sb_publishable_J9GpUOhNtUmV0WH_J60x9Q_ZKp7oLfA';
+const SUPABASE_KEY = window.SUPABASE_KEY || 'sb_secret_9V4OMZk62-tGTOCNsQashA_I3qvlWg5';
+
+const sb = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+             'Content-Type': 'application/json', 'Prefer': 'return=minimal', ...opts.headers },
+  ...opts
+});
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let oc = [], items = [], hosp = [];
+let ocF = [], itemsF = [], hospF = [];
+let ocPage = 1, itemsPage = 1, hospPage = 1;
+const PS = 15;
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [ocR, itemsR, hospR] = await Promise.all([
+      sb('ordenes_compra?select=*&order=FechaOC.desc&limit=5000').then(r=>r.json()),
+      sb('items_oc?select=*&order=FechaOC.desc&limit=10000').then(r=>r.json()),
+      sb('hospitales?select=*&order=TotalComprado.desc').then(r=>r.json()),
+    ]);
+    oc = Array.isArray(ocR) ? ocR : [];
+    items = Array.isArray(itemsR) ? itemsR : [];
+    hosp = Array.isArray(hospR) ? hospR : [];
+    ocF = [...oc]; itemsF = [...items]; hospF = [...hosp];
+    document.getElementById('syncDot').style.background = '#2D6A4F';
+    document.getElementById('syncText').textContent = 'Conectado';
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas();
+  } catch(e) {
+    document.getElementById('syncDot').style.background = '#991B1B';
+    document.getElementById('syncText').textContent = 'Sin conexión';
+    document.getElementById('oc-subtitle').textContent = 'Error conectando a la base de datos. Revisa la configuración.';
+  }
+}
+
+// ─── FILTERS ───────────────────────────────────────────────────────────────
+function populateFilters() {
+  const sel = (id, vals) => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = el.options[0].outerHTML + vals.map(v=>`<option value="${v}">${v}</option>`).join('');
+    el.value = cur;
+  };
+  sel('oc-region', [...new Set(oc.map(r=>r.Region).filter(Boolean))].sort());
+  sel('oc-estado', [...new Set(oc.map(r=>r.EstadoOC).filter(Boolean))].sort());
+  sel('items-familia', [...new Set(items.map(r=>r.Familia).filter(Boolean))].sort());
+  sel('hosp-region', [...new Set(hosp.map(r=>r.Region).filter(Boolean))].sort());
+}
+
+function filterOC() {
+  const q = document.getElementById('oc-search').value.toLowerCase();
+  const reg = document.getElementById('oc-region').value;
+  const est = document.getElementById('oc-estado').value;
+  const tipo = document.getElementById('oc-tipo').value;
+  ocF = oc.filter(r => {
+    const s = `${r.CodigoOC} ${r.NombreOC} ${r.Hospital} ${r.RutProveedor}`.toLowerCase();
+    return (!q || s.includes(q)) && (!reg || r.Region===reg) && (!est || r.EstadoOC===est) && (!tipo || r.TipoOC===tipo);
+  });
+  ocPage = 1; renderOC();
+}
+
+function filterItems() {
+  const q = document.getElementById('items-search').value.toLowerCase();
+  const fam = document.getElementById('items-familia').value;
+  itemsF = items.filter(r => {
+    const s = `${r.ProductoNormalizado} ${r.Familia} ${r.Hospital} ${r.CodigoOC}`.toLowerCase();
+    return (!q || s.includes(q)) && (!fam || r.Familia===fam);
+  });
+  itemsPage = 1; renderItems();
+}
+
+function filterHosp() {
+  const q = document.getElementById('hosp-search').value.toLowerCase();
+  const reg = document.getElementById('hosp-region').value;
+  hospF = hosp.filter(r => {
+    const s = `${r.Hospital} ${r.Region} ${r.Comuna}`.toLowerCase();
+    return (!q || s.includes(q)) && (!reg || r.Region===reg);
+  });
+  hospPage = 1; renderHosp();
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+const clp = n => n ? '$ ' + Math.round(n).toLocaleString('es-CL') : '—';
+const fDate = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const estadoBadge = e => {
+  if (!e) return '';
+  if (e.includes('Conforme')) return `<span class="badge badge-green">${e}</span>`;
+  if (e.includes('Aceptada')) return `<span class="badge badge-blue">${e}</span>`;
+  if (e.includes('Cancelad')) return `<span class="badge badge-red">${e}</span>`;
+  return `<span class="badge badge-gray">${e}</span>`;
+};
+const tipoBadge = t => t==='SE'
+  ? `<span class="badge badge-blue">Licitación</span>`
+  : `<span class="badge badge-gray">Compra ágil</span>`;
+
+function paginate(data, page) {
+  const pages = Math.ceil(data.length / PS) || 1;
+  return { slice: data.slice((page-1)*PS, page*PS), pages, total: data.length };
+}
+
+function renderPages(container, total, pages, cur, setPage) {
+  let h = `<button class="page-btn" onclick="${setPage}(${cur-1})" ${cur<=1?'disabled':''}>‹</button>`;
+  for (let i=1; i<=Math.min(pages,7); i++) h += `<button class="page-btn${cur===i?' active':''}" onclick="${setPage}(${i})">${i}</button>`;
+  if (pages > 7) h += `<span style="padding:4px 6px;color:var(--text-3)">…${pages}</span>`;
+  h += `<button class="page-btn" onclick="${setPage}(${cur+1})" ${cur>=pages?'disabled':''}>›</button>`;
+  document.getElementById(container).innerHTML = h;
+}
+
+// ─── RENDER OC ─────────────────────────────────────────────────────────────
+function renderOC() {
+  const { slice, pages, total } = paginate(ocF, ocPage);
+  document.getElementById('oc-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
+  renderPages('oc-pages', total, pages, ocPage, 'goOC');
+  if (!slice.length) { document.getElementById('oc-body').innerHTML = `<tr><td colspan="8" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  document.getElementById('oc-body').innerHTML = slice.map((r,i) => `
+    <tr onclick="toggleOCDetail(this)" data-idx="${i}">
+      <td><span class="mono">${r.CodigoOC||''}</span></td>
+      <td>${tipoBadge(r.TipoOC)}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.NombreOC||''}">${r.NombreOC||''}</td>
+      <td style="white-space:nowrap;color:var(--text-2)">${fDate(r.FechaOC)}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${r.Hospital||''}">${r.Hospital||''}</td>
+      <td style="font-size:12px;color:var(--text-2)">${(r.Region||'').replace('Región ','').replace('de ','')}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalNeto)}</td>
+      <td>${estadoBadge(r.EstadoOC)}</td>
+    </tr>
+    <tr class="detail-row" id="det-${i}" style="display:none">
+      <td colspan="8">
+        <div class="detail-inner">
+          <div class="detail-field"><label>Hospital completo</label><span>${r.Hospital||'—'}</span></div>
+          <div class="detail-field"><label>Unidad compradora</label><span>${r.UnidadCompradora||'—'}</span></div>
+          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.CodigoLicitacion||'—'}</span></div>
+          <div class="detail-field"><label>Total OC (con IVA)</label><span>${clp(r.TotalOC)}</span></div>
+          <div class="detail-field"><label>Forma de pago</label><span>${r.FormaPago||'—'}</span></div>
+          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.FechaAceptacion)}</span></div>
+          <div class="detail-field"><label>Estado proveedor</label><span>${r.EstadoProveedor||'—'}</span></div>
+          <div class="detail-field"><label>Región / Comuna</label><span>${r.Region||''} / ${r.Comuna||''}</span></div>
+          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.FechaEnvio)}</span></div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function toggleOCDetail(tr) {
+  if (tr.classList.contains('detail-row')) return;
+  const idx = tr.dataset.idx;
+  const det = document.getElementById('det-'+idx);
+  const open = det.style.display !== 'none';
+  document.querySelectorAll('.detail-row').forEach(r=>r.style.display='none');
+  document.querySelectorAll('#oc-body tr:not(.detail-row)').forEach(r=>r.classList.remove('expanded'));
+  if (!open) { det.style.display=''; tr.classList.add('expanded'); }
+}
+
+function goOC(p) { const {pages}=paginate(ocF,ocPage); if(p<1||p>pages) return; ocPage=p; renderOC(); window.scrollTo(0,0); }
+
+// ─── RENDER ITEMS ──────────────────────────────────────────────────────────
+function renderItems() {
+  const { slice, pages, total } = paginate(itemsF, itemsPage);
+  document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} ítems`;
+  renderPages('items-pages', total, pages, itemsPage, 'goItems');
+  if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  document.getElementById('items-body').innerHTML = slice.map(r => `<tr>
+    <td style="font-weight:500">${r.ProductoNormalizado||r.ProductoMP||'—'}</td>
+    <td style="font-size:12px;color:var(--text-2)">${r.Familia||'—'}</td>
+    <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Hospital||''}">${r.Hospital||'—'}</td>
+    <td style="text-align:right">${r.Cantidad||'—'} ${r.Unidad||''}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(r.PrecioUnitario)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalItem)}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.FechaOC)}</td>
+  </tr>`).join('');
+}
+function goItems(p) { const {pages}=paginate(itemsF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
+
+// ─── RENDER HOSPITALES ─────────────────────────────────────────────────────
+function renderHosp() {
+  const { slice, pages, total } = paginate(hospF, hospPage);
+  document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
+  renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
+  if (!slice.length) { document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr>
+    <td style="font-weight:500;max-width:240px">${r.Hospital||'—'}</td>
+    <td style="font-size:12px;color:var(--text-2)">${(r.Region||'').replace('Región ','')}</td>
+    <td style="text-align:right;font-weight:500">${(r.NumeroOC||0).toLocaleString('es-CL')}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.PrimeraCompra)}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.UltimaCompra)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalComprado)}</td>
+  </tr>`).join('');
+}
+function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
+
+// ─── STATS ─────────────────────────────────────────────────────────────────
+function updateStats() {
+  const total = oc.reduce((s,r)=>s+(r.TotalNeto||0),0);
+  const hosps = new Set(oc.map(r=>r.Hospital)).size;
+  const ultima = oc[0]?.FechaOC;
+  document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
+  document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
+  document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
+  document.getElementById('s-fecha').textContent = fDate(ultima);
+  document.getElementById('oc-subtitle').textContent = `${oc.length.toLocaleString('es-CL')} órdenes registradas — última actualización: ${fDate(ultima)}`;
+}
+
+function renderEstadisticas() {
+  const topHosp = [...hosp].sort((a,b)=>(b.TotalComprado||0)-(a.TotalComprado||0)).slice(0,10);
+  const byRegion = {};
+  oc.forEach(r => { if(r.Region) byRegion[r.Region] = (byRegion[r.Region]||0) + (r.TotalNeto||0); });
+  const topReg = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const byYear = {};
+  oc.forEach(r => { if(r.FechaOC) { const y=new Date(r.FechaOC).getFullYear(); byYear[y]=(byYear[y]||0)+(r.TotalNeto||0); }});
+
+  document.getElementById('stats-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="table-card" style="padding:16px">
+        <h3 style="font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Top 10 hospitales por monto</h3>
+        ${topHosp.map((h,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:11px;color:var(--text-3);width:16px;text-align:right">${i+1}</span>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.Hospital||'—'}</div>
+              <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
+                <div style="height:100%;background:var(--accent);width:${Math.round((h.TotalComprado/topHosp[0].TotalComprado)*100)}%;border-radius:2px"></div>
+              </div>
+            </div>
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(h.TotalComprado)}</span>
+          </div>`).join('')}
+      </div>
+      <div class="table-card" style="padding:16px">
+        <h3 style="font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Ventas por año</h3>
+        ${Object.entries(byYear).sort((a,b)=>a[0]-b[0]).map(([y,v])=>`
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text-2);width:36px">${y}</span>
+            <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+              <div style="height:100%;background:var(--green);width:${Math.round((v/Math.max(...Object.values(byYear)))*100)}%;border-radius:2px"></div>
+            </div>
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(v)}</span>
+          </div>`).join('')}
+        <h3 style="font-size:13px;font-weight:600;margin:18px 0 12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Por región</h3>
+        ${topReg.map(([reg,v])=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${reg.replace('Región ','')}</span>
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(v)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ─── IMPORT ────────────────────────────────────────────────────────────────
+let importData = null;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  handleFile(e.dataTransfer.files[0]);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb = XLSX.read(ev.target.result, { type: 'binary' });
+    const read = name => wb.SheetNames.includes(name) ? XLSX.utils.sheet_to_json(wb.Sheets[name]) : [];
+    importData = { oc: read('Mis_OC'), items: read('Mis_Items_OC'), hosp: read('Mis_Hospitales'), prod: read('Mis_Productos') };
+    document.getElementById('import-area').style.display = 'block';
+    document.getElementById('import-btn').disabled = false;
+    setStatus(`Archivo listo: ${importData.oc.length} OC, ${importData.items.length} ítems, ${importData.hosp.length} hospitales`, false);
+    log(`✔ Archivo leído: ${file.name}`, 'ok');
+    log(`  → ${importData.oc.length} órdenes de compra`, 'ok');
+    log(`  → ${importData.items.length} ítems`, 'ok');
+    log(`  → ${importData.hosp.length} hospitales`, 'ok');
+  };
+  reader.readAsBinaryString(file);
+}
+
+function log(msg, type='') {
+  const el = document.getElementById('import-log');
+  el.innerHTML += `<div class="log-line ${type==='ok'?'log-ok':type==='err'?'log-err':''}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(msg, pct) {
+  document.getElementById('import-status').textContent = msg;
+  if (pct !== false) {
+    document.getElementById('import-pct').textContent = pct+'%';
+    document.getElementById('import-bar').style.width = pct+'%';
+  }
+}
+
+async function upsertBatch(table, rows, key) {
+  if (!rows.length) return;
+  const CHUNK = 200;
+  for (let i=0; i<rows.length; i+=CHUNK) {
+    const chunk = rows.slice(i, i+CHUNK);
+    const res = await sb(`${table}?on_conflict=${key}`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(chunk)
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(err); }
+  }
+}
+
+async function startImport() {
+  if (!importData) return;
+  document.getElementById('import-btn').disabled = true;
+  try {
+    setStatus('Importando órdenes de compra…', 10);
+    log('→ Subiendo órdenes de compra…');
+    await upsertBatch('ordenes_compra', importData.oc, 'CodigoOC');
+    log(`✔ ${importData.oc.length} OC importadas`, 'ok');
+
+    setStatus('Importando ítems…', 35);
+    log('→ Subiendo ítems…');
+    await upsertBatch('items_oc', importData.items, 'CodigoOC,CorrelativoItem');
+    log(`✔ ${importData.items.length} ítems importados`, 'ok');
+
+    setStatus('Importando hospitales…', 65);
+    log('→ Subiendo hospitales…');
+    await upsertBatch('hospitales', importData.hosp, 'Hospital');
+    log(`✔ ${importData.hosp.length} hospitales importados`, 'ok');
+
+    setStatus('Importando productos…', 85);
+    log('→ Subiendo productos…');
+    await upsertBatch('productos', importData.prod, 'ProductoNormalizado');
+    log(`✔ ${importData.prod.length} productos importados`, 'ok');
+
+    setStatus('¡Importación completada!', 100);
+    log('✔ ¡Todo listo! Recargando datos…', 'ok');
+    setTimeout(() => { init(); showPage('oc', document.querySelector('.nav-item')); }, 1500);
+  } catch(e) {
+    log('✘ Error: ' + e.message, 'err');
+    setStatus('Error en la importación', false);
+    document.getElementById('import-btn').disabled = false;
+  }
+}
+
+// ─── NAV ───────────────────────────────────────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if (el) el.classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>
