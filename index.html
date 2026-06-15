@@ -309,8 +309,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const SUPABASE_URL = window.SUPABASE_URL || 'sb_publishable_J9GpUOhNtUmV0WH_J60x9Q_ZKp7oLfA';
-const SUPABASE_KEY = window.SUPABASE_KEY || 'sb_secret_9V4OMZk62-tGTOCNsQashA_I3qvlWg5';
+const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
+const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
+
 
 const sb = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
   headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
