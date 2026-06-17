@@ -309,9 +309,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
-const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
-
+const SUPABASE_URL = window.SUPABASE_URL || 'TU_SUPABASE_URL';
+const SUPABASE_KEY = window.SUPABASE_KEY || 'TU_SUPABASE_ANON_KEY';
 
 const sb = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
   headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
@@ -329,9 +328,9 @@ const PS = 15;
 async function init() {
   try {
     const [ocR, itemsR, hospR] = await Promise.all([
-      sb('ordenes_compra?select=*&order=FechaOC.desc&limit=5000').then(r=>r.json()),
-      sb('items_oc?select=*&order=FechaOC.desc&limit=10000').then(r=>r.json()),
-      sb('hospitales?select=*&order=TotalComprado.desc').then(r=>r.json()),
+      sb('ordenes_compra?select=*&order=fechaoc.desc&limit=5000').then(r=>r.json()),
+      sb('items_oc?select=*&order=fechaoc.desc&limit=10000').then(r=>r.json()),
+      sb('hospitales?select=*&order=totalcomprado.desc').then(r=>r.json()),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -355,10 +354,10 @@ function populateFilters() {
     el.innerHTML = el.options[0].outerHTML + vals.map(v=>`<option value="${v}">${v}</option>`).join('');
     el.value = cur;
   };
-  sel('oc-region', [...new Set(oc.map(r=>r.Region).filter(Boolean))].sort());
-  sel('oc-estado', [...new Set(oc.map(r=>r.EstadoOC).filter(Boolean))].sort());
-  sel('items-familia', [...new Set(items.map(r=>r.Familia).filter(Boolean))].sort());
-  sel('hosp-region', [...new Set(hosp.map(r=>r.Region).filter(Boolean))].sort());
+  sel('oc-region', [...new Set(oc.map(r=>r.region).filter(Boolean))].sort());
+  sel('oc-estado', [...new Set(oc.map(r=>r.estadooc).filter(Boolean))].sort());
+  sel('items-familia', [...new Set(items.map(r=>r.familia).filter(Boolean))].sort());
+  sel('hosp-region', [...new Set(hosp.map(r=>r.region).filter(Boolean))].sort());
 }
 
 function filterOC() {
@@ -367,8 +366,8 @@ function filterOC() {
   const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
   ocF = oc.filter(r => {
-    const s = `${r.CodigoOC} ${r.NombreOC} ${r.Hospital} ${r.RutProveedor}`.toLowerCase();
-    return (!q || s.includes(q)) && (!reg || r.Region===reg) && (!est || r.EstadoOC===est) && (!tipo || r.TipoOC===tipo);
+    const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${r.rutproveedor}`.toLowerCase();
+    return (!q || s.includes(q)) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
   ocPage = 1; renderOC();
 }
@@ -377,8 +376,8 @@ function filterItems() {
   const q = document.getElementById('items-search').value.toLowerCase();
   const fam = document.getElementById('items-familia').value;
   itemsF = items.filter(r => {
-    const s = `${r.ProductoNormalizado} ${r.Familia} ${r.Hospital} ${r.CodigoOC}`.toLowerCase();
-    return (!q || s.includes(q)) && (!fam || r.Familia===fam);
+    const s = `${r.productonormalizado} ${r.familia} ${r.hospital} ${r.codigooc}`.toLowerCase();
+    return (!q || s.includes(q)) && (!fam || r.familia===fam);
   });
   itemsPage = 1; renderItems();
 }
@@ -387,8 +386,8 @@ function filterHosp() {
   const q = document.getElementById('hosp-search').value.toLowerCase();
   const reg = document.getElementById('hosp-region').value;
   hospF = hosp.filter(r => {
-    const s = `${r.Hospital} ${r.Region} ${r.Comuna}`.toLowerCase();
-    return (!q || s.includes(q)) && (!reg || r.Region===reg);
+    const s = `${r.hospital} ${r.region} ${r.comuna}`.toLowerCase();
+    return (!q || s.includes(q)) && (!reg || r.region===reg);
   });
   hospPage = 1; renderHosp();
 }
@@ -428,27 +427,27 @@ function renderOC() {
   if (!slice.length) { document.getElementById('oc-body').innerHTML = `<tr><td colspan="8" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
   document.getElementById('oc-body').innerHTML = slice.map((r,i) => `
     <tr onclick="toggleOCDetail(this)" data-idx="${i}">
-      <td><span class="mono">${r.CodigoOC||''}</span></td>
-      <td>${tipoBadge(r.TipoOC)}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.NombreOC||''}">${r.NombreOC||''}</td>
-      <td style="white-space:nowrap;color:var(--text-2)">${fDate(r.FechaOC)}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${r.Hospital||''}">${r.Hospital||''}</td>
-      <td style="font-size:12px;color:var(--text-2)">${(r.Region||'').replace('Región ','').replace('de ','')}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalNeto)}</td>
-      <td>${estadoBadge(r.EstadoOC)}</td>
+      <td><span class="mono">${r.codigooc||''}</span></td>
+      <td>${tipoBadge(r.tipooc)}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nombreoc||''}">${r.nombreoc||''}</td>
+      <td style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${r.hospital||''}">${r.hospital||''}</td>
+      <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+      <td>${estadoBadge(r.estadooc)}</td>
     </tr>
     <tr class="detail-row" id="det-${i}" style="display:none">
       <td colspan="8">
         <div class="detail-inner">
-          <div class="detail-field"><label>Hospital completo</label><span>${r.Hospital||'—'}</span></div>
-          <div class="detail-field"><label>Unidad compradora</label><span>${r.UnidadCompradora||'—'}</span></div>
-          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.CodigoLicitacion||'—'}</span></div>
-          <div class="detail-field"><label>Total OC (con IVA)</label><span>${clp(r.TotalOC)}</span></div>
-          <div class="detail-field"><label>Forma de pago</label><span>${r.FormaPago||'—'}</span></div>
-          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.FechaAceptacion)}</span></div>
-          <div class="detail-field"><label>Estado proveedor</label><span>${r.EstadoProveedor||'—'}</span></div>
-          <div class="detail-field"><label>Región / Comuna</label><span>${r.Region||''} / ${r.Comuna||''}</span></div>
-          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.FechaEnvio)}</span></div>
+          <div class="detail-field"><label>Hospital completo</label><span>${r.hospital||'—'}</span></div>
+          <div class="detail-field"><label>Unidad compradora</label><span>${r.unidadcompradora||'—'}</span></div>
+          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.codigolicitacion||'—'}</span></div>
+          <div class="detail-field"><label>Total OC (con IVA)</label><span>${clp(r.totaloc)}</span></div>
+          <div class="detail-field"><label>Forma de pago</label><span>${r.formapago||'—'}</span></div>
+          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.fechaaceptacion)}</span></div>
+          <div class="detail-field"><label>Estado proveedor</label><span>${r.estadoproveedor||'—'}</span></div>
+          <div class="detail-field"><label>Región / Comuna</label><span>${r.region||''} / ${r.comuna||''}</span></div>
+          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.fechaenvio)}</span></div>
         </div>
       </td>
     </tr>`).join('');
@@ -473,13 +472,13 @@ function renderItems() {
   renderPages('items-pages', total, pages, itemsPage, 'goItems');
   if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
   document.getElementById('items-body').innerHTML = slice.map(r => `<tr>
-    <td style="font-weight:500">${r.ProductoNormalizado||r.ProductoMP||'—'}</td>
-    <td style="font-size:12px;color:var(--text-2)">${r.Familia||'—'}</td>
-    <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Hospital||''}">${r.Hospital||'—'}</td>
-    <td style="text-align:right">${r.Cantidad||'—'} ${r.Unidad||''}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(r.PrecioUnitario)}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalItem)}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.FechaOC)}</td>
+    <td style="font-weight:500">${r.productonormalizado||r.productomp||'—'}</td>
+    <td style="font-size:12px;color:var(--text-2)">${r.familia||'—'}</td>
+    <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.hospital||''}">${r.hospital||'—'}</td>
+    <td style="text-align:right">${r.cantidad||'—'} ${r.unidad||''}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(r.preciounitario)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalitem)}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.fechaoc)}</td>
   </tr>`).join('');
 }
 function goItems(p) { const {pages}=paginate(itemsF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
@@ -491,20 +490,20 @@ function renderHosp() {
   renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
   if (!slice.length) { document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
   document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr>
-    <td style="font-weight:500;max-width:240px">${r.Hospital||'—'}</td>
-    <td style="font-size:12px;color:var(--text-2)">${(r.Region||'').replace('Región ','')}</td>
-    <td style="text-align:right;font-weight:500">${(r.NumeroOC||0).toLocaleString('es-CL')}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.PrimeraCompra)}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.UltimaCompra)}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.TotalComprado)}</td>
+    <td style="font-weight:500;max-width:240px">${r.hospital||'—'}</td>
+    <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
+    <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
+    <td style="color:var(--text-2);font-size:12px">${fDate(r.ultimacompra)}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalcomprado)}</td>
   </tr>`).join('');
 }
 function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
 function updateStats() {
-  const total = oc.reduce((s,r)=>s+(r.TotalNeto||0),0);
-  const hosps = new Set(oc.map(r=>r.Hospital)).size;
+  const total = oc.reduce((s,r)=>s+(r.totalneto||0),0);
+  const hosps = new Set(oc.map(r=>r.hospital)).size;
   const ultima = oc[0]?.FechaOC;
   document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
   document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
@@ -516,10 +515,10 @@ function updateStats() {
 function renderEstadisticas() {
   const topHosp = [...hosp].sort((a,b)=>(b.TotalComprado||0)-(a.TotalComprado||0)).slice(0,10);
   const byRegion = {};
-  oc.forEach(r => { if(r.Region) byRegion[r.Region] = (byRegion[r.Region]||0) + (r.TotalNeto||0); });
+  oc.forEach(r => { if(r.region) byRegion[r.region] = (byRegion[r.region]||0) + (r.totalneto||0); });
   const topReg = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const byYear = {};
-  oc.forEach(r => { if(r.FechaOC) { const y=new Date(r.FechaOC).getFullYear(); byYear[y]=(byYear[y]||0)+(r.TotalNeto||0); }});
+  oc.forEach(r => { if(r.fechaoc) { const y=new Date(r.fechaoc).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totalneto||0); }});
 
   document.getElementById('stats-content').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
@@ -566,12 +565,22 @@ function handleDrop(e) {
   handleFile(e.dataTransfer.files[0]);
 }
 
+function lowerKeys(rows) {
+  // Convierte todas las llaves de cada fila a minúsculas
+  // para que calcen con los nombres de columna reales en Supabase (Postgres las guarda en minúscula)
+  return rows.map(row => {
+    const out = {};
+    for (const k in row) out[k.toLowerCase()] = row[k];
+    return out;
+  });
+}
+
 function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
     const wb = XLSX.read(ev.target.result, { type: 'binary' });
-    const read = name => wb.SheetNames.includes(name) ? XLSX.utils.sheet_to_json(wb.Sheets[name]) : [];
+    const read = name => wb.SheetNames.includes(name) ? lowerKeys(XLSX.utils.sheet_to_json(wb.Sheets[name])) : [];
     importData = { oc: read('Mis_OC'), items: read('Mis_Items_OC'), hosp: read('Mis_Hospitales'), prod: read('Mis_Productos') };
     document.getElementById('import-area').style.display = 'block';
     document.getElementById('import-btn').disabled = false;
@@ -618,22 +627,22 @@ async function startImport() {
   try {
     setStatus('Importando órdenes de compra…', 10);
     log('→ Subiendo órdenes de compra…');
-    await upsertBatch('ordenes_compra', importData.oc, 'CodigoOC');
+    await upsertBatch('ordenes_compra', importData.oc, 'codigooc');
     log(`✔ ${importData.oc.length} OC importadas`, 'ok');
 
     setStatus('Importando ítems…', 35);
     log('→ Subiendo ítems…');
-    await upsertBatch('items_oc', importData.items, 'CodigoOC,CorrelativoItem');
+    await upsertBatch('items_oc', importData.items, 'codigooc,correlativoitem');
     log(`✔ ${importData.items.length} ítems importados`, 'ok');
 
     setStatus('Importando hospitales…', 65);
     log('→ Subiendo hospitales…');
-    await upsertBatch('hospitales', importData.hosp, 'Hospital');
+    await upsertBatch('hospitales', importData.hosp, 'hospital');
     log(`✔ ${importData.hosp.length} hospitales importados`, 'ok');
 
     setStatus('Importando productos…', 85);
     log('→ Subiendo productos…');
-    await upsertBatch('productos', importData.prod, 'ProductoNormalizado');
+    await upsertBatch('productos', importData.prod, 'productonormalizado');
     log(`✔ ${importData.prod.length} productos importados`, 'ok');
 
     setStatus('¡Importación completada!', 100);
