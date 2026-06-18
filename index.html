@@ -429,8 +429,8 @@ function renderOC() {
   document.getElementById('oc-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oc-pages', total, pages, ocPage, 'goOC');
   if (!slice.length) { document.getElementById('oc-body').innerHTML = `<tr><td colspan="8" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('oc-body').innerHTML = slice.map((r,i) => `
-    <tr onclick="toggleOCDetail(this)" data-idx="${i}">
+  document.getElementById('oc-body').innerHTML = slice.map((r) => `
+    <tr onclick="openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
       <td><span class="mono">${r.codigooc||''}</span></td>
       <td>${tipoBadge(r.tipooc)}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nombreoc||''}">${r.nombreoc||''}</td>
@@ -439,60 +439,79 @@ function renderOC() {
       <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
       <td>${estadoBadge(r.estadooc)}</td>
-    </tr>
-    <tr class="detail-row" id="det-${i}" style="display:none">
-      <td colspan="8">
-        <div class="detail-inner">
-          <div class="detail-field"><label>Hospital completo</label><span>${r.hospital||'—'}</span></div>
-          <div class="detail-field"><label>Unidad compradora</label><span>${r.unidadcompradora||'—'}</span></div>
-          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.codigolicitacion||'—'}</span></div>
-          <div class="detail-field"><label>Total OC (con IVA)</label><span>${clp(r.totaloc)}</span></div>
-          <div class="detail-field"><label>Forma de pago</label><span>${r.formapago||'—'}</span></div>
-          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.fechaaceptacion)}</span></div>
-          <div class="detail-field"><label>Estado proveedor</label><span>${r.estadoproveedor||'—'}</span></div>
-          <div class="detail-field"><label>Región / Comuna</label><span>${r.region||''} / ${r.comuna||''}</span></div>
-          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.fechaenvio)}</span></div>
-        </div>
-        <div style="padding:0 14px 16px">
-          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Productos de esta OC</div>
-          ${renderOCItemsList(r.codigooc)}
-        </div>
-      </td>
     </tr>`).join('');
 }
 
-function renderOCItemsList(codigoOC) {
+function openOCDetail(codigoOC) {
+  const r = oc.find(o => o.codigooc === codigoOC);
+  if (!r) return;
   const relacionados = items.filter(it => it.codigooc === codigoOC);
-  if (!relacionados.length) {
-    return `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No se encontraron ítems para esta OC.</div>`;
-  }
-  return `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)">
-    <table style="margin:0">
-      <thead><tr>
-        <th style="font-size:10px">Producto</th><th style="font-size:10px">Cantidad</th>
-        <th style="font-size:10px">Precio unit.</th><th style="font-size:10px">Total</th>
-      </tr></thead>
-      <tbody>
-        ${relacionados.map(it => `
-          <tr onclick="openProductDetail('${(it.productonormalizado||it.productomp||'').replace(/'/g,"\\'")}'); event.stopPropagation();" style="cursor:pointer">
-            <td style="font-weight:500;color:var(--accent)">${it.productonormalizado||it.productomp||'—'} ↗</td>
-            <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem)}</td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-  </div>`;
+
+  const itemsHtml = !relacionados.length
+    ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No se encontraron ítems para esta OC.</div>`
+    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr>
+            <th style="font-size:10px">Producto</th><th style="font-size:10px">Cantidad</th>
+            <th style="font-size:10px">Precio unit.</th><th style="font-size:10px">Total</th>
+          </tr></thead>
+          <tbody>
+            ${relacionados.map(it => {
+              const nombreProd = (it.productonormalizado||it.productomp||'—');
+              return `<tr onclick="openProductDetail('${nombreProd.replace(/'/g,"\\'")}')" style="cursor:pointer">
+                <td style="font-weight:500;color:var(--accent)">${nombreProd} ↗</td>
+                <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'oc-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) closeOCDetail(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span class="mono" style="font-size:13px">${r.codigooc||''}</span>
+            ${tipoBadge(r.tipooc)}
+            ${estadoBadge(r.estadooc)}
+          </div>
+          <div style="font-size:15px;font-weight:600">${r.nombreoc||'—'}</div>
+        </div>
+        <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px;flex-shrink:0">✕</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+          <div class="stat" style="padding:12px"><div class="stat-label">Total neto</div><div class="stat-val" style="font-size:16px">${clp(r.totalneto)}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Total OC (con IVA)</div><div class="stat-val" style="font-size:16px">${clp(r.totaloc)}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Fecha OC</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaoc)}</div></div>
+        </div>
+        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
+          <div class="detail-field"><label>Hospital</label><span>${r.hospital||'—'}</span></div>
+          <div class="detail-field"><label>Unidad compradora</label><span>${r.unidadcompradora||'—'}</span></div>
+          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.codigolicitacion||'—'}</span></div>
+          <div class="detail-field"><label>Forma de pago</label><span>${r.formapago||'—'}</span></div>
+          <div class="detail-field"><label>Estado proveedor</label><span>${r.estadoproveedor||'—'}</span></div>
+          <div class="detail-field"><label>Región / Comuna</label><span>${r.region||''} / ${r.comuna||''}</span></div>
+          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.fechaaceptacion)}</span></div>
+          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.fechaenvio)}</span></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Productos de esta OC</div>
+        ${itemsHtml}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
-function toggleOCDetail(tr) {
-  if (tr.classList.contains('detail-row')) return;
-  const idx = tr.dataset.idx;
-  const det = document.getElementById('det-'+idx);
-  const open = det.style.display !== 'none';
-  document.querySelectorAll('.detail-row').forEach(r=>r.style.display='none');
-  document.querySelectorAll('#oc-body tr:not(.detail-row)').forEach(r=>r.classList.remove('expanded'));
-  if (!open) { det.style.display=''; tr.classList.add('expanded'); }
+function closeOCDetail() {
+  const m = document.getElementById('oc-modal-overlay');
+  if (m) m.remove();
 }
 
 function goOC(p) { const {pages}=paginate(ocF,ocPage); if(p<1||p>pages) return; ocPage=p; renderOC(); window.scrollTo(0,0); }
