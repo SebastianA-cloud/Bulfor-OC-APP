@@ -604,6 +604,15 @@ function fixDateColumns(rows) {
   });
 }
 
+function dedupeByKey(rows, keyField) {
+  // Si dos filas tienen el mismo valor en keyField (por ej. el mismo
+  // nombre de hospital), Postgres no permite actualizarlo dos veces
+  // en el mismo lote. Aquí nos quedamos solo con la última aparición.
+  const map = new Map();
+  rows.forEach(row => map.set(row[keyField], row));
+  return Array.from(map.values());
+}
+
 function normalizeRows(rows) {
   // Supabase exige que TODAS las filas de un mismo lote tengan exactamente
   // las mismas columnas. Si una fila del Excel tiene una celda vacía,
@@ -681,13 +690,15 @@ async function startImport() {
 
     setStatus('Importando hospitales…', 65);
     log('→ Subiendo hospitales…');
-    await upsertBatch('hospitales', importData.hosp, 'hospital');
-    log(`✔ ${importData.hosp.length} hospitales importados`, 'ok');
+    const hospUnicos = dedupeByKey(importData.hosp, 'hospital');
+    await upsertBatch('hospitales', hospUnicos, 'hospital');
+    log(`✔ ${hospUnicos.length} hospitales importados`, 'ok');
 
     setStatus('Importando productos…', 85);
     log('→ Subiendo productos…');
-    await upsertBatch('productos', importData.prod, 'productonormalizado');
-    log(`✔ ${importData.prod.length} productos importados`, 'ok');
+    const prodUnicos = dedupeByKey(importData.prod, 'productonormalizado');
+    await upsertBatch('productos', prodUnicos, 'productonormalizado');
+    log(`✔ ${prodUnicos.length} productos importados`, 'ok');
 
     setStatus('¡Importación completada!', 100);
     log('✔ ¡Todo listo! Recargando datos…', 'ok');
@@ -711,4 +722,5 @@ init();
 </script>
 </body>
 </html>
+
 
