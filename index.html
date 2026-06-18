@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+   <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -453,8 +453,36 @@ function renderOC() {
           <div class="detail-field"><label>Región / Comuna</label><span>${r.region||''} / ${r.comuna||''}</span></div>
           <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.fechaenvio)}</span></div>
         </div>
+        <div style="padding:0 14px 16px">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Productos de esta OC</div>
+          ${renderOCItemsList(r.codigooc)}
+        </div>
       </td>
     </tr>`).join('');
+}
+
+function renderOCItemsList(codigoOC) {
+  const relacionados = items.filter(it => it.codigooc === codigoOC);
+  if (!relacionados.length) {
+    return `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No se encontraron ítems para esta OC.</div>`;
+  }
+  return `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)">
+    <table style="margin:0">
+      <thead><tr>
+        <th style="font-size:10px">Producto</th><th style="font-size:10px">Cantidad</th>
+        <th style="font-size:10px">Precio unit.</th><th style="font-size:10px">Total</th>
+      </tr></thead>
+      <tbody>
+        ${relacionados.map(it => `
+          <tr onclick="openProductDetail('${(it.productonormalizado||it.productomp||'').replace(/'/g,"\\'")}'); event.stopPropagation();" style="cursor:pointer">
+            <td style="font-weight:500;color:var(--accent)">${it.productonormalizado||it.productomp||'—'} ↗</td>
+            <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
 }
 
 function toggleOCDetail(tr) {
@@ -475,17 +503,87 @@ function renderItems() {
   document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} ítems`;
   renderPages('items-pages', total, pages, itemsPage, 'goItems');
   if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('items-body').innerHTML = slice.map(r => `<tr>
-    <td style="font-weight:500">${r.productonormalizado||r.productomp||'—'}</td>
+  document.getElementById('items-body').innerHTML = slice.map(r => {
+    const nombreProd = r.productonormalizado||r.productomp||'—';
+    return `<tr>
+    <td style="font-weight:500;color:var(--accent);cursor:pointer" onclick="openProductDetail('${nombreProd.replace(/'/g,"\\'")}')">${nombreProd} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${r.familia||'—'}</td>
     <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.hospital||''}">${r.hospital||'—'}</td>
     <td style="text-align:right">${r.cantidad||'—'} ${r.unidad||''}</td>
     <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(r.preciounitario)}</td>
     <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalitem)}</td>
     <td style="color:var(--text-2);font-size:12px">${fDate(r.fechaoc)}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 function goItems(p) { const {pages}=paginate(itemsF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
+
+// ─── PRODUCT DETAIL MODAL ──────────────────────────────────────────────────
+function openProductDetail(nombreProducto) {
+  const ventas = items.filter(it => (it.productonormalizado||it.productomp) === nombreProducto)
+    .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+  if (!ventas.length) return;
+
+  const precios = ventas.map(v => v.preciounitario).filter(p => p != null && p > 0);
+  const precioMin = precios.length ? Math.min(...precios) : null;
+  const precioMax = precios.length ? Math.max(...precios) : null;
+  const precioProm = precios.length ? precios.reduce((a,b)=>a+b,0)/precios.length : null;
+  const totalVendido = ventas.reduce((s,v) => s + (v.totalitem||0), 0);
+  const hospitalesUnicos = new Set(ventas.map(v=>v.hospital).filter(Boolean)).size;
+  const familia = ventas[0]?.familia || '—';
+
+  const modal = document.createElement('div');
+  modal.id = 'product-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) closeProductDetail(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:17px;font-weight:600">${nombreProducto}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${familia}</div>
+        </div>
+        <button onclick="closeProductDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+          <div class="stat" style="padding:12px"><div class="stat-label">Total vendido</div><div class="stat-val" style="font-size:16px">${clp(totalVendido)}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">N° de ventas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${hospitalesUnicos}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Precio promedio</div><div class="stat-val" style="font-size:16px">${clp(precioProm)}</div></div>
+        </div>
+        <div style="display:flex;gap:20px;margin-bottom:20px;font-size:12px;color:var(--text-2)">
+          <span>Precio mínimo: <strong style="color:var(--text)">${clp(precioMin)}</strong></span>
+          <span>Precio máximo: <strong style="color:var(--text)">${clp(precioMax)}</strong></span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Historial de ventas (más reciente primero)</div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0">
+            <thead><tr>
+              <th style="font-size:10px">Fecha</th><th style="font-size:10px">Hospital</th>
+              <th style="font-size:10px">N° OC</th><th style="font-size:10px">Cantidad</th><th style="font-size:10px">Precio unit.</th>
+            </tr></thead>
+            <tbody>
+              ${ventas.slice(0,50).map(v => `<tr>
+                <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
+                <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.hospital||''}">${v.hospital||'—'}</td>
+                <td><span class="mono">${v.codigooc||''}</span></td>
+                <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.preciounitario)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${ventas.length > 50 ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:center">Mostrando las 50 ventas más recientes de ${ventas.length} totales</div>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeProductDetail() {
+  const m = document.getElementById('product-modal-overlay');
+  if (m) m.remove();
+}
 
 // ─── RENDER HOSPITALES ─────────────────────────────────────────────────────
 function renderHosp() {
@@ -517,7 +615,7 @@ function updateStats() {
 }
 
 function renderEstadisticas() {
-  const topHosp = [...hosp].sort((a,b)=>(b.TotalComprado||0)-(a.TotalComprado||0)).slice(0,10);
+  const topHosp = [...hosp].sort((a,b)=>(b.totalcomprado||0)-(a.totalcomprado||0)).slice(0,10);
   const byRegion = {};
   oc.forEach(r => { if(r.region) byRegion[r.region] = (byRegion[r.region]||0) + (r.totalneto||0); });
   const topReg = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -532,12 +630,12 @@ function renderEstadisticas() {
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span style="font-size:11px;color:var(--text-3);width:16px;text-align:right">${i+1}</span>
             <div style="flex:1">
-              <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.Hospital||'—'}</div>
+              <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.hospital||'—'}</div>
               <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
-                <div style="height:100%;background:var(--accent);width:${Math.round((h.TotalComprado/topHosp[0].TotalComprado)*100)}%;border-radius:2px"></div>
+                <div style="height:100%;background:var(--accent);width:${Math.round((h.totalcomprado/topHosp[0].totalcomprado)*100)}%;border-radius:2px"></div>
               </div>
             </div>
-            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(h.TotalComprado)}</span>
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(h.totalcomprado)}</span>
           </div>`).join('')}
       </div>
       <div class="table-card" style="padding:16px">
@@ -555,6 +653,7 @@ function renderEstadisticas() {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <span style="font-size:11px;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${reg.replace('Región ','')}</span>
             <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(v)}</span>
+
           </div>`).join('')}
       </div>
     </div>`;
@@ -722,5 +821,3 @@ init();
 </script>
 </body>
 </html>
-
-
