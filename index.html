@@ -309,7 +309,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
+const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co/rest/v1/';
 const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
 
 const sb = (path, opts={}) => {
@@ -578,12 +578,27 @@ function lowerKeys(rows) {
   });
 }
 
+function normalizeRows(rows) {
+  // Supabase exige que TODAS las filas de un mismo lote tengan exactamente
+  // las mismas columnas. Si una fila del Excel tiene una celda vacía,
+  // esa columna no aparece en el objeto. Aquí juntamos todas las columnas
+  // posibles y completamos con null las que falten en cada fila.
+  if (!rows.length) return rows;
+  const allKeys = new Set();
+  rows.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
+  return rows.map(row => {
+    const out = {};
+    allKeys.forEach(k => out[k] = (row[k] === undefined || row[k] === '') ? null : row[k]);
+    return out;
+  });
+}
+
 function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
     const wb = XLSX.read(ev.target.result, { type: 'binary' });
-    const read = name => wb.SheetNames.includes(name) ? lowerKeys(XLSX.utils.sheet_to_json(wb.Sheets[name])) : [];
+    const read = name => wb.SheetNames.includes(name) ? normalizeRows(lowerKeys(XLSX.utils.sheet_to_json(wb.Sheets[name]))) : [];
     importData = { oc: read('Mis_OC'), items: read('Mis_Items_OC'), hosp: read('Mis_Hospitales'), prod: read('Mis_Productos') };
     document.getElementById('import-area').style.display = 'block';
     document.getElementById('import-btn').disabled = false;
@@ -670,3 +685,4 @@ init();
 </script>
 </body>
 </html>
+
