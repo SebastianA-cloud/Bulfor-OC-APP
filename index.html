@@ -312,6 +312,7 @@
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
 const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
 
+
 const sb = (path, opts={}) => {
   const { headers: extraHeaders, ...restOpts } = opts;
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -578,6 +579,31 @@ function lowerKeys(rows) {
   });
 }
 
+function excelSerialToISO(serial) {
+  // Excel guarda las fechas como un número de días desde el 30/12/1899.
+  // Esto lo convierte a una fecha ISO real que Supabase puede entender.
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400; // segundos
+  const date = new Date(utcValue * 1000);
+  return date.toISOString();
+}
+
+function fixDateColumns(rows) {
+  // Cualquier columna cuyo nombre contenga "fecha" o "compra" y que venga
+  // como número (serial de Excel) se convierte a fecha real.
+  return rows.map(row => {
+    const out = { ...row };
+    for (const k in out) {
+      const val = out[k];
+      const looksLikeDateCol = k.includes('fecha') || k === 'primeracompra' || k === 'ultimacompra' || k === 'ultimaventa';
+      if (looksLikeDateCol && typeof val === 'number' && val > 1000) {
+        out[k] = excelSerialToISO(val);
+      }
+    }
+    return out;
+  });
+}
+
 function normalizeRows(rows) {
   // Supabase exige que TODAS las filas de un mismo lote tengan exactamente
   // las mismas columnas. Si una fila del Excel tiene una celda vacía,
@@ -598,7 +624,7 @@ function handleFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
     const wb = XLSX.read(ev.target.result, { type: 'binary' });
-    const read = name => wb.SheetNames.includes(name) ? normalizeRows(lowerKeys(XLSX.utils.sheet_to_json(wb.Sheets[name]))) : [];
+    const read = name => wb.SheetNames.includes(name) ? normalizeRows(fixDateColumns(lowerKeys(XLSX.utils.sheet_to_json(wb.Sheets[name])))) : [];
     importData = { oc: read('Mis_OC'), items: read('Mis_Items_OC'), hosp: read('Mis_Hospitales'), prod: read('Mis_Productos') };
     document.getElementById('import-area').style.display = 'block';
     document.getElementById('import-btn').disabled = false;
