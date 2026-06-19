@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -312,7 +312,6 @@
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
 const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
 
-
 const sb = (path, opts={}) => {
   const { headers: extraHeaders, ...restOpts } = opts;
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -329,12 +328,31 @@ let ocPage = 1, itemsPage = 1, hospPage = 1;
 const PS = 15;
 
 // ─── INIT ──────────────────────────────────────────────────────────────────
+async function fetchAll(table, query) {
+  // Supabase limita cada respuesta a 1000 filas por defecto.
+  // Esta función va pidiendo "páginas" de 1000 hasta traer todo.
+  const PAGE = 1000;
+  let allRows = [];
+  let offset = 0;
+  while (true) {
+    const res = await sb(`${table}?${query}`, {
+      headers: { 'Range': `${offset}-${offset + PAGE - 1}` }
+    });
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    allRows = allRows.concat(rows);
+    if (rows.length < PAGE) break; // ya llegamos al final
+    offset += PAGE;
+  }
+  return allRows;
+}
+
 async function init() {
   try {
     const [ocR, itemsR, hospR] = await Promise.all([
-      sb('ordenes_compra?select=*&order=fechaoc.desc&limit=5000').then(r=>r.json()),
-      sb('items_oc?select=*&order=fechaoc.desc&limit=10000').then(r=>r.json()),
-      sb('hospitales?select=*&order=totalcomprado.desc').then(r=>r.json()),
+      fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
+      fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
+      fetchAll('hospitales', 'select=*&order=totalcomprado.desc'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
