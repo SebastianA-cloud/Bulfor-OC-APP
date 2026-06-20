@@ -497,7 +497,7 @@ function openOCDetail(codigoOC) {
           <tbody>
             ${relacionados.map(it => {
               const nombreNormalizado = (it.productonormalizado||it.productomp||'—');
-              const nombreReal = (it.productomp||it.productonormalizado||'—');
+              const nombreReal = (it.especificacioncomprador||it.productomp||it.productonormalizado||'—');
               return `<tr onclick="closeOCDetail();openProductDetail('${nombreNormalizado.replace(/'/g,"\\'")}')" style="cursor:pointer">
                 <td style="font-weight:500;color:var(--accent)">${nombreReal} ↗</td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
