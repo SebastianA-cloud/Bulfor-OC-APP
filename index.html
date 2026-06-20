@@ -361,6 +361,12 @@ async function init() {
     ocF = [...oc]; itemsF = [...items]; hospF = [...hosp];
     productosUnicos = getProductosUnicos();
     productosUnicosF = [...productosUnicos];
+    productoPorOC = {};
+    items.forEach(it => {
+      if (!productoPorOC[it.codigooc]) {
+        productoPorOC[it.codigooc] = it.productonormalizado || it.productomp || '';
+      }
+    });
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas();
@@ -415,6 +421,7 @@ function getProductosUnicos() {
 
 let productosUnicos = [];
 let productosUnicosF = [];
+let productoPorOC = {};
 
 function filterItems() {
   const q = document.getElementById('items-search').value.toLowerCase();
@@ -469,16 +476,19 @@ function renderOC() {
   document.getElementById('oc-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oc-pages', total, pages, ocPage, 'goOC');
   if (!slice.length) { document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('oc-body').innerHTML = slice.map((r) => `
+  document.getElementById('oc-body').innerHTML = slice.map((r) => {
+    const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
+    return `
     <tr onclick="openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
       <td><span class="mono">${r.codigooc||''}</span></td>
       <td>${tipoBadge(r.tipooc)}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nombreoc||''}">${r.nombreoc||''}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
       <td style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${r.hospital||''}">${r.hospital||''}</td>
       <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function openOCDetail(codigoOC) {
@@ -497,7 +507,7 @@ function openOCDetail(codigoOC) {
           <tbody>
             ${relacionados.map(it => {
               const nombreNormalizado = (it.productonormalizado||it.productomp||'—');
-              const nombreReal = (it.especificacioncomprador||it.productomp||it.productonormalizado||'—');
+              const nombreReal = (it.especificacionproveedor||it.especificacioncomprador||it.productomp||it.productonormalizado||'—');
               return `<tr onclick="closeOCDetail();openProductDetail('${nombreNormalizado.replace(/'/g,"\\'")}')" style="cursor:pointer">
                 <td style="font-weight:500;color:var(--accent)">${nombreReal} ↗</td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
