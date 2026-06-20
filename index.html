@@ -227,8 +227,8 @@
     <div class="table-card">
       <table>
         <thead><tr>
-          <th>Producto normalizado</th><th>Familia</th><th>Hospital</th>
-          <th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th><th>Fecha</th>
+          <th>Producto</th><th>Familia</th>
+          <th style="text-align:right">N° ventas</th><th style="text-align:right">Total vendido</th>
         </tr></thead>
         <tbody id="items-body"></tbody>
       </table>
@@ -312,6 +312,7 @@
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
 const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZGlqY2tzdXFhYW92b2h1dGtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1MTAsImV4cCI6MjA5NzAyNTUxMH0._gRO2Rp6eVD8u3aLJvhJPxLGfrZ9d9gMjqChQl7DyLQ';
 
+
 const sb = (path, opts={}) => {
   const { headers: extraHeaders, ...restOpts } = opts;
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -358,6 +359,8 @@ async function init() {
     items = Array.isArray(itemsR) ? itemsR : [];
     hosp = Array.isArray(hospR) ? hospR : [];
     ocF = [...oc]; itemsF = [...items]; hospF = [...hosp];
+    productosUnicos = getProductosUnicos();
+    productosUnicosF = [...productosUnicos];
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas();
@@ -394,12 +397,31 @@ function filterOC() {
   ocPage = 1; renderOC();
 }
 
+function getProductosUnicos() {
+  // Agrupa todas las ventas (items) por producto normalizado,
+  // calculando totales para mostrar una sola fila por producto.
+  const map = new Map();
+  items.forEach(it => {
+    const key = it.productonormalizado || it.productomp || '—';
+    if (!map.has(key)) {
+      map.set(key, { nombre: key, familia: it.familia || '—', ventas: 0, totalVendido: 0 });
+    }
+    const entry = map.get(key);
+    entry.ventas += 1;
+    entry.totalVendido += (it.totalitem || 0);
+  });
+  return Array.from(map.values());
+}
+
+let productosUnicos = [];
+let productosUnicosF = [];
+
 function filterItems() {
   const q = document.getElementById('items-search').value.toLowerCase();
   const fam = document.getElementById('items-familia').value;
-  itemsF = items.filter(r => {
-    const s = `${r.productonormalizado} ${r.familia} ${r.hospital} ${r.codigooc}`.toLowerCase();
-    return (!q || s.includes(q)) && (!fam || r.familia===fam);
+  productosUnicosF = productosUnicos.filter(p => {
+    const s = `${p.nombre} ${p.familia}`.toLowerCase();
+    return (!q || s.includes(q)) && (!fam || p.familia===fam);
   });
   itemsPage = 1; renderItems();
 }
@@ -474,9 +496,10 @@ function openOCDetail(codigoOC) {
           </tr></thead>
           <tbody>
             ${relacionados.map(it => {
-              const nombreProd = (it.productonormalizado||it.productomp||'—');
-              return `<tr onclick="closeOCDetail();openProductDetail('${nombreProd.replace(/'/g,"\\'")}')" style="cursor:pointer">
-                <td style="font-weight:500;color:var(--accent)">${nombreProd} ↗</td>
+              const nombreNormalizado = (it.productonormalizado||it.productomp||'—');
+              const nombreReal = (it.productomp||it.productonormalizado||'—');
+              return `<tr onclick="closeOCDetail();openProductDetail('${nombreNormalizado.replace(/'/g,"\\'")}')" style="cursor:pointer">
+                <td style="font-weight:500;color:var(--accent)">${nombreReal} ↗</td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem)}</td>
@@ -532,50 +555,51 @@ function closeOCDetail() {
 
 function goOC(p) { const {pages}=paginate(ocF,ocPage); if(p<1||p>pages) return; ocPage=p; renderOC(); window.scrollTo(0,0); }
 
-// ─── RENDER ITEMS ──────────────────────────────────────────────────────────
+// ─── RENDER ITEMS (productos únicos) ───────────────────────────────────────
 function renderItems() {
-  const { slice, pages, total } = paginate(itemsF, itemsPage);
-  document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} ítems`;
+  const { slice, pages, total } = paginate(productosUnicosF, itemsPage);
+  document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
   renderPages('items-pages', total, pages, itemsPage, 'goItems');
-  if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('items-body').innerHTML = slice.map(r => {
-    const nombreProd = r.productonormalizado||r.productomp||'—';
-    return `<tr>
-    <td style="font-weight:500;color:var(--accent);cursor:pointer" onclick="openProductDetail('${nombreProd.replace(/'/g,"\\'")}')">${nombreProd} ↗</td>
-    <td style="font-size:12px;color:var(--text-2)">${r.familia||'—'}</td>
-    <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.hospital||''}">${r.hospital||'—'}</td>
-    <td style="text-align:right">${r.cantidad||'—'} ${r.unidad||''}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(r.preciounitario)}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalitem)}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.fechaoc)}</td>
-  </tr>`;
-  }).join('');
+  if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="4" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  document.getElementById('items-body').innerHTML = slice.map(p => `<tr onclick="openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
+    <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
+    <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
+    <td style="text-align:right">${p.ventas}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
+  </tr>`).join('');
 }
-function goItems(p) { const {pages}=paginate(itemsF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
+function goItems(p) { const {pages}=paginate(productosUnicosF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
 
 // ─── PRODUCT DETAIL MODAL ──────────────────────────────────────────────────
 function openProductDetail(nombreProducto) {
-  const ventas = items.filter(it => (it.productonormalizado||it.productomp) === nombreProducto)
-    .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+  const ventas = items.filter(it => (it.productonormalizado||it.productomp) === nombreProducto);
   if (!ventas.length) return;
 
   const precios = ventas.map(v => v.preciounitario).filter(p => p != null && p > 0);
   const precioMin = precios.length ? Math.min(...precios) : null;
   const precioMax = precios.length ? Math.max(...precios) : null;
   const totalVendido = ventas.reduce((s,v) => s + (v.totalitem||0), 0);
-  const hospitalesUnicos = new Set(ventas.map(v=>v.hospital).filter(Boolean)).size;
   const familia = ventas[0]?.familia || '—';
 
-  // Guardamos las ventas completas en una variable global para el botón "Mostrar más"
-  window.__productoVentasActuales = ventas;
-  window.__productoVentasMostradas = 20;
+  // Agrupamos por hospital para el primer nivel de navegación
+  const porHospital = new Map();
+  ventas.forEach(v => {
+    const h = v.hospital || 'Sin hospital';
+    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, ventas: 0, total: 0 });
+    const entry = porHospital.get(h);
+    entry.ventas += 1;
+    entry.total += (v.totalitem || 0);
+  });
+  const hospitalesList = Array.from(porHospital.values()).sort((a,b) => b.total - a.total);
+
+  window.__productoActual = nombreProducto;
 
   const modal = document.createElement('div');
   modal.id = 'product-modal-overlay';
   modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
   modal.onclick = (e) => { if (e.target === modal) closeProductDetail(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
       <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div style="font-size:17px;font-weight:600">${nombreProducto}</div>
@@ -587,54 +611,81 @@ function openProductDetail(nombreProducto) {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
           <div class="stat" style="padding:12px"><div class="stat-label">Total vendido</div><div class="stat-val" style="font-size:16px">${clp(totalVendido)}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">N° de ventas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${hospitalesUnicos}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${hospitalesList.length}</div></div>
         </div>
         <div style="display:flex;gap:20px;margin-bottom:20px;font-size:12px;color:var(--text-2)">
           <span>Precio mínimo: <strong style="color:var(--text)">${clp(precioMin)}</strong></span>
           <span>Precio máximo: <strong style="color:var(--text)">${clp(precioMax)}</strong></span>
         </div>
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Historial de ventas (más reciente primero)</div>
-        <div id="ventas-table-wrap"></div>
-        <div id="mostrar-mas-wrap" style="margin-top:10px;text-align:center"></div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Hospitales que han comprado este producto</div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0">
+            <thead><tr>
+              <th style="font-size:10px">Hospital</th>
+              <th style="font-size:10px;text-align:right">N° OC</th>
+              <th style="font-size:10px;text-align:right">Total comprado</th>
+            </tr></thead>
+            <tbody>
+              ${hospitalesList.map(h => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')">
+                <td style="font-weight:500;color:var(--accent)">${h.hospital} ↗</td>
+                <td style="text-align:right">${h.ventas}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
-  renderVentasTable();
 }
 
-function renderVentasTable() {
-  const ventas = window.__productoVentasActuales || [];
-  const mostrar = window.__productoVentasMostradas || 20;
-  const visibles = ventas.slice(0, mostrar);
+function openProductoHospitalOCs(nombreProducto, hospital) {
+  const ventas = items.filter(it =>
+    (it.productonormalizado||it.productomp) === nombreProducto && (it.hospital||'Sin hospital') === hospital
+  ).sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
 
-  document.getElementById('ventas-table-wrap').innerHTML = `
-    <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-      <table style="margin:0">
-        <thead><tr>
-          <th style="font-size:10px">Fecha</th><th style="font-size:10px">Hospital</th>
-          <th style="font-size:10px">N° OC</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th>
-        </tr></thead>
-        <tbody>
-          ${visibles.map(v => `<tr>
-            <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
-            <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.hospital||''}">${v.hospital||'—'}</td>
-            <td><span class="mono" style="cursor:pointer" onclick="closeProductDetail();openOCDetail('${(v.codigooc||'').replace(/'/g,"\\'")}')">${v.codigooc||''} ↗</span></td>
-            <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.preciounitario)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
+  closeProductDetail();
+
+  const modal = document.createElement('div');
+  modal.id = 'product-hosp-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) closeProductoHospitalOCs_(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:2px">${nombreProducto}</div>
+          <div style="font-size:16px;font-weight:600">${hospital}</div>
+        </div>
+        <button onclick="closeProductoHospitalOCs_()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Órdenes de compra con este producto</div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0">
+            <thead><tr>
+              <th style="font-size:10px">N° OC</th><th style="font-size:10px">Fecha</th>
+              <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
+            </tr></thead>
+            <tbody>
+              ${ventas.map(v => `<tr style="cursor:pointer" onclick="closeProductoHospitalOCs_();openOCDetail('${(v.codigooc||'').replace(/'/g,"\\'")}')">
+                <td><span class="mono" style="color:var(--accent)">${v.codigooc||''} ↗</span></td>
+                <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
+                <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(v.preciounitario)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.totalitem)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>`;
-
-  const quedan = ventas.length - visibles.length;
-  document.getElementById('mostrar-mas-wrap').innerHTML = quedan > 0
-    ? `<button class="page-btn" style="padding:8px 18px" onclick="mostrarMasVentas()">Mostrar más (${quedan} restantes)</button>`
-    : (ventas.length > 20 ? `<div style="font-size:11px;color:var(--text-3)">Mostrando todas las ${ventas.length} ventas</div>` : '');
+  document.body.appendChild(modal);
 }
 
-function mostrarMasVentas() {
-  window.__productoVentasMostradas = (window.__productoVentasMostradas || 20) + 20;
-  renderVentasTable();
+function closeProductoHospitalOCs_() {
+  const m = document.getElementById('product-hosp-modal-overlay');
+  if (m) m.remove();
 }
 
 function closeProductDetail() {
