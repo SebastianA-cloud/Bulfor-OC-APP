@@ -963,8 +963,8 @@ function renderHosp() {
   document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
   renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
   if (!slice.length) { document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr>
-    <td style="font-weight:500;max-width:240px">${r.hospital||'—'}</td>
+  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr style="cursor:pointer" onclick="openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
+    <td style="font-weight:500;max-width:240px;color:var(--accent)">${r.hospital||'—'} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
     <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
     <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
@@ -973,6 +973,53 @@ function renderHosp() {
   </tr>`).join('');
 }
 function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
+
+function openHospitalOCs(hospital) {
+  const ocsDelHospital = oc.filter(r => r.hospital === hospital)
+    .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+
+  const modal = document.createElement('div');
+  modal.id = 'hosp-oc-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) closeHospitalOCs(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:16px;font-weight:600">${hospital}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${ocsDelHospital.length} órdenes de compra</div>
+        </div>
+        <button onclick="closeHospitalOCs()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0">
+            <thead><tr>
+              <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
+              <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total neto</th>
+            </tr></thead>
+            <tbody>
+              ${ocsDelHospital.map(r => {
+                const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
+                return `<tr style="cursor:pointer" onclick="closeHospitalOCs();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
+                  <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
+                  <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+                  <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+                  <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeHospitalOCs() {
+  const m = document.getElementById('hosp-oc-modal-overlay');
+  if (m) m.remove();
+}
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
 function updateStats() {
