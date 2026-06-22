@@ -433,9 +433,39 @@ function filterOC() {
   ocPage = 1; renderOC();
 }
 
+const RUIDO_PATRONES_JS = [
+  /^\*+\s*favor\s+despachar/i,
+  /^despacho\s/i,
+  /^despacho$/i,
+  /vencimiento\s*\d/i,
+  /^elaborado\s+(en|por)\s+recetario/i,
+  /elaborado\s+en\s+recetario\s+magistral/i,
+  /^recetario\s+magistral/i,
+  /^pedido\s/i,
+  /^c[oó]digo\s+interno/i,
+  /^precio\s+x\s+gramo/i,
+];
+
+function esRuido(texto) {
+  // Detecta si un texto es "ruido" (notas de despacho, fechas, frases genéricas
+  // del proveedor) en vez de un nombre real de producto.
+  if (!texto) return true;
+  const t = texto.trim();
+  const letras = t.replace(/[^a-zA-ZÁÉÍÓÚáéíóúñÑ]/g, '');
+  if (letras.length < 3) return true;
+  return RUIDO_PATRONES_JS.some(p => p.test(t));
+}
+
 function textoOriginalDe(it) {
-  // El texto "largo" que el usuario puede normalizar manualmente
-  return it.especificacionproveedor || it.especificacioncomprador || it.productomp || it.productonormalizado || '—';
+  // El texto "largo" que el usuario puede normalizar manualmente.
+  // Priorizamos el texto que SÍ tenga nombre real de producto: si
+  // EspecificacionComprador no es ruido, se usa primero (suele traer
+  // el nombre real); si es ruido o está vacío, probamos los demás en cascada.
+  const candidatos = [it.especificacioncomprador, it.especificacionproveedor, it.productomp, it.productonormalizado];
+  const valido = candidatos.find(c => c && !esRuido(c));
+  if (valido) return valido;
+  // Si todos son ruido o están vacíos, devolvemos el primero que exista igual
+  return candidatos.find(c => c) || '—';
 }
 
 function nombreFinalDe(it) {
