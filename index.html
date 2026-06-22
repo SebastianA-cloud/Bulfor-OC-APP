@@ -459,6 +459,29 @@ let productosTextoPorOC = {};
 let diccionarioNormalizacion = {}; // texto_original -> nombre_normalizado (combinado, para mostrar)
 let diccionarioCampos = {}; // texto_original -> {nombre_producto, dosis, cantidad_formato}
 
+// ─── PILA DE NAVEGACIÓN ENTRE VENTANAS ──────────────────────────────────────
+// Cada vez que se abre una ventana desde otra, guardamos cómo volver a la anterior.
+let navStack = [];
+
+function navPush(volverFn) {
+  navStack.push(volverFn);
+}
+
+function navBack() {
+  const anterior = navStack.pop();
+  if (anterior) anterior();
+}
+
+function navReset() {
+  navStack = [];
+}
+
+function botonAtrasHtml() {
+  return navStack.length
+    ? `<button onclick="navBack()" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--accent);padding:4px 8px;display:flex;align-items:center;gap:4px"><span style="font-size:16px">←</span> Atrás</button>`
+    : '';
+}
+
 function filterItems() {
   const q = document.getElementById('items-search').value.toLowerCase();
   const fam = document.getElementById('items-familia').value;
@@ -515,7 +538,7 @@ function renderOC() {
   document.getElementById('oc-body').innerHTML = slice.map((r) => {
     const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
     return `
-    <tr onclick="openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
+    <tr onclick="navReset();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
       <td><span class="mono">${r.codigooc||''}</span></td>
       <td>${tipoBadge(r.tipooc)}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
@@ -549,7 +572,7 @@ function openOCDetail(codigoOC) {
               return `<tr>
                 <td style="font-weight:500">
                   <span style="cursor:pointer;${yaNormalizado ? 'color:var(--green)' : 'color:var(--text)'}" onclick="abrirNormalizacion('${textoOriginal.replace(/'/g,"\\'")}')" title="Clic para normalizar este nombre">${nombreMostrado}${yaNormalizado ? ' ✓' : ' ✎'}</span>
-                  <span style="cursor:pointer;color:var(--accent);margin-left:6px" onclick="closeOCDetail();openProductDetail('${nombreFinal.replace(/'/g,"\\'")}')" title="Ver historial de este producto">↗</span>
+                  <span style="cursor:pointer;color:var(--accent);margin-left:6px" onclick="navPush(()=>openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}'));closeOCDetail();openProductDetail('${nombreFinal.replace(/'/g,"\\'")}')" title="Ver historial de este producto">↗</span>
                 </td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
@@ -575,7 +598,10 @@ function openOCDetail(codigoOC) {
           </div>
           <div style="font-size:15px;font-weight:600">${r.nombreoc||'—'}</div>
         </div>
-        <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px;flex-shrink:0">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
       <div style="padding:20px 24px">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
@@ -825,7 +851,7 @@ function renderItems() {
   document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
   renderPages('items-pages', total, pages, itemsPage, 'goItems');
   if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="4" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('items-body').innerHTML = slice.map(p => `<tr onclick="openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
+  document.getElementById('items-body').innerHTML = slice.map(p => `<tr onclick="navReset();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
     <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
     <td style="text-align:right">${p.ventas}</td>
@@ -849,13 +875,13 @@ function openProductDetail(nombreProducto) {
   const porHospital = new Map();
   ventas.forEach(v => {
     const h = v.hospital || 'Sin hospital';
-    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, ventas: 0, total: 0 });
+    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, ventas: 0, total: 0, codigos: [] });
     const entry = porHospital.get(h);
     entry.ventas += 1;
     entry.total += (v.totalitem || 0);
+    if (v.codigooc) entry.codigos.push(v.codigooc);
   });
-  const hospitalesList = Array.from(porHospital.values()).sort((a,b) => b.total - a.total);
-
+  window.__productoHospitalesActual = Array.from(porHospital.values()).sort((a,b) => b.total - a.total);
   window.__productoActual = nombreProducto;
 
   const modal = document.createElement('div');
@@ -869,45 +895,68 @@ function openProductDetail(nombreProducto) {
           <div style="font-size:17px;font-weight:600">${nombreProducto}</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">${familia}</div>
         </div>
-        <button onclick="closeProductDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="closeProductDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
       <div style="padding:20px 24px">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
           <div class="stat" style="padding:12px"><div class="stat-label">Total vendido</div><div class="stat-val" style="font-size:16px">${clp(totalVendido)}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">N° de ventas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${hospitalesList.length}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${window.__productoHospitalesActual.length}</div></div>
         </div>
         <div style="display:flex;gap:20px;margin-bottom:20px;font-size:12px;color:var(--text-2)">
           <span>Precio mínimo: <strong style="color:var(--text)">${clp(precioMin)}</strong></span>
           <span>Precio máximo: <strong style="color:var(--text)">${clp(precioMax)}</strong></span>
         </div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Hospitales que han comprado este producto</div>
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-          <table style="margin:0">
-            <thead><tr>
-              <th style="font-size:10px">Hospital</th>
-              <th style="font-size:10px;text-align:right">N° OC</th>
-              <th style="font-size:10px;text-align:right">Total comprado</th>
-            </tr></thead>
-            <tbody>
-              ${hospitalesList.map(h => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')">
-                <td style="font-weight:500;color:var(--accent)">${h.hospital} ↗</td>
-                <td style="text-align:right">${h.ventas}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
+        <input type="text" id="product-hosp-search" placeholder="Buscar por hospital o N° OC…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitales()">
+        <div id="product-hosp-table-wrap"></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  renderProductoHospitalesTable(window.__productoHospitalesActual);
+}
+
+function renderProductoHospitalesTable(lista) {
+  document.getElementById('product-hosp-table-wrap').innerHTML = !lista.length
+    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
+    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr>
+            <th style="font-size:10px">Hospital</th>
+            <th style="font-size:10px;text-align:right">N° OC</th>
+            <th style="font-size:10px;text-align:right">Total comprado</th>
+          </tr></thead>
+          <tbody>
+            ${lista.map(h => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs('${window.__productoActual.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')">
+              <td style="font-weight:500;color:var(--accent)">${h.hospital} ↗</td>
+              <td style="text-align:right">${h.ventas}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+}
+
+function filterProductoHospitales() {
+  const q = document.getElementById('product-hosp-search').value.toLowerCase();
+  const lista = window.__productoHospitalesActual || [];
+  const filtrada = !q ? lista : lista.filter(h =>
+    h.hospital.toLowerCase().includes(q) || h.codigos.some(c => c.toLowerCase().includes(q))
+  );
+  renderProductoHospitalesTable(filtrada);
 }
 
 function openProductoHospitalOCs(nombreProducto, hospital) {
-  const ventas = items.filter(it =>
+  window.__prodHospVentasActual = items.filter(it =>
     nombreFinalDe(it) === nombreProducto && (it.hospital||'Sin hospital') === hospital
   ).sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+  window.__prodHospNombreActual = nombreProducto;
+  window.__prodHospHospitalActual = hospital;
 
+  navPush(()=>openProductDetail(nombreProducto));
   closeProductDetail();
 
   const modal = document.createElement('div');
@@ -921,30 +970,48 @@ function openProductoHospitalOCs(nombreProducto, hospital) {
           <div style="font-size:13px;color:var(--text-2);margin-bottom:2px">${nombreProducto}</div>
           <div style="font-size:16px;font-weight:600">${hospital}</div>
         </div>
-        <button onclick="closeProductoHospitalOCs_()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="closeProductoHospitalOCs_()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
       <div style="padding:20px 24px">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Órdenes de compra con este producto</div>
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-          <table style="margin:0">
-            <thead><tr>
-              <th style="font-size:10px">N° OC</th><th style="font-size:10px">Fecha</th>
-              <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
-            </tr></thead>
-            <tbody>
-              ${ventas.map(v => `<tr style="cursor:pointer" onclick="closeProductoHospitalOCs_();openOCDetail('${(v.codigooc||'').replace(/'/g,"\\'")}')">
-                <td><span class="mono" style="color:var(--accent)">${v.codigooc||''} ↗</span></td>
-                <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
-                <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(v.preciounitario)}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.totalitem)}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
+        <input type="text" id="product-hosp-oc-search" placeholder="Buscar por N° OC…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitalOCsLista()">
+        <div id="product-hosp-oc-table-wrap"></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  renderProductoHospitalOCsTabla(window.__prodHospVentasActual);
+}
+
+function renderProductoHospitalOCsTabla(ventas) {
+  document.getElementById('product-hosp-oc-table-wrap').innerHTML = !ventas.length
+    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
+    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr>
+            <th style="font-size:10px">N° OC</th><th style="font-size:10px">Fecha</th>
+            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
+          </tr></thead>
+          <tbody>
+            ${ventas.map(v => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoHospitalOCs('${window.__prodHospNombreActual.replace(/'/g,"\\'")}','${window.__prodHospHospitalActual.replace(/'/g,"\\'")}'));closeProductoHospitalOCs_();openOCDetail('${(v.codigooc||'').replace(/'/g,"\\'")}')">
+              <td><span class="mono" style="color:var(--accent)">${v.codigooc||''} ↗</span></td>
+              <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
+              <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(v.preciounitario)}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.totalitem)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+}
+
+function filterProductoHospitalOCsLista() {
+  const q = document.getElementById('product-hosp-oc-search').value.toLowerCase();
+  const lista = window.__prodHospVentasActual || [];
+  const filtrada = !q ? lista : lista.filter(v => (v.codigooc||'').toLowerCase().includes(q));
+  renderProductoHospitalOCsTabla(filtrada);
 }
 
 function closeProductoHospitalOCs_() {
@@ -963,7 +1030,7 @@ function renderHosp() {
   document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
   renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
   if (!slice.length) { document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
-  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr style="cursor:pointer" onclick="openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
+  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
     <td style="font-weight:500;max-width:240px;color:var(--accent)">${r.hospital||'—'} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
     <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
@@ -975,8 +1042,9 @@ function renderHosp() {
 function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
 
 function openHospitalOCs(hospital) {
-  const ocsDelHospital = oc.filter(r => r.hospital === hospital)
+  window.__hospActualOCs = oc.filter(r => r.hospital === hospital)
     .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+  window.__hospActualNombre = hospital;
 
   const modal = document.createElement('div');
   modal.id = 'hosp-oc-modal-overlay';
@@ -987,33 +1055,55 @@ function openHospitalOCs(hospital) {
       <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div style="font-size:16px;font-weight:600">${hospital}</div>
-          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${ocsDelHospital.length} órdenes de compra</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="hosp-oc-count">${window.__hospActualOCs.length} órdenes de compra</div>
         </div>
-        <button onclick="closeHospitalOCs()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="closeHospitalOCs()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
       <div style="padding:20px 24px">
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-          <table style="margin:0">
-            <thead><tr>
-              <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
-              <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total neto</th>
-            </tr></thead>
-            <tbody>
-              ${ocsDelHospital.map(r => {
-                const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
-                return `<tr style="cursor:pointer" onclick="closeHospitalOCs();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
-                  <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
-                  <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
-                  <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaoc)}</td>
-                  <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+        <input type="text" id="hosp-oc-search" placeholder="Buscar por N° OC o producto…" style="width:100%;margin-bottom:14px" oninput="filterHospitalOCs()">
+        <div id="hosp-oc-table-wrap"></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  renderHospitalOCsTable(window.__hospActualOCs);
+}
+
+function renderHospitalOCsTable(lista) {
+  document.getElementById('hosp-oc-count').textContent = `${lista.length} órdenes de compra`;
+  document.getElementById('hosp-oc-table-wrap').innerHTML = !lista.length
+    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
+    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr>
+            <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
+            <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total neto</th>
+          </tr></thead>
+          <tbody>
+            ${lista.map(r => {
+              const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
+              return `<tr style="cursor:pointer" onclick="navPush(()=>openHospitalOCs('${window.__hospActualNombre.replace(/'/g,"\\'")}'));closeHospitalOCs();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
+                <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+                <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+}
+
+function filterHospitalOCs() {
+  const q = document.getElementById('hosp-oc-search').value.toLowerCase();
+  const filtradas = !q ? window.__hospActualOCs : window.__hospActualOCs.filter(r => {
+    const descripcion = (productoPorOC[r.codigooc] || r.nombreoc || '').toLowerCase();
+    const textoProductos = (productosTextoPorOC[r.codigooc] || '').toLowerCase();
+    return (r.codigooc||'').toLowerCase().includes(q) || descripcion.includes(q) || textoProductos.includes(q);
+  });
+  renderHospitalOCsTable(filtradas);
 }
 
 function closeHospitalOCs() {
@@ -1240,3 +1330,4 @@ init();
 </script>
 </body>
 </html>
+
