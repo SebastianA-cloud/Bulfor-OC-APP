@@ -271,9 +271,9 @@
   <div class="page" id="page-estadisticas">
     <div class="page-header">
       <div class="page-title">Estadísticas</div>
-      <div class="page-sub">Resumen general de ventas</div>
+      <div class="page-sub">Elige una estadística para verla en detalle</div>
     </div>
-    <div id="stats-content"><div class="empty"><div class="empty-icon">📊</div><p>Cargando estadísticas…</p></div></div>
+    <div id="stats-content"></div>
   </div>
 
   <!-- IMPORTAR PAGE -->
@@ -509,6 +509,7 @@ const MODAL_OVERLAY_IDS = [
   'product-hosp-modal-overlay',
   'hosp-oc-modal-overlay',
   'normalizacion-modal-overlay',
+  'stat-modal-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -1184,49 +1185,198 @@ function updateStats() {
   document.getElementById('oc-subtitle').textContent = `${oc.length.toLocaleString('es-CL')} órdenes registradas — última actualización: ${fDate(ultima)}`;
 }
 
+const ESTADISTICAS_DISPONIBLES = [
+  { id: 'top-hospitales', icono: '🏥', titulo: 'Top 10 hospitales por monto', sub: 'Quiénes compran más' },
+  { id: 'top-productos-monto', icono: '💰', titulo: 'Top 10 productos por monto', sub: 'Lo que más facturas' },
+  { id: 'top-productos-cantidad', icono: '📦', titulo: 'Top 10 productos por cantidad', sub: 'Lo que más se despacha' },
+  { id: 'evolucion-mensual', icono: '📈', titulo: 'Evolución mensual de ventas', sub: 'Tendencia en el tiempo' },
+  { id: 'comparador-precios', icono: '⚖️', titulo: 'Comparador de precios por hospital', sub: 'Quién paga más o menos por lo mismo' },
+  { id: 'ventas-region', icono: '🗺️', titulo: 'Ventas por región', sub: 'Distribución geográfica' },
+  { id: 'ventas-anio', icono: '📅', titulo: 'Ventas por año', sub: 'Comparación anual' },
+];
+
 function renderEstadisticas() {
+  document.getElementById('stats-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:560px">
+      ${ESTADISTICAS_DISPONIBLES.map(e => `
+        <div class="table-card" style="padding:16px 18px;cursor:pointer;display:flex;align-items:center;gap:14px" onclick="abrirEstadistica('${e.id}')">
+          <span style="font-size:22px">${e.icono}</span>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:500">${e.titulo}</div>
+            <div style="font-size:12px;color:var(--text-2)">${e.sub}</div>
+          </div>
+          <span style="color:var(--text-3);font-size:16px">›</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function modalEstadistica(titulo, contenidoHtml) {
+  cerrarTodosLosModales();
+  navReset();
+  const modal = document.createElement('div');
+  modal.id = 'stat-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) closeEstadistica(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:16px;font-weight:600">${titulo}</div>
+        <button onclick="closeEstadistica()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px">${contenidoHtml}</div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeEstadistica() {
+  const m = document.getElementById('stat-modal-overlay');
+  if (m) m.remove();
+}
+
+function barraHtml(label, valor, valorMax, valorTexto, color) {
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</div>
+      <div style="height:5px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
+        <div style="height:100%;background:${color||'var(--accent)'};width:${valorMax ? Math.round((valor/valorMax)*100) : 0}%;border-radius:2px"></div>
+      </div>
+    </div>
+    <span style="font-size:12px;font-weight:500;white-space:nowrap;min-width:70px;text-align:right">${valorTexto}</span>
+  </div>`;
+}
+
+function abrirEstadistica(id) {
+  if (id === 'top-hospitales') return abrirTopHospitales();
+  if (id === 'top-productos-monto') return abrirTopProductos('monto');
+  if (id === 'top-productos-cantidad') return abrirTopProductos('cantidad');
+  if (id === 'evolucion-mensual') return abrirEvolucionMensual();
+  if (id === 'comparador-precios') return abrirComparadorPrecios();
+  if (id === 'ventas-region') return abrirVentasPorRegion();
+  if (id === 'ventas-anio') return abrirVentasPorAnio();
+}
+
+function abrirTopHospitales() {
   const topHosp = [...hosp].sort((a,b)=>(b.totalcomprado||0)-(a.totalcomprado||0)).slice(0,10);
+  const max = topHosp[0]?.totalcomprado || 1;
+  const html = topHosp.map((h,i) =>
+    barraHtml(`${i+1}. ${h.hospital||'—'}`, h.totalcomprado, max, clp(h.totalcomprado))
+  ).join('');
+  modalEstadistica('Top 10 hospitales por monto', html || '<p style="color:var(--text-3)">Sin datos</p>');
+}
+
+function abrirTopProductos(criterio) {
+  // criterio: 'monto' o 'cantidad'
+  const porProducto = new Map();
+  items.forEach(it => {
+    const key = nombreFinalDe(it);
+    if (!porProducto.has(key)) porProducto.set(key, { nombre: key, monto: 0, cantidad: 0 });
+    const e = porProducto.get(key);
+    e.monto += (it.totalitem || 0);
+    e.cantidad += (Number(it.cantidad) || 0);
+  });
+  const lista = Array.from(porProducto.values())
+    .sort((a,b) => criterio === 'monto' ? b.monto - a.monto : b.cantidad - a.cantidad)
+    .slice(0, 10);
+  const max = criterio === 'monto' ? (lista[0]?.monto || 1) : (lista[0]?.cantidad || 1);
+  const html = lista.map((p,i) => {
+    const valor = criterio === 'monto' ? p.monto : p.cantidad;
+    const texto = criterio === 'monto' ? clp(p.monto) : p.cantidad.toLocaleString('es-CL') + ' un.';
+    return barraHtml(`${i+1}. ${p.nombre}`, valor, max, texto, 'var(--green)');
+  }).join('');
+  modalEstadistica(
+    criterio === 'monto' ? 'Top 10 productos por monto' : 'Top 10 productos por cantidad',
+    html || '<p style="color:var(--text-3)">Sin datos</p>'
+  );
+}
+
+function abrirEvolucionMensual() {
+  const porMes = {};
+  oc.forEach(r => {
+    if (!r.fechaoc) return;
+    const d = new Date(r.fechaoc);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    porMes[key] = (porMes[key] || 0) + (r.totalneto || 0);
+  });
+  const meses = Object.keys(porMes).sort();
+  const max = Math.max(...Object.values(porMes), 1);
+  const nombresMes = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const html = `
+    <div style="display:flex;align-items:flex-end;gap:3px;height:220px;padding:10px 0;overflow-x:auto">
+      ${meses.map(m => {
+        const [y, mes] = m.split('-');
+        const valor = porMes[m];
+        const alturaPx = Math.max(4, Math.round((valor/max)*190));
+        return `<div style="flex:0 0 auto;width:22px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${nombresMes[parseInt(mes)-1]} ${y}: ${clp(valor)}">
+          <div style="width:16px;height:${alturaPx}px;background:var(--accent);border-radius:2px 2px 0 0"></div>
+          <div style="font-size:9px;color:var(--text-3);margin-top:4px;writing-mode:vertical-rl;text-orientation:mixed;height:34px">${nombresMes[parseInt(mes)-1]} ${y.slice(2)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text-3);margin-top:8px">Pasa el cursor sobre cada barra para ver el detalle</div>`;
+  modalEstadistica('Evolución mensual de ventas', meses.length ? html : '<p style="color:var(--text-3)">Sin datos</p>');
+}
+
+function abrirComparadorPrecios() {
+  // Para cada producto, mostramos el rango de precios entre hospitales distintos
+  const porProducto = new Map();
+  items.forEach(it => {
+    const key = nombreFinalDe(it);
+    const precio = it.preciounitario;
+    if (precio == null || precio <= 0) return;
+    if (!porProducto.has(key)) porProducto.set(key, []);
+    porProducto.get(key).push(precio);
+  });
+  const lista = Array.from(porProducto.entries())
+    .map(([nombre, precios]) => ({
+      nombre,
+      min: Math.min(...precios),
+      max: Math.max(...precios),
+      variacion: Math.max(...precios) - Math.min(...precios),
+      n: precios.length
+    }))
+    .filter(p => p.n >= 2)
+    .sort((a,b) => (b.max/b.min) - (a.max/a.min))
+    .slice(0, 15);
+
+  const html = !lista.length ? '<p style="color:var(--text-3)">Sin suficientes datos para comparar</p>' : `
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Productos donde más varía el precio entre OC distintas (mayor diferencia primero)</div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <table style="margin:0">
+        <thead><tr>
+          <th style="font-size:10px">Producto</th>
+          <th style="font-size:10px;text-align:right">Precio mín.</th>
+          <th style="font-size:10px;text-align:right">Precio máx.</th>
+          <th style="font-size:10px;text-align:right">Diferencia</th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(p => `<tr style="cursor:pointer" onclick="closeEstadistica();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')">
+            <td style="font-weight:500;color:var(--accent);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre} ↗</td>
+            <td style="text-align:right">${clp(p.min)}</td>
+            <td style="text-align:right">${clp(p.max)}</td>
+            <td style="text-align:right;font-weight:500;color:var(--red)">${clp(p.variacion)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  modalEstadistica('Comparador de precios', html);
+}
+
+function abrirVentasPorRegion() {
   const byRegion = {};
   oc.forEach(r => { if(r.region) byRegion[r.region] = (byRegion[r.region]||0) + (r.totalneto||0); });
-  const topReg = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const lista = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]);
+  const max = lista[0]?.[1] || 1;
+  const html = lista.map(([reg, v]) => barraHtml(reg.replace('Región ',''), v, max, clp(v), 'var(--amber)')).join('');
+  modalEstadistica('Ventas por región', html || '<p style="color:var(--text-3)">Sin datos</p>');
+}
+
+function abrirVentasPorAnio() {
   const byYear = {};
   oc.forEach(r => { if(r.fechaoc) { const y=new Date(r.fechaoc).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totalneto||0); }});
-
-  document.getElementById('stats-content').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-      <div class="table-card" style="padding:16px">
-        <h3 style="font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Top 10 hospitales por monto</h3>
-        ${topHosp.map((h,i)=>`
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <span style="font-size:11px;color:var(--text-3);width:16px;text-align:right">${i+1}</span>
-            <div style="flex:1">
-              <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.hospital||'—'}</div>
-              <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
-                <div style="height:100%;background:var(--accent);width:${Math.round((h.totalcomprado/topHosp[0].totalcomprado)*100)}%;border-radius:2px"></div>
-              </div>
-            </div>
-            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(h.totalcomprado)}</span>
-          </div>`).join('')}
-      </div>
-      <div class="table-card" style="padding:16px">
-        <h3 style="font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Ventas por año</h3>
-        ${Object.entries(byYear).sort((a,b)=>a[0]-b[0]).map(([y,v])=>`
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <span style="font-size:12px;color:var(--text-2);width:36px">${y}</span>
-            <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-              <div style="height:100%;background:var(--green);width:${Math.round((v/Math.max(...Object.values(byYear)))*100)}%;border-radius:2px"></div>
-            </div>
-            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(v)}</span>
-          </div>`).join('')}
-        <h3 style="font-size:13px;font-weight:600;margin:18px 0 12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Por región</h3>
-        ${topReg.map(([reg,v])=>`
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-size:11px;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${reg.replace('Región ','')}</span>
-            <span style="font-size:12px;font-weight:500;white-space:nowrap">${clp(v)}</span>
-
-          </div>`).join('')}
-      </div>
-    </div>`;
+  const lista = Object.entries(byYear).sort((a,b)=>a[0]-b[0]);
+  const max = Math.max(...lista.map(l=>l[1]), 1);
+  const html = lista.map(([y, v]) => barraHtml(y, v, max, clp(v), 'var(--green)')).join('');
+  modalEstadistica('Ventas por año', html || '<p style="color:var(--text-3)">Sin datos</p>');
 }
 
 // ─── IMPORT ────────────────────────────────────────────────────────────────
