@@ -351,17 +351,17 @@
       <div class="page-sub" id="fedex-subtitle">Cargando envíos…</div>
     </div>
     <div class="stats" id="fedex-stats">
-      <div class="stat"><div class="stat-label">Total envíos</div><div class="stat-val" id="fx-total">—</div></div>
-      <div class="stat"><div class="stat-label">Entregados</div><div class="stat-val" id="fx-entregados">—</div></div>
-      <div class="stat"><div class="stat-label">En tránsito</div><div class="stat-val" id="fx-transito">—</div></div>
-      <div class="stat"><div class="stat-label">Con retraso</div><div class="stat-val" id="fx-retraso">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('todos')"><div class="stat-label">Total envíos</div><div class="stat-val" id="fx-total">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('entregado')"><div class="stat-label">Entregados</div><div class="stat-val" id="fx-entregados">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('transito')"><div class="stat-label">En tránsito</div><div class="stat-val" id="fx-transito">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('retraso')"><div class="stat-label">Con retraso</div><div class="stat-val" id="fx-retraso">—</div></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="fedex-search" placeholder="Buscar por hospital, N° orden, factura…" oninput="filterFedex()">
       </div>
-      <select id="fedex-estado" onchange="filterFedex()"><option value="">Todos los estados</option></select>
+      <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';document.querySelectorAll('#fedex-stats .stat').forEach(s=>s.style.outline='');filterFedex()"><option value="">Todos los estados</option></select>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
     <div class="table-card">
@@ -1238,12 +1238,34 @@ function updateFedexStats() {
   document.getElementById('fedex-subtitle').textContent = `${fedex.length.toLocaleString('es-CL')} envíos registrados`;
 }
 
+let fedexCategoriaActiva = 'todos';
+
+function filtrarPorCategoriaFedex(categoria) {
+  fedexCategoriaActiva = categoria;
+  document.querySelectorAll('#fedex-stats .stat').forEach(s => s.style.outline = '');
+  const indices = { todos: 0, entregado: 1, transito: 2, retraso: 3 };
+  const cards = document.querySelectorAll('#fedex-stats .stat');
+  if (cards[indices[categoria]]) cards[indices[categoria]].style.outline = '2px solid var(--accent)';
+  // Limpiamos el select de estado y la búsqueda para que la categoría se vea clara
+  document.getElementById('fedex-estado').value = '';
+  filterFedex();
+}
+
+function coincideCategoriaFedex(f, categoria) {
+  const estado = (f.estado_envio||'').toLowerCase();
+  if (categoria === 'todos') return true;
+  if (categoria === 'entregado') return estado === 'entregado';
+  if (categoria === 'transito') return ['en ruta','recibido por fedex'].includes(estado);
+  if (categoria === 'retraso') return ['retraso','entrega reprogramada'].includes(estado);
+  return true;
+}
+
 function filterFedex() {
   const q = document.getElementById('fedex-search').value;
   const estado = document.getElementById('fedex-estado').value;
   fedexF = fedex.filter(f => {
     const s = `${f.hospital||''} ${f.orden_transporte||''} ${f.factura||''} ${f.recibido_por||''}`;
-    return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado);
+    return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado) && coincideCategoriaFedex(f, fedexCategoriaActiva);
   });
   fedexPage = 1; renderFedex();
 }
