@@ -28,12 +28,21 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 MP_BASE = "https://api.mercadopublico.cl/servicios/v1/publico/ordenesdecompra.json"
 
 
-def mp_get(params):
+def mp_get(params, max_reintentos=5):
     params = dict(params)
     params['ticket'] = MP_TICKET
-    r = requests.get(MP_BASE, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    espera = 3  # segundos, se va duplicando si sigue fallando
+    for intento in range(max_reintentos):
+        r = requests.get(MP_BASE, params=params, timeout=30)
+        if r.status_code == 429:
+            print(f"    ⏳ La API pidió esperar (intento {intento+1}/{max_reintentos}), pausando {espera}s...")
+            time.sleep(espera)
+            espera *= 2  # cada vez espera más: 3s, 6s, 12s, 24s, 48s
+            continue
+        r.raise_for_status()
+        return r.json()
+    # Si después de todos los reintentos sigue fallando, avisamos pero no rompemos todo el script
+    raise requests.exceptions.HTTPError(f"429 persistente tras {max_reintentos} intentos")
 
 
 def fecha_ddmmaaaa(dt):
@@ -44,7 +53,11 @@ def fecha_ddmmaaaa(dt):
 def obtener_codigos_oc_del_dia(fecha_dt):
     fecha_str = fecha_ddmmaaaa(fecha_dt)
     print(f"  → Consultando OC del día {fecha_str}...")
-    data = mp_get({"fecha": fecha_str, "CodigoProveedor": MP_CODIGO_PROVEEDOR})
+    try:
+        data = mp_get({"fecha": fecha_str, "CodigoProveedor": MP_CODIGO_PROVEEDOR})
+    except Exception as e:
+        print(f"    ⚠ No se pudo consultar este día, se omite: {e}")
+        return []
     listado = data.get("Listado", []) or []
     print(f"    {len(listado)} OC encontradas")
     return listado
@@ -233,7 +246,7 @@ def main():
                 )
                 items_para_guardar.extend(items_transf)
 
-            time.sleep(0.2)
+            time.sleep(1)  # pausa más conservadora para evitar el límite de la API
 
         guardar_oc(ocs_para_guardar)
         guardar_items(items_para_guardar)
