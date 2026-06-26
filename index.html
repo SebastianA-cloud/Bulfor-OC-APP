@@ -1354,22 +1354,89 @@ function abrirDetalleEnvio(id) {
         </div>
         <button onclick="cerrarDetalleEnvio()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
       </div>
-      <div style="padding:20px 24px">
-        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);margin-bottom:0;grid-template-columns:repeat(2,1fr)">
-          <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${badgeEstadoFedex(f.estado_envio)}</span></div>
-          <div class="detail-field"><label>Fecha ingreso</label><span>${fDate(f.fecha_ingreso)}</span></div>
-          <div class="detail-field"><label>Fecha entrega</label><span>${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</span></div>
-          <div class="detail-field"><label>Recibido por</label><span>${f.recibido_por||'—'}</span></div>
-        </div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:14px">El estado y la fecha de entrega se actualizan automáticamente cada vez que FedEx envía una notificación por correo. No es necesario editarlos manualmente.</div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
-          <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarEnvio(${f.id})">Eliminar envío</button>
-          <button class="page-btn" style="padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
-        </div>
-      </div>
+      <div style="padding:20px 24px" id="fedex-detalle-cuerpo"></div>
     </div>`;
   document.body.appendChild(modal);
+  renderDetalleEnvio(f, false);
+}
+
+function renderDetalleEnvio(f, modoEdicion) {
+  const cuerpo = document.getElementById('fedex-detalle-cuerpo');
+  if (!modoEdicion) {
+    cuerpo.innerHTML = `
+      <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);margin-bottom:0;grid-template-columns:repeat(2,1fr)">
+        <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
+        <div class="detail-field"><label>Estado</label><span>${badgeEstadoFedex(f.estado_envio)}</span></div>
+        <div class="detail-field"><label>Fecha ingreso</label><span>${fDate(f.fecha_ingreso)}</span></div>
+        <div class="detail-field"><label>Fecha entrega</label><span>${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</span></div>
+        <div class="detail-field"><label>Recibido por</label><span>${f.recibido_por||'—'}</span></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:14px">El estado y la fecha de entrega se actualizan automáticamente con las notificaciones de FedEx. Si este envío no llegó por correo (ej: se hizo directo en el mostrador), puedes actualizarlo a mano.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarEnvio(${f.id})">Eliminar envío</button>
+        <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), true)">✎ Editar manualmente</button>
+        <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
+      </div>`;
+    return;
+  }
+
+  // Modo edición: convertimos estado, fecha de entrega y recibido por en campos editables
+  const fechaEntregaInput = f.fecha_entrega ? new Date(f.fecha_entrega).toISOString().slice(0,10) : '';
+  cuerpo.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Estado</div>
+        <select id="fx-edit-estado" style="width:100%">
+          <option value="">Sin información</option>
+          ${ESTADOS_FEDEX.map(e => `<option value="${e.texto}" ${f.estado_envio===e.texto?'selected':''}>${e.texto}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha de entrega</div>
+        <input type="date" id="fx-edit-fecha" value="${fechaEntregaInput}" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Recibido por</div>
+        <input type="text" id="fx-edit-recibido" value="${(f.recibido_por||'').replace(/"/g,'&quot;')}" placeholder="Nombre de quien recibió" style="width:100%">
+      </div>
+      <div style="font-size:11px;color:var(--text-3)">Si marcas estado distinto de "Entregado", la fecha de entrega y recibido por se guardan vacíos.</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), false)">Cancelar</button>
+      <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="guardarEdicionEnvio(${f.id})">Guardar cambios</button>
+    </div>`;
+}
+
+async function guardarEdicionEnvio(id) {
+  const estado = document.getElementById('fx-edit-estado').value;
+  const fechaInput = document.getElementById('fx-edit-fecha').value;
+  const recibido = document.getElementById('fx-edit-recibido').value.trim();
+  const esEntregado = estado.toLowerCase() === 'entregado';
+
+  const cambios = {
+    estado_envio: estado || null,
+    fecha_entrega: esEntregado && fechaInput ? new Date(fechaInput).toISOString() : null,
+    recibido_por: esEntregado ? (recibido || null) : null,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const res = await sb(`seguimiento_fedex?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(cambios)
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(err); }
+    const actualizado = (await res.json())[0];
+    const idx = fedex.findIndex(f => f.id === id);
+    if (idx !== -1) fedex[idx] = actualizado;
+    fedexF = fedexF.map(f => f.id === id ? actualizado : f);
+    renderFedex();
+    renderDetalleEnvio(actualizado, false);
+  } catch(e) {
+    alert('No se pudo guardar el cambio: ' + e.message);
+  }
 }
 
 function cerrarDetalleEnvio() {
@@ -1860,8 +1927,3 @@ init();
 </script>
 </body>
 </html>
-
-
-
-
-
