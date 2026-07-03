@@ -465,10 +465,9 @@ async function fetchAll(table, query) {
 
 async function init() {
   try {
-    const [ocR, itemsR, hospR, diccR, fedexR, hospMaestroR, oeR, pacR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
-      fetchAll('hospitales', 'select=*&order=totalcomprado.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
       fetchAll('seguimiento_fedex', 'select=*&order=fecha_ingreso.desc'),
       fetchAll('hospitales_maestro', 'select=*&order=nombre_estandar.asc'),
@@ -477,11 +476,11 @@ async function init() {
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
-    hosp = Array.isArray(hospR) ? hospR : [];
     fedex = Array.isArray(fedexR) ? fedexR : [];
     fedexF = [...fedex];
     hospitalesMaestro = Array.isArray(hospMaestroR) ? hospMaestroR : [];
     reconstruirMapaHospitales();
+    hosp = calcularHospitalesDesdeOC();
     ordenesElaboracion = Array.isArray(oeR) ? oeR : [];
     ordenesElaboracionF = [...ordenesElaboracion];
     pacientes = Array.isArray(pacR) ? pacR : [];
@@ -1266,6 +1265,28 @@ function nombreHosp(nombreCrudo) {
   return mapaHospitalesNormalizados[nombreCrudo] || nombreCrudo;
 }
 
+// Calculamos las estadísticas de cada hospital DIRECTO desde ordenes_compra
+// (la tabla que se sincroniza todas las noches), en vez de leerlas de la
+// tabla 'hospitales', que solo se actualiza cuando se importa un Excel a
+// mano y por eso queda desfasada frente a las OC que llegan automáticas.
+function calcularHospitalesDesdeOC() {
+  const grupos = {};
+  oc.forEach(r => {
+    const nombre = nombreHosp(r.hospital) || r.hospital;
+    if (!nombre) return;
+    if (!grupos[nombre]) {
+      grupos[nombre] = { hospital: nombre, region: r.region, comuna: r.comuna,
+        numerooc: 0, totalcomprado: 0, primeracompra: r.fechaoc, ultimacompra: r.fechaoc };
+    }
+    const g = grupos[nombre];
+    g.numerooc += 1;
+    g.totalcomprado += (r.totalneto || 0);
+    if (r.fechaoc && (!g.primeracompra || r.fechaoc < g.primeracompra)) g.primeracompra = r.fechaoc;
+    if (r.fechaoc && (!g.ultimacompra || r.fechaoc > g.ultimacompra)) g.ultimacompra = r.fechaoc;
+  });
+  return Object.values(grupos).sort((a,b) => (b.totalcomprado||0) - (a.totalcomprado||0));
+}
+
 function idSanitizado(txt) {
   return (txt || '').replace(/[^a-zA-Z0-9]/g, '_');
 }
@@ -1391,8 +1412,28 @@ function renderNormalizacionHospitales() {
   cuerpo.innerHTML = nuevosHtml + pendientesHtml + sinRutHtml + bloqueYaNormalizados(yaNormalizados);
 }
 
-// Los ya normalizados quedan plegados abajo — no estorban, pero se pueden
-// editar si alguien se equivocó al escribir el nombre.
+// Reescribe de verdad el campo hospital en ordenes_compra e items_oc para
+// TODO el histórico (no solo lo que se ve en pantalla), y actualiza también
+// la tabla hospitales para que las estadísticas queden fusionadas ahí mismo.
+async function backfillHospitalEnOC(nombresOriginales, nombreEstandar) {
+  for (const nombreOriginal of nombresOriginales) {
+    if (!nombreOriginal || nombreOriginal === nombreEstandar) continue;
+    try {
+      const resOC = await sb(`ordenes_compra?hospital=eq.${encodeURIComponent(nombreOriginal)}`, {
+        method: 'PATCH', body: JSON.stringify({ hospital: nombreEstandar })
+      });
+      if (resOC.ok) oc.forEach(r => { if (r.hospital === nombreOriginal) r.hospital = nombreEstandar; });
+
+      const resItems = await sb(`items_oc?hospital=eq.${encodeURIComponent(nombreOriginal)}`, {
+        method: 'PATCH', body: JSON.stringify({ hospital: nombreEstandar })
+      });
+      if (resItems.ok) items.forEach(it => { if (it.hospital === nombreOriginal) it.hospital = nombreEstandar; });
+    } catch(e) {
+      console.error('No se pudo actualizar histórico para', nombreOriginal, e);
+    }
+  }
+  hosp = calcularHospitalesDesdeOC();
+}
 function bloqueYaNormalizados(yaNormalizados) {
   if (!yaNormalizados.length) return '';
   const filas = yaNormalizados.map(g => {
@@ -1429,6 +1470,8 @@ async function crearHospitalMaestroDesdeOC(nombreOriginal, rut, nombreEstandar, 
     const nuevo = (await res.json())[0];
     hospitalesMaestro.push(nuevo);
     reconstruirMapaHospitales();
+    btnEl.textContent = 'Aplicando a OC históricas…';
+    await backfillHospitalEnOC([nombreOriginal], nombreEstandar);
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
@@ -1448,8 +1491,11 @@ async function guardarNombreEstandarPorRut(rut, nuevoNombre, btnEl) {
       body: JSON.stringify({ nombre_estandar: nuevoNombre })
     });
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
+    const variantes = hospitalesMaestro.filter(h => h.rut === rut).map(h => h.nombre_original);
     hospitalesMaestro.forEach(h => { if (h.rut === rut) h.nombre_estandar = nuevoNombre; });
     reconstruirMapaHospitales();
+    btnEl.textContent = 'Aplicando a OC históricas…';
+    await backfillHospitalEnOC(variantes, nuevoNombre);
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
@@ -1471,6 +1517,8 @@ async function guardarNombreEstandarPorOriginal(nombreOriginal, nuevoNombre, btn
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
     hospitalesMaestro.forEach(h => { if (h.nombre_original === nombreOriginal) h.nombre_estandar = nuevoNombre; });
     reconstruirMapaHospitales();
+    btnEl.textContent = 'Aplicando a OC históricas…';
+    await backfillHospitalEnOC([nombreOriginal], nuevoNombre);
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
@@ -1482,7 +1530,8 @@ async function guardarNombreEstandarPorOriginal(nombreOriginal, nuevoNombre, btn
 // Vuelve a pintar todas las pantallas donde aparece un nombre de hospital,
 // para que el cambio se vea al instante sin recargar la página.
 function refrescarVistasHospital() {
-  renderOC(); renderHosp(); renderFedex(); renderEstadisticas();
+  filterHosp(); // hosp ya pudo cambiar (fusión por nombre normalizado) — recalcula hospF también
+  renderOC(); renderFedex(); renderEstadisticas();
   const ocAbierta = document.getElementById('oc-modal-overlay');
   if (ocAbierta) {
     const codigoActual = ocAbierta.querySelector('.mono')?.textContent?.trim();
@@ -2511,7 +2560,7 @@ async function eliminarEnvio(id) {
 
 function openHospitalOCs(hospital) {
   cerrarTodosLosModales();
-  window.__hospActualOCs = oc.filter(r => r.hospital === hospital)
+  window.__hospActualOCs = oc.filter(r => nombreHosp(r.hospital) === hospital)
     .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
   window.__hospActualNombre = hospital;
 
@@ -2583,7 +2632,7 @@ function closeHospitalOCs() {
 // ─── STATS ─────────────────────────────────────────────────────────────────
 function updateStats() {
   const total = oc.reduce((s,r)=>s+(r.totalneto||0),0);
-  const hosps = new Set(oc.map(r=>r.hospital)).size;
+  const hosps = new Set(oc.map(r=>nombreHosp(r.hospital))).size;
   const ultima = oc[0]?.fechaoc;
   document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
   document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
