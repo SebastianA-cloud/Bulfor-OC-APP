@@ -263,6 +263,7 @@
         <input type="text" id="hosp-search" placeholder="Buscar hospital, región, comuna…" oninput="filterHosp()">
       </div>
       <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirNormalizacionHospitales()">⚙️ Normalizar nombres</button>
     </div>
     <div class="table-card">
       <table>
@@ -1244,6 +1245,142 @@ function renderHosp() {
   </tr>`).join('');
 }
 function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
+
+// ─── NORMALIZACIÓN DE NOMBRES DE HOSPITALES (hospitales_maestro) ───────────
+// Agrupa las filas de hospitales_maestro por RUT: cada grupo son variantes
+// del nombre que en realidad son el mismo hospital. El usuario define un
+// nombre_estandar único por RUT, que el script de sincronización usará desde
+// ese momento para las OC nuevas. No modifica OC ya cargadas (eso es aparte).
+function idSanitizado(txt) {
+  return (txt || '').replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function agruparHospitalesPorRut() {
+  const grupos = {};
+  const sinRut = [];
+  hospitalesMaestro.forEach(h => {
+    if (h.rut) {
+      if (!grupos[h.rut]) grupos[h.rut] = { rut: h.rut, nombre_estandar: '', variantes: [] };
+      grupos[h.rut].variantes.push(h.nombre_original);
+      if (h.nombre_estandar && !grupos[h.rut].nombre_estandar) grupos[h.rut].nombre_estandar = h.nombre_estandar;
+    } else {
+      sinRut.push(h);
+    }
+  });
+  const listaGrupos = Object.values(grupos).sort((a,b) => b.variantes.length - a.variantes.length);
+  return { grupos: listaGrupos, sinRut };
+}
+
+function abrirNormalizacionHospitales() {
+  cerrarTodosLosModales();
+  const modal = document.createElement('div');
+  modal.id = 'normalizar-hosp-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) cerrarNormalizacionHospitales(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:16px;font-weight:600">Normalizar nombres de hospitales</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">Agrupados por RUT. El nombre que definas aquí se usará en las próximas OC que se sincronicen — no cambia las OC que ya están cargadas.</div>
+        </div>
+        <button onclick="cerrarNormalizacionHospitales()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px" id="normalizar-hosp-cuerpo"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  renderNormalizacionHospitales();
+}
+
+function cerrarNormalizacionHospitales() {
+  const m = document.getElementById('normalizar-hosp-modal-overlay');
+  if (m) m.remove();
+}
+
+function renderNormalizacionHospitales() {
+  const cuerpo = document.getElementById('normalizar-hosp-cuerpo');
+  const { grupos, sinRut } = agruparHospitalesPorRut();
+
+  if (!grupos.length && !sinRut.length) {
+    cuerpo.innerHTML = `<div style="font-size:13px;color:var(--text-3)">Todavía no hay hospitales cargados en hospitales_maestro.</div>`;
+    return;
+  }
+
+  const gruposHtml = grupos.map(g => {
+    const inputId = `hosp-std-${idSanitizado(g.rut)}`;
+    const yaDefinido = !!g.nombre_estandar;
+    return `
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">
+        RUT ${g.rut} · ${g.variantes.length} variante${g.variantes.length>1?'s':''} encontrada${g.variantes.length>1?'s':''}
+        ${yaDefinido ? ' · <span style="color:var(--green)">✓ ya tiene nombre estándar</span>' : ' · <span style="color:var(--amber,#b45309)">pendiente</span>'}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${g.variantes.map(v => `<span style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--text-2)">${v}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="${inputId}" value="${(g.nombre_estandar||'').replace(/"/g,'&quot;')}" placeholder="Nombre estándar a usar para este RUT" style="flex:1">
+        <button class="import-btn" style="margin-top:0;padding:8px 16px;white-space:nowrap" onclick="guardarNombreEstandarPorRut('${g.rut.replace(/'/g,"\\'")}', document.getElementById('${inputId}').value, this)">Guardar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const sinRutHtml = !sinRut.length ? '' : `
+    <div style="font-size:12px;color:var(--text-3);margin:18px 0 10px">Sin RUT registrado todavía (no se pueden agrupar automáticamente — corre "obtener_ruts_hospitales" desde GitHub Actions para completarlo)</div>
+    ${sinRut.map(h => {
+      const inputId = `hosp-std-orig-${idSanitizado(h.nombre_original)}`;
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:8px">${h.nombre_original}</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="${inputId}" value="${(h.nombre_estandar||'').replace(/"/g,'&quot;')}" placeholder="Nombre estándar a usar" style="flex:1">
+          <button class="import-btn" style="margin-top:0;padding:8px 16px;white-space:nowrap" onclick="guardarNombreEstandarPorOriginal('${h.nombre_original.replace(/'/g,"\\'")}', document.getElementById('${inputId}').value, this)">Guardar</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+
+  cuerpo.innerHTML = gruposHtml + sinRutHtml;
+}
+
+async function guardarNombreEstandarPorRut(rut, nuevoNombre, btnEl) {
+  nuevoNombre = (nuevoNombre||'').trim();
+  if (!nuevoNombre) { alert('Escribe un nombre estándar antes de guardar.'); return; }
+  const textoOriginalBtn = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const res = await sb(`hospitales_maestro?rut=eq.${encodeURIComponent(rut)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ nombre_estandar: nuevoNombre })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(err); }
+    hospitalesMaestro.forEach(h => { if (h.rut === rut) h.nombre_estandar = nuevoNombre; });
+    btnEl.textContent = '✔ Guardado';
+    setTimeout(() => renderNormalizacionHospitales(), 700);
+  } catch(e) {
+    alert('No se pudo guardar: ' + e.message);
+    btnEl.disabled = false; btnEl.textContent = textoOriginalBtn;
+  }
+}
+
+async function guardarNombreEstandarPorOriginal(nombreOriginal, nuevoNombre, btnEl) {
+  nuevoNombre = (nuevoNombre||'').trim();
+  if (!nuevoNombre) { alert('Escribe un nombre estándar antes de guardar.'); return; }
+  const textoOriginalBtn = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const res = await sb(`hospitales_maestro?nombre_original=eq.${encodeURIComponent(nombreOriginal)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ nombre_estandar: nuevoNombre })
+    });
+    if (!res.ok) { const err = await res.text(); throw new Error(err); }
+    hospitalesMaestro.forEach(h => { if (h.nombre_original === nombreOriginal) h.nombre_estandar = nuevoNombre; });
+    btnEl.textContent = '✔ Guardado';
+    setTimeout(() => renderNormalizacionHospitales(), 700);
+  } catch(e) {
+    alert('No se pudo guardar: ' + e.message);
+    btnEl.disabled = false; btnEl.textContent = textoOriginalBtn;
+  }
+}
 
 // ─── SEGUIMIENTO FEDEX ──────────────────────────────────────────────────────
 const ESTADOS_FEDEX = [
