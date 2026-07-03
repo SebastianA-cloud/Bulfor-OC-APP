@@ -1,0 +1,25 @@
+name: Completar hospitales_maestro (auto-descubrir desde OC reales)
+
+on:
+  workflow_dispatch:  # solo manual, no automático
+
+jobs:
+  completar-hospitales:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase
+
+      - name: Ejecutar script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MP_TICKET:    ${{ secrets.MP_TICKET }}
+        run: python completar_hospitales_maestro.py
