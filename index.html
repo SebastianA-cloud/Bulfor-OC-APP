@@ -43,7 +43,7 @@
   .nav-back { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; margin-bottom: 4px; transition: all .15s; }
   .nav-back:hover { background: var(--bg); color: var(--text); }
   .nav-divider { height: 1px; background: var(--border); margin: 6px 10px 10px; }
-  #nav-oc-submenu { display: none; }
+  #nav-submenu { display: none; }
   .modulo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 20px; color: var(--text-2); }
   .modulo-placeholder .icono { font-size: 48px; margin-bottom: 16px; opacity: .5; }
   .modulo-placeholder h2 { font-size: 18px; color: var(--text); margin-bottom: 8px; font-weight: 600; }
@@ -176,27 +176,7 @@
       <span class="nav-icon">💰</span><span>Seguimiento Pago Facturas</span>
     </div>
   </div>
-  <div class="nav" id="nav-oc-submenu">
-    <div class="nav-back" onclick="volverAModulos()">
-      <span class="nav-icon">←</span><span>Volver al menú</span>
-    </div>
-    <div class="nav-divider"></div>
-    <div class="nav-item active" onclick="showPage('oc',this)">
-      <span class="nav-icon">📋</span><span>Órdenes de compra</span>
-    </div>
-    <div class="nav-item" onclick="showPage('items',this)">
-      <span class="nav-icon">💊</span><span>Productos</span>
-    </div>
-    <div class="nav-item" onclick="showPage('hospitales',this)">
-      <span class="nav-icon">🏥</span><span>Hospitales</span>
-    </div>
-    <div class="nav-item" onclick="showPage('estadisticas',this)">
-      <span class="nav-icon">📊</span><span>Estadísticas</span>
-    </div>
-    <div class="nav-item" onclick="showPage('importar',this)">
-      <span class="nav-icon">⬆️</span><span>Importar Excel</span>
-    </div>
-  </div>
+  <div class="nav" id="nav-submenu"></div>
   <div class="sidebar-footer">
     <div class="sync-status">
       <div class="sync-dot" id="syncDot"></div>
@@ -2695,7 +2675,7 @@ async function startImport() {
 
     setStatus('¡Importación completada!', 100);
     log('✔ ¡Todo listo! Recargando datos…', 'ok');
-    setTimeout(() => { init(); showPage('oc', document.querySelector('.nav-item')); }, 1500);
+    setTimeout(() => { init(); showPage('oc', document.querySelector('#nav-submenu .nav-item')); }, 1500);
   } catch(e) {
     log('✘ Error: ' + e.message, 'err');
     setStatus('Error en la importación', false);
@@ -2705,33 +2685,58 @@ async function startImport() {
 
 // ─── NAV ───────────────────────────────────────────────────────────────────
 // ─── NAVEGACIÓN ENTRE MÓDULOS PRINCIPALES ──────────────────────────────────
-const PAGINA_POR_MODULO = {
-  'facturas': 'facturas',
-  'fedex': 'fedex',
-  'elaboracion': 'elaboracion',
-  'rrhh': 'rrhh',
-  'pagos': 'pagos',
+// Cada módulo del menú principal, tenga una o varias sub-páginas, abre su
+// propio submenú (ocultando el menú principal). Así el comportamiento es
+// idéntico para todos los botones, aunque algunos solo tengan un ítem.
+const SUBMENUS = {
+  'oc-modulo': {
+    items: [
+      { icon: '📋', label: 'Órdenes de compra', page: 'oc' },
+      { icon: '💊', label: 'Productos', page: 'items' },
+      { icon: '🏥', label: 'Hospitales', page: 'hospitales' },
+      { icon: '📊', label: 'Estadísticas', page: 'estadisticas' },
+      { icon: '⬆️', label: 'Importar Excel', page: 'importar' },
+    ],
+  },
+  'facturas': { items: [{ icon: '🧾', label: 'Facturas', page: 'facturas' }] },
+  'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
+  'elaboracion': { items: [{ icon: '⚗️', label: 'Órdenes de Elaboración', page: 'elaboracion' }] },
+  'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
+  'pagos': { items: [{ icon: '💰', label: 'Seguimiento Pago Facturas', page: 'pagos' }] },
 };
 
 function mostrarModulo(modulo, el) {
-  if (modulo === 'oc-modulo') {
-    // Mostramos el submenú de Órdenes de Compra y ocultamos el menú principal
-    document.getElementById('nav-modulos').style.display = 'none';
-    document.getElementById('nav-oc-submenu').style.display = 'block';
-    showPage('oc', document.querySelector('#nav-oc-submenu .nav-item'));
-    return;
-  }
+  const config = SUBMENUS[modulo];
+  if (!config) return;
 
-  // Para los demás módulos, mostramos directamente su página placeholder
-  showPage(PAGINA_POR_MODULO[modulo], null);
-  if (el) el.classList.add('active');
+  // Armamos el submenú: botón "Volver al menú" + los ítems del módulo
+  // (aunque sea uno solo, para que el comportamiento sea siempre el mismo).
+  const itemsHtml = config.items.map((it, i) => `
+    <div class="nav-item${i === 0 ? ' active' : ''}" onclick="showPage('${it.page}',this)">
+      <span class="nav-icon">${it.icon}</span><span>${it.label}</span>
+    </div>`).join('');
+
+  document.getElementById('nav-submenu').innerHTML = `
+    <div class="nav-back" onclick="volverAModulos()">
+      <span class="nav-icon">←</span><span>Volver al menú</span>
+    </div>
+    <div class="nav-divider"></div>
+    ${itemsHtml}`;
+
+  document.getElementById('nav-modulos').style.display = 'none';
+  document.getElementById('nav-submenu').style.display = 'block';
+  showPage(config.items[0].page, document.querySelector('#nav-submenu .nav-item'));
 }
 
 function volverAModulos() {
-  document.getElementById('nav-oc-submenu').style.display = 'none';
+  document.getElementById('nav-submenu').style.display = 'none';
+  document.getElementById('nav-submenu').innerHTML = '';
   document.getElementById('nav-modulos').style.display = 'block';
-  document.querySelectorAll('#nav-modulos .nav-item').forEach(n=>n.classList.remove('active'));
-  document.querySelector('#nav-modulos .nav-item').classList.add('active');
+
+  // Dejamos la pantalla limpia: ninguna página visible y ningún ítem
+  // marcado como activo, hasta que el usuario elija un módulo de nuevo.
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 }
 
 function showPage(id, el) {
