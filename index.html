@@ -691,6 +691,18 @@ function botonAtrasHtml() {
     : '';
 }
 
+// Construye el link público a la ficha de la OC en el portal de Mercado Público.
+// Desde ahí el usuario puede ver/imprimir el detalle oficial (o guardarlo como PDF
+// con "Imprimir" del navegador). No requiere login porque es información pública.
+function urlMercadoPublicoOC(codigoOC) {
+  return `https://www.mercadopublico.cl/PurchaseOrder/Modules/PO/DetailsPurchaseOrder.aspx?codigooc=${encodeURIComponent(codigoOC)}`;
+}
+
+function botonVerEnMPHtml(codigoOC) {
+  if (!codigoOC) return '';
+  return `<a href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;text-decoration:none;white-space:nowrap" title="Abrir la ficha oficial en mercadopublico.cl para verla o guardarla como PDF"><span>📄</span> Ver en Mercado Público</a>`;
+}
+
 function filterItems() {
   const q = document.getElementById('items-search').value;
   const fam = document.getElementById('items-familia').value;
@@ -809,6 +821,7 @@ function openOCDetail(codigoOC) {
           <div style="font-size:15px;font-weight:600">${r.nombreoc||'—'}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonVerEnMPHtml(r.codigooc)}
           ${botonAtrasHtml()}
           <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
         </div>
