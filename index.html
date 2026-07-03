@@ -1853,10 +1853,8 @@ function abrirDetalleOE(id) {
           <div style="font-size:12px;color:var(--text-2)">Emitida: ${fDate(receta.fecha_emision)}</div>
           <div style="font-size:12px;${vigente?'color:var(--green)':'color:var(--red)'}">Vence: ${fDate(venc.toISOString())} ${vigente?'✓ Vigente':'⚠️ Vencida'}</div>
           ${receta.archivo_url ? `
-          <div style="margin-top:10px;display:flex;gap:8px">
-            <button onclick="verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 12px;font-size:12px">👁 Ver receta</button>
-            <a href="${receta.archivo_url}" download="${receta.archivo_nombre||'receta'}" class="page-btn" style="padding:6px 12px;font-size:12px;text-decoration:none">⬇ Descargar</a>
-            <button onclick="imprimirRecetaOE('${receta.archivo_url}')" class="page-btn" style="padding:6px 12px;font-size:12px">🖨 Imprimir</button>
+          <div style="margin-top:10px">
+            <button onclick="verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 14px;font-size:12px">👁 Ver receta</button>
           </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>'}
         </div>` : ''}
 
@@ -1927,7 +1925,10 @@ function verRecetaEnModal(url) {
     <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:700px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:14px;font-weight:500">Vista de receta</span>
-        <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="imprimirRecetaOE('${url}')" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
+          <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+        </div>
       </div>
       <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;background:#111">
         ${esImagen
