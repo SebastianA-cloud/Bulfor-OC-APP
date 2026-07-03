@@ -1270,6 +1270,13 @@ function botonCopiar(texto, extraStyle='') {
   return `<button onclick="event.stopPropagation();copiarTexto('${texto.replace(/'/g,"\\'")}', this)" title="Copiar número" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:13px;padding:2px 4px;vertical-align:middle;${extraStyle}">📋</button>`;
 }
 
+// Construye el link directo a la página de rastreo de FedEx, con el número
+// de orden de transporte ya cargado — al abrirlo, FedEx muestra el resultado
+// directamente (no hace falta pegar el número ni apretar "Rastrear" a mano).
+function urlRastreoFedex(numero) {
+  return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(numero)}`;
+}
+
 function badgeEstadoFedex(estado) {
   if (!estado) return `<span class="badge badge-gray">Sin información</span>`;
   const e = ESTADOS_FEDEX.find(x => x.texto.toLowerCase() === estado.toLowerCase());
@@ -2170,9 +2177,10 @@ function renderDetalleEnvio(f, modoEdicion) {
         <div class="detail-field"><label>Recibido por</label><span>${f.recibido_por||'—'}</span></div>
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-top:14px">El estado y la fecha de entrega se actualizan automáticamente con las notificaciones de FedEx. Si este envío no llegó por correo (ej: se hizo directo en el mostrador), puedes actualizarlo a mano.</div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
         <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarEnvio(${f.id})">Eliminar envío</button>
         <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), true)">✎ Editar manualmente</button>
+        ${f.orden_transporte ? `<a href="${urlRastreoFedex(f.orden_transporte)}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-color:#4d148c;color:#4d148c" title="Abre fedex.com con este número ya cargado en el rastreador"><span>🚚</span> Rastrear en FedEx</a>` : ''}
         <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
       </div>`;
     return;
