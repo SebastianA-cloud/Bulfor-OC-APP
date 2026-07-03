@@ -1926,7 +1926,8 @@ function verRecetaEnModal(url) {
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:14px;font-weight:500">Vista de receta</span>
         <div style="display:flex;gap:8px;align-items:center">
-          <button onclick="imprimirRecetaOE('${url}')" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
+          <button onclick="imprimirRecetaOE('${url}', ${esImagen})" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
+          <button onclick="descargarRecetaOE('${url}')" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer">⬇ Descargar</button>
           <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
         </div>
       </div>
@@ -1940,13 +1941,48 @@ function verRecetaEnModal(url) {
   document.body.appendChild(modal);
 }
 
-function imprimirRecetaOE(url) {
-  // Abre la imagen en una ventana oculta y lanza el diálogo de impresora del sistema
-  const win = window.open(url, '_blank', 'width=800,height=600');
-  win.addEventListener('load', () => {
-    win.focus();
-    win.print();
-  });
+function imprimirRecetaOE(url, esImagen) {
+  // Creamos un iframe oculto en el mismo dominio con el contenido a imprimir
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;visibility:hidden';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  if (esImagen) {
+    doc.write(`<html><head><style>
+      body{margin:0;display:flex;justify-content:center;align-items:flex-start;}
+      img{max-width:100%;height:auto;}
+      @media print{body{margin:0}img{width:100%;max-width:100%}}
+    </style></head><body><img src="${url}" onload="window.focus();window.print()"></body></html>`);
+  } else {
+    doc.write(`<html><head></head><body style="margin:0">
+      <iframe src="${url}" style="width:100%;height:100vh;border:none" onload="window.focus();window.print()"></iframe>
+    </body></html>`);
+  }
+  doc.close();
+  // Limpiamos el iframe después de imprimir
+  iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+}
+
+async function descargarRecetaOE(url) {
+  try {
+    // Fetch del archivo para forzar descarga sin abrir pestaña
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const ext = url.split('.').pop().split('?')[0];
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `receta.${ext}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch(e) {
+    // Fallback si fetch falla por CORS
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'receta';
+    link.target = '_blank';
+    link.click();
+  }
 }
 
 function cerrarModalOE(id) {
