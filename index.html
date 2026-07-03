@@ -659,6 +659,7 @@ const MODAL_OVERLAY_IDS = [
   'fedex-detalle-modal-overlay',
   'oe-form-modal-overlay',
   'oe-detalle-modal-overlay',
+  'oe-receta-visor-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -1462,10 +1463,16 @@ function abrirNuevaOrdenElaboracion() {
         <button onclick="cerrarModalOE('oe-form-modal-overlay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
       </div>
       <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+
         <div>
           <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre del paciente *</div>
           <input type="text" id="oe-paciente-input" placeholder="Escribe para buscar o crear…" style="width:100%" autocomplete="off" oninput="buscarPacienteOE()" onfocus="buscarPacienteOE()">
           <div id="oe-paciente-sugerencias" style="display:none;border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:160px;overflow-y:auto;background:var(--surface)"></div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Teléfono (opcional)</div>
+          <input type="tel" id="oe-telefono" placeholder="Ej: +56 9 1234 5678" style="width:100%">
         </div>
 
         <div>
@@ -1494,31 +1501,40 @@ function abrirNuevaOrdenElaboracion() {
           </select>
         </div>
 
-        <div>
-          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Observaciones</div>
-          <input type="text" id="oe-observaciones" placeholder="Ej: Retira miércoles 14hrs" style="width:100%">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha de retiro</div>
+            <input type="date" id="oe-retiro-fecha" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Hora de retiro</div>
+            <input type="time" id="oe-retiro-hora" style="width:100%">
+          </div>
         </div>
 
         <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--bg)">
           <div style="font-size:13px;font-weight:500;margin-bottom:10px">📋 Receta</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
-            <div>
-              <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha emisión receta *</div>
-              <input type="date" id="oe-receta-fecha" style="width:100%" oninput="validarVigenciaReceta()">
-            </div>
-            <div style="display:flex;align-items:flex-end">
-              <div id="oe-vigencia-info" style="font-size:12px;color:var(--text-2)"></div>
-            </div>
-          </div>
-          <div id="oe-receta-opciones" style="display:none">
-            <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Recetas anteriores de este paciente con vigencia:</div>
+          <div id="oe-receta-opciones" style="display:none;margin-bottom:10px">
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Recetas vigentes anteriores de este paciente — haz clic para reutilizar:</div>
             <div id="oe-recetas-anteriores"></div>
           </div>
+          <div id="oe-receta-reutilizada" style="display:none;padding:8px 10px;background:var(--accent-light);border-radius:var(--radius);font-size:13px;color:var(--accent);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span id="oe-receta-reutilizada-texto"></span>
+            <button onclick="cancelarReutilizarReceta()" style="background:none;border:none;cursor:pointer;color:var(--text-2);font-size:16px">✕</button>
+          </div>
           <div id="oe-subir-receta">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
+              <div>
+                <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha emisión receta *</div>
+                <input type="date" id="oe-receta-fecha" style="width:100%" oninput="validarVigenciaReceta()">
+              </div>
+              <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+                <div id="oe-vigencia-info" style="font-size:12px"></div>
+              </div>
+            </div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Archivo receta (foto o PDF)</div>
             <input type="file" id="oe-receta-archivo" accept="image/*,.pdf" style="width:100%">
           </div>
-          <div id="oe-receta-reutilizada" style="display:none;padding:8px 10px;background:var(--accent-light);border-radius:var(--radius);font-size:13px;color:var(--accent)"></div>
         </div>
 
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
@@ -1528,8 +1544,7 @@ function abrirNuevaOrdenElaboracion() {
       </div>
     </div>`;
   document.body.appendChild(modal);
-  // Variable temporal para guardar paciente y receta seleccionados
-  window.__oeEstado = { pacienteId: null, recetaId: null };
+  window.__oeEstado = { pacienteId: null, recetaId: null, recetaUrl: null };
   setTimeout(() => document.getElementById('oe-paciente-input')?.focus(), 50);
 }
 
@@ -1537,84 +1552,137 @@ function buscarPacienteOE() {
   const q = document.getElementById('oe-paciente-input').value.trim();
   const cont = document.getElementById('oe-paciente-sugerencias');
   window.__oeEstado.pacienteId = null;
-
   if (!q) { cont.style.display = 'none'; return; }
-
   const coincidentes = pacientes.filter(p => coincideBusqueda(p.nombre, q)).slice(0, 6);
   if (!coincidentes.length) { cont.style.display = 'none'; return; }
-
   cont.innerHTML = coincidentes.map(p => `
     <div style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
          onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-         onclick="seleccionarPacienteOE(${p.id},'${p.nombre.replace(/'/g,"\\'") }')">
+         onclick="seleccionarPacienteOE(${p.id},'${p.nombre.replace(/'/g,"\\'")}','${(p.telefono||'').replace(/'/g,"\\'") }')">
       <span style="font-weight:500">${p.nombre}</span>
-      ${p.rut ? `<span style="font-size:11px;color:var(--text-2);margin-left:8px">${p.rut}</span>` : ''}
+      ${p.telefono ? `<span style="font-size:11px;color:var(--text-2);margin-left:8px">📞 ${p.telefono}</span>` : ''}
     </div>`).join('');
   cont.style.display = 'block';
 }
 
-async function seleccionarPacienteOE(id, nombre) {
+async function seleccionarPacienteOE(id, nombre, telefono) {
   document.getElementById('oe-paciente-input').value = nombre;
   document.getElementById('oe-paciente-sugerencias').style.display = 'none';
   window.__oeEstado.pacienteId = id;
 
-  // Buscar recetas vigentes anteriores de este paciente
+  // Pre-rellenar teléfono si existe
+  if (telefono) document.getElementById('oe-telefono').value = telefono;
+
+  // Buscar solo recetas VIGENTES de este paciente
   const recetasDelPaciente = await fetchAll('recetas', `select=*&paciente_id=eq.${id}&order=fecha_emision.desc`);
   const vigentes = (recetasDelPaciente || []).filter(r => recetaVigente(r.fecha_emision));
 
-  // Buscar órdenes anteriores para alertar
+  // Obtener órdenes anteriores para el historial
   const ordenesDelPaciente = ordenesElaboracion.filter(o => o.paciente_id === id);
-  if (ordenesDelPaciente.length) {
-    mostrarAlertaPacienteExistente(nombre, ordenesDelPaciente, vigentes);
-  }
 
-  if (vigentes.length) {
-    const cont = document.getElementById('oe-recetas-anteriores');
-    cont.innerHTML = vigentes.map(r => {
-      const venc = calcularVencimientoReceta(r.fecha_emision);
-      return `<div style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px"
-                   onclick="reutilizarReceta(${r.id},'${r.archivo_nombre||''}','${r.fecha_emision}')">
-        📋 Emitida ${fDate(r.fecha_emision)} — vence ${fDate(venc.toISOString())}
-        ${r.archivo_nombre ? `<span style="font-size:11px;color:var(--accent);margin-left:6px">${r.archivo_nombre}</span>` : ''}
-      </div>`;
-    }).join('');
-    document.getElementById('oe-receta-opciones').style.display = 'block';
+  if (ordenesDelPaciente.length) {
+    mostrarAlertaPacienteExistente(nombre, ordenesDelPaciente, vigentes, recetasDelPaciente || []);
+  } else if (vigentes.length) {
+    mostrarRecetasVigentesEnFormulario(vigentes);
   }
 }
 
-function mostrarAlertaPacienteExistente(nombre, ordenes, recetasVigentes) {
+function mostrarRecetasVigentesEnFormulario(vigentes) {
+  if (!vigentes.length) return;
+  const cont = document.getElementById('oe-recetas-anteriores');
+  cont.innerHTML = vigentes.map(r => {
+    const venc = calcularVencimientoReceta(r.fecha_emision);
+    return `<div style="padding:10px 12px;border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;background:var(--accent-light)"
+                 onclick="reutilizarReceta(${r.id},'${(r.archivo_nombre||'').replace(/'/g,"\\'")}','${r.fecha_emision}','${r.archivo_url||''}')">
+      <div style="font-weight:500">📋 Receta emitida el ${fDate(r.fecha_emision)}</div>
+      <div style="font-size:11px;color:var(--green);margin-top:2px">✓ Vigente hasta ${fDate(venc.toISOString())}</div>
+      ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px">📎 ${r.archivo_nombre}</div>` : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('oe-receta-opciones').style.display = 'block';
+}
+
+function mostrarAlertaPacienteExistente(nombre, ordenes, recetasVigentes, todasRecetas) {
   const modal = document.createElement('div');
   modal.id = 'oe-paciente-alerta-overlay';
   modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.6);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:80vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:540px;width:100%;max-height:82vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
       <div style="padding:20px 24px;border-bottom:1px solid var(--border)">
         <div style="font-size:16px;font-weight:600">⚠️ Paciente con historial</div>
-        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>${nombre}</strong> ya ha mandado a preparar ${ordenes.length} ${ordenes.length===1?'receta':'recetas'} anteriormente.</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>${nombre}</strong> ha mandado a preparar ${ordenes.length} ${ordenes.length===1?'receta':'recetas'}. Haz clic en un preparado para prellenar el formulario.</div>
       </div>
       <div style="padding:16px 24px">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Preparados anteriores</div>
-        ${ordenes.slice(0,8).map(o => `
-          <div style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:13px">
+        ${ordenes.slice(0,10).map(o => {
+          const recetaOrden = todasRecetas.find(r => r.id === o.receta_id);
+          const vigente = recetaOrden && recetaVigente(recetaOrden.fecha_emision);
+          return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;${vigente?'border-color:var(--accent)':''}"
+                       onclick="prerellenarOrdenDesdeHistorial(${JSON.stringify(o).replace(/"/g,'&quot;')},${JSON.stringify(recetaOrden||null).replace(/"/g,'&quot;')})">
             <div style="font-weight:500">${o.indicacion||'—'}</div>
-            <div style="font-size:11px;color:var(--text-2);margin-top:2px">${fDate(o.fecha_orden)} · ${o.valor ? clp(o.valor) : '—'} · ${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</div>
-          </div>`).join('')}
-        ${recetasVigentes.length ? `<div style="margin-top:10px;padding:10px;background:var(--accent-light);border-radius:var(--radius);font-size:13px;color:var(--accent)">✓ Tiene ${recetasVigentes.length} receta${recetasVigentes.length>1?'s':''} vigente${recetasVigentes.length>1?'s':''}. Puedes reutilizarla desde el formulario.</div>` : ''}
+            <div style="font-size:11px;color:var(--text-2);margin-top:3px;display:flex;gap:10px">
+              <span>${fDate(o.fecha_orden)}</span>
+              <span>${o.valor ? clp(o.valor) : '—'}</span>
+              <span>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</span>
+              ${vigente ? '<span style="color:var(--green);font-weight:500">✓ Receta vigente</span>' : '<span style="color:var(--text-3)">Receta vencida</span>'}
+            </div>
+          </div>`;
+        }).join('')}
         <div style="display:flex;justify-content:flex-end;margin-top:14px">
-          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="document.getElementById('oe-paciente-alerta-overlay').remove()">Entendido, continuar</button>
+          <button class="page-btn" style="padding:8px 16px" onclick="document.getElementById('oe-paciente-alerta-overlay').remove();mostrarRecetasVigentesEnFormulario(${JSON.stringify(recetasVigentes).replace(/"/g,'&quot;')})">Continuar sin seleccionar</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
-function reutilizarReceta(recetaId, nombre, fechaEmision) {
+function prerellenarOrdenDesdeHistorial(orden, receta) {
+  document.getElementById('oe-paciente-alerta-overlay').remove();
+
+  // Prellenamos todos los campos con los datos anteriores
+  if (orden.indicacion) document.getElementById('oe-indicacion').value = orden.indicacion;
+  if (orden.valor) document.getElementById('oe-valor').value = orden.valor;
+  if (orden.pago) document.getElementById('oe-pago').value = orden.pago;
+  if (orden.observaciones) {
+    // Intentamos extraer fecha y hora si vienen en el formato "Retiro: YYYY-MM-DD a las HH:MM hrs"
+    const mFecha = orden.observaciones.match(/Retiro:\s*(\d{4}-\d{2}-\d{2})/);
+    const mHora = orden.observaciones.match(/a las\s*(\d{2}:\d{2})/);
+    if (mFecha) document.getElementById('oe-retiro-fecha').value = mFecha[1];
+    if (mHora) document.getElementById('oe-retiro-hora').value = mHora[1];
+  }
+
+  // Intentamos usar la receta si existe y está vigente
+  if (receta && recetaVigente(receta.fecha_emision)) {
+    reutilizarReceta(receta.id, receta.archivo_nombre||'', receta.fecha_emision, receta.archivo_url||'');
+  } else {
+    // Receta vencida → ocultamos las vigentes también (ya filtradas) y pedimos receta nueva
+    document.getElementById('oe-receta-opciones').style.display = 'none';
+    document.getElementById('oe-subir-receta').style.display = 'block';
+    document.getElementById('oe-receta-fecha').value = '';
+    document.getElementById('oe-vigencia-info').innerHTML = '<span style="color:var(--red);font-size:12px">⚠️ La receta anterior venció — sube una nueva receta vigente</span>';
+  }
+}
+
+function reutilizarReceta(recetaId, nombre, fechaEmision, url) {
   window.__oeEstado.recetaId = recetaId;
+  window.__oeEstado.recetaUrl = url;
+  document.getElementById('oe-subir-receta').style.display = 'none';
+  const reutDiv = document.getElementById('oe-receta-reutilizada');
+  document.getElementById('oe-receta-reutilizada-texto').textContent = `✓ Reutilizando receta: ${nombre||'archivo guardado'} (emitida ${fDate(fechaEmision)})`;
+  reutDiv.style.display = 'flex';
+  document.getElementById('oe-receta-opciones').style.display = 'none';
+  // Ponemos la fecha de emisión en el campo para la validación
   document.getElementById('oe-receta-fecha').value = fechaEmision;
   validarVigenciaReceta();
-  document.getElementById('oe-subir-receta').style.display = 'none';
-  document.getElementById('oe-receta-reutilizada').style.display = 'block';
-  document.getElementById('oe-receta-reutilizada').textContent = `✓ Reutilizando receta: ${nombre||'Receta guardada'} (emitida ${fDate(fechaEmision)})`;
+}
+
+function cancelarReutilizarReceta() {
+  window.__oeEstado.recetaId = null;
+  window.__oeEstado.recetaUrl = null;
+  document.getElementById('oe-receta-reutilizada').style.display = 'none';
+  document.getElementById('oe-subir-receta').style.display = 'block';
+  document.getElementById('oe-receta-fecha').value = '';
+  document.getElementById('oe-vigencia-info').textContent = '';
 }
 
 function validarVigenciaReceta() {
@@ -1637,7 +1705,10 @@ async function guardarNuevaOrdenOE() {
   const valor = document.getElementById('oe-valor').value;
   const fecha = document.getElementById('oe-fecha').value;
   const pago = document.getElementById('oe-pago').value;
-  const observaciones = document.getElementById('oe-observaciones').value.trim();
+  const retiroFecha = document.getElementById('oe-retiro-fecha').value;
+  const retiroHora = document.getElementById('oe-retiro-hora').value;
+  const retiro = [retiroFecha ? `Retiro: ${retiroFecha}` : '', retiroHora ? `a las ${retiroHora} hrs` : ''].filter(Boolean).join(' ');
+  const telefono = document.getElementById('oe-telefono').value.trim();
   const fechaReceta = document.getElementById('oe-receta-fecha').value;
   const archivoEl = document.getElementById('oe-receta-archivo');
   const archivo = archivoEl?.files?.[0];
@@ -1658,12 +1729,20 @@ async function guardarNuevaOrdenOE() {
       const rPac = await sb('pacientes', {
         method: 'POST',
         headers: { 'Prefer': 'return=representation' },
-        body: JSON.stringify([{ nombre: nombrePaciente }])
+        body: JSON.stringify([{ nombre: nombrePaciente, telefono: telefono || null }])
       });
       if (!rPac.ok) throw new Error(await rPac.text());
       const nuevoPac = (await rPac.json())[0];
       pacienteId = nuevoPac.id;
       pacientes.push(nuevoPac);
+    } else if (telefono) {
+      // Actualizar teléfono si el paciente ya existe y se ingresó un nuevo teléfono
+      await sb(`pacientes?id=eq.${pacienteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ telefono, updated_at: new Date().toISOString() })
+      });
+      const idx = pacientes.findIndex(p => p.id === pacienteId);
+      if (idx !== -1) pacientes[idx].telefono = telefono;
     }
 
     let recetaId = window.__oeEstado.recetaId;
@@ -1719,7 +1798,7 @@ async function guardarNuevaOrdenOE() {
         indicacion,
         valor: valor ? parseInt(valor) : null,
         pago,
-        observaciones: observaciones || null,
+        observaciones: retiro || null,
       }])
     });
     if (!rOE.ok) throw new Error(await rOE.text());
@@ -1775,7 +1854,7 @@ function abrirDetalleOE(id) {
           <div style="font-size:12px;${vigente?'color:var(--green)':'color:var(--red)'}">Vence: ${fDate(venc.toISOString())} ${vigente?'✓ Vigente':'⚠️ Vencida'}</div>
           ${receta.archivo_url ? `
           <div style="margin-top:10px;display:flex;gap:8px">
-            <a href="${receta.archivo_url}" target="_blank" class="page-btn" style="padding:6px 12px;font-size:12px;text-decoration:none">👁 Ver receta</a>
+            <button onclick="verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 12px;font-size:12px">👁 Ver receta</button>
             <a href="${receta.archivo_url}" download="${receta.archivo_nombre||'receta'}" class="page-btn" style="padding:6px 12px;font-size:12px;text-decoration:none">⬇ Descargar</a>
             <button onclick="imprimirRecetaOE('${receta.archivo_url}')" class="page-btn" style="padding:6px 12px;font-size:12px">🖨 Imprimir</button>
           </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>'}
@@ -1838,9 +1917,35 @@ async function eliminarOrdenOE(id) {
   }
 }
 
+function verRecetaEnModal(url) {
+  const esImagen = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const modal = document.createElement('div');
+  modal.id = 'oe-receta-visor-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1200;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:700px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:14px;font-weight:500">Vista de receta</span>
+        <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+      </div>
+      <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;background:#111">
+        ${esImagen
+          ? `<img src="${url}" style="max-width:100%;max-height:70vh;border-radius:4px;object-fit:contain">`
+          : `<iframe src="${url}" style="width:100%;height:70vh;border:none;border-radius:4px"></iframe>`
+        }
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
 function imprimirRecetaOE(url) {
-  const win = window.open(url, '_blank');
-  win.onload = () => win.print();
+  // Abre la imagen en una ventana oculta y lanza el diálogo de impresora del sistema
+  const win = window.open(url, '_blank', 'width=800,height=600');
+  win.addEventListener('load', () => {
+    win.focus();
+    win.print();
+  });
 }
 
 function cerrarModalOE(id) {
