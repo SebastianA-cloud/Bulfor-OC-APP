@@ -400,6 +400,31 @@
     </div>
   </div>
 
+  <div class="page" id="page-pacientes">
+    <div class="page-header">
+      <div class="page-title">Pacientes</div>
+      <div class="page-sub">Buscador y gestor de pacientes de Órdenes de Elaboración</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="pac-search" placeholder="Buscar por nombre o teléfono…" oninput="filterPacientes()">
+      </div>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Paciente</th><th>Teléfono</th><th>N° Recetas</th><th>N° Órdenes</th><th>Última orden</th>
+        </tr></thead>
+        <tbody id="pac-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="pac-info"></span>
+        <div class="page-btns" id="pac-pages"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="page" id="page-rrhh">
     <div class="modulo-placeholder">
       <div class="icono">👥</div>
@@ -515,7 +540,7 @@ async function init() {
     }
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -635,12 +660,14 @@ const MODAL_OVERLAY_IDS = [
   'product-hosp-modal-overlay',
   'hosp-oc-modal-overlay',
   'normalizacion-modal-overlay',
+  'normalizar-hosp-modal-overlay',
   'stat-modal-overlay',
   'fedex-form-modal-overlay',
   'fedex-detalle-modal-overlay',
   'oe-form-modal-overlay',
   'oe-detalle-modal-overlay',
   'oe-receta-visor-overlay',
+  'pac-modal-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -1743,6 +1770,151 @@ function renderOE() {
 
 function goOE(p) { const {pages}=paginate(ordenesElaboracionF,oePage); if(p<1||p>pages) return; oePage=p; renderOE(); }
 
+// ─── PACIENTES (buscador y gestor) ─────────────────────────────────────────
+let pacientesF = [];
+let pacPage = 1;
+
+// Resumen por paciente: N° recetas distintas, N° órdenes, fecha de la
+// orden más reciente. Se arma en el momento a partir de lo que ya está
+// cargado (pacientes + ordenesElaboracion), sin llamadas extra a Supabase.
+function resumenPorPaciente() {
+  const porId = {};
+  ordenesElaboracion.forEach(o => {
+    if (!o.paciente_id) return;
+    if (!porId[o.paciente_id]) porId[o.paciente_id] = { recetas: new Set(), numeroOrdenes: 0, ultimaOrden: null };
+    const r = porId[o.paciente_id];
+    if (o.receta_id) r.recetas.add(o.receta_id);
+    r.numeroOrdenes += 1;
+    if (o.fecha_orden && (!r.ultimaOrden || o.fecha_orden > r.ultimaOrden)) r.ultimaOrden = o.fecha_orden;
+  });
+  return pacientes.map(p => {
+    const r = porId[p.id] || { recetas: new Set(), numeroOrdenes: 0, ultimaOrden: null };
+    return { ...p, numeroRecetas: r.recetas.size, numeroOrdenes: r.numeroOrdenes, ultimaOrden: r.ultimaOrden };
+  }).sort((a,b) => (b.ultimaOrden||'').localeCompare(a.ultimaOrden||''));
+}
+
+function filterPacientes() {
+  const q = document.getElementById('pac-search').value;
+  const resumen = resumenPorPaciente();
+  pacientesF = resumen.filter(p => coincideBusqueda(`${p.nombre} ${p.telefono||''}`, q));
+  pacPage = 1;
+  renderPacientes();
+}
+
+function renderPacientes() {
+  const { slice, pages, total } = paginate(pacientesF, pacPage);
+  document.getElementById('pac-info').textContent = `${total.toLocaleString('es-CL')} pacientes`;
+  renderPages('pac-pages', total, pages, pacPage, 'goPacientes');
+  if (!slice.length) {
+    document.getElementById('pac-body').innerHTML = `<tr><td colspan="5" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`;
+    return;
+  }
+  document.getElementById('pac-body').innerHTML = slice.map(p => `
+    <tr style="cursor:pointer" onclick="abrirDetallePaciente(${p.id})">
+      <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
+      <td style="font-size:12px">${p.telefono ? '📞 '+p.telefono : '—'}</td>
+      <td style="text-align:center">${p.numeroRecetas}</td>
+      <td style="text-align:center">${p.numeroOrdenes}</td>
+      <td style="font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaOrden ? fDate(p.ultimaOrden) : '—'}</td>
+    </tr>`).join('');
+}
+
+function goPacientes(p) { const {pages}=paginate(pacientesF, pacPage); if(p<1||p>pages) return; pacPage=p; renderPacientes(); }
+
+async function abrirDetallePaciente(id) {
+  cerrarTodosLosModales();
+  const paciente = pacientes.find(p => p.id === id);
+  if (!paciente) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'pac-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) cerrarDetallePaciente(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:600">${paciente.nombre}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <input type="text" id="pac-detalle-telefono" value="${(paciente.telefono||'').replace(/"/g,'&quot;')}" placeholder="Teléfono de contacto" style="font-size:13px;padding:6px 10px;max-width:200px">
+            <button class="page-btn" style="padding:6px 12px" onclick="guardarTelefonoPaciente(${paciente.id}, this)">Guardar</button>
+          </div>
+        </div>
+        <button onclick="cerrarDetallePaciente()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px" id="pac-detalle-cuerpo">
+        <div style="font-size:13px;color:var(--text-3)">Cargando historial…</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const recetasDelPaciente = await fetchAll('recetas', `select=*&paciente_id=eq.${id}&order=fecha_emision.desc`);
+  const ordenesDelPaciente = ordenesElaboracion.filter(o => o.paciente_id === id)
+    .sort((a,b) => (b.fecha_orden||'').localeCompare(a.fecha_orden||''));
+
+  const recetasHtml = !recetasDelPaciente?.length ? '<div style="font-size:13px;color:var(--text-3)">Sin recetas registradas.</div>' :
+    recetasDelPaciente.map(r => {
+      const vigente = recetaVigente(r.fecha_emision);
+      const venc = calcularVencimientoReceta(r.fecha_emision);
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <div style="font-size:13px;font-weight:500">Emitida el ${fDate(r.fecha_emision)}</div>
+          <div style="font-size:11px;margin-top:2px;color:${vigente?'var(--green)':'var(--red)'}">${vigente?'✓ Vigente hasta':'✗ Venció el'} ${fDate(venc.toISOString())}</div>
+          ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px">📎 ${r.archivo_nombre}</div>` : ''}
+        </div>
+        ${r.archivo_url ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="verRecetaEnModal('${r.archivo_url}')">Ver</button>` : ''}
+      </div>`;
+    }).join('');
+
+  const ordenesHtml = !ordenesDelPaciente.length ? '<div style="font-size:13px;color:var(--text-3)">Sin órdenes de elaboración registradas.</div>' :
+    ordenesDelPaciente.map(o => `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;cursor:pointer" onclick="cerrarDetallePaciente();abrirDetalleOE(${o.id})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:500">${o.indicacion||'—'}</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:2px">${fDate(o.fecha_orden)} · ${o.pago||'—'}</div>
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            <div style="font-size:13px;font-weight:600">${o.valor ? clp(o.valor) : '—'}</div>
+            <div style="margin-top:4px">${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</div>
+          </div>
+        </div>
+      </div>`).join('');
+
+  document.getElementById('pac-detalle-cuerpo').innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em">Recetas (${recetasDelPaciente?.length||0})</div>
+    ${recetasHtml}
+    <div style="font-size:12px;color:var(--text-3);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.03em">Órdenes de elaboración (${ordenesDelPaciente.length})</div>
+    ${ordenesHtml}`;
+}
+
+function cerrarDetallePaciente() {
+  const m = document.getElementById('pac-modal-overlay');
+  if (m) m.remove();
+}
+
+async function guardarTelefonoPaciente(id, btnEl) {
+  const telefono = document.getElementById('pac-detalle-telefono').value.trim();
+  const textoOriginal = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const res = await sb(`pacientes?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ telefono: telefono || null, updated_at: new Date().toISOString() })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const idx = pacientes.findIndex(p => p.id === id);
+    if (idx !== -1) pacientes[idx].telefono = telefono || null;
+    btnEl.textContent = '✔ Guardado';
+    filterPacientes();
+    setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1200);
+  } catch(e) {
+    alert('No se pudo guardar el teléfono: ' + e.message);
+    btnEl.disabled = false; btnEl.textContent = textoOriginal;
+  }
+}
+
 // ── NUEVO ORDEN: PASO 1 — Buscar o crear paciente ─────────────────────────
 function abrirNuevaOrdenElaboracion() {
   cerrarTodosLosModales();
@@ -2103,6 +2275,7 @@ async function guardarNuevaOrdenOE() {
     ordenesElaboracionF = [...ordenesElaboracion];
     cerrarModalOE('oe-form-modal-overlay');
     renderOE();
+    filterPacientes();
   } catch(e) {
     alert('No se pudo guardar: ' + e.message);
   }
@@ -3002,7 +3175,10 @@ const SUBMENUS = {
   },
   'facturas': { items: [{ icon: '🧾', label: 'Facturas', page: 'facturas' }] },
   'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
-  'elaboracion': { items: [{ icon: '⚗️', label: 'Órdenes de Elaboración', page: 'elaboracion' }] },
+  'elaboracion': { items: [
+    { icon: '⚗️', label: 'Órdenes de Elaboración', page: 'elaboracion' },
+    { icon: '🧑‍⚕️', label: 'Pacientes', page: 'pacientes' },
+  ] },
   'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
   'pagos': { items: [{ icon: '💰', label: 'Seguimiento Pago Facturas', page: 'pagos' }] },
 };
