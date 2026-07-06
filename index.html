@@ -438,6 +438,7 @@
     <div class="toolbar" style="flex-wrap:wrap">
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()">⬆️ Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
+      <div id="pagos-resumen" style="display:flex;gap:24px;align-items:center;margin-left:16px"></div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="togglePendientesPagos()">⏳ Pendientes</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="mostrarPagosAnios()">📅 Años</button>
     </div>
@@ -2064,10 +2065,35 @@ function aplicarFiltroPagos(lista) {
 // Punto único de render: mira pagosContexto y dibuja tarjetas de año, tarjetas
 // de mes, o la tabla de facturas (de un mes, de un año, o de pendientes).
 // soloTabla=true evita perder el foco del buscador mientras se escribe.
+// Total facturado, total pagado, % pagado y N° de pendientes de un conjunto
+// de facturas. Las anuladas ('N') no cuentan para ningún monto ni porcentaje
+// — nunca se van a pagar, así que no deben inflar ni el total ni el % pendiente.
+function calcularResumenPagos(lista) {
+  const validas = lista.filter(f => f.estado_aceptacion !== 'N');
+  const totalFacturado = validas.reduce((s,f) => s + (f.monto||0), 0);
+  const pagadas = validas.filter(f => f.fecha_pago);
+  const totalPagado = pagadas.reduce((s,f) => s + (f.monto||0), 0);
+  const pendientesCount = validas.filter(esPendienteReal).length;
+  const pct = totalFacturado ? (totalPagado / totalFacturado * 100) : 0;
+  return { totalFacturado, totalPagado, pct, pendientesCount };
+}
+
+function renderResumenPagos(lista) {
+  const cont = document.getElementById('pagos-resumen');
+  if (!lista) { cont.innerHTML = ''; return; }
+  const r = calcularResumenPagos(lista);
+  cont.innerHTML = `
+    <div><div style="font-size:11px;color:var(--text-2)">Total facturado</div><div style="font-size:14px;font-weight:600">${clp(r.totalFacturado)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">Total pagado</div><div style="font-size:14px;font-weight:600;color:var(--green)">${clp(r.totalPagado)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">% pagado</div><div style="font-size:14px;font-weight:600">${r.pct.toFixed(0)}%</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">Pendientes</div><div style="font-size:14px;font-weight:600;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
+}
+
 function renderPagosVista(soloTabla) {
   const { anio, mes, viendoPendientes } = pagosContexto;
 
   if (anio === null) {
+    renderResumenPagos(null); // "Todos los años" — sin resumen, como pediste
     if (!viendoPendientes) { setBreadcrumbPagos('Todos los años'); renderTarjetasAnios(); return; }
     setBreadcrumbPagos(`${migaAnios()} › Pendientes`);
     const lista = aplicarFiltroPagos(facturasPago.filter(esPendienteReal))
@@ -2077,9 +2103,11 @@ function renderPagosVista(soloTabla) {
   }
 
   if (mes === null) {
+    const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
+    renderResumenPagos(delAnio); // resumen del año completo, se vea o no "pendientes"
     if (!viendoPendientes) { setBreadcrumbPagos(`${migaAnios()} › ${anio}`); renderTarjetasMeses(anio); return; }
     setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › Pendientes`);
-    const lista = aplicarFiltroPagos(facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio) && esPendienteReal(f)))
+    const lista = aplicarFiltroPagos(delAnio.filter(esPendienteReal))
       .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
     renderTablaFacturasPago(lista, { esPendientes: true, soloTabla });
     return;
@@ -2091,6 +2119,7 @@ function renderPagosVista(soloTabla) {
     if (!fecha || !fecha.startsWith(anio)) return false;
     return (parseInt(fecha.slice(5,7),10) - 1) === mes;
   });
+  renderResumenPagos(delMes); // resumen del mes completo, se vea o no "pendientes"
   const base = viendoPendientes ? delMes.filter(esPendienteReal) : delMes;
   const lista = aplicarFiltroPagos(base).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
   setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
