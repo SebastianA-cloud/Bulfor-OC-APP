@@ -447,6 +447,14 @@
     <div id="pagos-contenido"></div>
   </div>
 
+  <div class="page" id="page-pagos-graficos">
+    <div class="page-header">
+      <div class="page-title">Gráficos de pagos</div>
+      <div class="page-sub">Quién paga más, más rápido, y quién se demora</div>
+    </div>
+    <div id="pagos-graficos-content"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -549,7 +557,7 @@ async function init() {
     }
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -2262,6 +2270,147 @@ async function guardarPagoFactura(id, btnEl) {
   }
 }
 
+// ─── GRÁFICOS DE PAGOS ───────────────────────────────────────────────────
+// Reutiliza el mismo patrón visual de "Estadísticas" (tarjetas + barras).
+// OJO: no tenemos fecha de vencimiento de las facturas (el Excel nunca la
+// trajo), así que "rapidez de pago" se mide como días entre fecha de
+// emisión y fecha de pago — es el dato más parecido que existe hoy.
+const GRAFICOS_PAGOS_DISPONIBLES = [
+  { id: 'top-monto-pagado', icono: '💰', titulo: 'Hospitales que más han pagado', sub: 'Ranking por monto total pagado' },
+  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Hospitales que más facturan', sub: 'Ranking por monto total facturado (pagado + pendiente)' },
+  { id: 'mas-rapidos', icono: '⚡', titulo: 'Los que pagan más puntual', sub: 'Comparado con su plazo de pago (vencimiento)' },
+  { id: 'mas-lentos', icono: '🐢', titulo: 'Los que más se atrasan', sub: 'Comparado con su plazo de pago (vencimiento)' },
+  { id: 'pct-pagado', icono: '📈', titulo: '% de facturas pagadas', sub: 'Qué tan al día está cada hospital' },
+  { id: 'evolucion-mensual-pagos', icono: '📅', titulo: 'Evolución mensual de pagos', sub: 'Total pagado mes a mes' },
+];
+
+function renderGraficosPagos() {
+  document.getElementById('pagos-graficos-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:560px">
+      ${GRAFICOS_PAGOS_DISPONIBLES.map(g => `
+        <div class="table-card" style="padding:16px 18px;cursor:pointer;display:flex;align-items:center;gap:14px" onclick="abrirGraficoPago('${g.id}')">
+          <span style="font-size:22px">${g.icono}</span>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:500">${g.titulo}</div>
+            <div style="font-size:12px;color:var(--text-2)">${g.sub}</div>
+          </div>
+          <span style="color:var(--text-3);font-size:16px">›</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// Plazo de pago en días, según lo que definiste. Si el nombre del hospital
+// contiene una de estas palabras clave, usa ese plazo; si no calza con
+// ninguna, usa el plazo general (30 días).
+const PLAZOS_PAGO_DIAS = {
+  default: 30,
+  'SIRAK': 15,
+  'OBRA DON GUANELLA': 0,
+  'INVERSIONES FARMALISTO': 0,
+};
+
+function plazoPagoDias(nombreHospital) {
+  if (!nombreHospital) return PLAZOS_PAGO_DIAS.default;
+  const up = nombreHospital.toUpperCase();
+  for (const key in PLAZOS_PAGO_DIAS) {
+    if (key !== 'default' && up.includes(key)) return PLAZOS_PAGO_DIAS[key];
+  }
+  return PLAZOS_PAGO_DIAS.default;
+}
+
+function calcularVencimientoFactura(fechaEmision, nombreHospital) {
+  if (!fechaEmision) return null;
+  const d = new Date(fechaEmision);
+  d.setDate(d.getDate() + plazoPagoDias(nombreHospital));
+  return d;
+}
+
+// Agrupa todas las facturas por hospital (nombre normalizado) y calcula:
+// monto facturado, monto pagado, % pagado, y el atraso promedio respecto al
+// VENCIMIENTO real de cada factura (emisión + su plazo de pago) — no solo
+// días crudos desde la emisión, para poder comparar plazos distintos entre sí.
+// Negativo = paga antes del plazo. Positivo = paga atrasado.
+// Las anuladas ('N') no cuentan para nada de esto.
+function statsPagosPorHospital() {
+  const grupos = {};
+  facturasPago.forEach(f => {
+    if (f.estado_aceptacion === 'N') return;
+    const nombre = nombreHosp(f.hospital) || f.hospital || 'Sin hospital';
+    if (!grupos[nombre]) grupos[nombre] = { hospital: nombre, totalFacturado: 0, totalPagado: 0, nFacturas: 0, nPagadas: 0, sumaAtraso: 0, nAtrasoValidos: 0 };
+    const g = grupos[nombre];
+    g.totalFacturado += (f.monto || 0);
+    g.nFacturas += 1;
+    if (f.fecha_pago) {
+      g.totalPagado += (f.monto || 0);
+      g.nPagadas += 1;
+      if (f.fecha_emision) {
+        const vencimiento = calcularVencimientoFactura(f.fecha_emision, nombre);
+        const atraso = Math.round((new Date(f.fecha_pago) - vencimiento) / 86400000);
+        g.sumaAtraso += atraso;
+        g.nAtrasoValidos += 1;
+      }
+    }
+  });
+  return Object.values(grupos).map(g => ({
+    ...g,
+    atrasoPromedio: g.nAtrasoValidos ? (g.sumaAtraso / g.nAtrasoValidos) : null,
+    pctPagado: g.totalFacturado ? (g.totalPagado / g.totalFacturado * 100) : 0,
+  }));
+}
+
+function abrirGraficoPago(id) {
+  const stats = statsPagosPorHospital();
+  const MIN_MUESTRA = 3; // para rapidez/% evitamos rankear con 1 sola factura, no es representativo
+
+  if (id === 'top-monto-pagado') {
+    const top = stats.filter(s => s.totalPagado > 0).sort((a,b) => b.totalPagado - a.totalPagado).slice(0, 15);
+    const max = Math.max(...top.map(s => s.totalPagado), 1);
+    modalEstadistica('Hospitales que más han pagado',
+      top.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.totalPagado, max, clp(s.totalPagado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+
+  } else if (id === 'top-monto-facturado') {
+    const top = stats.filter(s => s.totalFacturado > 0).sort((a,b) => b.totalFacturado - a.totalFacturado).slice(0, 15);
+    const max = Math.max(...top.map(s => s.totalFacturado), 1);
+    modalEstadistica('Hospitales que más facturan',
+      top.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.totalFacturado, max, clp(s.totalFacturado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+
+  } else if (id === 'mas-rapidos') {
+    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => a.atrasoPromedio - b.atrasoPromedio).slice(0, 15);
+    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
+    modalEstadistica('Hospitales que pagan más puntual',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con su plazo de pago (30 días por defecto; SIRAK 15 días; Obra Don Guanella e Inversiones Farmalisto, al contado). Negativo = pagan antes del plazo. Solo hospitales con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--green)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'mas-lentos') {
+    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => b.atrasoPromedio - a.atrasoPromedio).slice(0, 15);
+    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
+    modalEstadistica('Hospitales que más se atrasan',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con su plazo de pago (30 días por defecto; SIRAK 15 días; Obra Don Guanella e Inversiones Farmalisto, al contado). Solo hospitales con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--red)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'pct-pagado') {
+    const con = stats.filter(s => s.nFacturas >= MIN_MUESTRA).sort((a,b) => b.pctPagado - a.pctPagado).slice(0, 15);
+    modalEstadistica('% de facturas pagadas por hospital',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Solo hospitales con al menos ${MIN_MUESTRA} facturas emitidas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.pctPagado, 100, `${s.pctPagado.toFixed(0)}%`)).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'evolucion-mensual-pagos') {
+    const porMes = {};
+    facturasPago.forEach(f => {
+      if (!f.fecha_pago || f.estado_aceptacion === 'N') return;
+      const key = f.fecha_pago.slice(0,7);
+      porMes[key] = (porMes[key] || 0) + (f.monto || 0);
+    });
+    const meses = Object.keys(porMes).sort();
+    const max = Math.max(...meses.map(m => porMes[m]), 1);
+    modalEstadistica('Evolución mensual de pagos',
+      meses.map(m => {
+        const [a, mm] = m.split('-');
+        return barraHtml(`${MESES_NOMBRE[parseInt(mm,10)-1]} ${a}`, porMes[m], max, clp(porMes[m]));
+      }).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+  }
+}
+
 function logPagos(msg, tipo='') {
   const el = document.getElementById('pagos-import-log');
   el.style.display = 'block';
@@ -3653,6 +3802,7 @@ const SUBMENUS = {
   'facturas': { items: [
     { icon: '🔎', label: 'Buscador de documentos', page: 'facturas' },
     { icon: '💰', label: 'Seguimiento pago de facturas', page: 'pagos' },
+    { icon: '📊', label: 'Gráficos de pagos', page: 'pagos-graficos' },
   ] },
   'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
