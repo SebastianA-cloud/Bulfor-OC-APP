@@ -172,9 +172,6 @@
     <div class="nav-item" onclick="mostrarModulo('rrhh', this)">
       <span class="nav-icon">👥</span><span>Recursos Humanos</span>
     </div>
-    <div class="nav-item" onclick="mostrarModulo('pagos', this)">
-      <span class="nav-icon">💰</span><span>Seguimiento Pago Facturas</span>
-    </div>
   </div>
   <div class="nav" id="nav-submenu"></div>
   <div class="sidebar-footer">
@@ -320,9 +317,9 @@
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
     <div class="modulo-placeholder">
-      <div class="icono">🧾</div>
-      <h2>Facturas</h2>
-      <p>Este módulo está en construcción. Próximamente vas a poder gestionar tus facturas desde aquí.</p>
+      <div class="icono">🔎</div>
+      <h2>Buscador de documentos</h2>
+      <p>Este módulo se conectará vía API para buscar tus documentos tributarios directamente. Próximamente.</p>
     </div>
   </div>
 
@@ -434,11 +431,18 @@
   </div>
 
   <div class="page" id="page-pagos">
-    <div class="modulo-placeholder">
-      <div class="icono">💰</div>
-      <h2>Seguimiento Pago de Facturas</h2>
-      <p>Este módulo está en construcción. Próximamente vas a poder seguir el estado de pago de tus facturas desde aquí.</p>
+    <div class="page-header">
+      <div class="page-title">Seguimiento Pago de Facturas</div>
+      <div class="page-sub" id="pagos-breadcrumb">Todos los años</div>
     </div>
+    <div class="toolbar" style="flex-wrap:wrap">
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()">⬆️ Subir listado de pagos</button>
+      <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="mostrarPagosPendientes()">⏳ Pendientes</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="mostrarPagosAnios()">📅 Años</button>
+    </div>
+    <div id="pagos-import-log" style="display:none;margin-bottom:14px"></div>
+    <div id="pagos-contenido"></div>
   </div>
 
 </main>
@@ -463,6 +467,7 @@ let oc = [], items = [], hosp = [], fedex = [];
 let hospitalesMaestro = [];
 let ordenesElaboracion = [], ordenesElaboracionF = [], oePage = 1;
 let pacientes = [];
+let facturasPago = [];
 let oeCategoria = 'todos';
 let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
@@ -490,7 +495,7 @@ async function fetchAll(table, query) {
 
 async function init() {
   try {
-    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
@@ -498,6 +503,7 @@ async function init() {
       fetchAll('hospitales_maestro', 'select=*&order=nombre_estandar.asc'),
       fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc'),
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
+      fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -509,6 +515,7 @@ async function init() {
     ordenesElaboracion = Array.isArray(oeR) ? oeR : [];
     ordenesElaboracionF = [...ordenesElaboracion];
     pacientes = Array.isArray(pacR) ? pacR : [];
+    facturasPago = Array.isArray(facPagoR) ? facPagoR : [];
     diccionarioNormalizacion = {};
     diccionarioCampos = {};
     (Array.isArray(diccR) ? diccR : []).forEach(d => {
@@ -540,7 +547,7 @@ async function init() {
     }
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1957,6 +1964,285 @@ async function guardarTelefonoPaciente(id, btnEl) {
   }
 }
 
+// ─── SEGUIMIENTO PAGO DE FACTURAS ───────────────────────────────────────────
+// Navegación tipo "drill-down" dentro de la misma página: Años -> Meses ->
+// tabla de facturas de ese mes. También hay una vista "Pendientes" con todas
+// las facturas sin fecha de pago, sin importar el mes, para ir marcándolas.
+const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function fechaReferenciaFactura(f) {
+  // Para agrupar por año/mes usamos la fecha de emisión; si no la tiene
+  // (puede pasar con facturas creadas solo desde el listado de pagos),
+  // usamos la fecha de pago como respaldo.
+  return f.fecha_emision || f.fecha_pago || null;
+}
+
+function pagosAniosDisponibles() {
+  const anios = new Set();
+  facturasPago.forEach(f => {
+    const fecha = fechaReferenciaFactura(f);
+    if (fecha) anios.add(fecha.slice(0,4));
+  });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function setBreadcrumbPagos(texto) {
+  document.getElementById('pagos-breadcrumb').innerHTML = texto;
+}
+
+function mostrarPagosAnios() {
+  const anios = pagosAniosDisponibles();
+  setBreadcrumbPagos('Todos los años');
+  const cont = document.getElementById('pagos-contenido');
+  if (!anios.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas cargadas. Sube tu Excel mensual para empezar.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
+    ${anios.map(anio => {
+      const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
+      const pendientes = delAnio.filter(f => !f.fecha_pago).length;
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarPagosMeses('${anio}')">
+        <div style="font-size:22px;font-weight:600">${anio}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delAnio.length} factura${delAnio.length===1?'':'s'}</div>
+        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function mostrarPagosMeses(anio) {
+  setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › ${anio}`);
+  const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
+  const porMes = {};
+  delAnio.forEach(f => {
+    const mesIdx = parseInt((fechaReferenciaFactura(f)||'').slice(5,7), 10) - 1;
+    if (mesIdx < 0 || mesIdx > 11) return;
+    if (!porMes[mesIdx]) porMes[mesIdx] = [];
+    porMes[mesIdx].push(f);
+  });
+  const cont = document.getElementById('pagos-contenido');
+  const mesesConDatos = Object.keys(porMes).map(Number).sort((a,b)=>a-b);
+  if (!mesesConDatos.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas para ${anio}.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
+    ${mesesConDatos.map(mesIdx => {
+      const delMes = porMes[mesIdx];
+      const pendientes = delMes.filter(f => !f.fecha_pago).length;
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarPagosMes('${anio}', ${mesIdx})">
+        <div style="font-size:16px;font-weight:600">${MESES_NOMBRE[mesIdx]}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delMes.length} factura${delMes.length===1?'':'s'}</div>
+        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function mostrarPagosMes(anio, mesIdx) {
+  setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › ${MESES_NOMBRE[mesIdx]}`);
+  const delMes = facturasPago.filter(f => {
+    const fecha = fechaReferenciaFactura(f);
+    if (!fecha || !fecha.startsWith(anio)) return false;
+    return (parseInt(fecha.slice(5,7),10) - 1) === mesIdx;
+  }).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+  renderTablaFacturasPago(delMes, `${MESES_NOMBRE[mesIdx]} ${anio}`);
+}
+
+function mostrarPagosPendientes() {
+  setBreadcrumbPagos('Pendientes (todas, sin importar el mes)');
+  const pendientes = facturasPago.filter(f => !f.fecha_pago)
+    .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+  renderTablaFacturasPago(pendientes, 'Pendientes', true);
+}
+
+function renderTablaFacturasPago(lista, titulo, esPendientes) {
+  const cont = document.getElementById('pagos-contenido');
+  if (!lista.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✓</div><p>${esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.'}</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Monto</th><th>Estado</th><th>Fecha de pago</th><th>Estado de pago</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(f => `
+            <tr>
+              <td class="mono">${f.factura}</td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
+              <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+              <td style="white-space:nowrap">${clp(f.monto)}</td>
+              <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">No aceptada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+              <td><input type="date" value="${f.fecha_pago ? f.fecha_pago.slice(0,10) : ''}" id="fp-fecha-${f.id}" style="font-size:12px;padding:5px 8px;max-width:140px"></td>
+              <td><input type="text" value="${(f.estado_pago||'').replace(/"/g,'&quot;')}" id="fp-estado-${f.id}" placeholder="Ej: Pagado" style="font-size:12px;padding:5px 8px;max-width:140px"></td>
+              <td><button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarPagoFactura(${f.id}, this)">Guardar</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function guardarPagoFactura(id, btnEl) {
+  const fecha = document.getElementById(`fp-fecha-${id}`).value;
+  const estado = document.getElementById(`fp-estado-${id}`).value.trim();
+  const textoOriginal = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const res = await sb(`facturas_pago?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        fecha_pago: fecha || null,
+        estado_pago: estado || null,
+        updated_at: new Date().toISOString(),
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const idx = facturasPago.findIndex(f => f.id === id);
+    if (idx !== -1) { facturasPago[idx].fecha_pago = fecha || null; facturasPago[idx].estado_pago = estado || null; }
+    btnEl.textContent = '✔ Guardado';
+    setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1000);
+  } catch(e) {
+    alert('No se pudo guardar: ' + e.message);
+    btnEl.disabled = false; btnEl.textContent = textoOriginal;
+  }
+}
+
+function logPagos(msg, tipo='') {
+  const el = document.getElementById('pagos-import-log');
+  el.style.display = 'block';
+  el.innerHTML += `<div class="log-line ${tipo==='ok'?'log-ok':tipo==='err'?'log-err':''}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// Convierte "12-03-2026" o serial de Excel a 'YYYY-MM-DD'
+function parseFechaFlexible(v) {
+  if (!v) return null;
+  if (typeof v === 'number') return excelSerialToISO(v).slice(0,10);
+  if (v instanceof Date) return v.toISOString().slice(0,10);
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  const d = new Date(s);
+  return isNaN(d) ? null : d.toISOString().slice(0,10);
+}
+
+function parseMontoFlexible(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const limpio = String(v).replace(/[^0-9.-]/g, '');
+  return limpio ? parseFloat(limpio) : null;
+}
+
+
+// ── Subir listado de pagos (listado_documentos_recibidos o Pagos Automatizados) ──
+// Solo RELLENA fecha/estado de pago cuando estaba vacío. Si la factura no
+// existe todavía, crea un registro mínimo para no perder el dato del pago.
+function importarListadoPagos(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    document.getElementById('pagos-import-log').innerHTML = '';
+    logPagos(`Leyendo ${file.name}…`);
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'binary' });
+      const nombreHoja = wb.SheetNames.find(n => n.toLowerCase() !== 'meta') || wb.SheetNames[0];
+      const filasCrudas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, defval: null });
+
+      // El archivo puede traer filas de título/metadata antes del encabezado real.
+      // Buscamos la fila que contenga alguna de las columnas que reconocemos.
+      const idxHeader = filasCrudas.findIndex(fila =>
+        fila.some(c => typeof c === 'string' && ['Número de Documento','N° factura','Numero de Documento'].includes(c.trim()))
+      );
+      if (idxHeader === -1) throw new Error('No reconozco el formato de este archivo (no encontré la columna de N° de documento/factura).');
+
+      const headers = filasCrudas[idxHeader].map(h => (h||'').toString().trim());
+      const col = nombre => headers.indexOf(nombre);
+      const iFactura = [col('Número de Documento'), col('Numero de Documento'), col('N° factura')].find(i => i >= 0);
+      const iFechaPago = [col('Fecha de Pago'), col('Fecha de pago')].find(i => i >= 0);
+      const iEstadoPago = col('Estado de Pago');
+      const iMonto = col('Monto');
+      const iHospital = col('Nombre Beneficiario') >= 0 ? -1 : col('Hospital'); // el beneficiario ahí es Bulfor, no el hospital
+      const iRut = col('RUT Institución Pagadora');
+
+      const filas = filasCrudas.slice(idxHeader + 1).filter(f => f[iFactura] !== null && f[iFactura] !== undefined && f[iFactura] !== '');
+      logPagos(`${filas.length} filas de pago encontradas en "${nombreHoja}".`);
+
+      const porFactura = {};
+      facturasPago.forEach(f => { porFactura[String(f.factura)] = f; });
+
+      let rellenadas = 0, creadas = 0, sinCambio = 0;
+      const nuevasParaCrear = [];
+
+      for (const fila of filas) {
+        const factura = String(fila[iFactura]);
+        const fechaPago = parseFechaFlexible(fila[iFechaPago]);
+        const estadoPago = iEstadoPago >= 0 ? fila[iEstadoPago] : 'Pagado';
+        const existente = porFactura[factura];
+
+        if (existente) {
+          if (!existente.fecha_pago && fechaPago) {
+            const res = await sb(`facturas_pago?factura=eq.${encodeURIComponent(factura)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ fecha_pago: fechaPago, estado_pago: estadoPago || null, updated_at: new Date().toISOString() })
+            });
+            if (res.ok) {
+              existente.fecha_pago = fechaPago;
+              existente.estado_pago = estadoPago || null;
+              rellenadas++;
+            }
+          } else {
+            sinCambio++; // ya tenía fecha de pago — no se toca, tal como pediste
+          }
+        } else {
+          nuevasParaCrear.push({
+            factura,
+            rut_hospital: iRut >= 0 ? fila[iRut] : null,
+            hospital: iHospital >= 0 ? fila[iHospital] : null,
+            fecha_emision: null,
+            monto: iMonto >= 0 ? parseMontoFlexible(fila[iMonto]) : null,
+            estado_aceptacion: null,
+            fecha_pago: fechaPago,
+            estado_pago: estadoPago || null,
+            mes_origen: null,
+          });
+        }
+      }
+
+      if (nuevasParaCrear.length) {
+        const CHUNK = 200;
+        for (let i=0; i<nuevasParaCrear.length; i+=CHUNK) {
+          const chunk = nuevasParaCrear.slice(i, i+CHUNK);
+          const res = await sb('facturas_pago?on_conflict=factura', {
+            method: 'POST',
+            headers: { 'Prefer': 'resolution=ignore-duplicates,return=representation' },
+            body: JSON.stringify(chunk)
+          });
+          if (res.ok) {
+            const insertadas = await res.json();
+            facturasPago = facturasPago.concat(insertadas);
+            creadas += insertadas.length;
+          }
+        }
+      }
+
+      logPagos(`✔ ${rellenadas} facturas actualizadas con su fecha/estado de pago.`, 'ok');
+      logPagos(`✔ ${creadas} facturas nuevas creadas (no existían, solo tenían el pago).`, 'ok');
+      logPagos(`— ${sinCambio} ya tenían fecha de pago, no se tocaron.`, 'ok');
+      mostrarPagosAnios();
+    } catch(e) {
+      logPagos('✗ Error: ' + e.message, 'err');
+    }
+  };
+  reader.readAsBinaryString(file);
+  document.getElementById('pagos-file-listado').value = '';
+}
+
 // ── NUEVO ORDEN: PASO 1 — Buscar o crear paciente ─────────────────────────
 function abrirNuevaOrdenElaboracion() {
   cerrarTodosLosModales();
@@ -3215,14 +3501,16 @@ const SUBMENUS = {
       { icon: '⬆️', label: 'Importar Excel', page: 'importar' },
     ],
   },
-  'facturas': { items: [{ icon: '🧾', label: 'Facturas', page: 'facturas' }] },
+  'facturas': { items: [
+    { icon: '🔎', label: 'Buscador de documentos', page: 'facturas' },
+    { icon: '💰', label: 'Seguimiento pago de facturas', page: 'pagos' },
+  ] },
   'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
     { icon: '⚗️', label: 'Órdenes de Elaboración', page: 'elaboracion' },
     { icon: '🧑‍⚕️', label: 'Pacientes', page: 'pacientes' },
   ] },
   'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
-  'pagos': { items: [{ icon: '💰', label: 'Seguimiento Pago Facturas', page: 'pagos' }] },
 };
 
 function mostrarModulo(modulo, el) {
