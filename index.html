@@ -435,6 +435,7 @@
       <div class="page-title">Seguimiento Pago de Facturas</div>
       <div class="page-sub" id="pagos-breadcrumb">Todos los años</div>
     </div>
+    <div id="pagos-contexto-grande"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()">⬆️ Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
@@ -2089,11 +2090,18 @@ function renderResumenPagos(lista) {
     <div><div style="font-size:11px;color:var(--text-2)">Pendientes</div><div style="font-size:14px;font-weight:600;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
 }
 
+function renderContextoGrande(texto) {
+  const cont = document.getElementById('pagos-contexto-grande');
+  if (!texto) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-light);color:var(--accent);font-size:18px;font-weight:700;padding:8px 18px;border-radius:var(--radius);margin-bottom:14px">📅 ${texto}</div>`;
+}
+
 function renderPagosVista(soloTabla) {
   const { anio, mes, viendoPendientes } = pagosContexto;
 
   if (anio === null) {
     renderResumenPagos(null); // "Todos los años" — sin resumen, como pediste
+    renderContextoGrande(null);
     if (!viendoPendientes) { setBreadcrumbPagos('Todos los años'); renderTarjetasAnios(); return; }
     setBreadcrumbPagos(`${migaAnios()} › Pendientes`);
     const lista = aplicarFiltroPagos(facturasPago.filter(esPendienteReal))
@@ -2105,6 +2113,7 @@ function renderPagosVista(soloTabla) {
   if (mes === null) {
     const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
     renderResumenPagos(delAnio); // resumen del año completo, se vea o no "pendientes"
+    renderContextoGrande(anio);
     if (!viendoPendientes) { setBreadcrumbPagos(`${migaAnios()} › ${anio}`); renderTarjetasMeses(anio); return; }
     setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › Pendientes`);
     const lista = aplicarFiltroPagos(delAnio.filter(esPendienteReal))
@@ -2120,6 +2129,7 @@ function renderPagosVista(soloTabla) {
     return (parseInt(fecha.slice(5,7),10) - 1) === mes;
   });
   renderResumenPagos(delMes); // resumen del mes completo, se vea o no "pendientes"
+  renderContextoGrande(`${MESES_NOMBRE[mes]} ${anio}`);
   const base = viendoPendientes ? delMes.filter(esPendienteReal) : delMes;
   const lista = aplicarFiltroPagos(base).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
   setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
