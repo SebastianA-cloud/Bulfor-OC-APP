@@ -1986,22 +1986,34 @@ function pagosAniosDisponibles() {
   return Array.from(anios).sort((a,b) => b.localeCompare(a));
 }
 
+// Una factura "N" (no aceptada/anulada) nunca se va a pagar — normalmente
+// porque quedó reemplazada por otra factura. No cuenta como pendiente, solo
+// queda guardada como referencia de que existió y fue anulada.
+function esPendienteReal(f) {
+  return !f.fecha_pago && f.estado_aceptacion !== 'N';
+}
+
+// Recordamos en qué año/mes estamos parados, para que el botón "Pendientes"
+// muestre las pendientes de ESE contexto en vez de todas las históricas.
+let pagosContexto = { anio: null, mes: null };
+
 function setBreadcrumbPagos(texto) {
   document.getElementById('pagos-breadcrumb').innerHTML = texto;
 }
 
 function mostrarPagosAnios() {
+  pagosContexto = { anio: null, mes: null };
   const anios = pagosAniosDisponibles();
   setBreadcrumbPagos('Todos los años');
   const cont = document.getElementById('pagos-contenido');
   if (!anios.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas cargadas. Sube tu Excel mensual para empezar.</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas cargadas. Sube tu listado de pagos para empezar.</p></div></div>`;
     return;
   }
   cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
     ${anios.map(anio => {
       const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
-      const pendientes = delAnio.filter(f => !f.fecha_pago).length;
+      const pendientes = delAnio.filter(esPendienteReal).length;
       return `
       <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarPagosMeses('${anio}')">
         <div style="font-size:22px;font-weight:600">${anio}</div>
@@ -2013,6 +2025,7 @@ function mostrarPagosAnios() {
 }
 
 function mostrarPagosMeses(anio) {
+  pagosContexto = { anio, mes: null };
   setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › ${anio}`);
   const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
   const porMes = {};
@@ -2031,7 +2044,7 @@ function mostrarPagosMeses(anio) {
   cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
     ${mesesConDatos.map(mesIdx => {
       const delMes = porMes[mesIdx];
-      const pendientes = delMes.filter(f => !f.fecha_pago).length;
+      const pendientes = delMes.filter(esPendienteReal).length;
       return `
       <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarPagosMes('${anio}', ${mesIdx})">
         <div style="font-size:16px;font-weight:600">${MESES_NOMBRE[mesIdx]}</div>
@@ -2043,6 +2056,7 @@ function mostrarPagosMeses(anio) {
 }
 
 function mostrarPagosMes(anio, mesIdx) {
+  pagosContexto = { anio, mes: mesIdx };
   setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › ${MESES_NOMBRE[mesIdx]}`);
   const delMes = facturasPago.filter(f => {
     const fecha = fechaReferenciaFactura(f);
@@ -2053,10 +2067,30 @@ function mostrarPagosMes(anio, mesIdx) {
 }
 
 function mostrarPagosPendientes() {
-  setBreadcrumbPagos('Pendientes (todas, sin importar el mes)');
-  const pendientes = facturasPago.filter(f => !f.fecha_pago)
-    .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
-  renderTablaFacturasPago(pendientes, 'Pendientes', true);
+  let lista, etiqueta;
+  if (pagosContexto.mes !== null) {
+    // Estamos viendo un mes puntual: mostramos solo las pendientes de ese mes
+    const { anio, mes } = pagosContexto;
+    lista = facturasPago.filter(f => {
+      const fecha = fechaReferenciaFactura(f);
+      if (!fecha || !fecha.startsWith(anio)) return false;
+      return (parseInt(fecha.slice(5,7),10) - 1) === mes && esPendienteReal(f);
+    });
+    etiqueta = `Pendientes de ${MESES_NOMBRE[mes]} ${anio}`;
+    setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMes('${anio}',${mes})">${MESES_NOMBRE[mes]}</span> › Pendientes`);
+  } else if (pagosContexto.anio !== null) {
+    // Estamos viendo un año completo (sin mes elegido): pendientes de ese año
+    const { anio } = pagosContexto;
+    lista = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio) && esPendienteReal(f));
+    etiqueta = `Pendientes de ${anio}`;
+    setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › Pendientes`);
+  } else {
+    lista = facturasPago.filter(esPendienteReal);
+    etiqueta = 'Pendientes (todas, sin importar el mes)';
+    setBreadcrumbPagos('Pendientes (todas, sin importar el mes)');
+  }
+  lista = lista.sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+  renderTablaFacturasPago(lista, etiqueta, true);
 }
 
 function renderTablaFacturasPago(lista, titulo, esPendientes) {
