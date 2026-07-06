@@ -438,7 +438,7 @@
     <div class="toolbar" style="flex-wrap:wrap">
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()">⬆️ Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
-      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="mostrarPagosPendientes()">⏳ Pendientes</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="togglePendientesPagos()">⏳ Pendientes</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="mostrarPagosAnios()">📅 Años</button>
     </div>
     <div id="pagos-import-log" style="display:none;margin-bottom:14px"></div>
@@ -1993,18 +1993,112 @@ function esPendienteReal(f) {
   return !f.fecha_pago && f.estado_aceptacion !== 'N';
 }
 
-// Recordamos en qué año/mes estamos parados, para que el botón "Pendientes"
-// muestre las pendientes de ESE contexto en vez de todas las históricas.
-let pagosContexto = { anio: null, mes: null };
+// Estado de navegación de la página: en qué año/mes estamos parados, si
+// estamos viendo "pendientes" (toggle) y el texto de búsqueda actual.
+let pagosContexto = { anio: null, mes: null, viendoPendientes: false };
+let pagosBusqueda = '';
 
 function setBreadcrumbPagos(texto) {
   document.getElementById('pagos-breadcrumb').innerHTML = texto;
 }
 
+function migaAnios() {
+  return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span>`;
+}
+function migaAnio(anio) {
+  return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span>`;
+}
+
 function mostrarPagosAnios() {
-  pagosContexto = { anio: null, mes: null };
+  pagosContexto = { anio: null, mes: null, viendoPendientes: false };
+  pagosBusqueda = '';
+  renderPagosVista();
+}
+
+function mostrarPagosMeses(anio) {
+  pagosContexto = { anio, mes: null, viendoPendientes: false };
+  pagosBusqueda = '';
+  renderPagosVista();
+}
+
+function mostrarPagosMes(anio, mesIdx) {
+  // Si nos pasamos de rango (ej. diciembre + 1, o enero - 1), saltamos de año.
+  let a = parseInt(anio, 10), m = mesIdx;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  pagosContexto = { anio: String(a), mes: m, viendoPendientes: false };
+  pagosBusqueda = '';
+  renderPagosVista();
+}
+
+function cambiarMesPagos(delta) {
+  mostrarPagosMes(pagosContexto.anio, pagosContexto.mes + delta);
+}
+
+function volverAMesesDelAnio() {
+  mostrarPagosMeses(pagosContexto.anio);
+}
+
+// El botón "Pendientes" del toolbar de arriba es un interruptor: apretarlo
+// muestra las pendientes del contexto actual (año/mes/todo); apretarlo de
+// nuevo vuelve a mostrar todo, sin perder en qué año/mes estabas parado.
+function togglePendientesPagos() {
+  pagosContexto.viendoPendientes = !pagosContexto.viendoPendientes;
+  pagosBusqueda = '';
+  renderPagosVista();
+}
+
+function filtrarPagosBusqueda(valor) {
+  pagosBusqueda = valor;
+  renderPagosVista(true);
+}
+
+function aplicarFiltroPagos(lista) {
+  if (!pagosBusqueda) return lista;
+  return lista.filter(f => coincideBusqueda(
+    `${f.factura} ${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.estado_pago||''} ${f.estado_aceptacion==='A'?'aceptada':f.estado_aceptacion==='N'?'no aceptada anulada':''}`,
+    pagosBusqueda
+  ));
+}
+
+// Punto único de render: mira pagosContexto y dibuja tarjetas de año, tarjetas
+// de mes, o la tabla de facturas (de un mes, de un año, o de pendientes).
+// soloTabla=true evita perder el foco del buscador mientras se escribe.
+function renderPagosVista(soloTabla) {
+  const { anio, mes, viendoPendientes } = pagosContexto;
+
+  if (anio === null) {
+    if (!viendoPendientes) { setBreadcrumbPagos('Todos los años'); renderTarjetasAnios(); return; }
+    setBreadcrumbPagos(`${migaAnios()} › Pendientes`);
+    const lista = aplicarFiltroPagos(facturasPago.filter(esPendienteReal))
+      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+    renderTablaFacturasPago(lista, { esPendientes: true, soloTabla });
+    return;
+  }
+
+  if (mes === null) {
+    if (!viendoPendientes) { setBreadcrumbPagos(`${migaAnios()} › ${anio}`); renderTarjetasMeses(anio); return; }
+    setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › Pendientes`);
+    const lista = aplicarFiltroPagos(facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio) && esPendienteReal(f)))
+      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+    renderTablaFacturasPago(lista, { esPendientes: true, soloTabla });
+    return;
+  }
+
+  // Mes puntual
+  const delMes = facturasPago.filter(f => {
+    const fecha = fechaReferenciaFactura(f);
+    if (!fecha || !fecha.startsWith(anio)) return false;
+    return (parseInt(fecha.slice(5,7),10) - 1) === mes;
+  });
+  const base = viendoPendientes ? delMes.filter(esPendienteReal) : delMes;
+  const lista = aplicarFiltroPagos(base).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+  setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
+  renderTablaFacturasPago(lista, { esPendientes: viendoPendientes, soloTabla, conNavMes: true, anio, mes });
+}
+
+function renderTarjetasAnios() {
   const anios = pagosAniosDisponibles();
-  setBreadcrumbPagos('Todos los años');
   const cont = document.getElementById('pagos-contenido');
   if (!anios.length) {
     cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas cargadas. Sube tu listado de pagos para empezar.</p></div></div>`;
@@ -2024,9 +2118,7 @@ function mostrarPagosAnios() {
   </div>`;
 }
 
-function mostrarPagosMeses(anio) {
-  pagosContexto = { anio, mes: null };
-  setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › ${anio}`);
+function renderTarjetasMeses(anio) {
   const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
   const porMes = {};
   delAnio.forEach(f => {
@@ -2055,51 +2147,30 @@ function mostrarPagosMeses(anio) {
   </div>`;
 }
 
-function mostrarPagosMes(anio, mesIdx) {
-  pagosContexto = { anio, mes: mesIdx };
-  setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › ${MESES_NOMBRE[mesIdx]}`);
-  const delMes = facturasPago.filter(f => {
-    const fecha = fechaReferenciaFactura(f);
-    if (!fecha || !fecha.startsWith(anio)) return false;
-    return (parseInt(fecha.slice(5,7),10) - 1) === mesIdx;
-  }).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
-  renderTablaFacturasPago(delMes, `${MESES_NOMBRE[mesIdx]} ${anio}`);
-}
-
-function mostrarPagosPendientes() {
-  let lista, etiqueta;
-  if (pagosContexto.mes !== null) {
-    // Estamos viendo un mes puntual: mostramos solo las pendientes de ese mes
-    const { anio, mes } = pagosContexto;
-    lista = facturasPago.filter(f => {
-      const fecha = fechaReferenciaFactura(f);
-      if (!fecha || !fecha.startsWith(anio)) return false;
-      return (parseInt(fecha.slice(5,7),10) - 1) === mes && esPendienteReal(f);
-    });
-    etiqueta = `Pendientes de ${MESES_NOMBRE[mes]} ${anio}`;
-    setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMes('${anio}',${mes})">${MESES_NOMBRE[mes]}</span> › Pendientes`);
-  } else if (pagosContexto.anio !== null) {
-    // Estamos viendo un año completo (sin mes elegido): pendientes de ese año
-    const { anio } = pagosContexto;
-    lista = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio) && esPendienteReal(f));
-    etiqueta = `Pendientes de ${anio}`;
-    setBreadcrumbPagos(`<span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosAnios()">Todos los años</span> › <span style="cursor:pointer;color:var(--accent)" onclick="mostrarPagosMeses('${anio}')">${anio}</span> › Pendientes`);
-  } else {
-    lista = facturasPago.filter(esPendienteReal);
-    etiqueta = 'Pendientes (todas, sin importar el mes)';
-    setBreadcrumbPagos('Pendientes (todas, sin importar el mes)');
-  }
-  lista = lista.sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
-  renderTablaFacturasPago(lista, etiqueta, true);
-}
-
-function renderTablaFacturasPago(lista, titulo, esPendientes) {
+function renderTablaFacturasPago(lista, opts) {
+  opts = opts || {};
   const cont = document.getElementById('pagos-contenido');
+
+  // Toolbar: buscador + (si estamos en un mes) navegación mes anterior/siguiente + volver a meses.
+  const toolbarHtml = `
+    <div class="toolbar" style="margin-bottom:12px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" value="${pagosBusqueda.replace(/"/g,'&quot;')}" oninput="filtrarPagosBusqueda(this.value)">
+      </div>
+      ${opts.conNavMes ? `
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(-1)" title="Mes anterior">‹</button>
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(1)" title="Mes siguiente">›</button>
+        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="volverAMesesDelAnio()">↩ Volver a los meses de ${opts.anio}</button>
+      ` : ''}
+    </div>`;
+
   if (!lista.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✓</div><p>${esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.'}</p></div></div>`;
+    cont.innerHTML = toolbarHtml + `<div class="table-card"><div class="empty"><div class="empty-icon">${opts.esPendientes ? '✓' : '🧾'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : (opts.esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.')}</p></div></div>`;
     return;
   }
-  cont.innerHTML = `
+
+  cont.innerHTML = toolbarHtml + `
     <div class="table-card">
       <table>
         <thead><tr>
@@ -2120,6 +2191,11 @@ function renderTablaFacturasPago(lista, titulo, esPendientes) {
         </tbody>
       </table>
     </div>`;
+
+  if (opts.soloTabla) {
+    const inp = document.getElementById('pagos-search');
+    if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+  }
 }
 
 async function guardarPagoFactura(id, btnEl) {
