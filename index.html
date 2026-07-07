@@ -521,8 +521,12 @@ async function fetchAll(table, query) {
 function recalcularProductoPorOC() {
   const productosPorOCSet = {};
   items.forEach(it => {
-    const nombre = it.productonormalizado || it.productomp || '';
-    if (!nombre) return;
+    // Usamos la MISMA lógica que el detalle de la OC (nombreFinalDe): prioriza
+    // la especificación real del producto por sobre el "productomp" genérico
+    // de Mercado Público (que en licitaciones suele ser solo la categoría,
+    // ej. "Farmacias", no el nombre real del producto).
+    const nombre = nombreFinalDe(it);
+    if (!nombre || nombre === '—') return;
     if (!productosPorOCSet[it.codigooc]) productosPorOCSet[it.codigooc] = [];
     if (!productosPorOCSet[it.codigooc].includes(nombre)) productosPorOCSet[it.codigooc].push(nombre);
   });
