@@ -518,6 +518,25 @@ async function fetchAll(table, query) {
   return allRows;
 }
 
+function recalcularProductoPorOC() {
+  const productosPorOCSet = {};
+  items.forEach(it => {
+    const nombre = it.productonormalizado || it.productomp || '';
+    if (!nombre) return;
+    if (!productosPorOCSet[it.codigooc]) productosPorOCSet[it.codigooc] = [];
+    if (!productosPorOCSet[it.codigooc].includes(nombre)) productosPorOCSet[it.codigooc].push(nombre);
+  });
+  productoPorOC = {};
+  productosTextoPorOC = {};
+  for (const codigo in productosPorOCSet) {
+    const nombres = productosPorOCSet[codigo];
+    productoPorOC[codigo] = nombres.length > 1
+      ? `${nombres[0]} +${nombres.length - 1} producto${nombres.length > 2 ? 's' : ''}`
+      : nombres[0];
+    productosTextoPorOC[codigo] = nombres.join(' ');
+  }
+}
+
 async function init() {
   try {
     const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR] = await Promise.all([
@@ -554,22 +573,7 @@ async function init() {
     ocF = [...oc]; itemsF = [...items]; hospF = [...hosp];
     productosUnicos = getProductosUnicos();
     productosUnicosF = [...productosUnicos];
-    const productosPorOCSet = {};
-    items.forEach(it => {
-      const nombre = it.productonormalizado || it.productomp || '';
-      if (!nombre) return;
-      if (!productosPorOCSet[it.codigooc]) productosPorOCSet[it.codigooc] = [];
-      if (!productosPorOCSet[it.codigooc].includes(nombre)) productosPorOCSet[it.codigooc].push(nombre);
-    });
-    productoPorOC = {};
-    productosTextoPorOC = {};
-    for (const codigo in productosPorOCSet) {
-      const nombres = productosPorOCSet[codigo];
-      productoPorOC[codigo] = nombres.length > 1
-        ? `${nombres[0]} +${nombres.length - 1} producto${nombres.length > 2 ? 's' : ''}`
-        : nombres[0];
-      productosTextoPorOC[codigo] = nombres.join(' ');
-    }
+    recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas();
@@ -999,7 +1003,9 @@ function refrescarVistasTrasNormalizar() {
   // Recalcula las agrupaciones de productos para reflejar los cambios
   productosUnicos = getProductosUnicos();
   productosUnicosF = [...productosUnicos];
+  recalcularProductoPorOC();
   renderItems();
+  renderOC();
   const ocAbierta = document.getElementById('oc-modal-overlay');
   if (ocAbierta) {
     const codigoActual = ocAbierta.querySelector('.mono')?.textContent?.trim();
