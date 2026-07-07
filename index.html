@@ -801,10 +801,18 @@ function paginate(data, page) {
 }
 
 function renderPages(container, total, pages, cur, setPage) {
+  const inputId = container + '-goto';
   let h = `<button class="page-btn" onclick="${setPage}(${cur-1})" ${cur<=1?'disabled':''}>‹</button>`;
   for (let i=1; i<=Math.min(pages,7); i++) h += `<button class="page-btn${cur===i?' active':''}" onclick="${setPage}(${i})">${i}</button>`;
-  if (pages > 7) h += `<span style="padding:4px 6px;color:var(--text-3)">…${pages}</span>`;
+  if (pages > 7) h += `<button class="page-btn" onclick="${setPage}(${pages})" title="Ir a la última página">…${pages}</button>`;
   h += `<button class="page-btn" onclick="${setPage}(${cur+1})" ${cur>=pages?'disabled':''}>›</button>`;
+  if (pages > 1) {
+    h += `<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px">
+      <span style="font-size:11px;color:var(--text-3);white-space:nowrap">Ir a:</span>
+      <input type="number" min="1" max="${pages}" id="${inputId}" placeholder="Pág." style="width:58px;padding:5px 6px;font-size:12px"
+        onkeydown="if(event.key==='Enter'){const v=parseInt(this.value,10);if(v>=1&&v<=${pages}){${setPage}(v);}this.value='';}">
+    </span>`;
+  }
   document.getElementById(container).innerHTML = h;
 }
 
