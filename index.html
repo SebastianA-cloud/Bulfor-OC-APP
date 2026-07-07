@@ -767,6 +767,11 @@ function filterHosp() {
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 const clp = n => n ? '$ ' + Math.round(n).toLocaleString('es-CL') : '—';
 const fDate = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+function escapeHtml(texto) {
+  const div = document.createElement('div');
+  div.textContent = texto == null ? '' : String(texto);
+  return div.innerHTML;
+}
 const estadoBadge = e => {
   if (!e) return '';
   if (e.includes('Conforme')) return `<span class="badge badge-green">${e}</span>`;
@@ -818,6 +823,15 @@ function openOCDetail(codigoOC) {
   if (!r) return;
   const relacionados = items.filter(it => it.codigooc === codigoOC);
 
+  // Guardamos los textos reales en un array en memoria, en vez de meterlos
+  // crudos dentro de un atributo onclick — así no importa si el texto trae
+  // comillas, saltos de línea u otros caracteres raros (pasa seguido con
+  // textos de especificación de Mercado Público), el botón sigue funcionando.
+  window.__ocItemsTextos = relacionados.map(it => ({
+    textoOriginal: textoOriginalDe(it),
+    nombreFinal: nombreFinalDe(it),
+  }));
+
   const itemsHtml = !relacionados.length
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No se encontraron ítems para esta OC.</div>`
     : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -827,15 +841,14 @@ function openOCDetail(codigoOC) {
             <th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
           </tr></thead>
           <tbody>
-            ${relacionados.map(it => {
+            ${relacionados.map((it, i) => {
               const textoOriginal = textoOriginalDe(it);
               const nombreMostrado = diccionarioNormalizacion[textoOriginal] || textoOriginal;
               const yaNormalizado = !!diccionarioNormalizacion[textoOriginal];
-              const nombreFinal = nombreFinalDe(it);
               return `<tr>
                 <td style="font-weight:500">
-                  <span style="cursor:pointer;${yaNormalizado ? 'color:var(--green)' : 'color:var(--text)'}" onclick="abrirNormalizacion('${textoOriginal.replace(/'/g,"\\'")}')" title="Clic para normalizar este nombre">${nombreMostrado}${yaNormalizado ? ' ✓' : ' ✎'}</span>
-                  <span style="cursor:pointer;color:var(--accent);margin-left:6px" onclick="navPush(()=>openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}'));cerrarTodosLosModales();openProductDetail('${nombreFinal.replace(/'/g,"\\'")}')" title="Ver historial de este producto">↗</span>
+                  <span style="cursor:pointer;${yaNormalizado ? 'color:var(--green)' : 'color:var(--text)'}" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para normalizar este nombre">${nombreMostrado}${yaNormalizado ? ' ✓' : ' ✎'}</span>
+                  <span style="cursor:pointer;color:var(--accent);margin-left:6px" onclick="const _cod='${(r.codigooc||'').replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));cerrarTodosLosModales();openProductDetail(window.__ocItemsTextos[${i}].nombreFinal)" title="Ver historial de este producto">↗</span>
                 </td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
@@ -896,6 +909,11 @@ function closeOCDetail() {
 
 // ─── NORMALIZACIÓN MANUAL DE PRODUCTOS ─────────────────────────────────────
 function abrirNormalizacion(textoOriginal) {
+  // Guardado en una variable global (no embebido en HTML) para que el texto
+  // pueda traer cualquier caracter raro (comillas, saltos de línea, etc. —
+  // pasa seguido con textos de especificación de Mercado Público) sin romper
+  // los botones de este modal.
+  window.__normTextoActual = textoOriginal;
   const campos = diccionarioCampos[textoOriginal] || { nombre_producto: '', dosis: '', cantidad_formato: '' };
   const modal = document.createElement('div');
   modal.id = 'normalizacion-modal-overlay';
@@ -909,7 +927,7 @@ function abrirNormalizacion(textoOriginal) {
       </div>
       <div style="padding:20px 24px">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre original</div>
-        <div style="font-size:13px;color:var(--text-2);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:18px">${textoOriginal}</div>
+        <div style="font-size:13px;color:var(--text-2);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:18px;white-space:pre-wrap;word-break:break-word">${escapeHtml(textoOriginal)}</div>
 
         <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:6px">
           <div>
@@ -929,9 +947,9 @@ function abrirNormalizacion(textoOriginal) {
         </div>
         <div style="font-size:11px;color:var(--text-3);margin:12px 0 18px">Este nombre se aplicará automáticamente a todas las órdenes de compra que tengan exactamente este mismo texto original. Dosis es opcional, puede quedar en blanco.</div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
-          ${diccionarioNormalizacion[textoOriginal] ? `<button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarNormalizacion('${textoOriginal.replace(/'/g,"\\'")}')">Quitar normalización</button>` : ''}
+          ${diccionarioNormalizacion[textoOriginal] ? `<button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarNormalizacion(window.__normTextoActual)">Quitar normalización</button>` : ''}
           <button class="page-btn" style="padding:8px 16px" onclick="cerrarNormalizacion()">Cancelar</button>
-          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="guardarNormalizacion('${textoOriginal.replace(/'/g,"\\'")}')">Guardar</button>
+          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="guardarNormalizacion(window.__normTextoActual)">Guardar</button>
         </div>
       </div>
     </div>`;
