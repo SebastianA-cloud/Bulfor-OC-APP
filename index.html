@@ -455,6 +455,21 @@
     <div id="pagos-graficos-content"></div>
   </div>
 
+  <div class="page" id="page-facturas-rechazadas">
+    <div class="page-header">
+      <div class="page-title">Facturas rechazadas</div>
+      <div class="page-sub" id="rechazadas-sub">Todas las anuladas/rechazadas</div>
+    </div>
+    <div class="toolbar" style="flex-wrap:wrap">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rechazadas-search" placeholder="Buscar por N° factura, RUT, hospital…" oninput="filtrarRechazadas(this.value)">
+      </div>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" id="rechazadas-toggle-btn" onclick="toggleRechazadasHoy()">📅 Ver solo las de hoy</button>
+    </div>
+    <div id="rechazadas-contenido"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -557,7 +572,7 @@ async function init() {
     }
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -683,6 +698,7 @@ const MODAL_OVERLAY_IDS = [
   'fedex-detalle-modal-overlay',
   'oe-form-modal-overlay',
   'oe-detalle-modal-overlay',
+  'oe-editar-modal-overlay',
   'oe-receta-visor-overlay',
   'pac-modal-overlay',
 ];
@@ -2411,6 +2427,107 @@ function abrirGraficoPago(id) {
   }
 }
 
+// ─── FACTURAS RECHAZADAS / ANULADAS ─────────────────────────────────────────
+// Panel de control de facturas con estado_aceptacion 'N': quién la
+// reemplaza y qué nota de crédito le corresponde, para llevar la
+// trazabilidad completa. "Hoy" vs "Todas" es un interruptor, igual que
+// el de Pendientes en Seguimiento de Pago.
+let rechazadasSoloHoy = false;
+let rechazadasBusqueda = '';
+
+function facturasRechazadas() {
+  return facturasPago.filter(f => f.estado_aceptacion === 'N');
+}
+
+function hoyISO() {
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function toggleRechazadasHoy() {
+  rechazadasSoloHoy = !rechazadasSoloHoy;
+  const btn = document.getElementById('rechazadas-toggle-btn');
+  btn.textContent = rechazadasSoloHoy ? '↩ Ver todas' : '📅 Ver solo las de hoy';
+  document.getElementById('rechazadas-sub').textContent = rechazadasSoloHoy ? 'Rechazadas de hoy' : 'Todas las anuladas/rechazadas';
+  renderRechazadas();
+}
+
+function filtrarRechazadas(valor) {
+  rechazadasBusqueda = valor;
+  renderRechazadas(true);
+}
+
+function renderRechazadas(soloTabla) {
+  let lista = facturasRechazadas();
+  if (rechazadasSoloHoy) {
+    const hoy = hoyISO();
+    lista = lista.filter(f => (f.fecha_emision||'').slice(0,10) === hoy);
+  }
+  if (rechazadasBusqueda) {
+    lista = lista.filter(f => coincideBusqueda(
+      `${f.factura} ${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.factura_reemplazo||''} ${f.nota_credito_asociada||''}`,
+      rechazadasBusqueda
+    ));
+  }
+  lista = lista.sort((a,b) => (b.fecha_emision||'').localeCompare(a.fecha_emision||''));
+
+  const cont = document.getElementById('rechazadas-contenido');
+  if (!lista.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✓</div><p>${rechazadasSoloHoy ? 'No hay facturas rechazadas hoy.' : 'No hay facturas rechazadas/anuladas.'}</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Monto</th><th>Reemplazada por</th><th>N° Nota de crédito</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(f => `
+            <tr>
+              <td class="mono">${f.factura}</td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
+              <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+              <td style="white-space:nowrap">${clp(f.monto)}</td>
+              <td><input type="text" value="${(f.factura_reemplazo||'').replace(/"/g,'&quot;')}" id="rz-reemplazo-${f.id}" placeholder="N° factura" style="font-size:12px;padding:5px 8px;max-width:130px"></td>
+              <td><input type="text" value="${(f.nota_credito_asociada||'').replace(/"/g,'&quot;')}" id="rz-nc-${f.id}" placeholder="N° NC" style="font-size:12px;padding:5px 8px;max-width:110px"></td>
+              <td><button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarRechazada(${f.id}, this)">Guardar</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  if (soloTabla) {
+    const inp = document.getElementById('rechazadas-search');
+    if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+  }
+}
+
+async function guardarRechazada(id, btnEl) {
+  const reemplazo = document.getElementById(`rz-reemplazo-${id}`).value.trim();
+  const nc = document.getElementById(`rz-nc-${id}`).value.trim();
+  const textoOriginal = btnEl.textContent;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const res = await sb(`facturas_pago?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        factura_reemplazo: reemplazo || null,
+        nota_credito_asociada: nc || null,
+        updated_at: new Date().toISOString(),
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const idx = facturasPago.findIndex(f => f.id === id);
+    if (idx !== -1) { facturasPago[idx].factura_reemplazo = reemplazo || null; facturasPago[idx].nota_credito_asociada = nc || null; }
+    btnEl.textContent = '✔ Guardado';
+    setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1000);
+  } catch(e) {
+    alert('No se pudo guardar: ' + e.message);
+    btnEl.disabled = false; btnEl.textContent = textoOriginal;
+  }
+}
+
 function logPagos(msg, tipo='') {
   const el = document.getElementById('pagos-import-log');
   el.style.display = 'block';
@@ -2542,6 +2659,24 @@ function importarListadoPagos(file) {
 }
 
 // ── NUEVO ORDEN: PASO 1 — Buscar o crear paciente ─────────────────────────
+function seleccionarTipoPagoOE(tipo) {
+  window.__oeTipoPago = tipo;
+  const btnTotal = document.getElementById('oe-tipopago-total');
+  const btnAbonado = document.getElementById('oe-tipopago-abonado');
+  const inputMonto = document.getElementById('oe-monto-abonado');
+  if (tipo === 'abonado') {
+    btnAbonado.style.background = 'var(--accent-light)'; btnAbonado.style.color = 'var(--accent)'; btnAbonado.style.borderColor = 'var(--accent)';
+    btnTotal.style.background = ''; btnTotal.style.color = ''; btnTotal.style.borderColor = '';
+    inputMonto.disabled = false;
+    inputMonto.focus();
+  } else {
+    btnTotal.style.background = 'var(--accent-light)'; btnTotal.style.color = 'var(--accent)'; btnTotal.style.borderColor = 'var(--accent)';
+    btnAbonado.style.background = ''; btnAbonado.style.color = ''; btnAbonado.style.borderColor = '';
+    inputMonto.disabled = true;
+    inputMonto.value = '';
+  }
+}
+
 function abrirNuevaOrdenElaboracion() {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
@@ -2593,6 +2728,20 @@ function abrirNuevaOrdenElaboracion() {
           </select>
         </div>
 
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">¿Pago total o abonado?</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button type="button" id="oe-tipopago-total" class="page-btn" style="padding:8px 16px;flex:1" onclick="seleccionarTipoPagoOE('total')">Pago total</button>
+            <button type="button" id="oe-tipopago-abonado" class="page-btn" style="padding:8px 16px;flex:1" onclick="seleccionarTipoPagoOE('abonado')">Abonado</button>
+          </div>
+          <input type="number" id="oe-monto-abonado" placeholder="Monto abonado ($)" style="width:100%" disabled>
+        </div>
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Observaciones</div>
+          <textarea id="oe-observaciones" placeholder="Cualquier información adicional que necesites dejar anotada…" style="width:100%;min-height:60px;resize:vertical;font-family:inherit"></textarea>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha de retiro</div>
@@ -2637,7 +2786,8 @@ function abrirNuevaOrdenElaboracion() {
     </div>`;
   document.body.appendChild(modal);
   window.__oeEstado = { pacienteId: null, recetaId: null, recetaUrl: null };
-  setTimeout(() => document.getElementById('oe-paciente-input')?.focus(), 50);
+  window.__oeTipoPago = 'total';
+  setTimeout(() => { document.getElementById('oe-paciente-input')?.focus(); seleccionarTipoPagoOE('total'); }, 50);
 }
 
 function buscarPacienteOE() {
@@ -2735,12 +2885,19 @@ function prerellenarOrdenDesdeHistorial(orden, receta) {
   if (orden.indicacion) document.getElementById('oe-indicacion').value = orden.indicacion;
   if (orden.valor) document.getElementById('oe-valor').value = orden.valor;
   if (orden.pago) document.getElementById('oe-pago').value = orden.pago;
+  seleccionarTipoPagoOE(orden.tipo_pago === 'abonado' ? 'abonado' : 'total');
+  if (orden.monto_abonado) document.getElementById('oe-monto-abonado').value = orden.monto_abonado;
+  // "observaciones" en órdenes antiguas guardaba el texto de retiro; en las
+  // nuevas es texto libre real. Si no calza con el patrón de retiro, es texto
+  // libre genuino y lo copiamos tal cual a Observaciones.
+  if (orden.fecha_retiro) document.getElementById('oe-retiro-fecha').value = orden.fecha_retiro;
+  if (orden.hora_retiro) document.getElementById('oe-retiro-hora').value = orden.hora_retiro.slice(0,5);
   if (orden.observaciones) {
-    // Intentamos extraer fecha y hora si vienen en el formato "Retiro: YYYY-MM-DD a las HH:MM hrs"
     const mFecha = orden.observaciones.match(/Retiro:\s*(\d{4}-\d{2}-\d{2})/);
     const mHora = orden.observaciones.match(/a las\s*(\d{2}:\d{2})/);
-    if (mFecha) document.getElementById('oe-retiro-fecha').value = mFecha[1];
-    if (mHora) document.getElementById('oe-retiro-hora').value = mHora[1];
+    if (mFecha && !orden.fecha_retiro) document.getElementById('oe-retiro-fecha').value = mFecha[1];
+    if (mHora && !orden.hora_retiro) document.getElementById('oe-retiro-hora').value = mHora[1];
+    if (!mFecha && !mHora) document.getElementById('oe-observaciones').value = orden.observaciones;
   }
 
   // Intentamos usar la receta si existe y está vigente
@@ -2799,14 +2956,17 @@ async function guardarNuevaOrdenOE() {
   const pago = document.getElementById('oe-pago').value;
   const retiroFecha = document.getElementById('oe-retiro-fecha').value;
   const retiroHora = document.getElementById('oe-retiro-hora').value;
-  const retiro = [retiroFecha ? `Retiro: ${retiroFecha}` : '', retiroHora ? `a las ${retiroHora} hrs` : ''].filter(Boolean).join(' ');
   const telefono = document.getElementById('oe-telefono').value.trim();
+  const tipoPago = window.__oeTipoPago || 'total';
+  const montoAbonado = document.getElementById('oe-monto-abonado').value;
+  const observaciones = document.getElementById('oe-observaciones').value.trim();
   const fechaReceta = document.getElementById('oe-receta-fecha').value;
   const archivoEl = document.getElementById('oe-receta-archivo');
   const archivo = archivoEl?.files?.[0];
 
   if (!nombrePaciente || !indicacion || !pago) { alert('Paciente, preparado y pago son obligatorios.'); return; }
   if (!fechaReceta) { alert('La fecha de emisión de la receta es obligatoria.'); return; }
+  if (tipoPago === 'abonado' && !montoAbonado) { alert('Escribe el monto que se abonó.'); return; }
 
   // Verificar vigencia antes de guardar
   const venc = calcularVencimientoReceta(fechaReceta);
@@ -2890,7 +3050,11 @@ async function guardarNuevaOrdenOE() {
         indicacion,
         valor: valor ? parseInt(valor) : null,
         pago,
-        observaciones: retiro || null,
+        tipo_pago: tipoPago,
+        monto_abonado: tipoPago === 'abonado' && montoAbonado ? parseInt(montoAbonado) : null,
+        observaciones: observaciones || null,
+        fecha_retiro: retiroFecha || null,
+        hora_retiro: retiroHora || null,
       }])
     });
     if (!rOE.ok) throw new Error(await rOE.text());
@@ -2935,6 +3099,12 @@ function abrirDetalleOE(id) {
           <div class="detail-field"><label>Preparado</label><span>${o.indicacion||'—'}</span></div>
           <div class="detail-field"><label>Valor</label><span>${o.valor ? clp(o.valor) : '—'}</span></div>
           <div class="detail-field"><label>Pago</label><span>${o.pago||'—'}</span></div>
+          <div class="detail-field"><label>Tipo de pago</label><span>${o.tipo_pago === 'abonado' ? 'Abonado' : 'Pago total'}</span></div>
+          ${o.tipo_pago === 'abonado' ? `
+          <div class="detail-field"><label>Abonado</label><span>${clp(o.monto_abonado)}</span></div>
+          <div class="detail-field"><label>Saldo pendiente</label><span style="color:var(--red);font-weight:600">${clp((o.valor||0) - (o.monto_abonado||0))}</span></div>
+          ` : ''}
+          ${(o.fecha_retiro || o.hora_retiro) ? `<div class="detail-field"><label>Retiro</label><span>${o.fecha_retiro ? fDate(o.fecha_retiro) : ''}${o.hora_retiro ? ' a las '+o.hora_retiro.slice(0,5)+' hrs' : ''}</span></div>` : ''}
           <div class="detail-field"><label>Observaciones</label><span>${o.observaciones||'—'}</span></div>
           <div class="detail-field"><label>Estado digitación</label><span>${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</span></div>
           <div class="detail-field"><label>Estado entrega</label><span>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</span></div>
@@ -2964,6 +3134,7 @@ function abrirDetalleOE(id) {
 
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
           <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarOrdenOE(${o.id})">Eliminar orden</button>
+          <button class="page-btn" style="padding:8px 16px" onclick="abrirEditarOE(${o.id})">✎ Editar</button>
           <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarModalOE('oe-detalle-modal-overlay')">Cerrar</button>
         </div>
       </div>
@@ -2991,6 +3162,151 @@ async function cambiarEstadoOE(id, campo, valor) {
     abrirDetalleOE(id);
   } catch(e) {
     alert('Error al cambiar estado: ' + e.message);
+  }
+}
+
+// ── EDITAR ORDEN EXISTENTE ────────────────────────────────────────────────
+// A diferencia del formulario de "Nueva orden", este NO permite cambiar el
+// paciente ni la receta — solo los datos de la orden en sí (preparado,
+// valor, pago, observaciones, retiro), que es justo lo que se necesita
+// corregir cuando alguien se equivoca al tipear un precio, por ejemplo.
+function abrirEditarOE(id) {
+  const o = ordenesElaboracion.find(x => x.id === id);
+  if (!o) return;
+  cerrarTodosLosModales();
+
+  const modal = document.createElement('div');
+  modal.id = 'oe-editar-modal-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('oe-editar-modal-overlay'); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:16px;font-weight:600">Editar Orden — ${o.pacientes?.nombre || ''}</div>
+        <button onclick="cerrarModalOE('oe-editar-modal-overlay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+      </div>
+      <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Preparado / Indicación *</div>
+          <input type="text" id="oe-edit-indicacion" value="${(o.indicacion||'').replace(/"/g,'&quot;')}" style="width:100%">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Valor ($)</div>
+            <input type="number" id="oe-edit-valor" value="${o.valor||''}" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha orden</div>
+            <input type="date" id="oe-edit-fecha" value="${o.fecha_orden ? o.fecha_orden.slice(0,10) : ''}" style="width:100%">
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Pago *</div>
+          <select id="oe-edit-pago" style="width:100%">
+            <option value="">Seleccionar…</option>
+            <option ${o.pago==='Cancelado en meson'?'selected':''}>Cancelado en meson</option>
+            <option ${o.pago==='Cancelado por Transferencia'?'selected':''}>Cancelado por Transferencia</option>
+            <option ${o.pago==='Por Cancelar'?'selected':''}>Por Cancelar</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">¿Pago total o abonado?</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button type="button" id="oe-edit-tipopago-total" class="page-btn" style="padding:8px 16px;flex:1" onclick="seleccionarTipoPagoEditarOE('total')">Pago total</button>
+            <button type="button" id="oe-edit-tipopago-abonado" class="page-btn" style="padding:8px 16px;flex:1" onclick="seleccionarTipoPagoEditarOE('abonado')">Abonado</button>
+          </div>
+          <input type="number" id="oe-edit-monto-abonado" value="${o.monto_abonado||''}" placeholder="Monto abonado ($)" style="width:100%" ${o.tipo_pago!=='abonado'?'disabled':''}>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Fecha de retiro</div>
+            <input type="date" id="oe-edit-retiro-fecha" value="${o.fecha_retiro ? o.fecha_retiro.slice(0,10) : ''}" style="width:100%">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Hora de retiro</div>
+            <input type="time" id="oe-edit-retiro-hora" value="${o.hora_retiro ? o.hora_retiro.slice(0,5) : ''}" style="width:100%">
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Observaciones</div>
+          <textarea id="oe-edit-observaciones" style="width:100%;min-height:60px;resize:vertical;font-family:inherit">${o.observaciones||''}</textarea>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
+          <button class="page-btn" style="padding:8px 16px" onclick="cerrarModalOE('oe-editar-modal-overlay');abrirDetalleOE(${o.id})">Cancelar</button>
+          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="guardarEdicionOE(${o.id})">Guardar cambios</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  window.__oeEditTipoPago = o.tipo_pago === 'abonado' ? 'abonado' : 'total';
+  setTimeout(() => seleccionarTipoPagoEditarOE(window.__oeEditTipoPago), 30);
+}
+
+function seleccionarTipoPagoEditarOE(tipo) {
+  window.__oeEditTipoPago = tipo;
+  const btnTotal = document.getElementById('oe-edit-tipopago-total');
+  const btnAbonado = document.getElementById('oe-edit-tipopago-abonado');
+  const inputMonto = document.getElementById('oe-edit-monto-abonado');
+  if (tipo === 'abonado') {
+    btnAbonado.style.background = 'var(--accent-light)'; btnAbonado.style.color = 'var(--accent)'; btnAbonado.style.borderColor = 'var(--accent)';
+    btnTotal.style.background = ''; btnTotal.style.color = ''; btnTotal.style.borderColor = '';
+    inputMonto.disabled = false;
+  } else {
+    btnTotal.style.background = 'var(--accent-light)'; btnTotal.style.color = 'var(--accent)'; btnTotal.style.borderColor = 'var(--accent)';
+    btnAbonado.style.background = ''; btnAbonado.style.color = ''; btnAbonado.style.borderColor = '';
+    inputMonto.disabled = true;
+    inputMonto.value = '';
+  }
+}
+
+async function guardarEdicionOE(id) {
+  const indicacion = document.getElementById('oe-edit-indicacion').value.trim();
+  const valor = document.getElementById('oe-edit-valor').value;
+  const fecha = document.getElementById('oe-edit-fecha').value;
+  const pago = document.getElementById('oe-edit-pago').value;
+  const tipoPago = window.__oeEditTipoPago || 'total';
+  const montoAbonado = document.getElementById('oe-edit-monto-abonado').value;
+  const retiroFecha = document.getElementById('oe-edit-retiro-fecha').value;
+  const retiroHora = document.getElementById('oe-edit-retiro-hora').value;
+  const observaciones = document.getElementById('oe-edit-observaciones').value.trim();
+
+  if (!indicacion || !pago) { alert('Preparado y pago son obligatorios.'); return; }
+  if (tipoPago === 'abonado' && !montoAbonado) { alert('Escribe el monto que se abonó.'); return; }
+
+  try {
+    const res = await sb(`ordenes_elaboracion?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        indicacion,
+        valor: valor ? parseInt(valor) : null,
+        fecha_orden: fecha || null,
+        pago,
+        tipo_pago: tipoPago,
+        monto_abonado: tipoPago === 'abonado' && montoAbonado ? parseInt(montoAbonado) : null,
+        fecha_retiro: retiroFecha || null,
+        hora_retiro: retiroHora || null,
+        observaciones: observaciones || null,
+        updated_at: new Date().toISOString(),
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const actualizado = (await res.json())[0];
+    const idx = ordenesElaboracion.findIndex(o => o.id === id);
+    if (idx !== -1) ordenesElaboracion[idx] = { ...ordenesElaboracion[idx], ...actualizado };
+    ordenesElaboracionF = ordenesElaboracionF.map(o => o.id === id ? { ...o, ...actualizado } : o);
+    renderOE();
+    cerrarModalOE('oe-editar-modal-overlay');
+    abrirDetalleOE(id);
+  } catch(e) {
+    alert('No se pudo guardar: ' + e.message);
   }
 }
 
@@ -3803,6 +4119,7 @@ const SUBMENUS = {
     { icon: '🔎', label: 'Buscador de documentos', page: 'facturas' },
     { icon: '💰', label: 'Seguimiento pago de facturas', page: 'pagos' },
     { icon: '📊', label: 'Gráficos de pagos', page: 'pagos-graficos' },
+    { icon: '🚫', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
   ] },
   'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
