@@ -661,10 +661,14 @@ function textoOriginalDe(it) {
 
 function nombreFinalDe(it) {
   // Si ese texto largo ya tiene una normalización manual guardada, se usa esa.
-  // Si no, se usa el producto normalizado de tu Excel como hasta ahora.
+  // Si no, usamos el mismo texto "inteligente" que ya se muestra en el
+  // detalle de la OC (especificación real del comprador/proveedor) en vez
+  // de caer directo al "productomp" de Mercado Público — ese campo en
+  // licitaciones suele traer solo la categoría genérica (ej. "Farmacias",
+  // "Reactivos o soluciones químicos"), no el nombre real del producto.
   const original = textoOriginalDe(it);
   if (diccionarioNormalizacion[original]) return diccionarioNormalizacion[original];
-  return it.productonormalizado || it.productomp || '—';
+  return original || it.productonormalizado || it.productomp || '—';
 }
 
 function getProductosUnicos() {
@@ -825,6 +829,20 @@ function renderOC() {
   }).join('');
 }
 
+// Navega entre OC según la lista filtrada actual (ocF) — respeta lo que
+// esté visible según los filtros/búsqueda en pantalla en ese momento.
+function botonNavOCHtml(codigoActual) {
+  const idx = ocF.findIndex(o => o.codigooc === codigoActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0;
+  const haySiguiente = idx < ocF.length - 1;
+  const codAnterior = hayAnterior ? ocF[idx-1].codigooc.replace(/'/g,"\\'") : '';
+  const codSiguiente = haySiguiente ? ocF[idx+1].codigooc.replace(/'/g,"\\'") : '';
+  return `
+    <button onclick="openOCDetail('${codAnterior}')" ${hayAnterior?'':'disabled'} title="OC anterior" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="openOCDetail('${codSiguiente}')" ${haySiguiente?'':'disabled'} title="OC siguiente" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
 function openOCDetail(codigoOC) {
   cerrarTodosLosModales();
   const r = oc.find(o => o.codigooc === codigoOC);
@@ -883,6 +901,7 @@ function openOCDetail(codigoOC) {
           <div style="font-size:15px;font-weight:600">${r.nombreoc||'—'}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonNavOCHtml(r.codigooc)}
           ${botonVerEnMPHtml(r.codigooc)}
           ${botonAtrasHtml()}
           <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
@@ -916,6 +935,18 @@ function closeOCDetail() {
 }
 
 // ─── NORMALIZACIÓN MANUAL DE PRODUCTOS ─────────────────────────────────────
+// Lista de nombres de producto que ya usaste antes al normalizar (sin
+// repetir), para que al escribir "p" o "pr" te sugiera lo ya guardado y
+// no termines con "Pregabalina", "pregabalina" y "Pregabalina 75mg" como
+// si fueran 3 cosas distintas.
+function nombresProductoGuardados() {
+  const set = new Set();
+  Object.values(diccionarioCampos).forEach(c => {
+    if (c.nombre_producto) set.add(c.nombre_producto);
+  });
+  return Array.from(set).sort((a,b) => a.localeCompare(b, 'es'));
+}
+
 function abrirNormalizacion(textoOriginal) {
   // Guardado en una variable global (no embebido en HTML) para que el texto
   // pueda traer cualquier caracter raro (comillas, saltos de línea, etc. —
@@ -940,7 +971,10 @@ function abrirNormalizacion(textoOriginal) {
         <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:6px">
           <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre del producto</div>
-            <input type="text" id="norm-nombre" value="${campos.nombre_producto.replace(/"/g,'&quot;')}" placeholder="Ej: Tintura Benjuí, Polietilenglicol 3350" style="width:100%">
+            <input type="text" id="norm-nombre" value="${campos.nombre_producto.replace(/"/g,'&quot;')}" placeholder="Ej: Tintura Benjuí, Polietilenglicol 3350" list="norm-nombre-lista" style="width:100%">
+            <datalist id="norm-nombre-lista">
+              ${nombresProductoGuardados().map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('')}
+            </datalist>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div>
