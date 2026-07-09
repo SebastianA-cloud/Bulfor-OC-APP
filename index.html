@@ -3501,10 +3501,11 @@ function abrirNuevoEnvio() {
             <input type="text" id="fx-new-hospital" placeholder="Escribe para buscar un hospital…" style="width:100%" autocomplete="off" oninput="filtrarSugerenciasHospital()" onfocus="filtrarSugerenciasHospital()">
             <div id="fx-hospital-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
           </div>
-          <div>
+          <div style="position:relative">
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">RUT del hospital</div>
-            <input type="text" id="fx-new-rut" placeholder="Ej: 61.602.260-1" style="width:100%">
-            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Se completa solo si ya lo tenías guardado — puedes escribirlo o corregirlo aquí.</div>
+            <input type="text" id="fx-new-rut" placeholder="Ej: 61.602.260-1" style="width:100%" autocomplete="off" oninput="filtrarSugerenciasPorRut()" onfocus="filtrarSugerenciasPorRut()">
+            <div id="fx-rut-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Puedes escribir el hospital o el RUT — el otro campo se completa solo si ya lo tenías guardado.</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">N° Orden de transporte *</div>
@@ -3547,6 +3548,30 @@ function seleccionarHospitalSugerido(nombre) {
   document.getElementById('fx-hospital-sugerencias').style.display = 'none';
   const rutInput = document.getElementById('fx-new-rut');
   if (mapaRutPorHospital[nombre]) rutInput.value = mapaRutPorHospital[nombre];
+}
+
+function filtrarSugerenciasPorRut() {
+  const q = document.getElementById('fx-new-rut').value.trim();
+  const cont = document.getElementById('fx-rut-sugerencias');
+  if (!q) { cont.style.display = 'none'; return; }
+
+  const coincidencias = hospitalesMaestro.filter(h => h.rut && coincideBusqueda(h.rut, q)).slice(0, 8);
+  if (!coincidencias.length) { cont.style.display = 'none'; return; }
+
+  cont.innerHTML = coincidencias.map(h => `
+    <div style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+         onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+         onclick="seleccionarHospitalPorRut('${(h.nombre_estandar||'').replace(/'/g,"\\'")}', '${h.rut.replace(/'/g,"\\'")}')">
+      <div>${h.nombre_estandar}</div>
+      <div style="font-size:11px;color:var(--text-3)">${h.rut}</div>
+    </div>`).join('');
+  cont.style.display = 'block';
+}
+
+function seleccionarHospitalPorRut(nombre, rut) {
+  document.getElementById('fx-new-hospital').value = nombre;
+  document.getElementById('fx-new-rut').value = rut;
+  document.getElementById('fx-rut-sugerencias').style.display = 'none';
 }
 
 function intentarGuardarNuevoEnvio() {
