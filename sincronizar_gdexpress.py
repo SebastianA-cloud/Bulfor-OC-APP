@@ -38,7 +38,7 @@ FECHA_MINIMA = '2025-01-01'  # ignoramos todo lo emitido antes de esta fecha
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def gdexpress_get(pagina, max_reintentos=5):
+def gdexpress_get(pagina, max_reintentos=6):
     query_b64 = base64.b64encode(CONSULTA.encode('utf-8')).decode('ascii')
     url = f"http://{DTEBOX_IP}/api/Core.svc/core/PaginatedSearch/{AMBIENTE}/{GRUPO}/{query_b64}/{pagina}/{TAMANO_PAGINA}"
     headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
@@ -51,12 +51,12 @@ def gdexpress_get(pagina, max_reintentos=5):
             if str(data.get('Result')) != '0':
                 raise RuntimeError(f"GDExpress devolvió un error: {data.get('Description')}")
             return data
-        except requests.exceptions.RequestException as e:
-            print(f"    ⚠ Error de conexión en la página {pagina} (intento {intento+1}/{max_reintentos}): {e}")
+        except (requests.exceptions.RequestException, RuntimeError) as e:
+            print(f"    ⚠ Error en la página {pagina} (intento {intento+1}/{max_reintentos}): {e}")
             if intento == max_reintentos - 1:
                 raise
             time.sleep(espera)
-            espera *= 2  # 5s, 10s, 20s, 40s...
+            espera = min(espera * 2, 60)  # 5s, 10s, 20s, 40s, 60s, 60s...
 
 
 def parse_fecha(texto):
@@ -166,7 +166,7 @@ def main():
         if pagina >= total_paginas:
             break
         pagina += 1
-        time.sleep(1)
+        time.sleep(3 if pagina % 10 != 0 else 15)  # cada 10 páginas, una pausa más larga
 
     print(f"\n✔ Listo: {total_procesadas} facturas sincronizadas (creadas o actualizadas).")
     if paginas_con_error:
