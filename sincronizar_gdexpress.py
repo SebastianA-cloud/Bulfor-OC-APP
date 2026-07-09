@@ -33,6 +33,7 @@ AMBIENTE = 'P'   # P = Producción (facturas reales). Usar 'T' solo para pruebas
 GRUPO = 'E'      # E = Emitidos (lo que Bulfor factura a los hospitales)
 CONSULTA = 'TipoDTE:33'  # 33 = Factura Electrónica (no notas de crédito ni guías)
 TAMANO_PAGINA = 300  # máximo permitido por la API
+FECHA_MINIMA = '2025-01-01'  # ignoramos todo lo emitido antes de esta fecha
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -137,7 +138,10 @@ def main():
         docs = documentos_desde_xml(xml_bytes)
         print(f"  {len(docs)} facturas en esta página")
 
-        filas = [d for d in docs if d['factura']]  # nunca incluimos fecha_pago/estado_pago acá — eso no se toca
+        filas = [d for d in docs if d['factura'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
+        omitidas = len(docs) - len(filas)
+        if omitidas:
+            print(f"  ({omitidas} facturas de antes de {FECHA_MINIMA} — se ignoran)")
 
         if filas:
             supabase.table('facturas_pago').upsert(filas, on_conflict='factura').execute()
