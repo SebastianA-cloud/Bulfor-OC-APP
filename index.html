@@ -612,13 +612,20 @@ function coincideBusqueda(texto, query) {
   return palabras.every(palabra => textoLower.includes(palabra));
 }
 
+// Busca el RUT del hospital a partir de su nombre (crudo o ya normalizado),
+// usando el mapa precomputado — para poder buscar OC por RUT del hospital.
+function rutDeHospital(nombreCrudo) {
+  if (!nombreCrudo) return '';
+  return mapaRutPorHospital[nombreCrudo] || mapaRutPorHospital[nombreHosp(nombreCrudo)] || '';
+}
+
 function filterOC() {
   const q = document.getElementById('oc-search').value;
   const reg = document.getElementById('oc-region').value;
   const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
   ocF = oc.filter(r => {
-    const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
+    const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
   ocPage = 1; renderOC();
@@ -886,7 +893,7 @@ function openOCDetail(codigoOC) {
                 </td>
                 <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -1381,11 +1388,17 @@ function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) re
 // las filas que ya tienen nombre_estandar definido). Se usa para mostrar el
 // nombre correcto en toda la app SIN esperar a que se resincronicen las OC.
 let mapaHospitalesNormalizados = {};
+let mapaRutPorHospital = {};
 
 function reconstruirMapaHospitales() {
   mapaHospitalesNormalizados = {};
+  mapaRutPorHospital = {};
   hospitalesMaestro.forEach(h => {
     if (h.nombre_original && h.nombre_estandar) mapaHospitalesNormalizados[h.nombre_original] = h.nombre_estandar;
+    if (h.rut) {
+      if (h.nombre_original) mapaRutPorHospital[h.nombre_original] = h.rut;
+      if (h.nombre_estandar) mapaRutPorHospital[h.nombre_estandar] = h.rut;
+    }
   });
 }
 
