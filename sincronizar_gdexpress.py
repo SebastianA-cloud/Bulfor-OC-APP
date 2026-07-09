@@ -37,16 +37,25 @@ TAMANO_PAGINA = 300  # máximo permitido por la API
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def gdexpress_get(pagina):
+def gdexpress_get(pagina, max_reintentos=5):
     query_b64 = base64.b64encode(CONSULTA.encode('utf-8')).decode('ascii')
     url = f"http://{DTEBOX_IP}/api/Core.svc/core/PaginatedSearch/{AMBIENTE}/{GRUPO}/{query_b64}/{pagina}/{TAMANO_PAGINA}"
     headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
-    r = requests.get(url, headers=headers, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    if str(data.get('Result')) != '0':
-        raise RuntimeError(f"GDExpress devolvió un error: {data.get('Description')}")
-    return data
+    espera = 5
+    for intento in range(max_reintentos):
+        try:
+            r = requests.get(url, headers=headers, timeout=120)
+            r.raise_for_status()
+            data = r.json()
+            if str(data.get('Result')) != '0':
+                raise RuntimeError(f"GDExpress devolvió un error: {data.get('Description')}")
+            return data
+        except requests.exceptions.RequestException as e:
+            print(f"    ⚠ Error de conexión en la página {pagina} (intento {intento+1}/{max_reintentos}): {e}")
+            if intento == max_reintentos - 1:
+                raise
+            time.sleep(espera)
+            espera *= 2  # 5s, 10s, 20s, 40s...
 
 
 def parse_fecha(texto):
@@ -88,19 +97,34 @@ def documentos_desde_xml(xml_bytes):
 def main():
     print(f"Sincronizando facturas emitidas — Ambiente: {AMBIENTE}, Consulta: {CONSULTA}\n")
 
-    # Facturas ya existentes, para no pisar fecha_pago/estado_pago
-    existentes = {}
-    res = supabase.table('facturas_pago').select('factura,fecha_pago,estado_pago').execute()
-    for f in (res.data or []):
-        existentes[f['factura']] = f
-
     pagina = 1
     total_procesadas = 0
     total_paginas = None
+    paginas_con_error = []
+    fallos_seguidos = 0
 
     while True:
         print(f"Página {pagina}" + (f"/{total_paginas}" if total_paginas else "") + "...")
-        data = gdexpress_get(pagina)
+        try:
+            data = gdexpress_get(pagina)
+            fallos_seguidos = 0
+        except Exception as e:
+            print(f"  ✗ No se pudo traer la página {pagina} después de varios intentos: {e}")
+            paginas_con_error.append(pagina)
+            fallos_seguidos += 1
+            if fallos_seguidos >= 5:
+                print("  ✗ Demasiadas páginas seguidas fallando — se detiene acá para no colgarse. Corre el script de nuevo más tarde.")
+                break
+            if total_paginas is None:
+                print("  No sabemos cuántas páginas hay en total todavía — se detiene acá. Corre el script de nuevo.")
+                break
+            print("    Se sigue con la siguiente página — esta se puede reintentar corriendo el script de nuevo.")
+            if pagina >= total_paginas:
+                break
+            pagina += 1
+            time.sleep(2)
+            continue
+
         total_documentos = int(data.get('TotalDocuments', 0))
         if total_paginas is None:
             total_paginas = max(1, -(-total_documentos // TAMANO_PAGINA))  # ceil
@@ -113,11 +137,7 @@ def main():
         docs = documentos_desde_xml(xml_bytes)
         print(f"  {len(docs)} facturas en esta página")
 
-        filas = []
-        for d in docs:
-            if not d['factura']:
-                continue
-            filas.append(d)  # nunca incluimos fecha_pago/estado_pago acá — eso no se toca
+        filas = [d for d in docs if d['factura']]  # nunca incluimos fecha_pago/estado_pago acá — eso no se toca
 
         if filas:
             supabase.table('facturas_pago').upsert(filas, on_conflict='factura').execute()
@@ -129,6 +149,9 @@ def main():
         time.sleep(1)
 
     print(f"\n✔ Listo: {total_procesadas} facturas sincronizadas (creadas o actualizadas).")
+    if paginas_con_error:
+        print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
+        print("  Corre el script de nuevo para completarlas (no duplica nada, solo rellena lo que falte).")
 
 
 if __name__ == '__main__':
