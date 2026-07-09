@@ -1,0 +1,32 @@
+name: Probar conexión GDExpress
+
+on:
+  workflow_dispatch:  # solo manual, no automático
+
+jobs:
+  probar-gdexpress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Ejecutar script de prueba
+        env:
+          DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
+          GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+        run: python probar_gdexpress.py
+
+      - name: Subir el XML de respuesta (si se generó)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: respuesta-gdexpress
+          path: respuesta_gdexpress.xml
+          if-no-files-found: ignore
