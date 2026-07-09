@@ -69,6 +69,17 @@ def parse_fecha(texto):
         return None
 
 
+def es_verdadero(texto):
+    """GDExpress no siempre usa el mismo formato exacto para sí/no (a veces
+    'Sí', 'Si', 'SI', 'True', etc.). Para no perder ningún caso de anulación
+    por una diferencia de formato, tratamos como verdadero todo lo que NO
+    sea explícitamente un valor de "no" o "desconocido"."""
+    if not texto:
+        return False
+    t = texto.strip().lower()
+    return t not in ('no', 'false', '0', 'indefinido', '')
+
+
 def documentos_desde_xml(xml_bytes):
     """El XML viene en ISO-8859-1 (lo declara en la cabecera) — se lo pasamos
     crudo a ElementTree para que respete esa codificación él solo."""
@@ -79,8 +90,8 @@ def documentos_desde_xml(xml_bytes):
             el = doc.find(nombre)
             return el.text if el is not None else None
 
-        anulado = (campo('Anulado') or '').strip().lower() in ('si', 'sí', 'true')
-        autorizado = (campo('AutorizadoSII') or '').strip().lower() in ('si', 'sí', 'true')
+        anulado = es_verdadero(campo('Anulado'))
+        autorizado = es_verdadero(campo('AutorizadoSII'))
 
         docs.append({
             'factura': campo('Folio'),
@@ -137,6 +148,11 @@ def main():
         xml_bytes = base64.b64decode(data['Data'])
         docs = documentos_desde_xml(xml_bytes)
         print(f"  {len(docs)} facturas en esta página")
+
+        if pagina == 1:
+            print("  Muestra de valores reales (para verificar la detección de anuladas):")
+            for d in docs[:5]:
+                print(f"    Factura {d['factura']}: estado_aceptacion={d['estado_aceptacion']}")
 
         filas = [d for d in docs if d['factura'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
         omitidas = len(docs) - len(filas)
