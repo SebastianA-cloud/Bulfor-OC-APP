@@ -3502,6 +3502,11 @@ function abrirNuevoEnvio() {
             <div id="fx-hospital-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
           </div>
           <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">RUT del hospital</div>
+            <input type="text" id="fx-new-rut" placeholder="Ej: 61.602.260-1" style="width:100%">
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Se completa solo si ya lo tenías guardado — puedes escribirlo o corregirlo aquí.</div>
+          </div>
+          <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">N° Orden de transporte *</div>
             <input type="text" id="fx-new-ot" placeholder="Ej: 873581859362" style="width:100%">
           </div>
@@ -3540,23 +3545,46 @@ function filtrarSugerenciasHospital() {
 function seleccionarHospitalSugerido(nombre) {
   document.getElementById('fx-new-hospital').value = nombre;
   document.getElementById('fx-hospital-sugerencias').style.display = 'none';
+  const rutInput = document.getElementById('fx-new-rut');
+  if (mapaRutPorHospital[nombre]) rutInput.value = mapaRutPorHospital[nombre];
 }
 
 function intentarGuardarNuevoEnvio() {
   const hospitalEscrito = document.getElementById('fx-new-hospital').value.trim();
+  const rutEscrito = document.getElementById('fx-new-rut').value.trim();
   const ot = document.getElementById('fx-new-ot').value.trim();
   if (!hospitalEscrito || !ot) { alert('Hospital y N° de Orden de transporte son obligatorios.'); return; }
 
   // ¿Coincide exactamente con un hospital ya existente en la tabla maestra?
-  const existe = hospitalesMaestro.some(h => (h.nombre_estandar||'').toLowerCase() === hospitalEscrito.toLowerCase());
-  if (existe) {
-    guardarNuevoEnvio(hospitalEscrito);
+  const existente = hospitalesMaestro.find(h => (h.nombre_estandar||'').toLowerCase() === hospitalEscrito.toLowerCase());
+  if (existente) {
+    guardarRutHospitalSiCorresponde(existente, rutEscrito).then(() => guardarNuevoEnvio(hospitalEscrito));
   } else {
-    abrirConfirmacionHospitalNuevo(hospitalEscrito);
+    abrirConfirmacionHospitalNuevo(hospitalEscrito, rutEscrito);
   }
 }
 
-function abrirConfirmacionHospitalNuevo(nombreEscrito) {
+// Si el hospital ya existía pero no tenía RUT guardado (o lo escribiste
+// distinto), lo completa/actualiza en hospitales_maestro — así queda
+// estandarizado de una vez, sin tener que ir al panel de normalización.
+async function guardarRutHospitalSiCorresponde(fila, rutEscrito) {
+  if (!rutEscrito || rutEscrito === fila.rut) return;
+  try {
+    const res = await sb(`hospitales_maestro?nombre_original=eq.${encodeURIComponent(fila.nombre_original)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rut: rutEscrito })
+    });
+    if (res.ok) {
+      fila.rut = rutEscrito;
+      mapaRutPorHospital[fila.nombre_original] = rutEscrito;
+      if (fila.nombre_estandar) mapaRutPorHospital[fila.nombre_estandar] = rutEscrito;
+    }
+  } catch(e) {
+    console.error('No se pudo actualizar el RUT del hospital:', e);
+  }
+}
+
+function abrirConfirmacionHospitalNuevo(nombreEscrito, rutEscrito) {
   const modal = document.createElement('div');
   modal.id = 'fedex-hospital-nuevo-overlay';
   modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.6);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -3574,7 +3602,7 @@ function abrirConfirmacionHospitalNuevo(nombreEscrito) {
           </div>
           <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">RUT (opcional)</div>
-            <input type="text" id="fx-hosp-nuevo-rut" placeholder="Ej: 61.602.260-1" style="width:100%">
+            <input type="text" id="fx-hosp-nuevo-rut" value="${(rutEscrito||'').replace(/"/g,'&quot;')}" placeholder="Ej: 61.602.260-1" style="width:100%">
           </div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
@@ -3600,6 +3628,10 @@ async function crearHospitalYGuardarEnvio() {
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
     const nuevo = (await res.json())[0];
     hospitalesMaestro.push(nuevo);
+    if (nuevo.rut) {
+      mapaRutPorHospital[nuevo.nombre_original] = nuevo.rut;
+      if (nuevo.nombre_estandar) mapaRutPorHospital[nuevo.nombre_estandar] = nuevo.rut;
+    }
     document.getElementById('fedex-hospital-nuevo-overlay').remove();
     await guardarNuevoEnvio(nombre);
   } catch(e) {
