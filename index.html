@@ -166,8 +166,9 @@
     <div class="nav-item" onclick="mostrarModulo('fedex', this)">
       <span class="nav-icon">🚚</span><span>Seguimiento FedEx</span>
     </div>
-    <div class="nav-item" onclick="mostrarModulo('elaboracion', this)">
+    <div class="nav-item" onclick="mostrarModulo('elaboracion', this)" style="position:relative">
       <span class="nav-icon">⚗️</span><span>Órdenes de Elaboración</span>
+      <span id="badge-oe-digitar" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
     </div>
     <div class="nav-item" onclick="mostrarModulo('rrhh', this)">
       <span class="nav-icon">👥</span><span>Recursos Humanos</span>
@@ -1913,8 +1914,20 @@ function filterOE() {
   oePage = 1; renderOE();
 }
 
+function actualizarBadgeOEDigitar() {
+  const cantidad = ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length;
+  const badge = document.getElementById('badge-oe-digitar');
+  if (!cantidad) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.textContent = cantidad > 3 ? '3+' : String(cantidad);
+  badge.style.display = 'flex';
+}
+
 function renderOE() {
   updateOEStats();
+  actualizarBadgeOEDigitar();
   const { slice, pages, total } = paginate(ordenesElaboracionF, oePage);
   document.getElementById('oe-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oe-pages', total, pages, oePage, 'goOE');
