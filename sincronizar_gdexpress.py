@@ -2,7 +2,9 @@
 Sincronización de facturas emitidas (GDExpress -> Supabase).
 
 Trae las facturas (TipoDTE:33) que Bulfor ha emitido a los hospitales desde
-GDExpress, y las guarda/actualiza en facturas_pago:
+GDExpress, SOLO desde el 01-07-2026 en adelante (FECHA_MINIMA) — todo lo
+anterior a esa fecha ya está cargado tal cual vino del Excel original y no
+se toca. Las guarda/actualiza en facturas_pago:
   - Si la factura NO existía, la crea completa.
   - Si YA existía, actualiza los datos que vienen del documento (hospital,
     monto, fecha de emisión, fecha de vencimiento REAL, estado de
@@ -33,9 +35,33 @@ AMBIENTE = 'P'   # P = Producción (facturas reales). Usar 'T' solo para pruebas
 GRUPO = 'E'      # E = Emitidos (lo que Bulfor factura a los hospitales)
 CONSULTA = 'TipoDTE:33'  # 33 = Factura Electrónica (no notas de crédito ni guías)
 TAMANO_PAGINA = 300  # máximo permitido por la API
-FECHA_MINIMA = '2025-01-01'  # ignoramos todo lo emitido antes de esta fecha
+FECHA_MINIMA = '2026-07-01'  # todo lo anterior ya está tal cual vino de tu Excel — no se toca
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+CHECKPOINT_CLAVE = 'gdexpress_ultima_pagina_ok'
+
+
+def leer_checkpoint():
+    """Devuelve la última página que sabemos que se procesó bien la vez
+    anterior, o None si es la primera vez que se corre."""
+    try:
+        res = supabase.table('sync_estado').select('valor').eq('clave', CHECKPOINT_CLAVE).execute()
+        if res.data:
+            return int(res.data[0]['valor'])
+    except Exception as e:
+        print(f"  (no se pudo leer el checkpoint, se parte de cero: {e})")
+    return None
+
+
+def guardar_checkpoint(pagina):
+    try:
+        supabase.table('sync_estado').upsert(
+            {'clave': CHECKPOINT_CLAVE, 'valor': str(pagina), 'updated_at': datetime.utcnow().isoformat()},
+            on_conflict='clave'
+        ).execute()
+    except Exception as e:
+        print(f"  (no se pudo guardar el checkpoint: {e})")
 
 
 def gdexpress_get(pagina, max_reintentos=6):
@@ -109,10 +135,17 @@ def documentos_desde_xml(xml_bytes):
 def main():
     print(f"Sincronizando facturas emitidas — Ambiente: {AMBIENTE}, Consulta: {CONSULTA}\n")
 
-    pagina = 1
+    checkpoint = leer_checkpoint()
+    pagina = max(1, checkpoint - 3) if checkpoint else 1
+    if checkpoint:
+        print(f"Retomando desde la página {pagina} (checkpoint anterior: {checkpoint}, con 3 páginas de margen)\n")
+    else:
+        print("Primera vez que corre — empieza desde la página 1\n")
+
     total_procesadas = 0
     total_paginas = None
     paginas_con_error = []
+    pagina_maxima_ok = checkpoint or 0
     fallos_seguidos = 0
 
     while True:
@@ -163,12 +196,17 @@ def main():
             supabase.table('facturas_pago').upsert(filas, on_conflict='factura').execute()
             total_procesadas += len(filas)
 
+        pagina_maxima_ok = pagina
+
         if pagina >= total_paginas:
             break
         pagina += 1
         time.sleep(3 if pagina % 10 != 0 else 15)  # cada 10 páginas, una pausa más larga
 
+    guardar_checkpoint(pagina_maxima_ok)
+
     print(f"\n✔ Listo: {total_procesadas} facturas sincronizadas (creadas o actualizadas).")
+    print(f"  Checkpoint guardado en la página {pagina_maxima_ok} para la próxima corrida.")
     if paginas_con_error:
         print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
         print("  Corre el script de nuevo para completarlas (no duplica nada, solo rellena lo que falte).")
