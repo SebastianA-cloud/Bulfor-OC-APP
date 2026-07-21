@@ -722,6 +722,7 @@ const MODAL_OVERLAY_IDS = [
   'oe-receta-visor-overlay',
   'pac-modal-overlay',
   'factura-quickview-overlay',
+  'factura-pago-detalle-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -2385,20 +2386,19 @@ function renderTablaFacturasPago(lista, opts) {
     <div class="table-card">
       <table>
         <thead><tr>
-          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Fecha de pago</th><th>Estado de pago</th><th></th>
+          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Fecha de pago</th><th>Estado de pago</th>
         </tr></thead>
         <tbody>
           ${lista.map(f => `
-            <tr>
-              <td class="mono">${f.factura}</td>
+            <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
+              <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
               <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</td>
               <td style="white-space:nowrap">${clp(f.monto)}</td>
               <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">No aceptada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
-              <td><input type="date" value="${f.fecha_pago ? f.fecha_pago.slice(0,10) : ''}" id="fp-fecha-${f.id}" style="font-size:12px;padding:5px 8px;max-width:140px"></td>
-              <td><input type="text" value="${(f.estado_pago||'').replace(/"/g,'&quot;')}" id="fp-estado-${f.id}" placeholder="Ej: Pagado" style="font-size:12px;padding:5px 8px;max-width:140px"></td>
-              <td><button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarPagoFactura(${f.id}, this)">Guardar</button></td>
+              <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
+              <td>${badgeEstadoPagoHtml(f)}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -2410,9 +2410,75 @@ function renderTablaFacturasPago(lista, opts) {
   }
 }
 
-async function guardarPagoFactura(id, btnEl) {
-  const fecha = document.getElementById(`fp-fecha-${id}`).value;
-  const estado = document.getElementById(`fp-estado-${id}`).value.trim();
+// Verde si ya tiene fecha de pago (muestra el estado_pago real, o "Pagado" si
+// no se especificó ninguno). Ámbar si todavía no tiene fecha de pago — se
+// asume "Sin pagar" aunque el campo esté vacío, no lo dejamos en blanco.
+function badgeEstadoPagoHtml(f) {
+  if (f.fecha_pago) {
+    return `<span class="badge" style="background:var(--green-light);color:var(--green)">${f.estado_pago || 'Pagado'}</span>`;
+  }
+  return `<span class="badge" style="background:#FEF3C7;color:#92400E">Sin pagar</span>`;
+}
+
+function cerrarDetalleFacturaPago() {
+  const m = document.getElementById('factura-pago-detalle-overlay');
+  if (m) m.remove();
+}
+
+function abrirDetalleFacturaPago(id) {
+  const f = facturasPago.find(x => x.id === id);
+  if (!f) return;
+  cerrarTodosLosModales();
+
+  const modal = document.createElement('div');
+  modal.id = 'factura-pago-detalle-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) cerrarDetalleFacturaPago(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="mono" style="font-size:16px">${f.factura}</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(f.hospital)||f.hospital||'—'}</div>
+        </div>
+        <button onclick="cerrarDetalleFacturaPago()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+
+      <div style="padding:20px 24px">
+        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
+          <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
+          <div class="detail-field"><label>Vencimiento</label><span>${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</span></div>
+          <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion === 'N' ? 'No aceptada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
+        <div style="font-size:12px;color:var(--text-3);border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">
+          Todavía no disponible — se completa automáticamente cuando conectemos la búsqueda de documentos de GDExpress.
+        </div>
+
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Pago</div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Fecha de pago</div>
+            <input type="date" id="fp-detalle-fecha" value="${f.fecha_pago ? f.fecha_pago.slice(0,10) : ''}" style="width:100%">
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Estado de pago</div>
+            <input type="text" id="fp-detalle-estado" value="${(f.estado_pago||'').replace(/"/g,'&quot;')}" placeholder="Ej: Pagado" style="width:100%">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px">
+          <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarPagoFacturaDetalle(${f.id}, this)">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function guardarPagoFacturaDetalle(id, btnEl) {
+  const fecha = document.getElementById('fp-detalle-fecha').value;
+  const estado = document.getElementById('fp-detalle-estado').value.trim();
   const textoOriginal = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Guardando…';
   try {
@@ -2428,7 +2494,10 @@ async function guardarPagoFactura(id, btnEl) {
     const idx = facturasPago.findIndex(f => f.id === id);
     if (idx !== -1) { facturasPago[idx].fecha_pago = fecha || null; facturasPago[idx].estado_pago = estado || null; }
     btnEl.textContent = '✔ Guardado';
-    setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1000);
+    setTimeout(() => {
+      cerrarDetalleFacturaPago();
+      renderPagosVista();
+    }, 500);
   } catch(e) {
     alert('No se pudo guardar: ' + e.message);
     btnEl.disabled = false; btnEl.textContent = textoOriginal;
