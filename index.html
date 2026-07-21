@@ -2187,12 +2187,14 @@ function migaAnio(anio) {
 function mostrarPagosAnios() {
   pagosContexto = { anio: null, mes: null, viendoPendientes: false };
   pagosBusqueda = '';
+  pagosBusquedaAnio = '';
   renderPagosVista();
 }
 
 function mostrarPagosMeses(anio) {
   pagosContexto = { anio, mes: null, viendoPendientes: false };
   pagosBusqueda = '';
+  pagosBusquedaAnio = '';
   renderPagosVista();
 }
 
@@ -2203,6 +2205,7 @@ function mostrarPagosMes(anio, mesIdx) {
   if (m > 11) { m = 0; a += 1; }
   pagosContexto = { anio: String(a), mes: m, viendoPendientes: false };
   pagosBusqueda = '';
+  pagosBusquedaAnio = '';
   renderPagosVista();
 }
 
@@ -2220,6 +2223,7 @@ function volverAMesesDelAnio() {
 function togglePendientesPagos() {
   pagosContexto.viendoPendientes = !pagosContexto.viendoPendientes;
   pagosBusqueda = '';
+  pagosBusquedaAnio = '';
   renderPagosVista();
 }
 
@@ -2330,8 +2334,39 @@ function renderTarjetasAnios() {
   </div>`;
 }
 
-function renderTarjetasMeses(anio) {
+// Búsqueda por RUT/hospital dentro de un año (cruza todos los meses).
+// Vacía = se ven las tarjetas de mes normales; con texto = tabla de
+// resultados de todo el año, sin importar en qué mes caiga cada factura.
+let pagosBusquedaAnio = '';
+
+function filtrarFacturasEnAnio(valor) {
+  pagosBusquedaAnio = valor;
+  renderTarjetasMeses(pagosContexto.anio, true);
+}
+
+function renderTarjetasMeses(anio, soloTabla) {
+  const cont = document.getElementById('pagos-contenido');
   const delAnio = facturasPago.filter(f => (fechaReferenciaFactura(f)||'').startsWith(anio));
+
+  const buscadorHtml = `
+    <div class="toolbar" style="margin-bottom:14px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="pagos-search-anio" placeholder="Buscar por RUT o nombre de hospital en ${anio}…" value="${pagosBusquedaAnio.replace(/"/g,'&quot;')}" oninput="filtrarFacturasEnAnio(this.value)">
+      </div>
+    </div>`;
+
+  if (pagosBusquedaAnio) {
+    const resultado = delAnio.filter(f => coincideBusqueda(`${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''}`, pagosBusquedaAnio))
+      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+    cont.innerHTML = buscadorHtml + construirTablaFacturasHtml(resultado, 'Sin resultados para esa búsqueda en este año.');
+    if (soloTabla) {
+      const inp = document.getElementById('pagos-search-anio');
+      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+    }
+    return;
+  }
+
   const porMes = {};
   delAnio.forEach(f => {
     const mesIdx = parseInt((fechaReferenciaFactura(f)||'').slice(5,7), 10) - 1;
@@ -2339,13 +2374,12 @@ function renderTarjetasMeses(anio) {
     if (!porMes[mesIdx]) porMes[mesIdx] = [];
     porMes[mesIdx].push(f);
   });
-  const cont = document.getElementById('pagos-contenido');
   const mesesConDatos = Object.keys(porMes).map(Number).sort((a,b)=>a-b);
   if (!mesesConDatos.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas para ${anio}.</p></div></div>`;
+    cont.innerHTML = buscadorHtml + `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas para ${anio}.</p></div></div>`;
     return;
   }
-  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
+  cont.innerHTML = buscadorHtml + `<div style="display:flex;flex-wrap:wrap;gap:12px">
     ${mesesConDatos.map(mesIdx => {
       const delMes = porMes[mesIdx];
       const pendientes = delMes.filter(esPendienteReal).length;
@@ -2359,30 +2393,11 @@ function renderTarjetasMeses(anio) {
   </div>`;
 }
 
-function renderTablaFacturasPago(lista, opts) {
-  opts = opts || {};
-  const cont = document.getElementById('pagos-contenido');
-
-  // Toolbar: buscador + (si estamos en un mes) navegación mes anterior/siguiente + volver a meses.
-  const toolbarHtml = `
-    <div class="toolbar" style="margin-bottom:12px">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" value="${pagosBusqueda.replace(/"/g,'&quot;')}" oninput="filtrarPagosBusqueda(this.value)">
-      </div>
-      ${opts.conNavMes ? `
-        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(-1)" title="Mes anterior">‹</button>
-        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(1)" title="Mes siguiente">›</button>
-        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="volverAMesesDelAnio()">↩ Volver a los meses de ${opts.anio}</button>
-      ` : ''}
-    </div>`;
-
+function construirTablaFacturasHtml(lista, mensajeVacio) {
   if (!lista.length) {
-    cont.innerHTML = toolbarHtml + `<div class="table-card"><div class="empty"><div class="empty-icon">${opts.esPendientes ? '✓' : '🧾'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : (opts.esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.')}</p></div></div>`;
-    return;
+    return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
   }
-
-  cont.innerHTML = toolbarHtml + `
+  return `
     <div class="table-card">
       <table>
         <thead><tr>
@@ -2403,6 +2418,28 @@ function renderTablaFacturasPago(lista, opts) {
         </tbody>
       </table>
     </div>`;
+}
+
+function renderTablaFacturasPago(lista, opts) {
+  opts = opts || {};
+  const cont = document.getElementById('pagos-contenido');
+
+  // Toolbar: buscador + (si estamos en un mes) navegación mes anterior/siguiente + volver a meses.
+  const toolbarHtml = `
+    <div class="toolbar" style="margin-bottom:12px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" value="${pagosBusqueda.replace(/"/g,'&quot;')}" oninput="filtrarPagosBusqueda(this.value)">
+      </div>
+      ${opts.conNavMes ? `
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(-1)" title="Mes anterior">‹</button>
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesPagos(1)" title="Mes siguiente">›</button>
+        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="volverAMesesDelAnio()">↩ Volver a los meses de ${opts.anio}</button>
+      ` : ''}
+    </div>`;
+
+  const mensajeVacio = pagosBusqueda ? 'Sin resultados para tu búsqueda.' : (opts.esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.');
+  cont.innerHTML = toolbarHtml + construirTablaFacturasHtml(lista, mensajeVacio);
 
   if (opts.soloTabla) {
     const inp = document.getElementById('pagos-search');
