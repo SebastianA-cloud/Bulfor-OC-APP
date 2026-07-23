@@ -370,8 +370,8 @@ def main():
         time.sleep(2)
     print(f"\n✔✔ Listo en total: {total} documentos sincronizados entre los 3 tipos.")
 
-    sincronizar_detalle_pendiente()
-    actualizar_estado_fiscal()
+    sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
+    actualizar_estado_fiscal(limite=int(os.environ.get('LIMITE_FISCAL', 200)))
 
 
 if __name__ == '__main__':
