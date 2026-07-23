@@ -287,6 +287,81 @@ def sincronizar_detalle_pendiente(limite=150):
     print(f"✔ Detalle traído: {ok} documentos guardados ({ok - ok_sin_items} con productos, {ok_sin_items} solo con el XML crudo). Fallidos de verdad: {fallidos}.")
 
 
+def consultar_estado_fiscal(tipo_dte, folio, max_reintentos=3):
+    """Consulta el estado REAL del documento directo al SII (vía GDExpress) —
+    más confiable que el indicador 'Anulado' del resumen de búsqueda, que
+    puede quedar desactualizado.
+    Status: 0 = autorizado por el SII, 1 = pendiente, 2 = aprobado con
+    reparos, 9 = rechazado por el SII."""
+    url = f"http://{DTEBOX_IP}/api/Core.svc/core/FiscalStatus/{AMBIENTE}/{GRUPO}/{RUT_EMISOR}/{tipo_dte}/{folio}"
+    headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+    espera = 3
+    for intento in range(max_reintentos):
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            if str(data.get('Result')) != '0':
+                raise RuntimeError(data.get('Description'))
+            return str(data.get('Status'))
+        except (requests.exceptions.RequestException, RuntimeError) as e:
+            if intento == max_reintentos - 1:
+                raise
+            time.sleep(espera)
+            espera *= 2
+
+
+def estado_aceptacion_desde_status_fiscal(status):
+    if status == '9':
+        return 'N'  # rechazado por el SII
+    if status in ('0', '2'):
+        return 'A'  # autorizado, o aprobado con reparos
+    return None  # '1' = pendiente de resolución, o algo desconocido
+
+
+def actualizar_estado_fiscal(limite=200):
+    """Revisa el estado fiscal real de una tanda de documentos: primero los
+    que nunca se han revisado, y si sobra cupo, los que se revisaron hace
+    más tiempo (el estado puede cambiar — un documento puede pasar de
+    'pendiente' a 'rechazado' más adelante, así que conviene re-chequear)."""
+    print(f"\n{'='*50}\nRevisando estado fiscal real (hasta {limite} documentos por corrida)\n{'='*50}")
+
+    res_nuevos = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio') \
+        .is_('estado_fiscal_actualizado', 'null').limit(limite).execute()
+    pendientes = res_nuevos.data or []
+
+    if len(pendientes) < limite:
+        faltan = limite - len(pendientes)
+        res_viejos = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio,estado_fiscal_actualizado') \
+            .order('estado_fiscal_actualizado').limit(faltan + 50).execute()
+        extra = [d for d in (res_viejos.data or []) if d.get('estado_fiscal_actualizado')][:faltan]
+        pendientes += extra
+
+    print(f"{len(pendientes)} documentos a revisar")
+
+    ok, fallidos = 0, 0
+    cambios_a_rechazado = []
+    for doc in pendientes:
+        try:
+            status = consultar_estado_fiscal(doc['tipo_dte'], doc['folio'])
+            nuevo_estado = estado_aceptacion_desde_status_fiscal(status)
+            update = {'estado_fiscal_status': status, 'estado_fiscal_actualizado': datetime.now().isoformat()}
+            if nuevo_estado:
+                update['estado_aceptacion'] = nuevo_estado
+                if nuevo_estado == 'N':
+                    cambios_a_rechazado.append(f"{doc['tipo_dte']}-{doc['folio']}")
+            supabase.table('documentos_gdexpress').update(update).eq('id', doc['id']).execute()
+            ok += 1
+        except Exception as e:
+            print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): {e}")
+            fallidos += 1
+        time.sleep(0.5)
+
+    print(f"✔ Estado fiscal revisado: {ok} documentos. Fallidos: {fallidos}.")
+    if cambios_a_rechazado:
+        print(f"⚠ Rechazados por el SII en esta tanda: {cambios_a_rechazado}")
+
+
 def main():
     print(f"Sincronizando Buscador de Documentos — {FECHA_MINIMA} a {FECHA_MAXIMA}")
     total = 0
@@ -296,6 +371,7 @@ def main():
     print(f"\n✔✔ Listo en total: {total} documentos sincronizados entre los 3 tipos.")
 
     sincronizar_detalle_pendiente()
+    actualizar_estado_fiscal()
 
 
 if __name__ == '__main__':
