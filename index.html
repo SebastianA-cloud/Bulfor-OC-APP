@@ -317,11 +317,22 @@
 
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
-    <div class="modulo-placeholder">
-      <div class="icono">🔎</div>
-      <h2>Buscador de documentos</h2>
-      <p>Este módulo se conectará vía API para buscar tus documentos tributarios directamente. Próximamente.</p>
+    <div class="page-header">
+      <div class="page-title">Buscador de documentos</div>
+      <div class="page-sub">Facturas, Notas de Crédito y Guías de Despacho</div>
     </div>
+    <div class="toolbar" style="gap:8px">
+      <button class="page-btn" id="doc-tab-33" style="padding:8px 16px" onclick="cambiarTipoDocumento('33')">Facturas</button>
+      <button class="page-btn" id="doc-tab-61" style="padding:8px 16px" onclick="cambiarTipoDocumento('61')">Notas de Crédito</button>
+      <button class="page-btn" id="doc-tab-52" style="padding:8px 16px" onclick="cambiarTipoDocumento('52')">Guías de Despacho</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="doc-search" placeholder="Buscar por N° documento, RUT, hospital, N° OC…" oninput="filtrarDocumentosGdexpress(this.value)">
+      </div>
+    </div>
+    <div id="doc-contenido"></div>
   </div>
 
   <div class="page" id="page-fedex">
@@ -494,6 +505,9 @@ let hospitalesMaestro = [];
 let ordenesElaboracion = [], ordenesElaboracionF = [], oePage = 1;
 let pacientes = [];
 let facturasPago = [];
+let documentosGdexpress = [];
+let docTipoActual = '33';
+let docBusqueda = '';
 let oeCategoria = 'todos';
 let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
@@ -544,7 +558,7 @@ function recalcularProductoPorOC() {
 
 async function init() {
   try {
-    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
@@ -553,6 +567,7 @@ async function init() {
       fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc'),
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
       fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
+      fetchAll('documentos_gdexpress', 'select=*&order=fecha_emision.desc'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -565,6 +580,7 @@ async function init() {
     ordenesElaboracionF = [...ordenesElaboracion];
     pacientes = Array.isArray(pacR) ? pacR : [];
     facturasPago = Array.isArray(facPagoR) ? facPagoR : [];
+    documentosGdexpress = Array.isArray(docGdexR) ? docGdexR : [];
     diccionarioNormalizacion = {};
     diccionarioCampos = {};
     (Array.isArray(diccR) ? diccR : []).forEach(d => {
@@ -581,7 +597,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33');
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -723,6 +739,7 @@ const MODAL_OVERLAY_IDS = [
   'pac-modal-overlay',
   'factura-quickview-overlay',
   'factura-pago-detalle-overlay',
+  'doc-gdexpress-detalle-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -2782,6 +2799,143 @@ function abrirGraficoPago(id) {
         const [a, mm] = m.split('-');
         return barraHtml(`${MESES_NOMBRE[parseInt(mm,10)-1]} ${a}`, porMes[m], max, clp(porMes[m]));
       }).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+  }
+}
+
+// ─── BUSCADOR DE DOCUMENTOS (Facturas / Notas de Crédito / Guías) ──────────
+const TIPOS_DTE_INFO = {
+  '33': { nombre: 'Facturas', singular: 'Factura' },
+  '61': { nombre: 'Notas de Crédito', singular: 'Nota de Crédito' },
+  '52': { nombre: 'Guías de Despacho', singular: 'Guía de Despacho' },
+};
+
+function cambiarTipoDocumento(tipo) {
+  docTipoActual = tipo;
+  docBusqueda = '';
+  document.getElementById('doc-search').value = '';
+  ['33','61','52'].forEach(t => {
+    const btn = document.getElementById(`doc-tab-${t}`);
+    if (t === tipo) { btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+    else { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+  });
+  renderDocumentosGdexpress();
+}
+
+function filtrarDocumentosGdexpress(valor) {
+  docBusqueda = valor;
+  renderDocumentosGdexpress(true);
+}
+
+function renderDocumentosGdexpress(soloTabla) {
+  const cont = document.getElementById('doc-contenido');
+  let lista = documentosGdexpress.filter(d => d.tipo_dte === docTipoActual);
+
+  if (docBusqueda) {
+    lista = lista.filter(d => coincideBusqueda(
+      `${d.folio} ${d.rut_hospital||''} ${d.hospital||''} ${nombreHosp(d.hospital)||''} ${d.orden_compra_ref||''}`,
+      docBusqueda
+    ));
+  }
+
+  lista = lista.slice().sort((a,b) => (b.fecha_emision||'').localeCompare(a.fecha_emision||''));
+
+  const info = TIPOS_DTE_INFO[docTipoActual];
+  if (!lista.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda.' : `Todavía no hay ${info.nombre.toLowerCase()} sincronizadas.`}</p></div></div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Emisión</th><th>N° ${info.singular}</th><th>Hospital</th><th>RUT Hospital</th><th>N° OC</th><th>Monto</th><th>Estado</th>
+        </tr></thead>
+        <tbody>
+          ${lista.map(d => `
+            <tr style="cursor:pointer" onclick="abrirDetalleDocumentoGdexpress(${d.id})">
+              <td style="font-size:12px;white-space:nowrap">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td class="mono" style="color:var(--accent)">${d.folio} ↗</td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
+              <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
+              <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref||'—'}</td>
+              <td style="white-space:nowrap">${clp(d.monto)}</td>
+              <td>${d.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : d.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  if (soloTabla) {
+    const inp = document.getElementById('doc-search');
+    if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+  }
+}
+
+async function abrirDetalleDocumentoGdexpress(id) {
+  const d = documentosGdexpress.find(x => x.id === id);
+  if (!d) return;
+  cerrarTodosLosModales();
+  const info = TIPOS_DTE_INFO[d.tipo_dte];
+
+  const modal = document.createElement('div');
+  modal.id = 'doc-gdexpress-detalle-overlay';
+  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${info.singular}</div>
+          <div class="mono" style="font-size:16px">${d.folio}</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
+        </div>
+        <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
+          <div class="detail-field"><label>Fecha emisión</label><span>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</span></div>
+          <div class="detail-field"><label>Monto</label><span>${clp(d.monto)}</span></div>
+          <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${d.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : d.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
+          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref || 'No detectada'}</span></div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos / Ítems</div>
+        <div id="doc-items-cuerpo" style="font-size:12px;color:var(--text-3)">Cargando…</div>
+
+        ${d.doc_url ? `<div style="margin-top:16px;text-align:right"><a href="${d.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const cuerpoItems = document.getElementById('doc-items-cuerpo');
+  if (!d.detalle_sincronizado) {
+    cuerpoItems.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">Todavía no se ha traído el detalle de este documento — se completa solo en la próxima sincronización.</div>`;
+    return;
+  }
+  try {
+    const items = await fetchAll('documentos_gdexpress_items', `select=*&documento_id=eq.${d.id}`);
+    if (!items.length) {
+      cuerpoItems.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">No se encontraron productos para este documento.</div>`;
+      return;
+    }
+    cuerpoItems.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
+          <tbody>
+            ${items.map(it => `<tr>
+              <td style="font-weight:500">${it.nombre_producto||'—'}</td>
+              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    cuerpoItems.innerHTML = `<div style="color:var(--red)">No se pudo cargar el detalle: ${e.message}</div>`;
   }
 }
 
