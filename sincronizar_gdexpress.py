@@ -2,9 +2,16 @@
 Sincronización de facturas emitidas (GDExpress -> Supabase).
 
 Trae las facturas (TipoDTE:33) que Bulfor ha emitido a los hospitales desde
-GDExpress, SOLO desde el 01-07-2026 en adelante (FECHA_MINIMA) — todo lo
-anterior a esa fecha ya está cargado tal cual vino del Excel original y no
-se toca. Las guarda/actualiza en facturas_pago:
+GDExpress, SOLO desde el 01-07-2026 en adelante — todo lo anterior a esa
+fecha ya está cargado tal cual vino del Excel original y no se toca.
+
+A diferencia de la primera versión (que recorría TODO el historial página
+por página y se pegaba en un rango roto de GDExpress), esta versión le pide
+directamente a la API solo el rango de fechas que necesitamos, usando el
+filtro FchEmis:[fecha_inicio TO fecha_fin] en la consulta — así nunca toca
+las páginas viejas donde fallaba, y de paso es mucho más rápido.
+
+Guarda/actualiza en facturas_pago:
   - Si la factura NO existía, la crea completa.
   - Si YA existía, actualiza los datos que vienen del documento (hospital,
     monto, fecha de emisión, fecha de vencimiento REAL, estado de
@@ -13,8 +20,7 @@ se toca. Las guarda/actualiza en facturas_pago:
     listado de pagos o la edición manual en la app. Así no se pisa nada
     de lo que ya hayas marcado como pagado.
 
-Se corre todas las noches via GitHub Actions (workflow_dispatch + cron),
-igual que el script de Mercado Público.
+Se corre todas las noches via GitHub Actions (workflow_dispatch + cron).
 """
 
 import os
@@ -33,35 +39,17 @@ AUTH_KEY = os.environ['GDEXPRESS_API_KEY']
 
 AMBIENTE = 'P'   # P = Producción (facturas reales). Usar 'T' solo para pruebas.
 GRUPO = 'E'      # E = Emitidos (lo que Bulfor factura a los hospitales)
-CONSULTA = 'TipoDTE:33'  # 33 = Factura Electrónica (no notas de crédito ni guías)
+RUT_EMISOR = '76186755-5'  # RUT de Farmacia Bulfor
 TAMANO_PAGINA = 300  # máximo permitido por la API
-FECHA_MINIMA = '2026-07-01'  # todo lo anterior ya está tal cual vino de tu Excel — no se toca
+
+# Todo lo anterior a esta fecha ya está cargado tal cual vino del Excel —
+# no se toca. Le pedimos a la API SOLO desde acá hasta hoy.
+FECHA_MINIMA = '2026-07-01'
+FECHA_MAXIMA = datetime.now().strftime('%Y-%m-%d')
+
+CONSULTA = f'(RUTEmisor:{RUT_EMISOR} AND TipoDTE:33 AND FchEmis:[{FECHA_MINIMA} TO {FECHA_MAXIMA}])'
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-CHECKPOINT_CLAVE = 'gdexpress_ultima_pagina_ok'
-
-
-def leer_checkpoint():
-    """Devuelve la última página que sabemos que se procesó bien la vez
-    anterior, o None si es la primera vez que se corre."""
-    try:
-        res = supabase.table('sync_estado').select('valor').eq('clave', CHECKPOINT_CLAVE).execute()
-        if res.data:
-            return int(res.data[0]['valor'])
-    except Exception as e:
-        print(f"  (no se pudo leer el checkpoint, se parte de cero: {e})")
-    return None
-
-
-def guardar_checkpoint(pagina):
-    try:
-        supabase.table('sync_estado').upsert(
-            {'clave': CHECKPOINT_CLAVE, 'valor': str(pagina), 'updated_at': datetime.utcnow().isoformat()},
-            on_conflict='clave'
-        ).execute()
-    except Exception as e:
-        print(f"  (no se pudo guardar el checkpoint: {e})")
 
 
 def gdexpress_get(pagina, max_reintentos=6):
@@ -133,38 +121,22 @@ def documentos_desde_xml(xml_bytes):
 
 
 def main():
-    print(f"Sincronizando facturas emitidas — Ambiente: {AMBIENTE}, Consulta: {CONSULTA}\n")
+    print(f"Sincronizando facturas emitidas — Ambiente: {AMBIENTE}")
+    print(f"Consulta: {CONSULTA}\n")
 
-    checkpoint = leer_checkpoint()
-    pagina = max(1, checkpoint - 3) if checkpoint else 1
-    if checkpoint:
-        print(f"Retomando desde la página {pagina} (checkpoint anterior: {checkpoint}, con 3 páginas de margen)\n")
-    else:
-        print("Primera vez que corre — empieza desde la página 1\n")
-
+    pagina = 1
     total_procesadas = 0
     total_paginas = None
     paginas_con_error = []
-    pagina_maxima_ok = checkpoint or 0
-    fallos_seguidos = 0
 
     while True:
         print(f"Página {pagina}" + (f"/{total_paginas}" if total_paginas else "") + "...")
         try:
             data = gdexpress_get(pagina)
-            fallos_seguidos = 0
         except Exception as e:
             print(f"  ✗ No se pudo traer la página {pagina} después de varios intentos: {e}")
             paginas_con_error.append(pagina)
-            fallos_seguidos += 1
-            if fallos_seguidos >= 5:
-                print("  ✗ Demasiadas páginas seguidas fallando — se detiene acá para no colgarse. Corre el script de nuevo más tarde.")
-                break
-            if total_paginas is None:
-                print("  No sabemos cuántas páginas hay en total todavía — se detiene acá. Corre el script de nuevo.")
-                break
-            print("    Se sigue con la siguiente página — esta se puede reintentar corriendo el script de nuevo.")
-            if pagina >= total_paginas:
+            if total_paginas is None or pagina >= total_paginas:
                 break
             pagina += 1
             time.sleep(2)
@@ -173,6 +145,7 @@ def main():
         total_documentos = int(data.get('TotalDocuments', 0))
         if total_paginas is None:
             total_paginas = max(1, -(-total_documentos // TAMANO_PAGINA))  # ceil
+            print(f"  Total de documentos en el rango: {total_documentos} ({total_paginas} página(s))")
 
         if not data.get('Data'):
             print("  Sin datos en esta página.")
@@ -182,31 +155,20 @@ def main():
         docs = documentos_desde_xml(xml_bytes)
         print(f"  {len(docs)} facturas en esta página")
 
-        if pagina == 1:
-            print("  Muestra de valores reales (para verificar la detección de anuladas):")
-            for d in docs[:5]:
-                print(f"    Factura {d['factura']}: estado_aceptacion={d['estado_aceptacion']}")
-
+        # Resguardo extra: aunque la consulta ya filtra por fecha, nos
+        # aseguramos de no guardar nada fuera del rango por si acaso.
         filas = [d for d in docs if d['factura'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
-        omitidas = len(docs) - len(filas)
-        if omitidas:
-            print(f"  ({omitidas} facturas de antes de {FECHA_MINIMA} — se ignoran)")
 
         if filas:
             supabase.table('facturas_pago').upsert(filas, on_conflict='factura').execute()
             total_procesadas += len(filas)
 
-        pagina_maxima_ok = pagina
-
         if pagina >= total_paginas:
             break
         pagina += 1
-        time.sleep(3 if pagina % 10 != 0 else 15)  # cada 10 páginas, una pausa más larga
-
-    guardar_checkpoint(pagina_maxima_ok)
+        time.sleep(2)
 
     print(f"\n✔ Listo: {total_procesadas} facturas sincronizadas (creadas o actualizadas).")
-    print(f"  Checkpoint guardado en la página {pagina_maxima_ok} para la próxima corrida.")
     if paginas_con_error:
         print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
         print("  Corre el script de nuevo para completarlas (no duplica nada, solo rellena lo que falte).")
