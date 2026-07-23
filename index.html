@@ -788,7 +788,19 @@ function filterHosp() {
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 const clp = n => n ? '$ ' + Math.round(n).toLocaleString('es-CL') : '—';
-const fDate = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const fDate = d => {
+  if (!d) return '—';
+  // Si es un texto tipo 'YYYY-MM-DD...' lo formateamos directo, sin pasar
+  // por new Date() — eso es lo que causaba el desfase de un día (new Date
+  // interpreta 'YYYY-MM-DD' como medianoche UTC, y en Chile eso cae en el
+  // día anterior al mostrarlo).
+  if (typeof d === 'string') {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  const dt = (d instanceof Date) ? d : new Date(d);
+  return isNaN(dt) ? '—' : dt.toLocaleDateString('es-CL');
+};
 function escapeHtml(texto) {
   const div = document.createElement('div');
   div.textContent = texto == null ? '' : String(texto);
@@ -2404,12 +2416,15 @@ function renderTarjetasMeses(anio, soloTabla) {
 
 function filaFacturaHtml(f, opts) {
   opts = opts || {};
+  const vencReal = !!f.fecha_vencimiento;
+  const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+  const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
   return `
     <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
       <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</td>
+      <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
       <td style="white-space:nowrap">${clp(f.monto)}</td>
       <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
@@ -2472,17 +2487,21 @@ function descargarExcelFacturasPago() {
   const lista = window.__ultimaListaFacturasPago || [];
   if (!lista.length) { alert('No hay nada para descargar.'); return; }
 
-  const filas = lista.map(f => ({
-    'Factura': f.factura,
-    'Hospital': nombreHosp(f.hospital) || f.hospital || '',
-    'RUT Hospital': f.rut_hospital || '',
-    'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
-    'Vencimiento': f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '',
-    'Monto': f.monto || 0,
-    'Estado': f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '',
-    'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
-    'Estado de Pago': f.fecha_pago ? (f.estado_pago || 'Pagado') : 'Sin pagar',
-  }));
+  const filas = lista.map(f => {
+    const vencReal = !!f.fecha_vencimiento;
+    const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+    return {
+      'Factura': f.factura,
+      'Hospital': nombreHosp(f.hospital) || f.hospital || '',
+      'RUT Hospital': f.rut_hospital || '',
+      'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
+      'Vencimiento': vencDate ? (vencReal ? fDate(vencDate) : `~${fDate(vencDate)} (estimado)`) : '',
+      'Monto': f.monto || 0,
+      'Estado': f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '',
+      'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
+      'Estado de Pago': f.fecha_pago ? (f.estado_pago || 'Pagado') : 'Sin pagar',
+    };
+  });
 
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();
@@ -2539,6 +2558,10 @@ function abrirDetalleFacturaPago(id) {
   if (!f) return;
   cerrarTodosLosModales();
 
+  const vencRealDetalle = !!f.fecha_vencimiento;
+  const vencDateDetalle = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+  const vencHtmlDetalle = vencDateDetalle ? (vencRealDetalle ? fDate(vencDateDetalle) : `<span title="Estimado — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDateDetalle)} (estimado)</span>`) : '—';
+
   const modal = document.createElement('div');
   modal.id = 'factura-pago-detalle-overlay';
   modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -2556,7 +2579,7 @@ function abrirDetalleFacturaPago(id) {
       <div style="padding:20px 24px">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
-          <div class="detail-field"><label>Vencimiento</label><span>${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</span></div>
+          <div class="detail-field"><label>Vencimiento</label><span>${vencHtmlDetalle}</span></div>
           <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
           <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
         </div>
@@ -2665,9 +2688,11 @@ function calcularVencimientoFactura(f, nombreHospital) {
   // Si ya tenemos la fecha de vencimiento REAL (viene de GDExpress), la usamos
   // tal cual. Si no (facturas históricas de antes de esa integración), la
   // estimamos por el plazo de pago que corresponda.
-  if (f.fecha_vencimiento) return new Date(f.fecha_vencimiento);
+  // Ojo: agregamos 'T00:00:00' para que new Date() lo interprete en hora
+  // LOCAL, no UTC — si no, en Chile se corre un día hacia atrás.
+  if (f.fecha_vencimiento) return new Date(f.fecha_vencimiento + 'T00:00:00');
   if (!f.fecha_emision) return null;
-  const d = new Date(f.fecha_emision);
+  const d = new Date(f.fecha_emision + 'T00:00:00');
   d.setDate(d.getDate() + plazoPagoDias(nombreHospital));
   return d;
 }
@@ -2693,7 +2718,7 @@ function statsPagosPorHospital() {
       if (f.fecha_emision || f.fecha_vencimiento) {
         const vencimiento = calcularVencimientoFactura(f, nombre);
         if (vencimiento) {
-          const atraso = Math.round((new Date(f.fecha_pago) - vencimiento) / 86400000);
+          const atraso = Math.round((new Date(f.fecha_pago + 'T00:00:00') - vencimiento) / 86400000);
           g.sumaAtraso += atraso;
           g.nAtrasoValidos += 1;
         }
@@ -3986,7 +4011,7 @@ function renderDetalleEnvio(f, modoEdicion) {
   }
 
   // Modo edición: convertimos estado, fecha de entrega y recibido por en campos editables
-  const fechaEntregaInput = f.fecha_entrega ? new Date(f.fecha_entrega).toISOString().slice(0,10) : '';
+  const fechaEntregaInput = f.fecha_entrega ? String(f.fecha_entrega).slice(0,10) : '';
   cuerpo.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
