@@ -1838,7 +1838,7 @@ function abrirFacturaDesdeFedex(numero) {
       </div>
       <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
-        <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion==='N'?'No aceptada':f.estado_aceptacion==='A'?'Aceptada':'—'}</span></div>
+        <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion==='N'?'Anulada/Rechazada':f.estado_aceptacion==='A'?'Aceptada':'—'}</span></div>
         <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision?fDate(f.fecha_emision):'—'}</span></div>
         <div class="detail-field"><label>Fecha de pago</label><span>${f.fecha_pago?fDate(f.fecha_pago):'Pendiente'}</span></div>
         <div class="detail-field" style="grid-column:span 2"><label>Estado de pago</label><span>${f.estado_pago||'—'}</span></div>
@@ -2152,6 +2152,15 @@ function fechaReferenciaFactura(f) {
   return f.fecha_emision || f.fecha_pago || null;
 }
 
+// Ordena por N° de factura (folio) de menor a mayor. Comparamos como número
+// cuando se puede (la mayoría de los folios son numéricos); si alguno no lo
+// es, cae de vuelta a orden de texto para no romper nada.
+function compararPorFolio(a, b) {
+  const na = parseInt(a.factura, 10), nb = parseInt(b.factura, 10);
+  if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+  return String(a.factura||'').localeCompare(String(b.factura||''));
+}
+
 function pagosAniosDisponibles() {
   const anios = new Set();
   facturasPago.forEach(f => {
@@ -2282,7 +2291,7 @@ function renderPagosVista(soloTabla) {
     if (!viendoPendientes) { setBreadcrumbPagos('Todos los años'); renderTarjetasAnios(); return; }
     setBreadcrumbPagos(`${migaAnios()} › Pendientes`);
     const lista = aplicarFiltroPagos(facturasPago.filter(esPendienteReal))
-      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+      .sort(compararPorFolio);
     renderTablaFacturasPago(lista, { esPendientes: true, soloTabla });
     return;
   }
@@ -2294,7 +2303,7 @@ function renderPagosVista(soloTabla) {
     if (!viendoPendientes) { setBreadcrumbPagos(`${migaAnios()} › ${anio}`); renderTarjetasMeses(anio); return; }
     setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › Pendientes`);
     const lista = aplicarFiltroPagos(delAnio.filter(esPendienteReal))
-      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+      .sort(compararPorFolio);
     renderTablaFacturasPago(lista, { esPendientes: true, soloTabla });
     return;
   }
@@ -2308,7 +2317,7 @@ function renderPagosVista(soloTabla) {
   renderResumenPagos(delMes); // resumen del mes completo, se vea o no "pendientes"
   renderContextoGrande(`${MESES_NOMBRE[mes]} ${anio}`);
   const base = viendoPendientes ? delMes.filter(esPendienteReal) : delMes;
-  const lista = aplicarFiltroPagos(base).sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+  const lista = aplicarFiltroPagos(base).sort(compararPorFolio);
   setBreadcrumbPagos(`${migaAnios()} › ${migaAnio(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
   renderTablaFacturasPago(lista, { esPendientes: viendoPendientes, soloTabla, conNavMes: true, anio, mes });
 }
@@ -2358,7 +2367,7 @@ function renderTarjetasMeses(anio, soloTabla) {
 
   if (pagosBusquedaAnio) {
     const resultado = delAnio.filter(f => coincideBusqueda(`${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''}`, pagosBusquedaAnio))
-      .sort((a,b) => (fechaReferenciaFactura(a)||'').localeCompare(fechaReferenciaFactura(b)||''));
+      .sort(compararPorFolio);
     cont.innerHTML = buscadorHtml + construirTablaFacturasHtml(resultado, 'Sin resultados para esa búsqueda en este año.');
     if (soloTabla) {
       const inp = document.getElementById('pagos-search-anio');
@@ -2393,31 +2402,90 @@ function renderTarjetasMeses(anio, soloTabla) {
   </div>`;
 }
 
-function construirTablaFacturasHtml(lista, mensajeVacio) {
-  if (!lista.length) {
-    return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
-  }
+function filaFacturaHtml(f) {
+  return `
+    <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
+      <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
+      <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</td>
+      <td style="white-space:nowrap">${clp(f.monto)}</td>
+      <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+      <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
+      <td>${badgeEstadoPagoHtml(f)}</td>
+    </tr>`;
+}
+
+function tablaFacturasHtml(lista) {
   return `
     <div class="table-card">
       <table>
         <thead><tr>
           <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Fecha de pago</th><th>Estado de pago</th>
         </tr></thead>
-        <tbody>
-          ${lista.map(f => `
-            <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
-              <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
-              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</td>
-              <td style="white-space:nowrap">${clp(f.monto)}</td>
-              <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">No aceptada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
-              <td>${badgeEstadoPagoHtml(f)}</td>
-            </tr>`).join('')}
-        </tbody>
+        <tbody>${lista.map(filaFacturaHtml).join('')}</tbody>
       </table>
     </div>`;
+}
+
+function construirTablaFacturasHtml(lista, mensajeVacio) {
+  window.__ultimaListaFacturasPago = lista; // para que el botón de descarga exporte justo lo que se ve
+
+  if (!lista.length) {
+    return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
+  }
+
+  // Las anuladas/rechazadas se muestran aparte, destacadas — no mezcladas
+  // con las facturas normales, para que salten a la vista.
+  const normales = lista.filter(f => f.estado_aceptacion !== 'N');
+  const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
+
+  let html = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFacturasPago()">⬇️ Descargar Excel (${lista.length})</button>
+    </div>`;
+
+  html += normales.length
+    ? tablaFacturasHtml(normales)
+    : `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas normales — solo hay anuladas/rechazadas abajo.</p></div></div>`;
+
+  if (anuladas.length) {
+    html += `
+      <div style="margin-top:24px;border:1px solid var(--red);border-radius:var(--radius-lg);overflow:hidden">
+        <div style="background:var(--red-light);padding:12px 20px;font-size:13px;font-weight:600;color:var(--red)">
+          🚫 Anuladas / Rechazadas (${anuladas.length})
+        </div>
+        <div style="padding:14px">
+          ${tablaFacturasHtml(anuladas)}
+        </div>
+      </div>`;
+  }
+
+  return html;
+}
+
+function descargarExcelFacturasPago() {
+  const lista = window.__ultimaListaFacturasPago || [];
+  if (!lista.length) { alert('No hay nada para descargar.'); return; }
+
+  const filas = lista.map(f => ({
+    'Factura': f.factura,
+    'Hospital': nombreHosp(f.hospital) || f.hospital || '',
+    'RUT Hospital': f.rut_hospital || '',
+    'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
+    'Vencimiento': f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '',
+    'Monto': f.monto || 0,
+    'Estado': f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '',
+    'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
+    'Estado de Pago': f.fecha_pago ? (f.estado_pago || 'Pagado') : 'Sin pagar',
+  }));
+
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Facturas');
+
+  const fechaArchivo = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(libro, `facturas_pago_${fechaArchivo}.xlsx`);
 }
 
 function renderTablaFacturasPago(lista, opts) {
@@ -2486,7 +2554,7 @@ function abrirDetalleFacturaPago(id) {
           <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
           <div class="detail-field"><label>Vencimiento</label><span>${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</span></div>
           <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion === 'N' ? 'No aceptada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
         </div>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
