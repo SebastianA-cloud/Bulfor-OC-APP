@@ -2402,7 +2402,8 @@ function renderTarjetasMeses(anio, soloTabla) {
   </div>`;
 }
 
-function filaFacturaHtml(f) {
+function filaFacturaHtml(f, opts) {
+  opts = opts || {};
   return `
     <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
       <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
@@ -2411,19 +2412,22 @@ function filaFacturaHtml(f) {
       <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}</td>
       <td style="white-space:nowrap">${clp(f.monto)}</td>
       <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+      ${opts.sinPago ? '' : `
       <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
-      <td>${badgeEstadoPagoHtml(f)}</td>
+      <td>${badgeEstadoPagoHtml(f)}</td>`}
     </tr>`;
 }
 
-function tablaFacturasHtml(lista) {
+function tablaFacturasHtml(lista, opts) {
+  opts = opts || {};
   return `
     <div class="table-card">
       <table>
         <thead><tr>
-          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Fecha de pago</th><th>Estado de pago</th>
+          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th>
+          ${opts.sinPago ? '' : '<th>Fecha de pago</th><th>Estado de pago</th>'}
         </tr></thead>
-        <tbody>${lista.map(filaFacturaHtml).join('')}</tbody>
+        <tbody>${lista.map(f => filaFacturaHtml(f, opts)).join('')}</tbody>
       </table>
     </div>`;
 }
@@ -2456,7 +2460,7 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
           🚫 Anuladas / Rechazadas (${anuladas.length})
         </div>
         <div style="padding:14px">
-          ${tablaFacturasHtml(anuladas)}
+          ${tablaFacturasHtml(anuladas, { sinPago: true })}
         </div>
       </div>`;
   }
