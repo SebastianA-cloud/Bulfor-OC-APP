@@ -113,7 +113,7 @@ def documentos_desde_xml(xml_bytes, tipo_dte):
             'folio': campo('Folio'),
             'rut_hospital': campo('RUTRecep'),
             'hospital': campo('RznSocRecep'),
-            'fecha_emision': parse_fecha(campo('FchEmis')),
+            'fecha_emision': parse_fecha(campo('FchEmis') or campo('EmissionDate') or campo('DocumentDate')),
             'monto': float(campo('MntNeto')) if campo('MntNeto') else None,
             'estado_aceptacion': 'N' if anulado else ('A' if autorizado else None),
             'doc_url': campo('DownloadCustomerDocumentUrl'),
