@@ -192,12 +192,24 @@ def recuperar_xml_documento(doctype, folio):
     return base64.b64decode(data['Data'])
 
 
-def items_desde_xml_completo(xml_bytes):
+def sanitizar_xml(texto):
+    """Arregla los problemas más comunes que rompen un XML 'a medias':
+    - Un '&' suelto que no sea parte de una entidad válida (&amp;, &lt;, etc.)
+      se reemplaza por &amp; — esto pasa seguido en nombres de hospitales o
+      productos que traen un '&' literal (ej. 'Salud & Vida').
+    - Caracteres de control inválidos para XML 1.0 se eliminan.
+    """
+    texto = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)', '&amp;', texto)
+    texto = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', texto)
+    return texto
+
+
+def items_desde_xml_completo(xml_texto_saneado):
     """Intento de extraer los ítems (productos) del XML completo del
     documento. El estándar SII usa un bloque <Detalle> repetido por cada
     producto — probamos varios nombres de campo posibles (a veces cambian
     de mayúsculas/formato) para no perder datos por una diferencia chica."""
-    root = ET.fromstring(xml_bytes)
+    root = ET.fromstring(xml_texto_saneado)
 
     def buscar_todos(tag_objetivo):
         return [el for el in root.iter() if el.tag.split('}')[-1].lower() == tag_objetivo.lower()]
@@ -225,20 +237,39 @@ def items_desde_xml_completo(xml_bytes):
 def sincronizar_detalle_pendiente(limite=150):
     """Para los documentos que todavía no tienen su detalle de productos
     guardado, lo trae y lo guarda. Limitado por corrida para que no se
-    demore demasiado — lo que falte se completa en la siguiente corrida."""
+    demore demasiado — lo que falte se completa en la siguiente corrida.
+
+    Importante: aunque no se puedan extraer los productos (XML raro que ni
+    saneándolo se puede leer), igual guardamos el XML crudo y marcamos el
+    documento como sincronizado — si no, se reintentaría para siempre en
+    cada corrida sin nunca avanzar."""
     print(f"\n{'='*50}\nTrayendo detalle de productos (hasta {limite} documentos por corrida)\n{'='*50}")
     res = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio') \
         .eq('detalle_sincronizado', False).limit(limite).execute()
     pendientes = res.data or []
     print(f"{len(pendientes)} documentos sin detalle todavía")
 
-    ok, fallidos = 0, 0
+    ok, ok_sin_items, fallidos = 0, 0, 0
     for doc in pendientes:
         try:
             xml_bytes = recuperar_xml_documento(doc['tipo_dte'], doc['folio'])
-            items = items_desde_xml_completo(xml_bytes)
-            xml_texto = xml_bytes.decode('iso-8859-1', errors='replace')
+        except Exception as e:
+            print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): no se pudo traer el XML — {e}")
+            fallidos += 1
+            time.sleep(1)
+            continue
 
+        xml_texto = xml_bytes.decode('iso-8859-1', errors='replace')
+        xml_saneado = sanitizar_xml(xml_texto)
+
+        items = []
+        try:
+            items = items_desde_xml_completo(xml_saneado)
+        except Exception as e:
+            print(f"  ⚠ Folio {doc['folio']} (tipo {doc['tipo_dte']}): XML no se pudo interpretar ni saneado ({e}) — se guarda el XML crudo igual, sin productos.")
+            ok_sin_items += 1
+
+        try:
             if items:
                 filas_items = [{**it, 'documento_id': doc['id']} for it in items]
                 supabase.table('documentos_gdexpress_items').insert(filas_items).execute()
@@ -249,11 +280,11 @@ def sincronizar_detalle_pendiente(limite=150):
             }).eq('id', doc['id']).execute()
             ok += 1
         except Exception as e:
-            print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): {e}")
+            print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): no se pudo guardar en Supabase — {e}")
             fallidos += 1
         time.sleep(1)
 
-    print(f"✔ Detalle traído: {ok} documentos. Fallidos: {fallidos}.")
+    print(f"✔ Detalle traído: {ok} documentos guardados ({ok - ok_sin_items} con productos, {ok_sin_items} solo con el XML crudo). Fallidos de verdad: {fallidos}.")
 
 
 def main():
