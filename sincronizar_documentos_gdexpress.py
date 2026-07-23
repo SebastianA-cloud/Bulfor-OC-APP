@@ -170,6 +170,92 @@ def sincronizar_tipo(tipo_dte, nombre):
     return total_procesadas
 
 
+def recuperar_xml_documento(doctype, folio):
+    """Trae el XML COMPLETO de un documento puntual (con sus productos),
+    usando el caso de uso 'Recuperar XML' (RecoverXML_V2) — distinto del
+    PaginatedSearch, que solo trae datos generales."""
+    url = f"http://{DTEBOX_IP}/api/Core.svc/core/RecoverXML_V2"
+    headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+    body = {
+        "Environment": AMBIENTE,
+        "Group": GRUPO,
+        "Rut": RUT_EMISOR,
+        "DocType": doctype,
+        "Folio": str(folio),
+        "IsForDistribution": "true",
+    }
+    r = requests.post(url, headers=headers, json=body, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    if str(data.get('Result')) != '0':
+        raise RuntimeError(data.get('Description'))
+    return base64.b64decode(data['Data'])
+
+
+def items_desde_xml_completo(xml_bytes):
+    """Intento de extraer los ítems (productos) del XML completo del
+    documento. El estándar SII usa un bloque <Detalle> repetido por cada
+    producto — probamos varios nombres de campo posibles (a veces cambian
+    de mayúsculas/formato) para no perder datos por una diferencia chica."""
+    root = ET.fromstring(xml_bytes)
+
+    def buscar_todos(tag_objetivo):
+        return [el for el in root.iter() if el.tag.split('}')[-1].lower() == tag_objetivo.lower()]
+
+    def texto_de(padre, *nombres_posibles):
+        for nombre in nombres_posibles:
+            for hijo in padre.iter():
+                if hijo.tag.split('}')[-1].lower() == nombre.lower() and hijo is not padre:
+                    return hijo.text
+        return None
+
+    detalles = buscar_todos('Detalle')
+    items = []
+    for det in detalles:
+        items.append({
+            'nombre_producto': texto_de(det, 'NmbItem', 'NombreItem'),
+            'cantidad': texto_de(det, 'QtyItem', 'Cantidad'),
+            'unidad': texto_de(det, 'UnmdItem', 'Unidad'),
+            'precio_unitario': texto_de(det, 'PrcItem', 'PrecioUnitario', 'PrecioUnit'),
+            'monto_item': texto_de(det, 'MontoItem', 'MntItem'),
+        })
+    return items
+
+
+def sincronizar_detalle_pendiente(limite=150):
+    """Para los documentos que todavía no tienen su detalle de productos
+    guardado, lo trae y lo guarda. Limitado por corrida para que no se
+    demore demasiado — lo que falte se completa en la siguiente corrida."""
+    print(f"\n{'='*50}\nTrayendo detalle de productos (hasta {limite} documentos por corrida)\n{'='*50}")
+    res = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio') \
+        .eq('detalle_sincronizado', False).limit(limite).execute()
+    pendientes = res.data or []
+    print(f"{len(pendientes)} documentos sin detalle todavía")
+
+    ok, fallidos = 0, 0
+    for doc in pendientes:
+        try:
+            xml_bytes = recuperar_xml_documento(doc['tipo_dte'], doc['folio'])
+            items = items_desde_xml_completo(xml_bytes)
+            xml_texto = xml_bytes.decode('iso-8859-1', errors='replace')
+
+            if items:
+                filas_items = [{**it, 'documento_id': doc['id']} for it in items]
+                supabase.table('documentos_gdexpress_items').insert(filas_items).execute()
+
+            supabase.table('documentos_gdexpress').update({
+                'detalle_sincronizado': True,
+                'xml_completo': xml_texto,
+            }).eq('id', doc['id']).execute()
+            ok += 1
+        except Exception as e:
+            print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): {e}")
+            fallidos += 1
+        time.sleep(1)
+
+    print(f"✔ Detalle traído: {ok} documentos. Fallidos: {fallidos}.")
+
+
 def main():
     print(f"Sincronizando Buscador de Documentos — {FECHA_MINIMA} a {FECHA_MAXIMA}")
     total = 0
@@ -177,6 +263,8 @@ def main():
         total += sincronizar_tipo(tipo_dte, nombre)
         time.sleep(2)
     print(f"\n✔✔ Listo en total: {total} documentos sincronizados entre los 3 tipos.")
+
+    sincronizar_detalle_pendiente()
 
 
 if __name__ == '__main__':
