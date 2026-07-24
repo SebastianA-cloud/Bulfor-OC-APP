@@ -204,6 +204,26 @@ def sanitizar_xml(texto):
     return texto
 
 
+def oc_ref_desde_xml_completo(xml_texto_saneado):
+    """El N° de OC vive en el bloque <Referencia> del documento (con
+    FolioRef, TpoDocRef, RazonRef) — NO en el 'DocumentReferences' del
+    resumen de búsqueda (que viene vacío). Buscamos ahí un FolioRef con
+    pinta de código de OC de Mercado Público."""
+    try:
+        root = ET.fromstring(xml_texto_saneado)
+    except ET.ParseError:
+        return None
+
+    for el in root.iter():
+        if el.tag.split('}')[-1].lower() == 'referencia':
+            for hijo in el.iter():
+                if hijo.tag.split('}')[-1].lower() == 'folioref' and hijo.text:
+                    m = PATRON_OC.search(hijo.text)
+                    if m:
+                        return m.group(0)
+    return None
+
+
 def items_desde_xml_completo(xml_texto_saneado):
     """Intento de extraer los ítems (productos) del XML completo del
     documento. El estándar SII usa un bloque <Detalle> repetido por cada
@@ -269,15 +289,24 @@ def sincronizar_detalle_pendiente(limite=150):
             print(f"  ⚠ Folio {doc['folio']} (tipo {doc['tipo_dte']}): XML no se pudo interpretar ni saneado ({e}) — se guarda el XML crudo igual, sin productos.")
             ok_sin_items += 1
 
+        oc_ref = None
+        try:
+            oc_ref = oc_ref_desde_xml_completo(xml_saneado)
+        except Exception:
+            pass
+
         try:
             if items:
                 filas_items = [{**it, 'documento_id': doc['id']} for it in items]
                 supabase.table('documentos_gdexpress_items').insert(filas_items).execute()
 
-            supabase.table('documentos_gdexpress').update({
+            update = {
                 'detalle_sincronizado': True,
                 'xml_completo': xml_texto,
-            }).eq('id', doc['id']).execute()
+            }
+            if oc_ref:
+                update['orden_compra_ref'] = oc_ref
+            supabase.table('documentos_gdexpress').update(update).eq('id', doc['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): no se pudo guardar en Supabase — {e}")
@@ -317,6 +346,29 @@ def estado_aceptacion_desde_status_fiscal(status):
     if status in ('0', '2'):
         return 'A'  # autorizado, o aprobado con reparos
     return None  # '1' = pendiente de resolución, o algo desconocido
+
+
+def corregir_oc_ref_desde_xml_completo(limite=300):
+    """Para documentos que YA tienen el XML completo guardado pero no
+    quedó extraída la referencia de OC (porque antes buscábamos en el
+    lugar equivocado), la sacamos ahora del XML real."""
+    print(f"\n{'='*50}\nRescatando N° de OC desde el XML guardado\n{'='*50}")
+    res = supabase.table('documentos_gdexpress').select('id,xml_completo') \
+        .eq('detalle_sincronizado', True).is_('orden_compra_ref', 'null').limit(limite).execute()
+    filas = res.data or []
+    print(f"{len(filas)} documentos con detalle pero sin N° de OC todavía")
+
+    ok = 0
+    for fila in filas:
+        xml_texto = fila.get('xml_completo') or ''
+        try:
+            oc_ref = oc_ref_desde_xml_completo(xml_texto)
+        except Exception:
+            oc_ref = None
+        if oc_ref:
+            supabase.table('documentos_gdexpress').update({'orden_compra_ref': oc_ref}).eq('id', fila['id']).execute()
+            ok += 1
+    print(f"✔ {ok} N° de OC rescatados del XML.")
 
 
 def corregir_fechas_desde_xml_completo(limite=300):
@@ -392,6 +444,7 @@ def main():
 
     sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
     corregir_fechas_desde_xml_completo()
+    corregir_oc_ref_desde_xml_completo()
     actualizar_estado_fiscal(limite=int(os.environ.get('LIMITE_FISCAL', 200)))
 
 
