@@ -245,7 +245,7 @@ def sincronizar_detalle_pendiente(limite=150):
     cada corrida sin nunca avanzar."""
     print(f"\n{'='*50}\nTrayendo detalle de productos (hasta {limite} documentos por corrida)\n{'='*50}")
     res = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio') \
-        .eq('detalle_sincronizado', False).limit(limite).execute()
+        .eq('detalle_sincronizado', False).order('fecha_emision', desc=True, nullsfirst=True).limit(limite).execute()
     pendientes = res.data or []
     print(f"{len(pendientes)} documentos sin detalle todavía")
 
@@ -319,6 +319,26 @@ def estado_aceptacion_desde_status_fiscal(status):
     return None  # '1' = pendiente de resolución, o algo desconocido
 
 
+def corregir_fechas_desde_xml_completo(limite=300):
+    """Para documentos que YA tienen el XML completo guardado pero se
+    quedaron sin fecha de emisión (el resumen de búsqueda no la traía),
+    la sacamos directo del XML real, que sí la tiene siempre."""
+    print(f"\n{'='*50}\nRescatando fechas faltantes desde el XML guardado\n{'='*50}")
+    res = supabase.table('documentos_gdexpress').select('id,xml_completo') \
+        .eq('detalle_sincronizado', True).is_('fecha_emision', 'null').limit(limite).execute()
+    filas = res.data or []
+    print(f"{len(filas)} documentos con detalle pero sin fecha")
+
+    ok = 0
+    for fila in filas:
+        xml_texto = fila.get('xml_completo') or ''
+        m = re.search(r'<FchEmis>([\d-]{10})</FchEmis>', xml_texto)
+        if m:
+            supabase.table('documentos_gdexpress').update({'fecha_emision': m.group(1)}).eq('id', fila['id']).execute()
+            ok += 1
+    print(f"✔ {ok} fechas rescatadas del XML.")
+
+
 def actualizar_estado_fiscal(limite=200):
     """Revisa el estado fiscal real de una tanda de documentos: primero los
     que nunca se han revisado, y si sobra cupo, los que se revisaron hace
@@ -327,7 +347,7 @@ def actualizar_estado_fiscal(limite=200):
     print(f"\n{'='*50}\nRevisando estado fiscal real (hasta {limite} documentos por corrida)\n{'='*50}")
 
     res_nuevos = supabase.table('documentos_gdexpress').select('id,tipo_dte,folio') \
-        .is_('estado_fiscal_actualizado', 'null').limit(limite).execute()
+        .is_('estado_fiscal_actualizado', 'null').order('fecha_emision', desc=True, nullsfirst=True).limit(limite).execute()
     pendientes = res_nuevos.data or []
 
     if len(pendientes) < limite:
@@ -371,6 +391,7 @@ def main():
     print(f"\n✔✔ Listo en total: {total} documentos sincronizados entre los 3 tipos.")
 
     sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
+    corregir_fechas_desde_xml_completo()
     actualizar_estado_fiscal(limite=int(os.environ.get('LIMITE_FISCAL', 200)))
 
 
