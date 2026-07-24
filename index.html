@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#C0392B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bulfor OC">
 <title>Farmacia Bulfor — Buscador de OC</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -146,6 +152,53 @@
     .logo-title, .logo-sub, .nav-item span { display: none; }
     .main { margin-left: 60px; padding: 20px 16px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Tablas -> tarjetas apiladas en celular. Cada <tr> con onclick sigue
+     funcionando como fila clicable, solo que se ve como una tarjeta con
+     una fila por dato (usando el texto de data-label como etiqueta). */
+  @media (max-width: 760px) {
+    .table-card table, .table-card thead, .table-card tbody, .table-card tr, .table-card td {
+      display: block;
+      width: 100%;
+    }
+    .table-card thead { position: absolute; left: -9999px; top: -9999px; } /* oculto pero accesible */
+    .table-card tr {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+    }
+    .table-card tr:hover { background: var(--surface); }
+    .table-card td {
+      border: none !important;
+      padding: 6px 0 !important;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      max-width: none !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+      text-align: left !important;
+    }
+    .table-card td::before {
+      content: attr(data-label);
+      font-size: 11px;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      flex-shrink: 0;
+      margin-right: 10px;
+    }
+    .table-card td:empty, .table-card td[data-label=""] { display: none; }
+    .table-card td.empty {
+      display: block !important;
+      text-align: center !important;
+    }
+    .table-card td.empty::before { content: none; }
   }
 </style>
 </head>
@@ -865,13 +918,13 @@ function renderOC() {
     const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
     return `
     <tr onclick="navReset();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
-      <td><span class="mono">${r.codigooc||''}</span></td>
-      <td>${tipoBadge(r.tipooc)}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
-      <td style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
-      <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+      <td data-label="N° OC"><span class="mono">${r.codigooc||''}</span></td>
+      <td data-label="Tipo">${tipoBadge(r.tipooc)}</td>
+      <td data-label="Descripción" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+      <td data-label="Hospital" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
+      <td data-label="Región" style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
+      <td data-label="Total neto" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
     </tr>`;
   }).join('');
 }
