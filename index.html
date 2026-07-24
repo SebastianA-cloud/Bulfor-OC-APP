@@ -1717,8 +1717,8 @@ function refrescarVistasHospital() {
 // ─── SEGUIMIENTO FEDEX ──────────────────────────────────────────────────────
 const ESTADOS_FEDEX = [
   { texto: 'Entregado',              color: '#D8F3DC', textColor: '#2D6A4F' },
-  { texto: 'En ruta',                color: '#D8F3DC', textColor: '#2D6A4F' },
-  { texto: 'Recibido por FedEx',     color: '#D8F3DC', textColor: '#2D6A4F' },
+  { texto: 'En ruta',                color: '#FFEDD5', textColor: '#9A3412' },
+  { texto: 'Recibido por FedEx',     color: '#DBEAFE', textColor: '#1E40AF' },
   { texto: 'Entrega reprogramada',   color: '#FEF3C7', textColor: '#92400E' },
   { texto: 'Retraso',                color: '#FEE2E2', textColor: '#991B1B' },
 ];
@@ -2826,6 +2826,25 @@ function filtrarDocumentosGdexpress(valor) {
   renderDocumentosGdexpress(true);
 }
 
+// Para Facturas (tipo 33), cruzamos con facturas_pago por N° de factura —
+// esa tabla tiene datos de tu Excel original (revisados a mano, más
+// confiables históricamente) además de la sincronización de GDExpress.
+// Si existe ahí un estado, manda por sobre lo que diga el resumen del
+// Buscador de documentos (que puede estar desactualizado del lado de GDExpress).
+function estadoAceptacionFusionado(d) {
+  if (d.tipo_dte === '33') {
+    const enPagos = facturasPago.find(f => String(f.factura) === String(d.folio));
+    if (enPagos && enPagos.estado_aceptacion) return enPagos.estado_aceptacion;
+  }
+  return d.estado_aceptacion;
+}
+
+function badgeEstadoDocGdexpress(estado) {
+  if (estado === 'N') return '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>';
+  if (estado === 'A') return '<span style="color:var(--green);font-size:12px">Aceptada</span>';
+  return '—';
+}
+
 function renderDocumentosGdexpress(soloTabla) {
   const cont = document.getElementById('doc-contenido');
   let lista = documentosGdexpress.filter(d => d.tipo_dte === docTipoActual);
@@ -2860,7 +2879,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref||'—'}</td>
               <td style="white-space:nowrap">${clp(d.monto)}</td>
-              <td>${d.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : d.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+              <td>${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -2877,6 +2896,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
   if (!d) return;
   cerrarTodosLosModales();
   const info = TIPOS_DTE_INFO[d.tipo_dte];
+  const estadoFusionado = estadoAceptacionFusionado(d);
 
   const modal = document.createElement('div');
   modal.id = 'doc-gdexpress-detalle-overlay';
@@ -2897,7 +2917,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="detail-field"><label>Fecha emisión</label><span>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</span></div>
           <div class="detail-field"><label>Monto</label><span>${clp(d.monto)}</span></div>
           <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${d.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : d.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
           <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref || 'No detectada'}</span></div>
         </div>
 
