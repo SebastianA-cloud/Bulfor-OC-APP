@@ -149,7 +149,9 @@
   /* Responsive */
   @media (max-width: 900px) {
     .sidebar { width: 60px; }
-    .logo-title, .logo-sub, .nav-item span { display: none; }
+    .logo-title, .logo-sub, .nav-item span:not(.nav-icon), .nav-back span:not(.nav-icon) { display: none; }
+    .nav-item, .nav-back { justify-content: center; }
+    .nav-icon { margin: 0; font-size: 20px; }
     .main { margin-left: 60px; padding: 20px 16px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
