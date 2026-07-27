@@ -2492,8 +2492,8 @@ function filaFacturaHtml(f, opts) {
   const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
   return `
-    <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
-      <td class="mono" style="color:var(--accent)" onclick="event.stopPropagation();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}')">${f.factura} ↗</td>
+    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPago(${f.id})">
+      <td class="mono" style="color:var(--accent)" onclick="event.stopPropagation();navReset();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}', ${f.id})">${f.factura} ↗</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
       <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
@@ -2950,12 +2950,13 @@ function renderDocumentosGdexpress(soloTabla) {
 // del documento tal como aparece en el Buscador de documentos (con sus
 // productos/ítems), en vez del modal de pago que se abre al hacer click en
 // el resto de la fila.
-function verDocumentoDeFactura(numeroFactura) {
+function verDocumentoDeFactura(numeroFactura, facturaPagoId) {
   const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(numeroFactura));
   if (!doc) {
     alert('Todavía no encontramos el documento de esta factura en GDExpress. Puede que aún no se haya sincronizado.');
     return;
   }
+  if (facturaPagoId != null) navPush(() => abrirDetalleFacturaPago(facturaPagoId));
   abrirDetalleDocumentoGdexpress(doc.id);
 }
 
@@ -2978,7 +2979,10 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="mono" style="font-size:16px">${d.folio}</div>
           <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
         </div>
-        <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
       <div style="padding:20px 24px">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
