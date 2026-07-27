@@ -2493,7 +2493,7 @@ function filaFacturaHtml(f, opts) {
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
   return `
     <tr style="cursor:pointer" onclick="abrirDetalleFacturaPago(${f.id})">
-      <td class="mono" style="color:var(--accent)">${f.factura} ↗</td>
+      <td class="mono" style="color:var(--accent)" onclick="event.stopPropagation();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}')">${f.factura} ↗</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
       <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
@@ -2944,6 +2944,19 @@ function renderDocumentosGdexpress(soloTabla) {
     const inp = document.getElementById('doc-search');
     if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
   }
+}
+
+// Desde el seguimiento de facturas, el N° de factura ahora abre el detalle
+// del documento tal como aparece en el Buscador de documentos (con sus
+// productos/ítems), en vez del modal de pago que se abre al hacer click en
+// el resto de la fila.
+function verDocumentoDeFactura(numeroFactura) {
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(numeroFactura));
+  if (!doc) {
+    alert('Todavía no encontramos el documento de esta factura en GDExpress. Puede que aún no se haya sincronizado.');
+    return;
+  }
+  abrirDetalleDocumentoGdexpress(doc.id);
 }
 
 async function abrirDetalleDocumentoGdexpress(id) {
