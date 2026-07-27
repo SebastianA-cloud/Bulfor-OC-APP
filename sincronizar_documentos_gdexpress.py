@@ -205,10 +205,12 @@ def sanitizar_xml(texto):
 
 
 def oc_ref_desde_xml_completo(xml_texto_saneado):
-    """El N° de OC vive en el bloque <Referencia> del documento (con
-    FolioRef, TpoDocRef, RazonRef) — NO en el 'DocumentReferences' del
-    resumen de búsqueda (que viene vacío). Buscamos ahí un FolioRef con
-    pinta de código de OC de Mercado Público."""
+    """El N° de OC vive en el bloque <Referencia> del documento, marcado con
+    TpoDocRef=801 (código oficial del SII para 'Orden de Compra'). Tomamos el
+    FolioRef tal cual viene, SIN exigirle el formato típico de Mercado
+    Público (999-999-XX99): distintos hospitales usan formatos muy
+    distintos (con '/', solo números, con texto, con minúsculas), y exigir
+    ese patrón dejaba fuera a la mayoría aunque el dato sí estaba ahí."""
     try:
         root = ET.fromstring(xml_texto_saneado)
     except ET.ParseError:
@@ -216,11 +218,16 @@ def oc_ref_desde_xml_completo(xml_texto_saneado):
 
     for el in root.iter():
         if el.tag.split('}')[-1].lower() == 'referencia':
+            tpo_doc_ref = None
+            folio_ref = None
             for hijo in el.iter():
-                if hijo.tag.split('}')[-1].lower() == 'folioref' and hijo.text:
-                    m = PATRON_OC.search(hijo.text)
-                    if m:
-                        return m.group(0)
+                tag = hijo.tag.split('}')[-1].lower()
+                if tag == 'tpodocref':
+                    tpo_doc_ref = (hijo.text or '').strip()
+                elif tag == 'folioref':
+                    folio_ref = (hijo.text or '').strip()
+            if tpo_doc_ref == '801' and folio_ref:
+                return folio_ref[:100]
     return None
 
 
@@ -354,7 +361,7 @@ def corregir_oc_ref_desde_xml_completo(limite=300):
     lugar equivocado), la sacamos ahora del XML real."""
     print(f"\n{'='*50}\nRescatando N° de OC desde el XML guardado\n{'='*50}")
     res = supabase.table('documentos_gdexpress').select('id,xml_completo') \
-        .eq('detalle_sincronizado', True).is_('orden_compra_ref', 'null').limit(limite).execute()
+        .eq('detalle_sincronizado', True).is_('orden_compra_ref', 'null').order('id').limit(limite).execute()
     filas = res.data or []
     print(f"{len(filas)} documentos con detalle pero sin N° de OC todavía")
 
