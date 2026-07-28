@@ -576,10 +576,25 @@ async function fetchAll(table, query) {
   let allRows = [];
   let offset = 0;
   while (true) {
-    const res = await sb(`${table}?${query}`, {
-      headers: { 'Range': `${offset}-${offset + PAGE - 1}` }
-    });
-    const rows = await res.json();
+    let res, rows;
+    // Reintenta hasta 3 veces esta página si Supabase devuelve un error
+    // (ej. timeout momentáneo por carga) — antes, un solo fallo dejaba la
+    // tabla completa vacía sin avisar nada.
+    for (let intento = 1; intento <= 3; intento++) {
+      res = await sb(`${table}?${query}`, {
+        headers: { 'Range': `${offset}-${offset + PAGE - 1}` }
+      });
+      if (res.ok) {
+        rows = await res.json();
+        break;
+      }
+      console.error(`⚠ Error cargando "${table}" (intento ${intento}/3): HTTP ${res.status}`);
+      if (intento < 3) await new Promise(r => setTimeout(r, 1000 * intento));
+    }
+    if (!res.ok) {
+      alert(`No se pudo cargar "${table}" después de varios intentos. Recarga la página — si sigue pasando, avísale a Sebastián.`);
+      break;
+    }
     if (!Array.isArray(rows) || rows.length === 0) break;
     allRows = allRows.concat(rows);
     if (rows.length < PAGE) break; // ya llegamos al final
