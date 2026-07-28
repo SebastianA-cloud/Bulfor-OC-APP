@@ -228,6 +228,9 @@
     <div class="nav-item" onclick="mostrarModulo('rrhh', this)">
       <span class="nav-icon">👥</span><span>Recursos Humanos</span>
     </div>
+    <div class="nav-item" onclick="mostrarModulo('farmacia-modulo', this)">
+      <span class="nav-icon">💊</span><span>Control Farmacia</span>
+    </div>
   </div>
   <div class="nav" id="nav-submenu"></div>
   <div class="sidebar-footer">
@@ -537,6 +540,21 @@
     <div id="rechazadas-contenido"></div>
   </div>
 
+  <div class="page" id="page-farmacia-catastro">
+    <div class="page-header">
+      <div class="page-title">Catastro de stock</div>
+      <div class="page-sub">Busca el producto por código o nombre y registra lo que cuentes físicamente</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-search" placeholder="Código o nombre del producto…" oninput="buscarProductoFarmacia(this.value)" autocomplete="off">
+      </div>
+    </div>
+    <div id="farmacia-resultados"></div>
+    <div id="farmacia-detalle"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -566,6 +584,8 @@ let docBusqueda = '';
 let oeCategoria = 'todos';
 let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
+let farmaciaProductos = [], farmaciaFamilias = [], farmaciaLotes = [];
+let farmaciaProductoSeleccionado = null;
 const PS = 15;
 
 // ─── INIT ──────────────────────────────────────────────────────────────────
@@ -628,7 +648,7 @@ function recalcularProductoPorOC() {
 
 async function init() {
   try {
-    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
@@ -638,6 +658,9 @@ async function init() {
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
       fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
       fetchAll('documentos_gdexpress', 'select=*&order=fecha_emision.desc'),
+      fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
+      fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
+      fetchAll('farmacia_lotes', 'select=*'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -651,6 +674,9 @@ async function init() {
     pacientes = Array.isArray(pacR) ? pacR : [];
     facturasPago = Array.isArray(facPagoR) ? facPagoR : [];
     documentosGdexpress = Array.isArray(docGdexR) ? docGdexR : [];
+    farmaciaProductos = Array.isArray(farmProdR) ? farmProdR : [];
+    farmaciaFamilias = Array.isArray(farmFamR) ? farmFamR : [];
+    farmaciaLotes = Array.isArray(farmLotesR) ? farmLotesR : [];
     diccionarioNormalizacion = {};
     diccionarioCampos = {};
     (Array.isArray(diccR) ? diccR : []).forEach(d => {
@@ -4776,6 +4802,184 @@ async function startImport() {
   }
 }
 
+// ─── CONTROL FARMACIA — CATASTRO DE STOCK ─────────────────────────────────
+// Cada resultado guardado acá reemplaza directamente el stock del sistema
+// para ese producto/lote — no se compara contra ningún stock viejo, se
+// construye desde cero con lo que realmente se cuenta en la farmacia.
+
+function lotesDeProducto(productoId) {
+  return farmaciaLotes.filter(l => l.producto_id === productoId);
+}
+
+function familiaNombre(familiaId) {
+  const f = farmaciaFamilias.find(x => x.id === familiaId);
+  return f ? f.nombre : null;
+}
+
+function buscarProductoFarmacia(q) {
+  farmaciaProductoSeleccionado = null;
+  document.getElementById('farmacia-detalle').innerHTML = '';
+  const cont = document.getElementById('farmacia-resultados');
+  const query = (q || '').trim().toLowerCase();
+  if (!query) { cont.innerHTML = ''; return; }
+
+  const resultados = farmaciaProductos.filter(p =>
+    p.codigo.toLowerCase().includes(query) || p.nombre.toLowerCase().includes(query)
+  ).slice(0, 30);
+
+  if (resultados.length === 0) {
+    cont.innerHTML = `
+      <div class="table-card"><div class="empty">
+        <div class="empty-icon">🔎</div>
+        <p>No encontramos ningún producto con "${query}".</p>
+        <button class="page-btn" style="margin-top:10px" onclick="mostrarFormularioProductoNuevo('${query.replace(/'/g,"\\'")}')">+ Crear producto nuevo</button>
+      </div></div>`;
+    return;
+  }
+
+  cont.innerHTML = `<div class="table-card"><table><tbody>
+    ${resultados.map(p => `
+      <tr style="cursor:pointer" onclick="seleccionarProductoFarmacia(${p.id})">
+        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td>${p.nombre}</td>
+        <td style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '— sin familia —'}</td>
+      </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function seleccionarProductoFarmacia(productoId) {
+  farmaciaProductoSeleccionado = productoId;
+  renderDetalleProductoFarmacia();
+}
+
+function renderDetalleProductoFarmacia() {
+  const p = farmaciaProductos.find(x => x.id === farmaciaProductoSeleccionado);
+  const cont = document.getElementById('farmacia-detalle');
+  if (!p) { cont.innerHTML = ''; return; }
+
+  const lotes = lotesDeProducto(p.id);
+  const opcionesFamilia = farmaciaFamilias.map(f =>
+    `<option value="${f.id}" ${f.id === p.familia_id ? 'selected' : ''}>${f.nombre}</option>`).join('');
+
+  cont.innerHTML = `
+    <div class="table-card" style="padding:20px 24px;margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="mono" style="color:var(--accent);font-size:14px">${p.codigo}</div>
+          <div style="font-weight:700;font-size:17px">${p.nombre}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="color:var(--text-2);font-size:13px">Familia</label>
+          <select id="farmacia-familia-select" onchange="guardarFamiliaProducto(${p.id}, this.value)">
+            <option value="">— sin familia —</option>
+            ${opcionesFamilia}
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;font-weight:600;color:var(--text-2);font-size:13px">LOTES CONTADOS</div>
+      ${lotes.length === 0 ? `<p style="color:var(--text-2);margin:8px 0">Todavía no has contado ningún lote de este producto.</p>` : `
+      <table style="margin-top:8px"><thead><tr>
+        <th>Lote</th><th>Vencimiento</th><th>Cantidad</th><th></th>
+      </tr></thead><tbody>
+        ${lotes.map(l => `
+          <tr>
+            <td class="mono">${l.lote || '—'}</td>
+            <td>${l.vencimiento ? fDate(l.vencimiento) : '—'}</td>
+            <td>${l.cantidad}</td>
+            <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="eliminarLoteFarmacia(${l.id})">Eliminar</button></td>
+          </tr>`).join('')}
+      </tbody></table>`}
+
+      <div style="margin-top:18px;font-weight:600;color:var(--text-2);font-size:13px">AGREGAR LOTE CONTADO</div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">N° de lote</label>
+          <input type="text" id="farmacia-nuevo-lote" style="width:140px"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Vencimiento</label>
+          <input type="date" id="farmacia-nuevo-vencimiento"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Cantidad contada</label>
+          <input type="number" id="farmacia-nueva-cantidad" style="width:100px" min="0"></div>
+        <button class="page-btn" onclick="guardarLoteCatastro(${p.id})">Guardar</button>
+      </div>
+    </div>`;
+}
+
+async function guardarFamiliaProducto(productoId, familiaIdStr) {
+  const familiaId = familiaIdStr ? Number(familiaIdStr) : null;
+  await sb(`farmacia_productos?id=eq.${productoId}`, { method: 'PATCH', body: JSON.stringify({ familia_id: familiaId }) });
+  const p = farmaciaProductos.find(x => x.id === productoId);
+  if (p) p.familia_id = familiaId;
+}
+
+async function guardarLoteCatastro(productoId) {
+  const lote = document.getElementById('farmacia-nuevo-lote').value.trim() || null;
+  const vencimiento = document.getElementById('farmacia-nuevo-vencimiento').value || null;
+  const cantidad = Number(document.getElementById('farmacia-nueva-cantidad').value);
+  if (!cantidad && cantidad !== 0) { alert('Ingresa la cantidad contada.'); return; }
+
+  const res = await sb('farmacia_lotes?on_conflict=producto_id,lote,vencimiento', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify([{ producto_id: productoId, lote, vencimiento, cantidad }]),
+  });
+  const filas = await res.json();
+  if (Array.isArray(filas) && filas[0]) {
+    farmaciaLotes = farmaciaLotes.filter(l => l.id !== filas[0].id);
+    farmaciaLotes.push(filas[0]);
+    await sb('farmacia_movimientos', {
+      method: 'POST',
+      body: JSON.stringify([{ tipo: 'catastro_inicial', producto_id: productoId, lote_id: filas[0].id, cantidad, fecha: new Date().toISOString().slice(0, 10) }]),
+    });
+  }
+  document.getElementById('farmacia-nuevo-lote').value = '';
+  document.getElementById('farmacia-nuevo-vencimiento').value = '';
+  document.getElementById('farmacia-nueva-cantidad').value = '';
+  renderDetalleProductoFarmacia();
+}
+
+async function eliminarLoteFarmacia(loteId) {
+  if (!confirm('¿Eliminar este lote contado?')) return;
+  await sb(`farmacia_lotes?id=eq.${loteId}`, { method: 'DELETE' });
+  farmaciaLotes = farmaciaLotes.filter(l => l.id !== loteId);
+  renderDetalleProductoFarmacia();
+}
+
+function mostrarFormularioProductoNuevo(codigoSugerido) {
+  const opcionesFamilia = farmaciaFamilias.map(f => `<option value="${f.id}">${f.nombre}</option>`).join('');
+  document.getElementById('farmacia-detalle').innerHTML = `
+    <div class="table-card" style="padding:20px 24px;margin-top:14px">
+      <div style="font-weight:700;margin-bottom:12px">Crear producto nuevo</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Código interno</label>
+          <input type="text" id="farmacia-nuevo-codigo" value="${codigoSugerido || ''}" style="width:140px"></div>
+        <div style="flex:1;min-width:220px"><label style="display:block;font-size:12px;color:var(--text-2)">Nombre del producto</label>
+          <input type="text" id="farmacia-nuevo-nombre" style="width:100%"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Familia</label>
+          <select id="farmacia-nueva-familia"><option value="">— sin familia —</option>${opcionesFamilia}</select></div>
+        <button class="page-btn" onclick="crearProductoFarmacia()">Crear</button>
+      </div>
+    </div>`;
+}
+
+async function crearProductoFarmacia() {
+  const codigo = document.getElementById('farmacia-nuevo-codigo').value.trim();
+  const nombre = document.getElementById('farmacia-nuevo-nombre').value.trim();
+  const familiaId = document.getElementById('farmacia-nueva-familia').value || null;
+  if (!codigo || !nombre) { alert('Completa el código y el nombre.'); return; }
+
+  const res = await sb('farmacia_productos', {
+    method: 'POST',
+    headers: { 'Prefer': 'return=representation' },
+    body: JSON.stringify([{ codigo, nombre, familia_id: familiaId ? Number(familiaId) : null }]),
+  });
+  if (!res.ok) { alert('No se pudo crear el producto — puede que el código ya exista.'); return; }
+  const filas = await res.json();
+  const nuevo = filas[0];
+  farmaciaProductos.push(nuevo);
+  document.getElementById('farmacia-search').value = nuevo.codigo;
+  seleccionarProductoFarmacia(nuevo.id);
+}
+
 // ─── NAV ───────────────────────────────────────────────────────────────────
 // ─── NAVEGACIÓN ENTRE MÓDULOS PRINCIPALES ──────────────────────────────────
 // Cada módulo del menú principal, tenga una o varias sub-páginas, abre su
@@ -4803,6 +5007,9 @@ const SUBMENUS = {
     { icon: '🧑‍⚕️', label: 'Pacientes', page: 'pacientes' },
   ] },
   'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
+  'farmacia-modulo': { items: [
+    { icon: '📋', label: 'Catastro de stock', page: 'farmacia-catastro' },
+  ] },
 };
 
 function mostrarModulo(modulo, el) {
