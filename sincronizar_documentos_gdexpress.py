@@ -119,6 +119,14 @@ def documentos_desde_xml(xml_bytes, tipo_dte):
             'doc_url': campo('DownloadCustomerDocumentUrl'),
             'orden_compra_ref': extraer_oc_referenciada(campo('DocumentReferences')),
         })
+    # Importante: el resumen liviano de búsqueda casi nunca trae fecha completa
+    # ni N° de OC (eso lo rellenan sincronizar_detalle_pendiente y
+    # corregir_oc_ref_desde_xml_completo más abajo, leyendo el XML completo).
+    # Si dejáramos estos campos vacíos en el upsert, se BORRARÍA en cada corrida
+    # el dato bueno que ya se había rellenado antes. Por eso quitamos del upsert
+    # cualquier campo que venga vacío del resumen — así nunca "downgradeamos"
+    # un documento que ya estaba completo.
+    docs = [{k: v for k, v in d.items() if v is not None or k in ('tipo_dte', 'folio')} for d in docs]
     return docs
 
 
