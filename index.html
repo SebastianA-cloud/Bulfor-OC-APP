@@ -600,6 +600,36 @@
     <div id="farmacia-mov-historial"></div>
   </div>
 
+  <div class="page" id="page-farmacia-vencimientos">
+    <div class="page-header">
+      <div class="page-title">Vencimientos</div>
+      <div class="page-sub">Lotes vencidos y por vencer, con opción de darlos de baja</div>
+    </div>
+    <div class="toolbar">
+      <label style="color:var(--text-2);font-size:13px">Considerar "por vencer" dentro de</label>
+      <select id="farmacia-venc-dias" onchange="renderVencimientos()" style="margin-left:8px">
+        <option value="30">30 días</option>
+        <option value="60" selected>60 días</option>
+        <option value="90">90 días</option>
+        <option value="180">180 días</option>
+      </select>
+      <div class="search-wrap" style="margin-left:10px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-venc-search" placeholder="Código o nombre del producto…" oninput="renderVencimientos()" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="page-header" style="margin-top:10px">
+      <div class="page-title" style="font-size:16px;color:#d64545">🔴 Vencidos</div>
+    </div>
+    <div id="farmacia-venc-vencidos"></div>
+
+    <div class="page-header" style="margin-top:22px">
+      <div class="page-title" style="font-size:16px;color:#b8860b">🟡 Por vencer</div>
+    </div>
+    <div id="farmacia-venc-porvencer"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -5279,8 +5309,8 @@ function renderHistorialMovFarmacia() {
     cont.innerHTML = `<div class="table-card"><div class="empty"><p>Todavía no hay movimientos registrados.</p></div></div>`;
     return;
   }
-  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋' };
-  const nombreTipo = { compra: 'Compra', venta: 'Venta/Consumo', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial' };
+  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋', baja: '🗑️' };
+  const nombreTipo = { compra: 'Compra', venta: 'Venta/Consumo', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial', baja: 'Baja por vencimiento' };
   cont.innerHTML = `<div class="table-card"><table><thead><tr>
     <th>Fecha</th><th>Tipo</th><th>Producto</th><th style="text-align:right">Cantidad</th>
   </tr></thead><tbody>
@@ -5297,7 +5327,72 @@ function renderHistorialMovFarmacia() {
   </tbody></table></div>`;
 }
 
-// Al entrar a la página de Movimientos, marcamos el tab "Compra" por defecto
+// ─── FARMACIA: VENCIMIENTOS ────────────────────────────────────────────────
+function diasEntre(fechaISO) {
+  const hoy = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+  const venc = new Date(fechaISO + 'T00:00:00');
+  return Math.round((venc - hoy) / 86400000);
+}
+
+function renderVencimientos() {
+  const q = (document.getElementById('farmacia-venc-search').value || '').trim().toLowerCase();
+  const diasLimite = Number(document.getElementById('farmacia-venc-dias').value);
+
+  let filas = farmaciaLotes
+    .filter(l => l.vencimiento && Number(l.cantidad) > 0)
+    .map(l => ({ l, p: farmaciaProductos.find(x => x.id === l.producto_id), dias: diasEntre(l.vencimiento) }))
+    .filter(({p}) => p);
+
+  if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
+
+  const vencidos = filas.filter(f => f.dias < 0).sort((a, b) => a.dias - b.dias);
+  const porVencer = filas.filter(f => f.dias >= 0 && f.dias <= diasLimite).sort((a, b) => a.dias - b.dias);
+
+  const filaHtml = (f, esVencido) => `
+    <tr>
+      <td class="mono" style="color:var(--accent);white-space:nowrap">${f.p.codigo}</td>
+      <td>${f.p.nombre}</td>
+      <td class="mono">${f.l.lote || '—'}</td>
+      <td style="white-space:nowrap">${fDate(f.l.vencimiento)}</td>
+      <td style="white-space:nowrap;font-weight:600;${esVencido ? 'color:#d64545' : 'color:#b8860b'}">
+        ${esVencido ? `Venció hace ${Math.abs(f.dias)} día${Math.abs(f.dias) === 1 ? '' : 's'}` : (f.dias === 0 ? 'Vence hoy' : `Vence en ${f.dias} día${f.dias === 1 ? '' : 's'}`)}
+      </td>
+      <td style="text-align:right">${f.l.cantidad}</td>
+      <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="darDeBajaLote(${f.l.id})">Dar de baja</button></td>
+    </tr>`;
+
+  const tabla = (arr, esVencido, vacioMsg) => arr.length === 0
+    ? `<div class="table-card"><div class="empty"><p>${vacioMsg}</p></div></div>`
+    : `<div class="table-card"><table><thead><tr>
+        <th>Código</th><th>Producto</th><th>Lote</th><th>Vencimiento</th><th></th><th style="text-align:right">Cantidad</th><th></th>
+      </tr></thead><tbody>${arr.map(f => filaHtml(f, esVencido)).join('')}</tbody></table></div>`;
+
+  document.getElementById('farmacia-venc-vencidos').innerHTML = tabla(vencidos, true, 'No hay lotes vencidos. 🎉');
+  document.getElementById('farmacia-venc-porvencer').innerHTML = tabla(porVencer, false, 'No hay lotes por vencer en ese rango.');
+}
+
+async function darDeBajaLote(loteId) {
+  const lote = farmaciaLotes.find(l => l.id === loteId);
+  if (!lote) return;
+  const p = farmaciaProductos.find(x => x.id === lote.producto_id);
+  const entrada = prompt(`Dar de baja "${p ? p.nombre : ''}" (lote ${lote.lote || 'sin número'}).\nCantidad disponible: ${lote.cantidad}.\n¿Cuánto quieres dar de baja?`, lote.cantidad);
+  if (entrada === null) return;
+  const cantidad = Number(entrada);
+  if (!cantidad || cantidad <= 0 || cantidad > Number(lote.cantidad)) { alert('Cantidad inválida.'); return; }
+
+  const nuevaCantidad = Number(lote.cantidad) - cantidad;
+  await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+  lote.cantidad = nuevaCantidad;
+  const movRes = await sb('farmacia_movimientos', {
+    method: 'POST', headers: { 'Prefer': 'return=representation' },
+    body: JSON.stringify([{ tipo: 'baja', producto_id: lote.producto_id, lote_id: lote.id, cantidad: -cantidad, fecha: new Date().toISOString().slice(0, 10) }]),
+  });
+  const movFilas = await movRes.json();
+  farmaciaMovimientos.unshift(movFilas[0]);
+  renderVencimientos();
+}
+
+
 // y mostramos el historial reciente.
 const _showPageOriginal = showPage;
 showPage = function(id, el) {
@@ -5312,6 +5407,9 @@ showPage = function(id, el) {
   }
   if (id === 'farmacia-stock') {
     renderStockActual();
+  }
+  if (id === 'farmacia-vencimientos') {
+    renderVencimientos();
   }
 };
 
@@ -5346,6 +5444,7 @@ const SUBMENUS = {
     { icon: '📋', label: 'Catastro de stock', page: 'farmacia-catastro' },
     { icon: '📦', label: 'Stock actual', page: 'farmacia-stock' },
     { icon: '🔁', label: 'Movimientos', page: 'farmacia-movimientos' },
+    { icon: '⏰', label: 'Vencimientos', page: 'farmacia-vencimientos' },
   ] },
 };
 
