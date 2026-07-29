@@ -982,13 +982,18 @@ function abrirFacturasAsociadasOC(codigoOC) {
           <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
           <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
         </tr></thead><tbody>
-          ${facturas.map(d => `
-            <tr style="cursor:pointer" onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>abrirFacturasAsociadasOC(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
-              <td class="mono" style="color:var(--accent)">${d.folio}</td>
-              <td>${nombreHosp(d.hospital) || d.hospital || '—'}</td>
+          ${facturas.map(d => {
+            const estado = estadoAceptacionFusionado(d);
+            const anulada = estado === 'N';
+            const estilo = anulada ? 'opacity:.6' : '';
+            return `
+            <tr style="cursor:pointer;${estilo}" onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>abrirFacturasAsociadasOC(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
+              <td class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
               <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(d.monto)}</td>
-            </tr>`).join('')}
+              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(d.monto)}</td>
+            </tr>`;
+          }).join('')}
         </tbody></table>
       </div>`;
 
@@ -3062,8 +3067,18 @@ function filtrarDocumentosGdexpress(valor) {
 // confiables históricamente) además de la sincronización de GDExpress.
 // Si existe ahí un estado, manda por sobre lo que diga el resumen del
 // Buscador de documentos (que puede estar desactualizado del lado de GDExpress).
+// Busca si existe una Nota de Crédito (tipo_dte 61) sincronizada desde GDExpress
+// cuya Referencia apunte a esta factura — eso significa que la factura está
+// anulada, sin depender de que "facturas_pago" lo haya marcado manualmente
+// (ese campo puede quedar desactualizado si el proceso de pago no se tocó).
+function notaCreditoQueAnula(folioFactura) {
+  if (!folioFactura) return null;
+  return documentosGdexpress.find(d => d.tipo_dte === '61' && (d.nc_factura_ref || '').trim() === String(folioFactura).trim()) || null;
+}
+
 function estadoAceptacionFusionado(d) {
   if (d.tipo_dte === '33') {
+    if (notaCreditoQueAnula(d.folio)) return 'N';
     const enPagos = facturasPago.find(f => String(f.factura) === String(d.folio));
     if (enPagos && enPagos.estado_aceptacion) return enPagos.estado_aceptacion;
   }
@@ -3108,7 +3123,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td class="mono" style="color:var(--accent)">${d.folio} ↗</td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref||'—'}</td>
+              <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
               <td style="white-space:nowrap">${clp(d.monto)}</td>
               <td>${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
@@ -3167,6 +3182,16 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
           <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
           <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref || 'No detectada'}</span></div>
+          ${d.tipo_dte === '33' && notaCreditoQueAnula(d.folio) ? `
+          <div class="detail-field" style="grid-column:span 2">
+            <label>Anulada por Nota de Crédito</label>
+            <span style="color:var(--red);cursor:pointer" onclick="verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(d.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(d.folio).folio} ↗</span>
+          </div>` : ''}
+          ${d.tipo_dte === '61' && d.nc_factura_ref ? `
+          <div class="detail-field" style="grid-column:span 2">
+            <label>Anula la Factura</label>
+            <span style="color:var(--accent);cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{alert('Esa factura no está sincronizada todavía.')}">N° ${d.nc_factura_ref} ↗</span>
+          </div>` : ''}
         </div>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos / Ítems</div>
@@ -3223,7 +3248,49 @@ let rechazadasSoloHoy = false;
 let rechazadasBusqueda = '';
 
 function facturasRechazadas() {
-  return facturasPago.filter(f => f.estado_aceptacion === 'N');
+  const map = new Map(); // clave: N° de factura (texto)
+
+  // 1) Lo que ya está marcado manualmente/por el pipeline de pagos.
+  facturasPago.forEach(f => {
+    if (f.estado_aceptacion === 'N') map.set(String(f.factura), f);
+  });
+
+  // 2) Lo que GDExpress muestra como anulado por una Nota de Crédito, aunque
+  // "facturas_pago" todavía no lo tenga marcado así (por eso antes se veían
+  // rezagadas: dependía de que alguien actualizara ese estado a mano).
+  documentosGdexpress.filter(d => d.tipo_dte === '61' && d.nc_factura_ref).forEach(nc => {
+    const folio = nc.nc_factura_ref;
+    const existente = map.get(String(folio));
+    if (existente) {
+      // Ya estaba en la lista: solo completamos el N° de NC si faltaba.
+      if (!existente.nota_credito_asociada) existente.nota_credito_asociada = nc.folio;
+      existente._ncAutoDetectada = nc.folio;
+      return;
+    }
+    const enPagos = facturasPago.find(f => String(f.factura) === String(folio));
+    if (enPagos) {
+      enPagos._ncAutoDetectada = nc.folio;
+      map.set(String(folio), enPagos);
+      return;
+    }
+    // No hay ninguna fila en facturas_pago para esta factura — igual la
+    // mostramos, con lo que tengamos sincronizado desde GDExpress.
+    const docFactura = documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === String(folio));
+    map.set(String(folio), {
+      id: null,
+      factura: folio,
+      hospital: docFactura ? docFactura.hospital : null,
+      fecha_emision: docFactura ? docFactura.fecha_emision : nc.fecha_emision,
+      monto: docFactura ? docFactura.monto : null,
+      estado_aceptacion: 'N',
+      factura_reemplazo: null,
+      nota_credito_asociada: nc.folio,
+      _ncAutoDetectada: nc.folio,
+      _sinRegistroPagos: true,
+    });
+  });
+
+  return Array.from(map.values());
 }
 
 function hoyISO() {
@@ -3270,16 +3337,22 @@ function renderRechazadas(soloTabla) {
           <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Monto</th><th>Reemplazada por</th><th>N° Nota de crédito</th><th></th>
         </tr></thead>
         <tbody>
-          ${lista.map(f => `
-            <tr>
-              <td class="mono">${f.factura}</td>
+          ${lista.map(f => {
+            const rowKey = f.id != null ? f.id : `f${f.factura}`;
+            const ncCelda = f._ncAutoDetectada
+              ? `<span class="mono" style="color:var(--green);cursor:pointer" title="Detectada automáticamente desde GDExpress — clic para verla" onclick="verNotaCreditoDesdeRechazadas('${String(f._ncAutoDetectada).replace(/'/g,"\\'")}')">${f._ncAutoDetectada} ↗</span>`
+              : `<input type="text" value="${(f.nota_credito_asociada||'').replace(/"/g,'&quot;')}" id="rz-nc-${rowKey}" placeholder="N° NC" style="font-size:12px;padding:5px 8px;max-width:110px">`;
+            return `
+            <tr${f._sinRegistroPagos ? ' style="opacity:.85"' : ''}>
+              <td class="mono">${f.factura}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠ sin registro de pago</span>' : ''}</td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
               <td style="white-space:nowrap">${clp(f.monto)}</td>
-              <td><input type="text" value="${(f.factura_reemplazo||'').replace(/"/g,'&quot;')}" id="rz-reemplazo-${f.id}" placeholder="N° factura" style="font-size:12px;padding:5px 8px;max-width:130px"></td>
-              <td><input type="text" value="${(f.nota_credito_asociada||'').replace(/"/g,'&quot;')}" id="rz-nc-${f.id}" placeholder="N° NC" style="font-size:12px;padding:5px 8px;max-width:110px"></td>
-              <td><button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarRechazada(${f.id}, this)">Guardar</button></td>
-            </tr>`).join('')}
+              <td>${f.id != null ? `<input type="text" value="${(f.factura_reemplazo||'').replace(/"/g,'&quot;')}" id="rz-reemplazo-${rowKey}" placeholder="N° factura" style="font-size:12px;padding:5px 8px;max-width:130px">` : '<span style="color:var(--text-3);font-size:12px">—</span>'}</td>
+              <td>${ncCelda}</td>
+              <td>${f.id != null ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarRechazada(${f.id}, this)">Guardar</button>` : ''}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>`;
@@ -3290,9 +3363,18 @@ function renderRechazadas(soloTabla) {
   }
 }
 
+function verNotaCreditoDesdeRechazadas(folioNC) {
+  const nc = documentosGdexpress.find(d => d.tipo_dte === '61' && String(d.folio) === String(folioNC));
+  if (!nc) { alert('No encontramos el documento de esa nota de crédito.'); return; }
+  navReset();
+  abrirDetalleDocumentoGdexpress(nc.id);
+}
+
 async function guardarRechazada(id, btnEl) {
   const reemplazo = document.getElementById(`rz-reemplazo-${id}`).value.trim();
-  const nc = document.getElementById(`rz-nc-${id}`).value.trim();
+  const ncInput = document.getElementById(`rz-nc-${id}`);
+  const existente = facturasPago.find(f => f.id === id);
+  const nc = ncInput ? ncInput.value.trim() : (existente ? (existente.nota_credito_asociada || '') : '');
   const textoOriginal = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Guardando…';
   try {
