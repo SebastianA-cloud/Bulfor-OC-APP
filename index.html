@@ -555,6 +555,51 @@
     <div id="farmacia-detalle"></div>
   </div>
 
+  <div class="page" id="page-farmacia-stock">
+    <div class="page-header">
+      <div class="page-title">Stock actual</div>
+      <div class="page-sub">Existencias por producto, sumando todos los lotes contados</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-stock-search" placeholder="Código o nombre del producto…" oninput="renderStockActual()" autocomplete="off">
+      </div>
+      <select id="farmacia-stock-familia" onchange="renderStockActual()" style="margin-left:10px">
+        <option value="">Todas las familias</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;margin-left:10px;color:var(--text-2);font-size:13px">
+        <input type="checkbox" id="farmacia-stock-solo-bajo" onchange="renderStockActual()"> Solo bajo el mínimo
+      </label>
+    </div>
+    <div id="farmacia-stock-resultados"></div>
+  </div>
+
+  <div class="page" id="page-farmacia-movimientos">
+    <div class="page-header">
+      <div class="page-title">Movimientos de stock</div>
+      <div class="page-sub">Registra compras (entradas), ventas/consumo (salidas) y ajustes</div>
+    </div>
+    <div class="toolbar" style="gap:8px">
+      <button class="page-btn" id="farmacia-tab-compra" onclick="cambiarTipoMovFarmacia('compra')">⬆️ Compra</button>
+      <button class="page-btn" id="farmacia-tab-venta" onclick="cambiarTipoMovFarmacia('venta')">⬇️ Venta/Consumo</button>
+      <button class="page-btn" id="farmacia-tab-ajuste" onclick="cambiarTipoMovFarmacia('ajuste')">⚖️ Ajuste</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-mov-search" placeholder="Código o nombre del producto…" oninput="buscarProductoMovFarmacia(this.value)" autocomplete="off">
+      </div>
+    </div>
+    <div id="farmacia-mov-resultados"></div>
+    <div id="farmacia-mov-formulario"></div>
+
+    <div class="page-header" style="margin-top:26px">
+      <div class="page-title" style="font-size:16px">Últimos movimientos</div>
+    </div>
+    <div id="farmacia-mov-historial"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -584,8 +629,10 @@ let docBusqueda = '';
 let oeCategoria = 'todos';
 let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
-let farmaciaProductos = [], farmaciaFamilias = [], farmaciaLotes = [];
+let farmaciaProductos = [], farmaciaFamilias = [], farmaciaLotes = [], farmaciaMovimientos = [];
 let farmaciaProductoSeleccionado = null;
+let farmaciaMovTipo = 'compra';
+let farmaciaMovProductoId = null;
 const PS = 15;
 
 // ─── INIT ──────────────────────────────────────────────────────────────────
@@ -648,7 +695,7 @@ function recalcularProductoPorOC() {
 
 async function init() {
   try {
-    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR, farmMovR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
@@ -661,6 +708,7 @@ async function init() {
       fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_lotes', 'select=*'),
+      fetchAll('farmacia_movimientos', 'select=*&order=creado_en.desc'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -677,6 +725,7 @@ async function init() {
     farmaciaProductos = Array.isArray(farmProdR) ? farmProdR : [];
     farmaciaFamilias = Array.isArray(farmFamR) ? farmFamR : [];
     farmaciaLotes = Array.isArray(farmLotesR) ? farmLotesR : [];
+    farmaciaMovimientos = Array.isArray(farmMovR) ? farmMovR : [];
     diccionarioNormalizacion = {};
     diccionarioCampos = {};
     (Array.isArray(diccR) ? diccR : []).forEach(d => {
@@ -4980,6 +5029,292 @@ async function crearProductoFarmacia() {
   seleccionarProductoFarmacia(nuevo.id);
 }
 
+// ─── FARMACIA: STOCK ACTUAL ────────────────────────────────────────────────
+function stockTotalProducto(productoId) {
+  return lotesDeProducto(productoId).reduce((s, l) => s + Number(l.cantidad || 0), 0);
+}
+
+function poblarSelectFamiliasStock() {
+  const sel = document.getElementById('farmacia-stock-familia');
+  if (sel.options.length > 1) return; // ya poblado
+  farmaciaFamilias.forEach(f => {
+    const op = document.createElement('option');
+    op.value = f.id; op.textContent = f.nombre;
+    sel.appendChild(op);
+  });
+}
+
+function renderStockActual() {
+  poblarSelectFamiliasStock();
+  const q = (document.getElementById('farmacia-stock-search').value || '').trim().toLowerCase();
+  const familiaId = document.getElementById('farmacia-stock-familia').value;
+  const soloBajo = document.getElementById('farmacia-stock-solo-bajo').checked;
+
+  let filas = farmaciaProductos.map(p => ({ p, total: stockTotalProducto(p.id) }));
+  if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
+  if (familiaId) filas = filas.filter(({p}) => String(p.familia_id) === familiaId);
+  if (soloBajo) filas = filas.filter(({p, total}) => p.stock_minimo != null && total < Number(p.stock_minimo));
+
+  filas.sort((a, b) => a.p.nombre.localeCompare(b.p.nombre));
+  filas = filas.slice(0, 300);
+
+  const cont = document.getElementById('farmacia-stock-resultados');
+  if (filas.length === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>No hay productos que coincidan.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `<div class="table-card"><table><thead><tr>
+    <th>Código</th><th>Producto</th><th>Familia</th><th style="text-align:right">Stock actual</th><th style="text-align:right">Mínimo</th>
+  </tr></thead><tbody>
+    ${filas.map(({p, total}) => {
+      const bajo = p.stock_minimo != null && total < Number(p.stock_minimo);
+      return `<tr>
+        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td>${p.nombre}</td>
+        <td style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
+        <td style="text-align:right;font-weight:700;${bajo ? 'color:#d64545' : ''}">${total}</td>
+        <td style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+// ─── FARMACIA: MOVIMIENTOS (compra / venta / ajuste) ──────────────────────
+function cambiarTipoMovFarmacia(tipo) {
+  farmaciaMovTipo = tipo;
+  ['compra','venta','ajuste'].forEach(t => {
+    document.getElementById(`farmacia-tab-${t}`).classList.toggle('active', t === tipo);
+  });
+  if (farmaciaMovProductoId) renderFormularioMovFarmacia();
+}
+
+function buscarProductoMovFarmacia(q) {
+  farmaciaMovProductoId = null;
+  document.getElementById('farmacia-mov-formulario').innerHTML = '';
+  const cont = document.getElementById('farmacia-mov-resultados');
+  const query = (q || '').trim().toLowerCase();
+  if (!query) { cont.innerHTML = ''; return; }
+
+  const resultados = farmaciaProductos.filter(p =>
+    p.codigo.toLowerCase().includes(query) || p.nombre.toLowerCase().includes(query)
+  ).slice(0, 30);
+
+  if (resultados.length === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🔎</div><p>No encontramos ningún producto con "${query}".</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `<div class="table-card"><table><tbody>
+    ${resultados.map(p => `
+      <tr style="cursor:pointer" onclick="seleccionarProductoMovFarmacia(${p.id})">
+        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td>${p.nombre}</td>
+        <td style="text-align:right;color:var(--text-2)">Stock: ${stockTotalProducto(p.id)}</td>
+      </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function seleccionarProductoMovFarmacia(productoId) {
+  farmaciaMovProductoId = productoId;
+  renderFormularioMovFarmacia();
+}
+
+function renderFormularioMovFarmacia() {
+  const p = farmaciaProductos.find(x => x.id === farmaciaMovProductoId);
+  const cont = document.getElementById('farmacia-mov-formulario');
+  if (!p) { cont.innerHTML = ''; return; }
+  const hoy = new Date().toISOString().slice(0, 10);
+  const lotes = lotesDeProducto(p.id);
+
+  const cabecera = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+      <div>
+        <div class="mono" style="color:var(--accent);font-size:14px">${p.codigo}</div>
+        <div style="font-weight:700;font-size:17px">${p.nombre}</div>
+      </div>
+      <div style="color:var(--text-2)">Stock actual: <b style="color:var(--text)">${stockTotalProducto(p.id)}</b></div>
+    </div>`;
+
+  let cuerpo = '';
+  if (farmaciaMovTipo === 'compra') {
+    cuerpo = `
+      <div style="margin-top:18px;font-weight:600;color:var(--text-2);font-size:13px">DATOS DE LA COMPRA</div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">N° de lote</label>
+          <input type="text" id="mov-lote" style="width:140px"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Vencimiento</label>
+          <input type="date" id="mov-vencimiento"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Cantidad que ingresa</label>
+          <input type="number" id="mov-cantidad" style="width:110px" min="1"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Precio unitario (opcional)</label>
+          <input type="number" id="mov-precio" style="width:110px" min="0" step="0.01"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Fecha</label>
+          <input type="date" id="mov-fecha" value="${hoy}"></div>
+        <button class="page-btn" onclick="registrarMovimientoFarmacia(${p.id})">Registrar entrada</button>
+      </div>
+      <p style="color:var(--text-2);font-size:12px;margin-top:8px">Si el lote y vencimiento ya existen, se suma la cantidad al mismo lote. Si no, se crea un lote nuevo.</p>`;
+  } else if (farmaciaMovTipo === 'venta') {
+    if (lotes.length === 0) {
+      cuerpo = `<p style="color:var(--text-2);margin-top:14px">Este producto no tiene lotes con stock. Registra primero una compra o un catastro inicial.</p>`;
+    } else {
+      cuerpo = `
+        <div style="margin-top:18px;font-weight:600;color:var(--text-2);font-size:13px">DATOS DE LA SALIDA</div>
+        <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="display:block;font-size:12px;color:var(--text-2)">Lote</label>
+            <select id="mov-lote-select" style="min-width:200px">
+              ${lotes.map(l => `<option value="${l.id}">${l.lote || '(sin número)'} — vence ${l.vencimiento ? fDate(l.vencimiento) : '—'} — disp. ${l.cantidad}</option>`).join('')}
+            </select></div>
+          <div><label style="display:block;font-size:12px;color:var(--text-2)">Cantidad que sale</label>
+            <input type="number" id="mov-cantidad" style="width:110px" min="1"></div>
+          <div><label style="display:block;font-size:12px;color:var(--text-2)">Fecha</label>
+            <input type="date" id="mov-fecha" value="${hoy}"></div>
+          <button class="page-btn" onclick="registrarMovimientoFarmacia(${p.id})">Registrar salida</button>
+        </div>
+        <p style="color:var(--text-2);font-size:12px;margin-top:8px">No se puede sacar más cantidad de la disponible en el lote elegido.</p>`;
+    }
+  } else if (farmaciaMovTipo === 'ajuste') {
+    cuerpo = `
+      <div style="margin-top:18px;font-weight:600;color:var(--text-2);font-size:13px">CORREGIR CANTIDAD DE UN LOTE</div>
+      ${lotes.length === 0 ? `<p style="color:var(--text-2);margin-top:8px">Este producto todavía no tiene lotes registrados.</p>` : `
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Lote</label>
+          <select id="mov-lote-select" style="min-width:200px" onchange="mostrarCantidadActualAjuste(this.value)">
+            ${lotes.map(l => `<option value="${l.id}" data-cant="${l.cantidad}">${l.lote || '(sin número)'} — vence ${l.vencimiento ? fDate(l.vencimiento) : '—'} — actual ${l.cantidad}</option>`).join('')}
+          </select></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Cantidad real contada</label>
+          <input type="number" id="mov-cantidad" style="width:110px" min="0" value="${lotes[0].cantidad}"></div>
+        <div><label style="display:block;font-size:12px;color:var(--text-2)">Fecha</label>
+          <input type="date" id="mov-fecha" value="${hoy}"></div>
+        <button class="page-btn" onclick="registrarMovimientoFarmacia(${p.id})">Guardar ajuste</button>
+      </div>
+      <p style="color:var(--text-2);font-size:12px;margin-top:8px">Se registra la diferencia entre lo que había y lo que realmente hay.</p>`}`;
+  }
+
+  cont.innerHTML = `<div class="table-card" style="padding:20px 24px;margin-top:14px">${cabecera}${cuerpo}</div>`;
+}
+
+function mostrarCantidadActualAjuste(loteId) {
+  const opt = document.querySelector(`#mov-lote-select option[value="${loteId}"]`);
+  if (opt) document.getElementById('mov-cantidad').value = opt.dataset.cant;
+}
+
+async function registrarMovimientoFarmacia(productoId) {
+  const fecha = document.getElementById('mov-fecha').value || new Date().toISOString().slice(0, 10);
+
+  if (farmaciaMovTipo === 'compra') {
+    const lote = document.getElementById('mov-lote').value.trim() || null;
+    const vencimiento = document.getElementById('mov-vencimiento').value || null;
+    const cantidad = Number(document.getElementById('mov-cantidad').value);
+    const precio = document.getElementById('mov-precio').value ? Number(document.getElementById('mov-precio').value) : null;
+    if (!cantidad || cantidad <= 0) { alert('Ingresa la cantidad que ingresa.'); return; }
+
+    const existente = farmaciaLotes.find(l => l.producto_id === productoId && (l.lote || null) === lote && (l.vencimiento || null) === vencimiento);
+    let loteId;
+    if (existente) {
+      const nuevaCantidad = Number(existente.cantidad) + cantidad;
+      await sb(`farmacia_lotes?id=eq.${existente.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+      existente.cantidad = nuevaCantidad;
+      loteId = existente.id;
+    } else {
+      const res = await sb('farmacia_lotes', {
+        method: 'POST', headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify([{ producto_id: productoId, lote, vencimiento, cantidad }]),
+      });
+      const filas = await res.json();
+      farmaciaLotes.push(filas[0]);
+      loteId = filas[0].id;
+    }
+    const movRes = await sb('farmacia_movimientos', {
+      method: 'POST', headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify([{ tipo: 'compra', producto_id: productoId, lote_id: loteId, cantidad, precio, fecha }]),
+    });
+    const movFilas = await movRes.json();
+    farmaciaMovimientos.unshift(movFilas[0]);
+
+  } else if (farmaciaMovTipo === 'venta') {
+    const loteId = Number(document.getElementById('mov-lote-select').value);
+    const cantidad = Number(document.getElementById('mov-cantidad').value);
+    const lote = farmaciaLotes.find(l => l.id === loteId);
+    if (!cantidad || cantidad <= 0) { alert('Ingresa la cantidad que sale.'); return; }
+    if (!lote || cantidad > Number(lote.cantidad)) { alert('La cantidad supera el stock disponible en ese lote.'); return; }
+
+    const nuevaCantidad = Number(lote.cantidad) - cantidad;
+    await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+    lote.cantidad = nuevaCantidad;
+    const movRes = await sb('farmacia_movimientos', {
+      method: 'POST', headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify([{ tipo: 'venta', producto_id: productoId, lote_id: lote.id, cantidad, fecha }]),
+    });
+    const movFilas = await movRes.json();
+    farmaciaMovimientos.unshift(movFilas[0]);
+
+  } else if (farmaciaMovTipo === 'ajuste') {
+    const loteId = Number(document.getElementById('mov-lote-select').value);
+    const cantidadReal = Number(document.getElementById('mov-cantidad').value);
+    const lote = farmaciaLotes.find(l => l.id === loteId);
+    if (cantidadReal < 0 || isNaN(cantidadReal)) { alert('Ingresa la cantidad real contada.'); return; }
+    const diferencia = cantidadReal - Number(lote.cantidad);
+    if (diferencia === 0) { alert('No hay diferencia que registrar.'); return; }
+
+    await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: cantidadReal, actualizado_en: new Date().toISOString() }) });
+    lote.cantidad = cantidadReal;
+    const movRes = await sb('farmacia_movimientos', {
+      method: 'POST', headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify([{ tipo: 'ajuste', producto_id: productoId, lote_id: lote.id, cantidad: diferencia, fecha }]),
+    });
+    const movFilas = await movRes.json();
+    farmaciaMovimientos.unshift(movFilas[0]);
+  }
+
+  document.getElementById('farmacia-mov-search').value = '';
+  document.getElementById('farmacia-mov-resultados').innerHTML = '';
+  document.getElementById('farmacia-mov-formulario').innerHTML = '';
+  farmaciaMovProductoId = null;
+  renderHistorialMovFarmacia();
+}
+
+function renderHistorialMovFarmacia() {
+  const cont = document.getElementById('farmacia-mov-historial');
+  const ultimos = farmaciaMovimientos.slice(0, 50);
+  if (ultimos.length === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>Todavía no hay movimientos registrados.</p></div></div>`;
+    return;
+  }
+  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋' };
+  const nombreTipo = { compra: 'Compra', venta: 'Venta/Consumo', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial' };
+  cont.innerHTML = `<div class="table-card"><table><thead><tr>
+    <th>Fecha</th><th>Tipo</th><th>Producto</th><th style="text-align:right">Cantidad</th>
+  </tr></thead><tbody>
+    ${ultimos.map(m => {
+      const p = farmaciaProductos.find(x => x.id === m.producto_id);
+      const cant = Number(m.cantidad);
+      return `<tr>
+        <td style="white-space:nowrap">${fDate(m.fecha)}</td>
+        <td style="white-space:nowrap">${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}</td>
+        <td>${p ? `${p.codigo} — ${p.nombre}` : '—'}</td>
+        <td style="text-align:right;font-weight:600;${cant < 0 ? 'color:#d64545' : ''}">${cant > 0 && m.tipo !== 'ajuste' ? '' : ''}${cant}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+// Al entrar a la página de Movimientos, marcamos el tab "Compra" por defecto
+// y mostramos el historial reciente.
+const _showPageOriginal = showPage;
+showPage = function(id, el) {
+  _showPageOriginal(id, el);
+  if (id === 'farmacia-movimientos') {
+    if (!document.getElementById('farmacia-tab-compra').classList.contains('active') &&
+        !document.getElementById('farmacia-tab-venta').classList.contains('active') &&
+        !document.getElementById('farmacia-tab-ajuste').classList.contains('active')) {
+      cambiarTipoMovFarmacia('compra');
+    }
+    renderHistorialMovFarmacia();
+  }
+  if (id === 'farmacia-stock') {
+    renderStockActual();
+  }
+};
+
 // ─── NAV ───────────────────────────────────────────────────────────────────
 // ─── NAVEGACIÓN ENTRE MÓDULOS PRINCIPALES ──────────────────────────────────
 // Cada módulo del menú principal, tenga una o varias sub-páginas, abre su
@@ -5009,6 +5344,8 @@ const SUBMENUS = {
   'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
   'farmacia-modulo': { items: [
     { icon: '📋', label: 'Catastro de stock', page: 'farmacia-catastro' },
+    { icon: '📦', label: 'Stock actual', page: 'farmacia-stock' },
+    { icon: '🔁', label: 'Movimientos', page: 'farmacia-movimientos' },
   ] },
 };
 
