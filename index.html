@@ -3194,7 +3194,14 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
-              <td style="font-weight:500">${it.nombre_producto||'—'}</td>
+              <td style="font-weight:500">
+                ${it.nombre_producto||'—'}
+                ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
+                  ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
+                  ${it.codigo_valor && it.descripcion ? ' · ' : ''}
+                  ${it.descripcion || ''}
+                </div>` : ''}
+              </td>
               <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
               <td style="text-align:right">${clp(it.precio_unitario)}</td>
               <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
