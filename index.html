@@ -991,7 +991,7 @@ function abrirFacturasAsociadasOC(codigoOC) {
               <td class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
               <td style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
               <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(d.monto)}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(d.monto_total ?? d.monto)}</td>
             </tr>`;
           }).join('')}
         </tbody></table>
@@ -3124,7 +3124,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
-              <td style="white-space:nowrap">${clp(d.monto)}</td>
+              <td style="white-space:nowrap">${clp(d.monto_total ?? d.monto)}</td>
               <td>${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
         </tbody>
@@ -3178,7 +3178,8 @@ async function abrirDetalleDocumentoGdexpress(id) {
       <div style="padding:20px 24px">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Fecha emisión</label><span>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</span></div>
-          <div class="detail-field"><label>Monto</label><span>${clp(d.monto)}</span></div>
+          <div class="detail-field"><label>Monto neto</label><span>${clp(d.monto)}</span></div>
+          <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(d.monto_total ?? d.monto)}</span></div>
           <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
           <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
           <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref || 'No detectada'}</span></div>
@@ -3281,7 +3282,7 @@ function facturasRechazadas() {
       factura: folio,
       hospital: docFactura ? docFactura.hospital : null,
       fecha_emision: docFactura ? docFactura.fecha_emision : nc.fecha_emision,
-      monto: docFactura ? docFactura.monto : null,
+      monto: docFactura ? (docFactura.monto_total ?? docFactura.monto) : null,
       estado_aceptacion: 'N',
       factura_reemplazo: null,
       nota_credito_asociada: nc.folio,
