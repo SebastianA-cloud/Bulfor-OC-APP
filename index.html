@@ -5238,6 +5238,7 @@ function renderStockActual() {
   const soloBajo = document.getElementById('farmacia-stock-solo-bajo').checked;
 
   let filas = farmaciaProductos.map(p => ({ p, total: stockTotalProducto(p.id) }));
+  filas = filas.filter(({total}) => total !== 0);
   if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
   if (familiaId) filas = filas.filter(({p}) => String(p.familia_id) === familiaId);
   if (soloBajo) filas = filas.filter(({p, total}) => p.stock_minimo != null && total < Number(p.stock_minimo));
@@ -5247,10 +5248,11 @@ function renderStockActual() {
 
   const cont = document.getElementById('farmacia-stock-resultados');
   if (filas.length === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>No hay productos que coincidan.</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>No hay productos con stock distinto de 0 que coincidan.</p></div></div>`;
     return;
   }
-  cont.innerHTML = `<div class="table-card"><table><thead><tr>
+  const nota = `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Los productos con stock en 0 no se muestran aquí (siguen guardados en la base de datos).</div>`;
+  cont.innerHTML = `${nota}<div class="table-card"><table><thead><tr>
     <th>Código</th><th>Producto</th><th>Familia</th><th style="text-align:right">Stock actual</th><th style="text-align:right">Mínimo</th>
   </tr></thead><tbody>
     ${filas.map(({p, total}) => {
