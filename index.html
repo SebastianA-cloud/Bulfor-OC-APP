@@ -5276,6 +5276,9 @@ function abrirRevisionFamiliasCatastro(productoIds) {
             </tr>`).join('')}
         </tbody></table></div>
       </div>
+      <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+        <button class="page-btn" style="padding:8px 20px" onclick="document.getElementById('farmacia-revision-familias-overlay').remove()">Aceptar</button>
+      </div>
     </div>`;
   document.body.appendChild(modal);
 }
