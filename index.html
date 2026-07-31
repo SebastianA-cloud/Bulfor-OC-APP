@@ -268,7 +268,7 @@
       <table>
         <thead><tr>
           <th>N° OC</th><th>Tipo</th><th>Descripción</th><th>Fecha</th>
-          <th>Hospital</th><th>Región</th><th style="text-align:right">Total neto</th>
+          <th>Hospital</th><th>Región</th><th style="text-align:right">Total (con IVA)</th>
         </tr></thead>
         <tbody id="oc-body"></tbody>
       </table>
@@ -1106,7 +1106,7 @@ function renderOC() {
       <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
       <td data-label="Hospital" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
       <td data-label="Región" style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
-      <td data-label="Total neto" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+      <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
     </tr>`;
   }).join('');
 }
