@@ -5199,16 +5199,27 @@ function importarCatastroExcel(file) {
 
       // 2) Lotes: upsert por (producto_id, lote, vencimiento).
       const sinProducto = [];
-      const lotesPayload = [];
+      const porClave = new Map(); // clave = producto_id|lote|vencimiento, para no mandar duplicados en el mismo archivo
+      let fechasInvalidas = 0;
       filas.forEach(f => {
         const p = porCodigo.get(f.codigo);
         if (!p) { sinProducto.push(f.codigo); return; }
-        lotesPayload.push({ producto_id: p.id, lote: f.lote, vencimiento: f.vencimiento, cantidad: f.cantidad, _codigo: f.codigo });
+        let venc = f.vencimiento;
+        if (venc && !/^\d{4}-\d{2}-\d{2}$/.test(venc)) { venc = null; fechasInvalidas++; }
+        const clave = `${p.id}|${f.lote || ''}|${venc || ''}`;
+        if (porClave.has(clave)) {
+          porClave.get(clave).cantidad += f.cantidad; // misma fila repetida en el archivo: se suma
+        } else {
+          porClave.set(clave, { producto_id: p.id, lote: f.lote, vencimiento: venc, cantidad: f.cantidad, _codigo: f.codigo });
+        }
       });
+      const lotesPayload = Array.from(porClave.values());
+      if (fechasInvalidas) logCatastro(`⚠ ${fechasInvalidas} fecha(s) de vencimiento no se pudieron interpretar y quedaron sin vencimiento.`, 'err');
 
       let lotesGuardados = [];
+      const lotesConError = [];
       if (lotesPayload.length) {
-        const CHUNK = 300;
+        const CHUNK = 200;
         for (let i = 0; i < lotesPayload.length; i += CHUNK) {
           const chunk = lotesPayload.slice(i, i + CHUNK).map(({_codigo, ...rest}) => rest);
           const res = await sb('farmacia_lotes?on_conflict=producto_id,lote,vencimiento', {
@@ -5220,7 +5231,24 @@ function importarCatastroExcel(file) {
             const filasLote = await res.json();
             lotesGuardados = lotesGuardados.concat(filasLote);
           } else {
-            logCatastro(`Hubo un problema guardando un lote de filas (${i + 1}-${i + chunk.length}).`, 'err');
+            const detalle = await res.text().catch(() => '');
+            logCatastro(`⚠ Ese lote de filas falló junto (${i + 1}-${i + chunk.length}): ${detalle.slice(0, 200)}. Reintentando fila por fila…`, 'err');
+            // Reintentamos una por una para salvar las que sí sirven y detectar exactamente cuál falla.
+            for (const fila of lotesPayload.slice(i, i + CHUNK)) {
+              const { _codigo, ...rest } = fila;
+              const resUno = await sb('farmacia_lotes?on_conflict=producto_id,lote,vencimiento', {
+                method: 'POST',
+                headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+                body: JSON.stringify([rest]),
+              });
+              if (resUno.ok) {
+                const f1 = await resUno.json();
+                lotesGuardados = lotesGuardados.concat(f1);
+              } else {
+                const detalleUno = await resUno.text().catch(() => '');
+                lotesConError.push({ codigo: _codigo, detalle: detalleUno });
+              }
+            }
           }
         }
       }
@@ -5240,6 +5268,10 @@ function importarCatastroExcel(file) {
       }
 
       logCatastro(`${lotesGuardados.length} lote(s) cargado(s)/actualizado(s).`, 'ok');
+      if (lotesConError.length) {
+        logCatastro(`⚠ ${lotesConError.length} fila(s) no se pudieron guardar:`, 'err');
+        lotesConError.slice(0, 15).forEach(e => logCatastro(`&nbsp;&nbsp;· ${e.codigo}: ${e.detalle.slice(0, 150)}`, 'err'));
+      }
       if (sinProducto.length) logCatastro(`⚠ ${sinProducto.length} fila(s) con código no encontrado ni creado: ${sinProducto.slice(0, 10).join(', ')}${sinProducto.length > 10 ? '…' : ''}`, 'err');
 
       // 3) Productos tocados por esta carga que quedaron sin familia — se
