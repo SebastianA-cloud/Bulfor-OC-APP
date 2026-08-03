@@ -633,6 +633,19 @@
     <div id="farmacia-venc-porvencer"></div>
   </div>
 
+  <div class="page" id="page-farmacia-conciliacion">
+    <div class="page-header">
+      <div class="page-title">Conciliación con maestro del PC</div>
+      <div class="page-sub">Sube el listado actual del PC (Código + Stock) y ajusta automáticamente lo que se vendió durante el catastro, quitando primero los lotes que vencen antes (FEFO)</div>
+    </div>
+    <div class="toolbar">
+      <button class="page-btn" style="white-space:nowrap" onclick="document.getElementById('farmacia-conciliacion-file').click()">📤 Subir maestro del PC</button>
+      <input type="file" id="farmacia-conciliacion-file" accept=".xlsx,.xlsm" style="display:none" onchange="conciliarConMaestroPC(this.files[0])">
+    </div>
+    <div id="farmacia-conciliacion-log" style="display:none;margin-bottom:14px"></div>
+    <div id="farmacia-conciliacion-resultado"></div>
+  </div>
+
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -5782,6 +5795,157 @@ async function darDeBajaLote(loteId) {
   renderVencimientos();
 }
 
+// ─── FARMACIA: CONCILIACIÓN CON MAESTRO DEL PC (ajuste automático FEFO) ────
+function logConciliacion(msg, tipo = '') {
+  const el = document.getElementById('farmacia-conciliacion-log');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML += `<div class="log-line ${tipo === 'ok' ? 'log-ok' : tipo === 'err' ? 'log-err' : ''}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// Quita `cantidadARemover` unidades de los lotes de un producto, partiendo
+// SIEMPRE por el lote cuyo vencimiento sea más cercano (FEFO). Los lotes sin
+// vencimiento registrado se dejan para el final (se asume que no vencen pronto).
+async function aplicarReduccionFEFO(productoId, cantidadARemover) {
+  const lotes = lotesDeProducto(productoId)
+    .filter(l => Number(l.cantidad) > 0)
+    .slice()
+    .sort((a, b) => {
+      if (!a.vencimiento && !b.vencimiento) return 0;
+      if (!a.vencimiento) return 1;
+      if (!b.vencimiento) return -1;
+      return a.vencimiento.localeCompare(b.vencimiento);
+    });
+
+  let restante = cantidadARemover;
+  const detalle = [];
+  for (const l of lotes) {
+    if (restante <= 0) break;
+    const quitar = Math.min(restante, Number(l.cantidad));
+    if (quitar <= 0) continue;
+    const nuevaCantidad = Number(l.cantidad) - quitar;
+    await sb(`farmacia_lotes?id=eq.${l.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+    l.cantidad = nuevaCantidad;
+    const movRes2 = await sb('farmacia_movimientos', {
+      method: 'POST', headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify([{ tipo: 'ajuste', producto_id: productoId, lote_id: l.id, cantidad: -quitar, fecha: new Date().toISOString().slice(0, 10), archivo_origen: 'conciliacion_maestro_pc' }]),
+    });
+    if (movRes2.ok) { const mf = await movRes2.json(); farmaciaMovimientos.unshift(mf[0]); }
+    detalle.push({ lote: l.lote, vencimiento: l.vencimiento, quitado: quitar, quedan: nuevaCantidad });
+    restante -= quitar;
+  }
+  return { detalle, faltante: restante }; // faltante > 0 = no había stock suficiente para completar la baja
+}
+
+function conciliarConMaestroPC(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const logEl = document.getElementById('farmacia-conciliacion-log');
+    if (logEl) logEl.innerHTML = '';
+    document.getElementById('farmacia-conciliacion-resultado').innerHTML = '';
+    logConciliacion(`Leyendo ${file.name}…`);
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const filasCrudas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+      const idxHeader = filasCrudas.findIndex(fila => fila.some(c => normalizarEncabezado(c) === 'codigo'));
+      if (idxHeader === -1) throw new Error('No encontré una columna "Código" en este archivo.');
+
+      const headers = filasCrudas[idxHeader].map(normalizarEncabezado);
+      const col = nombre => headers.indexOf(nombre);
+      const iCodigo = col('codigo');
+      const iStock = [col('stock actual'), col('cantidad'), col('stock')].find(i => i >= 0) ?? -1;
+      if (iStock < 0) throw new Error('Necesito una columna de cantidad ("Stock Actual", "Cantidad" o "Stock").');
+
+      const filas = filasCrudas.slice(idxHeader + 1)
+        .filter(f => f && f[iCodigo] !== null && f[iCodigo] !== undefined && f[iCodigo] !== '')
+        .map(f => ({ codigo: String(f[iCodigo]).trim(), pcTotal: Number(f[iStock]) || 0 }));
+      logConciliacion(`${filas.length} filas encontradas en el maestro.`);
+
+      const resultado = { ajustados: [], masEnMaestro: [], noEncontrados: [], sinCambios: 0 };
+
+      for (const fila of filas) {
+        const p = farmaciaProductos.find(x => x.codigo === fila.codigo);
+        if (!p) { resultado.noEncontrados.push(fila); continue; }
+        const actual = stockTotalProducto(p.id);
+        const diff = actual - fila.pcTotal;
+        if (diff === 0) { resultado.sinCambios++; continue; }
+        if (diff > 0) {
+          logConciliacion(`Ajustando ${p.codigo} — ${p.nombre}: ${actual} → ${fila.pcTotal} (quitando ${diff})`);
+          const { detalle, faltante } = await aplicarReduccionFEFO(p.id, diff);
+          resultado.ajustados.push({ p, actual, pcTotal: fila.pcTotal, diff, detalle, faltante });
+        } else {
+          resultado.masEnMaestro.push({ p, actual, pcTotal: fila.pcTotal, diff: -diff });
+        }
+      }
+
+      logConciliacion(`Listo. ${resultado.ajustados.length} producto(s) ajustado(s), ${resultado.masEnMaestro.length} para revisar, ${resultado.sinCambios} sin cambios.`, 'ok');
+      renderResultadoConciliacion(resultado);
+      document.getElementById('farmacia-conciliacion-file').value = '';
+    } catch (err) {
+      logConciliacion(`Error: ${err.message}`, 'err');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function renderResultadoConciliacion(r) {
+  const cont = document.getElementById('farmacia-conciliacion-resultado');
+  let html = '';
+
+  if (r.ajustados.length) {
+    html += `
+      <div class="page-header" style="margin-top:8px"><div class="page-title" style="font-size:16px">✅ Ajustados automáticamente (FEFO)</div></div>
+      <div class="table-card"><table><thead><tr>
+        <th>Código</th><th>Producto</th><th style="text-align:right">Antes</th><th style="text-align:right">Maestro PC</th><th style="text-align:right">Se quitó</th><th>Lotes afectados (del más próximo a vencer)</th>
+      </tr></thead><tbody>
+        ${r.ajustados.map(a => `
+          <tr>
+            <td class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
+            <td>${a.p.nombre}</td>
+            <td style="text-align:right">${a.actual}</td>
+            <td style="text-align:right">${a.pcTotal}</td>
+            <td style="text-align:right;font-weight:600;color:#d64545">-${a.diff}</td>
+            <td style="font-size:12px;color:var(--text-2)">
+              ${a.detalle.map(d => `Lote ${d.lote || 's/n'} (vence ${d.vencimiento ? fDate(d.vencimiento) : '—'}): -${d.quitado}`).join('<br>')}
+              ${a.faltante > 0 ? `<br><span style="color:#d64545">⚠ No había stock suficiente, faltaron ${a.faltante} por quitar</span>` : ''}
+            </td>
+          </tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  if (r.masEnMaestro.length) {
+    html += `
+      <div class="page-header" style="margin-top:22px"><div class="page-title" style="font-size:16px;color:#b8860b">⚠ El maestro dice que hay MÁS que en el sistema — revisar a mano</div></div>
+      <div class="table-card"><table><thead><tr>
+        <th>Código</th><th>Producto</th><th style="text-align:right">En Bulfor</th><th style="text-align:right">Maestro PC</th><th style="text-align:right">Diferencia</th>
+      </tr></thead><tbody>
+        ${r.masEnMaestro.map(a => `
+          <tr>
+            <td class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
+            <td>${a.p.nombre}</td>
+            <td style="text-align:right">${a.actual}</td>
+            <td style="text-align:right">${a.pcTotal}</td>
+            <td style="text-align:right;font-weight:600;color:#b8860b">+${a.diff}</td>
+          </tr>`).join('')}
+      </tbody></table></div>
+      <p style="font-size:12px;color:var(--text-3);margin-top:6px">No los subí solo porque no sé a qué lote/vencimiento pertenece la diferencia — probablemente sea una compra que llegó y todavía no se registró en Movimientos.</p>`;
+  }
+
+  if (r.noEncontrados.length) {
+    html += `
+      <div class="page-header" style="margin-top:22px"><div class="page-title" style="font-size:16px">❓ Códigos del maestro que no existen en Bulfor</div></div>
+      <div class="table-card"><div style="padding:14px;font-size:13px;color:var(--text-2)">${r.noEncontrados.map(f => `${f.codigo} (${f.pcTotal})`).join(', ')}</div></div>`;
+  }
+
+  if (!html) html = `<div class="table-card"><div class="empty"><p>Todo coincide — no hubo que ajustar nada. 🎉</p></div></div>`;
+  cont.innerHTML = html;
+}
+
+
 
 // y mostramos el historial reciente.
 const _showPageOriginal = showPage;
@@ -5835,6 +5999,7 @@ const SUBMENUS = {
     { icon: '📦', label: 'Stock actual', page: 'farmacia-stock' },
     { icon: '🔁', label: 'Movimientos', page: 'farmacia-movimientos' },
     { icon: '⏰', label: 'Vencimientos', page: 'farmacia-vencimientos' },
+    { icon: '🧮', label: 'Conciliación con PC', page: 'farmacia-conciliacion' },
   ] },
 };
 
