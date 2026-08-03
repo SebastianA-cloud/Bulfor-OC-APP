@@ -5176,8 +5176,24 @@ function importarCatastroExcel(file) {
       }
       logCatastro(`${filas.length} filas encontradas en "${nombreHoja}".`);
 
-      // 1) Productos nuevos que no existen todavía por código.
+      // 1) Productos que el navegador no tiene en memoria (por ejemplo si la
+      // pestaña llevaba rato abierta): antes de darlos por "nuevos", los
+      // buscamos directo en el servidor para no crear duplicados.
       const porCodigo = new Map(farmaciaProductos.map(p => [p.codigo, p]));
+      const codigosDesconocidos = Array.from(new Set(filas.map(f => f.codigo).filter(c => !porCodigo.has(c))));
+      if (codigosDesconocidos.length) {
+        logCatastro(`Revisando ${codigosDesconocidos.length} código(s) que no tengo en memoria…`);
+        const CHUNK_CHECK = 150;
+        for (let i = 0; i < codigosDesconocidos.length; i += CHUNK_CHECK) {
+          const lote = codigosDesconocidos.slice(i, i + CHUNK_CHECK);
+          const resExist = await sb(`farmacia_productos?select=*&codigo=in.(${lote.map(c => `"${c.replace(/"/g,'')}"`).join(',')})`);
+          if (resExist.ok) {
+            const existentes = await resExist.json();
+            existentes.forEach(p => { porCodigo.set(p.codigo, p); if (!farmaciaProductos.some(x => x.id === p.id)) farmaciaProductos.push(p); });
+          }
+        }
+      }
+
       const codigosNuevos = new Map();
       filas.forEach(f => {
         if (!porCodigo.has(f.codigo) && !codigosNuevos.has(f.codigo)) {
@@ -5193,7 +5209,9 @@ function importarCatastroExcel(file) {
         if (res.ok) {
           const creados = await res.json();
           creados.forEach(p => { farmaciaProductos.push(p); porCodigo.set(p.codigo, p); });
-          logCatastro(`${creados.length} producto(s) nuevo(s) creado(s).`, 'ok');
+          logCatastro(`${creados.length} producto(s) nuevo(s) creado(s) de verdad.`, 'ok');
+        } else {
+          logCatastro(`⚠ No pude crear productos nuevos: ${(await res.text().catch(()=>'')).slice(0,200)}`, 'err');
         }
       }
 
