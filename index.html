@@ -750,7 +750,7 @@ async function init() {
       fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc'),
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
       fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
-      fetchAll('documentos_gdexpress', 'select=*&order=fecha_emision.desc'),
+      fetchAll('documentos_gdexpress', 'select=id,tipo_dte,folio,rut_hospital,hospital,fecha_emision,monto,estado_aceptacion,doc_url,orden_compra_ref,created_at,updated_at,detalle_sincronizado,estado_fiscal_status,estado_fiscal_actualizado,nc_factura_ref,monto_total&order=fecha_emision.desc'),
       fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_lotes', 'select=*'),
@@ -3103,18 +3103,30 @@ function notaCreditoQueAnula(folioFactura) {
   return documentosGdexpress.find(d => d.tipo_dte === '61' && (d.nc_factura_ref || '').trim() === String(folioFactura).trim()) || null;
 }
 
-// Devuelve el monto TOTAL con IVA de un documento GDExpress. Si el campo
-// monto_total no está guardado todavía (documentos sincronizados antes de
-// que existiera esa columna, o nuevos que el script aún no completó), lo
-// saca directo del XML completo que ya tenemos cargado, para que el monto
-// que se muestre sea siempre con IVA y nunca el neto.
+// Devuelve el monto TOTAL con IVA de un documento GDExpress. Ya no cargamos
+// el XML completo en memoria para todos los documentos (era ~62MB por carga
+// de página, la causa del consumo excesivo de tráfico en Supabase) — el XML
+// solo se pide puntualmente para un documento si hace falta, ver
+// completarMontoTotalSiFalta().
 function montoTotalDoc(d) {
   if (d.monto_total != null && d.monto_total !== '') return Number(d.monto_total);
-  if (d.xml_completo) {
-    const m = d.xml_completo.match(/<MntTotal>\s*([\d.]+)\s*<\/MntTotal>/);
-    if (m) return Number(m[1]);
-  }
   return Number(d.monto || 0);
+}
+
+// Para el puñado de documentos que todavía no tengan monto_total calculado
+// (nuevos, sincronizados antes de que el script lo genere), se pide el XML
+// de ESE documento nada más — no de todos — y se completa en memoria.
+async function completarMontoTotalSiFalta(d) {
+  if (d.monto_total != null && d.monto_total !== '') return;
+  try {
+    const res = await sb(`documentos_gdexpress?id=eq.${d.id}&select=xml_completo`);
+    if (!res.ok) return;
+    const filas = await res.json();
+    const xml = filas[0]?.xml_completo;
+    if (!xml) return;
+    const m = xml.match(/<MntTotal>\s*([\d.]+)\s*<\/MntTotal>/);
+    if (m) d.monto_total = Number(m[1]);
+  } catch (e) { /* si falla, se queda mostrando el neto como respaldo */ }
 }
 
 function estadoAceptacionFusionado(d) {
@@ -3195,6 +3207,7 @@ function verDocumentoDeFactura(numeroFactura, facturaPagoId) {
 async function abrirDetalleDocumentoGdexpress(id) {
   const d = documentosGdexpress.find(x => x.id === id);
   if (!d) return;
+  await completarMontoTotalSiFalta(d);
   cerrarTodosLosModales();
   const info = TIPOS_DTE_INFO[d.tipo_dte];
   const estadoFusionado = estadoAceptacionFusionado(d);
