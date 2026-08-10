@@ -256,17 +256,69 @@ def items_desde_xml_completo(xml_texto_saneado):
                     return hijo.text
         return None
 
+    def codigo_de(padre):
+        """El código del ítem (ej. RM - 11377/25) vive en un bloque aparte
+        <CdgItem><TpoCodigo>RM</TpoCodigo><VlrCodigo>11377/25</VlrCodigo></CdgItem>."""
+        for hijo in padre.iter():
+            if hijo.tag.split('}')[-1].lower() == 'cdgitem':
+                return texto_de(hijo, 'TpoCodigo'), texto_de(hijo, 'VlrCodigo')
+        return None, None
+
     detalles = buscar_todos('Detalle')
     items = []
     for det in detalles:
+        codigo_tipo, codigo_valor = codigo_de(det)
         items.append({
             'nombre_producto': texto_de(det, 'NmbItem', 'NombreItem'),
             'cantidad': texto_de(det, 'QtyItem', 'Cantidad'),
             'unidad': texto_de(det, 'UnmdItem', 'Unidad'),
             'precio_unitario': texto_de(det, 'PrcItem', 'PrecioUnitario', 'PrecioUnit'),
             'monto_item': texto_de(det, 'MontoItem', 'MntItem'),
+            'codigo_tipo': codigo_tipo,
+            'codigo_valor': codigo_valor,
+            'descripcion': texto_de(det, 'DscItem', 'DescripcionItem'),
         })
     return items
+
+
+def monto_total_desde_xml_completo(xml_texto_saneado):
+    """El monto CON IVA del documento vive en <Totales><MntTotal>. El
+    resumen liviano de búsqueda solo trae MntNeto (sin IVA), por eso este
+    dato hay que sacarlo del XML completo."""
+    try:
+        root = ET.fromstring(xml_texto_saneado)
+    except ET.ParseError:
+        return None
+    for el in root.iter():
+        if el.tag.split('}')[-1].lower() == 'mnttotal':
+            try:
+                return float((el.text or '').strip())
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def nc_factura_ref_desde_xml_completo(xml_texto_saneado):
+    """Para una Nota de Crédito, qué factura anula: mismo bloque
+    <Referencia> que usamos para la OC, pero con TpoDocRef=33 (código SII
+    de Factura Electrónica) en vez de 801."""
+    try:
+        root = ET.fromstring(xml_texto_saneado)
+    except ET.ParseError:
+        return None
+    for el in root.iter():
+        if el.tag.split('}')[-1].lower() == 'referencia':
+            tpo_doc_ref = None
+            folio_ref = None
+            for hijo in el.iter():
+                tag = hijo.tag.split('}')[-1].lower()
+                if tag == 'tpodocref':
+                    tpo_doc_ref = (hijo.text or '').strip()
+                elif tag == 'folioref':
+                    folio_ref = (hijo.text or '').strip()
+            if tpo_doc_ref == '33' and folio_ref:
+                return folio_ref[:100]
+    return None
 
 
 def sincronizar_detalle_pendiente(limite=150):
@@ -310,6 +362,19 @@ def sincronizar_detalle_pendiente(limite=150):
         except Exception:
             pass
 
+        monto_total = None
+        try:
+            monto_total = monto_total_desde_xml_completo(xml_saneado)
+        except Exception:
+            pass
+
+        nc_factura_ref = None
+        if doc['tipo_dte'] == '61':
+            try:
+                nc_factura_ref = nc_factura_ref_desde_xml_completo(xml_saneado)
+            except Exception:
+                pass
+
         try:
             if items:
                 filas_items = [{**it, 'documento_id': doc['id']} for it in items]
@@ -321,6 +386,10 @@ def sincronizar_detalle_pendiente(limite=150):
             }
             if oc_ref:
                 update['orden_compra_ref'] = oc_ref
+            if monto_total is not None:
+                update['monto_total'] = monto_total
+            if nc_factura_ref:
+                update['nc_factura_ref'] = nc_factura_ref
             supabase.table('documentos_gdexpress').update(update).eq('id', doc['id']).execute()
             ok += 1
         except Exception as e:
@@ -449,6 +518,51 @@ def actualizar_estado_fiscal(limite=200):
         print(f"⚠ Rechazados por el SII en esta tanda: {cambios_a_rechazado}")
 
 
+def corregir_monto_total_desde_xml_completo(limite=300):
+    """Para documentos que YA tienen el XML completo guardado pero no
+    quedó calculado el monto total (con IVA) — por ejemplo, documentos
+    sincronizados antes de que existiera esta columna."""
+    print(f"\n{'='*50}\nRescatando monto total (con IVA) desde el XML guardado\n{'='*50}")
+    res = supabase.table('documentos_gdexpress').select('id,xml_completo') \
+        .eq('detalle_sincronizado', True).is_('monto_total', 'null').order('id').limit(limite).execute()
+    filas = res.data or []
+    print(f"{len(filas)} documentos con detalle pero sin monto total todavía")
+
+    ok = 0
+    for fila in filas:
+        xml_texto = fila.get('xml_completo') or ''
+        try:
+            monto_total = monto_total_desde_xml_completo(xml_texto)
+        except Exception:
+            monto_total = None
+        if monto_total is not None:
+            supabase.table('documentos_gdexpress').update({'monto_total': monto_total}).eq('id', fila['id']).execute()
+            ok += 1
+    print(f"✔ {ok} montos totales rescatados del XML.")
+
+
+def corregir_nc_factura_ref_desde_xml_completo(limite=300):
+    """Para notas de crédito que YA tienen el XML completo guardado pero
+    no quedó extraída a qué factura anulan."""
+    print(f"\n{'='*50}\nRescatando qué factura anula cada Nota de Crédito\n{'='*50}")
+    res = supabase.table('documentos_gdexpress').select('id,xml_completo') \
+        .eq('detalle_sincronizado', True).eq('tipo_dte', '61').is_('nc_factura_ref', 'null').order('id').limit(limite).execute()
+    filas = res.data or []
+    print(f"{len(filas)} notas de crédito con detalle pero sin factura asociada todavía")
+
+    ok = 0
+    for fila in filas:
+        xml_texto = fila.get('xml_completo') or ''
+        try:
+            nc_ref = nc_factura_ref_desde_xml_completo(xml_texto)
+        except Exception:
+            nc_ref = None
+        if nc_ref:
+            supabase.table('documentos_gdexpress').update({'nc_factura_ref': nc_ref}).eq('id', fila['id']).execute()
+            ok += 1
+    print(f"✔ {ok} referencias de factura rescatadas del XML.")
+
+
 def main():
     print(f"Sincronizando Buscador de Documentos — {FECHA_MINIMA} a {FECHA_MAXIMA}")
     total = 0
@@ -460,6 +574,8 @@ def main():
     sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
     corregir_fechas_desde_xml_completo()
     corregir_oc_ref_desde_xml_completo()
+    corregir_monto_total_desde_xml_completo()
+    corregir_nc_factura_ref_desde_xml_completo()
     actualizar_estado_fiscal(limite=int(os.environ.get('LIMITE_FISCAL', 200)))
 
 
