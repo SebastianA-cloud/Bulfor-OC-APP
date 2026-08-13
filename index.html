@@ -697,6 +697,56 @@ function toast(msg, tipo = 'ok') {
   setTimeout(() => el.remove(), 3200);
 }
 
+// Reemplazo propio de confirm()/prompt() del navegador, con el mismo estilo
+// que el resto de la app. Ambos devuelven una Promise, así que se usan con
+// `await confirmModal(...)` / `await promptModal(...)` dentro de funciones
+// async — el resto del flujo (guardar, eliminar, etc.) sigue igual.
+function confirmModal(mensaje, { textoOk = 'Confirmar', textoCancelar = 'Cancelar', peligro = true } = {}) {
+  return new Promise(resolve => {
+    const modal = document.createElement('div');
+    modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+    const cerrar = (valor) => { modal.remove(); resolve(valor); };
+    modal.onclick = (e) => { if (e.target === modal) cerrar(false); };
+    modal.innerHTML = `
+      <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:22px 24px" onclick="event.stopPropagation()">
+        <div style="font-size:14px;line-height:1.5;white-space:pre-line">${mensaje}</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+          <button class="page-btn" id="confirm-cancelar" style="padding:8px 16px">${textoCancelar}</button>
+          <button class="page-btn" id="confirm-ok" style="padding:8px 16px;${peligro ? 'background:var(--red);color:#fff;border-color:var(--red)' : 'background:var(--accent);color:#fff;border-color:var(--accent)'}">${textoOk}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#confirm-ok').onclick = () => cerrar(true);
+    modal.querySelector('#confirm-cancelar').onclick = () => cerrar(false);
+  });
+}
+
+function promptModal(mensaje, valorInicial = '') {
+  return new Promise(resolve => {
+    const modal = document.createElement('div');
+    modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+    const cerrar = (valor) => { modal.remove(); resolve(valor); };
+    modal.onclick = (e) => { if (e.target === modal) cerrar(null); };
+    modal.innerHTML = `
+      <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:22px 24px" onclick="event.stopPropagation()">
+        <div style="font-size:14px;line-height:1.5;white-space:pre-line;margin-bottom:14px">${mensaje}</div>
+        <input type="text" id="prompt-input" value="${String(valorInicial).replace(/"/g,'&quot;')}" style="width:100%">
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+          <button class="page-btn" id="prompt-cancelar" style="padding:8px 16px">Cancelar</button>
+          <button class="page-btn" id="prompt-ok" style="padding:8px 16px;background:var(--accent);color:#fff;border-color:var(--accent)">Aceptar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const input = modal.querySelector('#prompt-input');
+    input.focus();
+    input.select();
+    const aceptar = () => cerrar(input.value);
+    modal.querySelector('#prompt-ok').onclick = aceptar;
+    modal.querySelector('#prompt-cancelar').onclick = () => cerrar(null);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') aceptar(); });
+  });
+}
+
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let oc = [], items = [], hosp = [], fedex = [];
 let hospitalesMaestro = [];
@@ -739,7 +789,7 @@ async function fetchAll(table, query) {
       if (intento < 3) await new Promise(r => setTimeout(r, 1000 * intento));
     }
     if (!res.ok) {
-      alert(`No se pudo cargar "${table}" después de varios intentos. Recarga la página — si sigue pasando, avísale a Sebastián.`);
+      toast(`No se pudo cargar "${table}" después de varios intentos. Recarga la página — si sigue pasando, avísale a Sebastián.`, 'err');
       break;
     }
     if (!Array.isArray(rows) || rows.length === 0) break;
@@ -1352,7 +1402,7 @@ async function guardarNormalizacion(textoOriginal) {
   const nombreProducto = document.getElementById('norm-nombre').value.trim();
   const dosis = document.getElementById('norm-dosis').value.trim();
   const cantidadFormato = document.getElementById('norm-cantidad').value.trim();
-  if (!nombreProducto) { alert('Escribe al menos el nombre del producto antes de guardar.'); return; }
+  if (!nombreProducto) { toast('Escribe al menos el nombre del producto antes de guardar.', 'err'); return; }
 
   // Combinamos los 3 campos en un solo texto para mostrar en toda la app
   const nombreCombinado = [nombreProducto, dosis, cantidadFormato].filter(Boolean).join(' ');
@@ -1377,7 +1427,7 @@ async function guardarNormalizacion(textoOriginal) {
     // En vez de cerrar de inmediato, buscamos textos similares para normalizar en lote
     mostrarSugerenciasSimilares(textoOriginal, nombreProducto, dosis, cantidadFormato, nombreCombinado);
   } catch(e) {
-    alert('No se pudo guardar la normalización: ' + e.message);
+    toast('No se pudo guardar la normalización: ' + e.message, 'err');
   }
 }
 
@@ -1487,7 +1537,7 @@ async function aplicarNormalizacionEnLote(candidatos, nombreProducto, dosis, can
     refrescarVistasTrasNormalizar();
     cerrarNormalizacion();
   } catch(e) {
-    alert('No se pudo aplicar la normalización en lote: ' + e.message);
+    toast('No se pudo aplicar la normalización en lote: ' + e.message, 'err');
   }
 }
 
@@ -1509,7 +1559,7 @@ async function eliminarNormalizacion(textoOriginal) {
       if (codigoActual) { closeOCDetail(); openOCDetail(codigoActual); }
     }
   } catch(e) {
-    alert('No se pudo quitar la normalización: ' + e.message);
+    toast('No se pudo quitar la normalización: ' + e.message, 'err');
   }
 }
 
@@ -1929,7 +1979,7 @@ function bloqueYaNormalizados(yaNormalizados) {
 async function crearHospitalMaestroDesdeOC(nombreOriginal, rut, nombreEstandar, btnEl) {
   nombreEstandar = (nombreEstandar||'').trim();
   rut = (rut||'').trim();
-  if (!nombreEstandar) { alert('Escribe un nombre estándar antes de registrar.'); return; }
+  if (!nombreEstandar) { toast('Escribe un nombre estándar antes de registrar.', 'err'); return; }
   const textoOriginalBtn = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Guardando…';
   try {
@@ -1947,14 +1997,14 @@ async function crearHospitalMaestroDesdeOC(nombreOriginal, rut, nombreEstandar, 
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
-    alert('No se pudo registrar: ' + e.message);
+    toast('No se pudo registrar: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginalBtn;
   }
 }
 
 async function guardarNombreEstandarPorRut(rut, nuevoNombre, btnEl) {
   nuevoNombre = (nuevoNombre||'').trim();
-  if (!nuevoNombre) { alert('Escribe un nombre estándar antes de guardar.'); return; }
+  if (!nuevoNombre) { toast('Escribe un nombre estándar antes de guardar.', 'err'); return; }
   const textoOriginalBtn = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Guardando…';
   try {
@@ -1971,14 +2021,14 @@ async function guardarNombreEstandarPorRut(rut, nuevoNombre, btnEl) {
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginalBtn;
   }
 }
 
 async function guardarNombreEstandarPorOriginal(nombreOriginal, nuevoNombre, btnEl) {
   nuevoNombre = (nuevoNombre||'').trim();
-  if (!nuevoNombre) { alert('Escribe un nombre estándar antes de guardar.'); return; }
+  if (!nuevoNombre) { toast('Escribe un nombre estándar antes de guardar.', 'err'); return; }
   const textoOriginalBtn = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Guardando…';
   try {
@@ -1994,7 +2044,7 @@ async function guardarNombreEstandarPorOriginal(nombreOriginal, nuevoNombre, btn
     refrescarVistasHospital();
     renderNormalizacionHospitales();
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginalBtn;
   }
 }
@@ -2028,7 +2078,7 @@ async function copiarTexto(texto, btnEl) {
     btnEl.style.color = 'var(--green)';
     setTimeout(() => { btnEl.innerHTML = original; btnEl.style.color = ''; }, 1200);
   } catch(e) {
-    alert('No se pudo copiar: ' + texto);
+    toast('No se pudo copiar: ' + texto, 'err');
   }
 }
 
@@ -2147,7 +2197,7 @@ function chipsFacturaHtml(textoFactura) {
 
 function abrirFacturaDesdeFedex(numero) {
   const f = facturasPago.find(x => String(x.factura).trim() === numero);
-  if (!f) { alert('Esa factura todavía no está sincronizada en Seguimiento de Pago.'); return; }
+  if (!f) { toast('Esa factura todavía no está sincronizada en Seguimiento de Pago.', 'err'); return; }
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'factura-quickview-overlay';
@@ -2415,7 +2465,7 @@ async function eliminarPaciente(id, numOrdenes, numRecetas, btnEl) {
   } else {
     mensaje += '\n\nEsta acción no se puede deshacer.';
   }
-  if (!confirm(mensaje)) return;
+  if (!(await confirmModal(mensaje))) return;
 
   const textoOriginal = btnEl.textContent;
   btnEl.disabled = true; btnEl.textContent = 'Eliminando…';
@@ -2439,7 +2489,7 @@ async function eliminarPaciente(id, numOrdenes, numRecetas, btnEl) {
     renderOE();
     filterPacientes();
   } catch(e) {
-    alert('No se pudo eliminar el paciente: ' + e.message);
+    toast('No se pudo eliminar el paciente: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginal;
   }
 }
@@ -2460,7 +2510,7 @@ async function guardarTelefonoPaciente(id, btnEl) {
     filterPacientes();
     setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1200);
   } catch(e) {
-    alert('No se pudo guardar el teléfono: ' + e.message);
+    toast('No se pudo guardar el teléfono: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginal;
   }
 }
@@ -2799,7 +2849,7 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
 
 function descargarExcelFacturasPago() {
   const lista = window.__ultimaListaFacturasPago || [];
-  if (!lista.length) { alert('No hay nada para descargar.'); return; }
+  if (!lista.length) { toast('No hay nada para descargar.', 'err'); return; }
 
   const filas = lista.map(f => {
     const vencReal = !!f.fecha_vencimiento;
@@ -2945,7 +2995,7 @@ async function guardarPagoFacturaDetalle(id, btnEl) {
       renderPagosVista();
     }, 500);
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginal;
   }
 }
@@ -3231,7 +3281,7 @@ function renderDocumentosGdexpress(soloTabla) {
 function verDocumentoDeFactura(numeroFactura, facturaPagoId) {
   const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(numeroFactura));
   if (!doc) {
-    alert('Todavía no encontramos el documento de esta factura en GDExpress. Puede que aún no se haya sincronizado.');
+    toast('Todavía no encontramos el documento de esta factura en GDExpress. Puede que aún no se haya sincronizado.', 'err');
     return;
   }
   if (facturaPagoId != null) navPush(() => abrirDetalleFacturaPago(facturaPagoId));
@@ -3279,7 +3329,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
           ${d.tipo_dte === '61' && d.nc_factura_ref ? `
           <div class="detail-field" style="grid-column:span 2">
             <label>Anula la Factura</label>
-            <span style="color:var(--accent);cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{alert('Esa factura no está sincronizada todavía.')}">N° ${d.nc_factura_ref} ↗</span>
+            <span style="color:var(--accent);cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{toast('Esa factura no está sincronizada todavía.', 'err')}">N° ${d.nc_factura_ref} ↗</span>
           </div>` : ''}
         </div>
 
@@ -3454,7 +3504,7 @@ function renderRechazadas(soloTabla) {
 
 function verNotaCreditoDesdeRechazadas(folioNC) {
   const nc = documentosGdexpress.find(d => d.tipo_dte === '61' && String(d.folio) === String(folioNC));
-  if (!nc) { alert('No encontramos el documento de esa nota de crédito.'); return; }
+  if (!nc) { toast('No encontramos el documento de esa nota de crédito.', 'err'); return; }
   navReset();
   abrirDetalleDocumentoGdexpress(nc.id);
 }
@@ -3481,7 +3531,7 @@ async function guardarRechazada(id, btnEl) {
     btnEl.textContent = '✔ Guardado';
     setTimeout(() => { btnEl.disabled = false; btnEl.textContent = textoOriginal; }, 1000);
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
     btnEl.disabled = false; btnEl.textContent = textoOriginal;
   }
 }
@@ -3922,14 +3972,14 @@ async function guardarNuevaOrdenOE() {
   const archivoEl = document.getElementById('oe-receta-archivo');
   const archivo = archivoEl?.files?.[0];
 
-  if (!nombrePaciente || !indicacion || !pago) { alert('Paciente, preparado y pago son obligatorios.'); return; }
-  if (!fechaReceta) { alert('La fecha de emisión de la receta es obligatoria.'); return; }
-  if (tipoPago === 'abonado' && !montoAbonado) { alert('Escribe el monto que se abonó.'); return; }
+  if (!nombrePaciente || !indicacion || !pago) { toast('Paciente, preparado y pago son obligatorios.', 'err'); return; }
+  if (!fechaReceta) { toast('La fecha de emisión de la receta es obligatoria.', 'err'); return; }
+  if (tipoPago === 'abonado' && !montoAbonado) { toast('Escribe el monto que se abonó.', 'err'); return; }
 
   // Verificar vigencia antes de guardar
   const venc = calcularVencimientoReceta(fechaReceta);
   if (venc < new Date()) {
-    if (!confirm(`⚠️ Esta receta venció el ${fDate(venc.toISOString())}. ¿Deseas guardar la orden de todas formas?`)) return;
+    if (!(await confirmModal(`⚠️ Esta receta venció el ${fDate(venc.toISOString())}. ¿Deseas guardar la orden de todas formas?`, { textoOk: 'Guardar igual', peligro: false }))) return;
   }
 
   try {
@@ -4025,7 +4075,7 @@ async function guardarNuevaOrdenOE() {
     renderOE();
     filterPacientes();
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
   }
 }
 
@@ -4119,7 +4169,7 @@ async function cambiarEstadoOE(id, campo, valor) {
     cerrarModalOE('oe-detalle-modal-overlay');
     abrirDetalleOE(id);
   } catch(e) {
-    alert('Error al cambiar estado: ' + e.message);
+    toast('Error al cambiar estado: ' + e.message, 'err');
   }
 }
 
@@ -4235,8 +4285,8 @@ async function guardarEdicionOE(id) {
   const retiroHora = document.getElementById('oe-edit-retiro-hora').value;
   const observaciones = document.getElementById('oe-edit-observaciones').value.trim();
 
-  if (!indicacion || !pago) { alert('Preparado y pago son obligatorios.'); return; }
-  if (tipoPago === 'abonado' && !montoAbonado) { alert('Escribe el monto que se abonó.'); return; }
+  if (!indicacion || !pago) { toast('Preparado y pago son obligatorios.', 'err'); return; }
+  if (tipoPago === 'abonado' && !montoAbonado) { toast('Escribe el monto que se abonó.', 'err'); return; }
 
   try {
     const res = await sb(`ordenes_elaboracion?id=eq.${id}`, {
@@ -4264,12 +4314,12 @@ async function guardarEdicionOE(id) {
     cerrarModalOE('oe-editar-modal-overlay');
     abrirDetalleOE(id);
   } catch(e) {
-    alert('No se pudo guardar: ' + e.message);
+    toast('No se pudo guardar: ' + e.message, 'err');
   }
 }
 
 async function eliminarOrdenOE(id) {
-  if (!confirm('¿Eliminar esta orden de elaboración? Esta acción no se puede deshacer.')) return;
+  if (!(await confirmModal('¿Eliminar esta orden de elaboración?\n\nEsta acción no se puede deshacer.', { textoOk: 'Eliminar' }))) return;
   try {
     const res = await sb(`ordenes_elaboracion?id=eq.${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
@@ -4278,7 +4328,7 @@ async function eliminarOrdenOE(id) {
     cerrarModalOE('oe-detalle-modal-overlay');
     renderOE();
   } catch(e) {
-    alert('Error al eliminar: ' + e.message);
+    toast('Error al eliminar: ' + e.message, 'err');
   }
 }
 
@@ -4453,7 +4503,7 @@ function intentarGuardarNuevoEnvio() {
   const hospitalEscrito = document.getElementById('fx-new-hospital').value.trim();
   const rutEscrito = document.getElementById('fx-new-rut').value.trim();
   const ot = document.getElementById('fx-new-ot').value.trim();
-  if (!hospitalEscrito || !ot) { alert('Hospital y N° de Orden de transporte son obligatorios.'); return; }
+  if (!hospitalEscrito || !ot) { toast('Hospital y N° de Orden de transporte son obligatorios.', 'err'); return; }
 
   // ¿Coincide exactamente con un hospital ya existente en la tabla maestra?
   const existente = hospitalesMaestro.find(h => (h.nombre_estandar||'').toLowerCase() === hospitalEscrito.toLowerCase());
@@ -4517,7 +4567,7 @@ function abrirConfirmacionHospitalNuevo(nombreEscrito, rutEscrito) {
 async function crearHospitalYGuardarEnvio() {
   const nombre = document.getElementById('fx-hosp-nuevo-nombre').value.trim();
   const rut = document.getElementById('fx-hosp-nuevo-rut').value.trim();
-  if (!nombre) { alert('El nombre del hospital es obligatorio.'); return; }
+  if (!nombre) { toast('El nombre del hospital es obligatorio.', 'err'); return; }
 
   try {
     const res = await sb('hospitales_maestro', {
@@ -4535,7 +4585,7 @@ async function crearHospitalYGuardarEnvio() {
     document.getElementById('fedex-hospital-nuevo-overlay').remove();
     await guardarNuevoEnvio(nombre);
   } catch(e) {
-    alert('No se pudo crear el hospital: ' + e.message);
+    toast('No se pudo crear el hospital: ' + e.message, 'err');
   }
 }
 
@@ -4547,7 +4597,7 @@ function cerrarFormularioEnvio() {
 async function guardarNuevoEnvio(hospital) {
   const ot = document.getElementById('fx-new-ot').value.trim();
   const factura = document.getElementById('fx-new-factura').value.trim();
-  if (!hospital || !ot) { alert('Hospital y N° de Orden de transporte son obligatorios.'); return; }
+  if (!hospital || !ot) { toast('Hospital y N° de Orden de transporte son obligatorios.', 'err'); return; }
 
   try {
     const res = await sb('seguimiento_fedex', {
@@ -4562,7 +4612,7 @@ async function guardarNuevoEnvio(hospital) {
     cerrarFormularioEnvio();
     renderFedex();
   } catch(e) {
-    alert('No se pudo guardar el envío: ' + e.message + '\n\n(Si el error menciona "duplicate", ese N° de orden de transporte ya existe)');
+    toast('No se pudo guardar el envío: ' + e.message + ' (Si el error menciona "duplicate", ese N° de orden de transporte ya existe)', 'err');
   }
 }
 
@@ -4665,7 +4715,7 @@ async function guardarEdicionEnvio(id) {
     renderFedex();
     renderDetalleEnvio(actualizado, false);
   } catch(e) {
-    alert('No se pudo guardar el cambio: ' + e.message);
+    toast('No se pudo guardar el cambio: ' + e.message, 'err');
   }
 }
 
@@ -4675,7 +4725,7 @@ function cerrarDetalleEnvio() {
 }
 
 async function eliminarEnvio(id) {
-  if (!confirm('¿Seguro que quieres eliminar este envío? Esta acción no se puede deshacer.')) return;
+  if (!(await confirmModal('¿Seguro que quieres eliminar este envío?\n\nEsta acción no se puede deshacer.', { textoOk: 'Eliminar' }))) return;
   try {
     const res = await sb(`seguimiento_fedex?id=eq.${id}`, { method: 'DELETE' });
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
@@ -4684,7 +4734,7 @@ async function eliminarEnvio(id) {
     cerrarDetalleEnvio();
     renderFedex();
   } catch(e) {
-    alert('No se pudo eliminar: ' + e.message);
+    toast('No se pudo eliminar: ' + e.message, 'err');
   }
 }
 
@@ -5517,7 +5567,7 @@ async function guardarLoteCatastro(productoId) {
 }
 
 async function eliminarLoteFarmacia(loteId) {
-  if (!confirm('¿Eliminar este lote contado?')) return;
+  if (!(await confirmModal('¿Eliminar este lote contado?', { textoOk: 'Eliminar' }))) return;
   await sb(`farmacia_lotes?id=eq.${loteId}`, { method: 'DELETE' });
   farmaciaLotes = farmaciaLotes.filter(l => l.id !== loteId);
   renderDetalleProductoFarmacia();
@@ -5544,14 +5594,14 @@ async function crearProductoFarmacia() {
   const codigo = document.getElementById('farmacia-nuevo-codigo').value.trim();
   const nombre = document.getElementById('farmacia-nuevo-nombre').value.trim();
   const familiaId = document.getElementById('farmacia-nueva-familia').value || null;
-  if (!codigo || !nombre) { alert('Completa el código y el nombre.'); return; }
+  if (!codigo || !nombre) { toast('Completa el código y el nombre.', 'err'); return; }
 
   const res = await sb('farmacia_productos', {
     method: 'POST',
     headers: { 'Prefer': 'return=representation' },
     body: JSON.stringify([{ codigo, nombre, familia_id: familiaId ? Number(familiaId) : null }]),
   });
-  if (!res.ok) { alert('No se pudo crear el producto — puede que el código ya exista.'); return; }
+  if (!res.ok) { toast('No se pudo crear el producto — puede que el código ya exista.', 'err'); return; }
   const filas = await res.json();
   const nuevo = filas[0];
   farmaciaProductos.push(nuevo);
@@ -5878,7 +5928,7 @@ async function darDeBajaLote(loteId) {
   const lote = farmaciaLotes.find(l => l.id === loteId);
   if (!lote) return;
   const p = farmaciaProductos.find(x => x.id === lote.producto_id);
-  const entrada = prompt(`Dar de baja "${p ? p.nombre : ''}" (lote ${lote.lote || 'sin número'}).\nCantidad disponible: ${lote.cantidad}.\n¿Cuánto quieres dar de baja?`, lote.cantidad);
+  const entrada = await promptModal(`Dar de baja "${p ? p.nombre : ''}" (lote ${lote.lote || 'sin número'}).\nCantidad disponible: ${lote.cantidad}.\n¿Cuánto quieres dar de baja?`, lote.cantidad);
   if (entrada === null) return;
   const cantidad = Number(entrada);
   if (!cantidad || cantidad <= 0 || cantidad > Number(lote.cantidad)) { toast('Cantidad inválida.', 'err'); return; }
