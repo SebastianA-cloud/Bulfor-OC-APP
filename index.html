@@ -74,7 +74,7 @@
      y formularios cortos, md para fichas de detalle, lg para fichas con
      tablas adentro (ítems, historial). Header y footer con el mismo padding
      siempre, para que ninguna ventana "se sienta" distinta a otra. */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(26,25,23,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-5); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(26,25,23,.5); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: var(--sp-5); overflow-y: auto; }
   .modal-shell { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 12px 32px rgba(26,25,23,.18); }
   .modal-sm { max-width: 420px; }
   .modal-md { max-width: 520px; }
