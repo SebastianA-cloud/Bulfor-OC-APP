@@ -3320,7 +3320,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(d))}</span></div>
           <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
           <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
-          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref || 'No detectada'}</span></div>
+          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || 'No detectada')}</span></div>
           ${d.tipo_dte === '33' && notaCreditoQueAnula(d.folio) ? `
           <div class="detail-field" style="grid-column:span 2">
             <label>Anulada por Nota de Crédito</label>
