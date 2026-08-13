@@ -2917,14 +2917,17 @@ function cerrarDetalleFacturaPago() {
   if (m) m.remove();
 }
 
-function abrirDetalleFacturaPago(id) {
+async function abrirDetalleFacturaPago(id) {
   const f = facturasPago.find(x => x.id === id);
   if (!f) return;
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  if (doc) await completarMontoTotalSiFalta(doc);
   cerrarTodosLosModales();
 
   const vencRealDetalle = !!f.fecha_vencimiento;
   const vencDateDetalle = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
   const vencHtmlDetalle = vencDateDetalle ? (vencRealDetalle ? fDate(vencDateDetalle) : `<span title="Estimado — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDateDetalle)} (estimado)</span>`) : '—';
+  const estadoFusionado = doc ? estadoAceptacionFusionado(doc) : f.estado_aceptacion;
 
   const modal = document.createElement('div');
   modal.id = 'factura-pago-detalle-overlay';
@@ -2937,21 +2940,36 @@ function abrirDetalleFacturaPago(id) {
           <div class="mono" style="font-size:16px">${f.factura}</div>
           <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(f.hospital)||f.hospital||'—'}</div>
         </div>
-        <button onclick="cerrarDetalleFacturaPago()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="cerrarDetalleFacturaPago()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        </div>
       </div>
 
       <div style="padding:20px 24px">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
           <div class="detail-field"><label>Vencimiento</label><span>${vencHtmlDetalle}</span></div>
-          <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '—'}</span></div>
+          ${doc ? `
+          <div class="detail-field"><label>Monto neto</label><span>${clp(doc.monto)}</span></div>
+          <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(doc))}</span></div>
+          <div class="detail-field"><label>RUT Hospital</label><span>${doc.rut_hospital||'—'}</span></div>
+          ` : `<div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>`}
+          <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
+          ${doc && doc.orden_compra_ref ? `
+          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</span></div>` : ''}
+          ${doc && notaCreditoQueAnula(doc.folio) ? `
+          <div class="detail-field" style="grid-column:span 2">
+            <label>Anulada por Nota de Crédito</label>
+            <span style="color:var(--red);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(doc.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(doc.folio).folio} ↗</span>
+          </div>` : ''}
         </div>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
-        <div style="font-size:12px;color:var(--text-3);border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">
-          Todavía no disponible — se completa automáticamente cuando conectemos la búsqueda de documentos de GDExpress.
+        <div id="fp-items-cuerpo" style="font-size:12px;color:var(--text-3)">
+          ${doc ? 'Cargando…' : 'Todavía no encontramos esta factura en GDExpress — se completa solo apenas se sincronice.'}
         </div>
+        ${doc && doc.doc_url ? `<div style="margin-top:10px;text-align:right"><a href="${doc.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Pago</div>
         <div style="display:flex;gap:10px">
@@ -2970,6 +2988,43 @@ function abrirDetalleFacturaPago(id) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+
+  if (!doc) return;
+  const cuerpoItems = document.getElementById('fp-items-cuerpo');
+  if (!doc.detalle_sincronizado) {
+    cuerpoItems.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">Todavía no se ha traído el detalle de este documento — se completa solo en la próxima sincronización.</div>`;
+    return;
+  }
+  try {
+    const items = await fetchAll('documentos_gdexpress_items', `select=*&documento_id=eq.${doc.id}`);
+    if (!items.length) {
+      cuerpoItems.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center">No se encontraron productos para este documento.</div>`;
+      return;
+    }
+    cuerpoItems.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
+          <tbody>
+            ${items.map(it => `<tr>
+              <td style="font-weight:500">
+                ${it.nombre_producto||'—'}
+                ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
+                  ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
+                  ${it.codigo_valor && it.descripcion ? ' · ' : ''}
+                  ${it.descripcion || ''}
+                </div>` : ''}
+              </td>
+              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    cuerpoItems.innerHTML = `<div style="color:var(--red)">No se pudo cargar el detalle: ${e.message}</div>`;
+  }
 }
 
 async function guardarPagoFacturaDetalle(id, btnEl) {
