@@ -747,11 +747,12 @@ function toast(msg, tipo = 'ok') {
 function confirmModal(mensaje, { textoOk = 'Confirmar', textoCancelar = 'Cancelar', peligro = true } = {}) {
   return new Promise(resolve => {
     const modal = document.createElement('div');
-    modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+    modal.className = 'modal-overlay';
+  modal.style.zIndex = '2000';
     const cerrar = (valor) => { modal.remove(); resolve(valor); };
     modal.onclick = (e) => { if (e.target === modal) cerrar(false); };
     modal.innerHTML = `
-      <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:22px 24px" onclick="event.stopPropagation()">
+      <div class="modal-shell modal-sm" style="padding:22px 24px" onclick="event.stopPropagation()">
         <div style="font-size:14px;line-height:1.5;white-space:pre-line">${mensaje}</div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
           <button class="page-btn" id="confirm-cancelar" style="padding:8px 16px">${textoCancelar}</button>
@@ -767,11 +768,12 @@ function confirmModal(mensaje, { textoOk = 'Confirmar', textoCancelar = 'Cancela
 function promptModal(mensaje, valorInicial = '') {
   return new Promise(resolve => {
     const modal = document.createElement('div');
-    modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+    modal.className = 'modal-overlay';
+  modal.style.zIndex = '2000';
     const cerrar = (valor) => { modal.remove(); resolve(valor); };
     modal.onclick = (e) => { if (e.target === modal) cerrar(null); };
     modal.innerHTML = `
-      <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:22px 24px" onclick="event.stopPropagation()">
+      <div class="modal-shell modal-sm" style="padding:22px 24px" onclick="event.stopPropagation()">
         <div style="font-size:14px;line-height:1.5;white-space:pre-line;margin-bottom:14px">${mensaje}</div>
         <input type="text" id="prompt-input" value="${String(valorInicial).replace(/"/g,'&quot;')}" style="width:100%">
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
@@ -1142,21 +1144,22 @@ function abrirFacturasAsociadasOC(codigoOC) {
 
   const modal = document.createElement('div');
   modal.id = 'oc-facturas-asociadas-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Facturas asociadas</div>
           <div class="mono" style="font-size:14px">${codigoOC}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
-          <button onclick="document.getElementById('oc-facturas-asociadas-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="document.getElementById('oc-facturas-asociadas-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">${filasHtml}</div>
+      <div class="modal-body">${filasHtml}</div>
     </div>`;
   document.body.appendChild(modal);
 }
@@ -1393,15 +1396,16 @@ function abrirNormalizacion(textoOriginal) {
   const campos = diccionarioCampos[textoOriginal] || { nombre_producto: '', dosis: '', cantidad_formato: '' };
   const modal = document.createElement('div');
   modal.id = 'normalizacion-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
   modal.onclick = (e) => { if (e.target === modal) cerrarNormalizacion(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-md">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">¿Normalizar este nombre?</div>
-        <button onclick="cerrarNormalizacion()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarNormalizacion()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre original</div>
         <div style="font-size:13px;color:var(--text-2);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:18px;white-space:pre-wrap;word-break:break-word">${escapeHtml(textoOriginal)}</div>
 
@@ -1523,13 +1527,13 @@ function mostrarSugerenciasSimilares(textoOriginal, nombreProducto, dosis, canti
   const modal = document.getElementById('normalizacion-modal-overlay');
   if (!modal) return;
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:580px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-size:16px;font-weight:600">¿Aplicar el mismo nombre a estos también?</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:4px">Encontramos ${candidatos.length} producto${candidatos.length>1?'s':''} con texto similar a "<strong>${nombreCombinado}</strong>"</div>
         </div>
-        <button onclick="cerrarNormalizacion()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarNormalizacion()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:16px 24px">
         <div style="display:flex;gap:10px;margin-bottom:12px">
@@ -1650,21 +1654,22 @@ function openProductDetail(nombreProducto) {
 
   const modal = document.createElement('div');
   modal.id = 'product-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) closeProductDetail(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-xl">
+      <div class="modal-header">
         <div>
           <div style="font-size:17px;font-weight:600">${nombreProducto}</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">${familia}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
-          <button onclick="closeProductDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="closeProductDetail()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
           <div class="stat" style="padding:12px"><div class="stat-label">Total vendido</div><div class="stat-val" style="font-size:16px">${clp(totalVendido)}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">N° de ventas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
@@ -1725,21 +1730,22 @@ function openProductoHospitalOCs(nombreProducto, hospital) {
 
   const modal = document.createElement('div');
   modal.id = 'product-hosp-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) closeProductoHospitalOCs_(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-xl">
+      <div class="modal-header">
         <div>
           <div style="font-size:13px;color:var(--text-2);margin-bottom:2px">${nombreProducto}</div>
           <div style="font-size:16px;font-weight:600">${hospital}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
-          <button onclick="closeProductoHospitalOCs_()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="closeProductoHospitalOCs_()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Órdenes de compra con este producto</div>
         <input type="text" id="product-hosp-oc-search" placeholder="Buscar por N° OC…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitalOCsLista()">
         <div id="product-hosp-oc-table-wrap"></div>
@@ -1892,16 +1898,17 @@ function abrirNormalizacionHospitales() {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'normalizar-hosp-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarNormalizacionHospitales(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-size:16px;font-weight:600">Normalizar nombres de hospitales</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">Solo se muestran los pendientes. El nombre se aplica al instante en toda la app.</div>
         </div>
-        <button onclick="cerrarNormalizacionHospitales()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarNormalizacionHospitales()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:20px 24px" id="normalizar-hosp-cuerpo"></div>
     </div>`;
@@ -2244,16 +2251,17 @@ function abrirFacturaDesdeFedex(numero) {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'factura-quickview-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1200';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-sm" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div class="mono" style="font-size:15px">${f.factura}</div>
           <div style="font-size:14px;font-weight:600;margin-top:2px">${nombreHosp(f.hospital)||f.hospital||'—'}</div>
         </div>
-        <button onclick="document.getElementById('factura-quickview-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="document.getElementById('factura-quickview-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
@@ -2429,11 +2437,12 @@ async function abrirDetallePaciente(id) {
 
   const modal = document.createElement('div');
   modal.id = 'pac-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarDetallePaciente(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="flex:1">
           <div style="font-size:16px;font-weight:600">${paciente.nombre}</div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
@@ -2441,7 +2450,7 @@ async function abrirDetallePaciente(id) {
             <button class="page-btn" style="padding:6px 12px" onclick="guardarTelefonoPaciente(${paciente.id}, this)">Guardar</button>
           </div>
         </div>
-        <button onclick="cerrarDetallePaciente()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarDetallePaciente()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:20px 24px" id="pac-detalle-cuerpo">
         <div style="font-size:13px;color:var(--text-3)">Cargando historial…</div>
@@ -2464,13 +2473,13 @@ async function abrirDetallePaciente(id) {
           <div style="font-size:11px;margin-top:2px;color:${vigente?'var(--green)':'var(--red)'}">${vigente?'✓ Vigente hasta':'✗ Venció el'} ${fDate(venc.toISOString())}</div>
           ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px">📎 ${r.archivo_nombre}</div>` : ''}
         </div>
-        ${r.archivo_url ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="verRecetaEnModal('${r.archivo_url}')">Ver</button>` : ''}
+        ${r.archivo_url ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="navPush(()=>abrirDetallePaciente(${id}));verRecetaEnModal('${r.archivo_url}')">Ver</button>` : ''}
       </div>`;
     }).join('');
 
   const ordenesHtml = !ordenesDelPaciente.length ? '<div style="font-size:13px;color:var(--text-3)">Sin órdenes de elaboración registradas.</div>' :
     ordenesDelPaciente.map(o => `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;cursor:pointer" onclick="cerrarDetallePaciente();abrirDetalleOE(${o.id})">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;cursor:pointer" onclick="navPush(()=>abrirDetallePaciente(${id}));abrirDetalleOE(${o.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
             <div style="font-size:13px;font-weight:500">${o.indicacion||'—'}</div>
@@ -2974,22 +2983,23 @@ async function abrirDetalleFacturaPago(id) {
 
   const modal = document.createElement('div');
   modal.id = 'factura-pago-detalle-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarDetalleFacturaPago(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div class="mono" style="font-size:16px">${f.factura}</div>
           <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(f.hospital)||f.hospital||'—'}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
-          <button onclick="cerrarDetalleFacturaPago()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="cerrarDetalleFacturaPago()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
 
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
           <div class="detail-field"><label>Vencimiento</label><span>${vencHtmlDetalle}</span></div>
@@ -2998,7 +3008,7 @@ async function abrirDetalleFacturaPago(id) {
           <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(doc))}</span></div>
           <div class="detail-field"><label>RUT Hospital</label><span>${doc.rut_hospital||'—'}</span></div>
           ` : `<div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>`}
-          <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${badgeEstadoDocGdexpress(estadoFusionado)}</span></div>
           ${doc && doc.orden_compra_ref ? `
           <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</span></div>` : ''}
           ${doc && notaCreditoQueAnula(doc.folio) ? `
@@ -3009,8 +3019,8 @@ async function abrirDetalleFacturaPago(id) {
         </div>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
-        <div id="fp-items-cuerpo" style="font-size:12px;color:var(--text-3)">
-          ${doc ? 'Cargando…' : 'Todavía no encontramos esta factura en GDExpress — se completa solo apenas se sincronice.'}
+        <div id="fp-items-cuerpo">
+          ${doc ? '<div class="skeleton" style="height:38px;margin-bottom:6px"></div><div class="skeleton" style="height:38px;width:80%"></div>' : '<div style="font-size:12px;color:var(--text-3)">Todavía no encontramos esta factura en GDExpress — se completa solo apenas se sincronice.</div>'}
         </div>
         ${doc && doc.doc_url ? `<div style="margin-top:10px;text-align:right"><a href="${doc.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
 
@@ -3790,11 +3800,12 @@ function abrirNuevaOrdenElaboracion() {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'oe-form-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('oe-form-modal-overlay'); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">Nueva Orden de Elaboración</div>
         <button onclick="cerrarModalOE('oe-form-modal-overlay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
       </div>
@@ -3956,10 +3967,11 @@ function mostrarRecetasVigentesEnFormulario(vigentes) {
 function mostrarAlertaPacienteExistente(nombre, ordenes, recetasVigentes, todasRecetas) {
   const modal = document.createElement('div');
   modal.id = 'oe-paciente-alerta-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.6);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:540px;width:100%;max-height:82vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border)">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">⚠️ Paciente con historial</div>
         <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>${nombre}</strong> ha mandado a preparar ${ordenes.length} ${ordenes.length===1?'receta':'recetas'}. Haz clic en un preparado para prellenar el formulario.</div>
       </div>
@@ -4192,18 +4204,22 @@ function abrirDetalleOE(id) {
 
   const modal = document.createElement('div');
   modal.id = 'oe-detalle-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('oe-detalle-modal-overlay'); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-size:13px;color:var(--text-2)">${fDate(o.fecha_orden)}</div>
           <div style="font-size:17px;font-weight:600">${nombre}</div>
         </div>
-        <button onclick="cerrarModalOE('oe-detalle-modal-overlay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="cerrarModalOE('oe-detalle-modal-overlay')" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Preparado</label><span>${o.indicacion||'—'}</span></div>
           <div class="detail-field"><label>Valor</label><span>${o.valor ? clp(o.valor) : '—'}</span></div>
@@ -4226,7 +4242,7 @@ function abrirDetalleOE(id) {
           <div style="font-size:12px;${vigente?'color:var(--green)':'color:var(--red)'}">Vence: ${fDate(venc.toISOString())} ${vigente?'✓ Vigente':'⚠️ Vencida'}</div>
           ${receta.archivo_url ? `
           <div style="margin-top:10px">
-            <button onclick="verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 14px;font-size:12px">👁 Ver receta</button>
+            <button onclick="navPush(()=>abrirDetalleOE(${o.id}));verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 14px;font-size:12px">👁 Ver receta</button>
           </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>'}
         </div>` : ''}
 
@@ -4286,11 +4302,12 @@ function abrirEditarOE(id) {
 
   const modal = document.createElement('div');
   modal.id = 'oe-editar-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('oe-editar-modal-overlay'); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">Editar Orden — ${o.pacientes?.nombre || ''}</div>
         <button onclick="cerrarModalOE('oe-editar-modal-overlay')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
       </div>
@@ -4446,7 +4463,8 @@ function verRecetaEnModal(url) {
         <div style="display:flex;gap:8px;align-items:center">
           <button onclick="imprimirRecetaOE('${url}', ${esImagen})" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
           <button onclick="descargarRecetaOE('${url}')" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer">⬇ Descargar</button>
-          <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2)">✕</button>
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
       <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;background:#111">
@@ -4512,15 +4530,16 @@ function abrirNuevoEnvio() {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'fedex-form-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarFormularioEnvio(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:480px;width:100%;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">Nuevo envío</div>
-        <button onclick="cerrarFormularioEnvio()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarFormularioEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div style="display:flex;flex-direction:column;gap:14px">
           <div style="position:relative">
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Hospital *</div>
@@ -4638,14 +4657,15 @@ async function guardarRutHospitalSiCorresponde(fila, rutEscrito) {
 function abrirConfirmacionHospitalNuevo(nombreEscrito, rutEscrito) {
   const modal = document.createElement('div');
   modal.id = 'fedex-hospital-nuevo-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.6);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:420px;width:100%;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border)">
+    <div class="modal-shell modal-sm" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">¿Este hospital es nuevo?</div>
         <div style="font-size:13px;color:var(--text-2);margin-top:4px">No encontramos "<strong>${nombreEscrito}</strong>" en la lista de hospitales. ¿Quieres crearlo?</div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div style="display:flex;flex-direction:column;gap:14px">
           <div>
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre del hospital</div>
@@ -4723,16 +4743,17 @@ function abrirDetalleEnvio(id) {
   cerrarTodosLosModales();
   const modal = document.createElement('div');
   modal.id = 'fedex-detalle-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarDetalleEnvio(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:480px;width:100%;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-size:13px;color:var(--text-2);margin-bottom:2px"><span class="mono">${f.orden_transporte}</span> ${botonCopiar(f.orden_transporte)}</div>
           <div style="font-size:16px;font-weight:600">${nombreHosp(f.hospital)}</div>
         </div>
-        <button onclick="cerrarDetalleEnvio()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="cerrarDetalleEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:20px 24px" id="fedex-detalle-cuerpo"></div>
     </div>`;
@@ -4847,21 +4868,22 @@ function openHospitalOCs(hospital) {
 
   const modal = document.createElement('div');
   modal.id = 'hosp-oc-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) closeHospitalOCs(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-xl">
+      <div class="modal-header">
         <div>
           <div style="font-size:16px;font-weight:600">${hospital}</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="hosp-oc-count">${window.__hospActualOCs.length} órdenes de compra</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
-          <button onclick="closeHospitalOCs()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="closeHospitalOCs()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <input type="text" id="hosp-oc-search" placeholder="Buscar por N° OC o producto…" style="width:100%;margin-bottom:14px" oninput="filterHospitalOCs()">
         <div id="hosp-oc-table-wrap"></div>
       </div>
@@ -4952,15 +4974,16 @@ function modalEstadistica(titulo, contenidoHtml) {
   navReset();
   const modal = document.createElement('div');
   modal.id = 'stat-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) closeEstadistica(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-xl">
+      <div class="modal-header">
         <div style="font-size:16px;font-weight:600">${titulo}</div>
-        <button onclick="closeEstadistica()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="closeEstadistica()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
-      <div style="padding:20px 24px">${contenidoHtml}</div>
+      <div class="modal-body">${contenidoHtml}</div>
     </div>`;
   document.body.appendChild(modal);
 }
@@ -5514,16 +5537,17 @@ function abrirRevisionFamiliasCatastro(productoIds) {
   const opcionesFamilia = farmaciaFamilias.map(f => `<option value="${f.id}">${f.nombre}</option>`).join('');
   const modal = document.createElement('div');
   modal.id = 'farmacia-revision-familias-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
           <div style="font-weight:700;font-size:16px">Asigna familia a lo recién catastrado</div>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">${sinFamilia.length} producto(s) de esta carga todavía no tienen familia</div>
         </div>
-        <button onclick="document.getElementById('farmacia-revision-familias-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+        <button onclick="document.getElementById('farmacia-revision-familias-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:12px 24px">
         <div class="table-card"><table><thead><tr>
