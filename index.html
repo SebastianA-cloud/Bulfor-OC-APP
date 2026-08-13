@@ -12,6 +12,7 @@
 <title>Farmacia Bulfor — Buscador de OC</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 <style>
   :root {
     --bg: #F7F6F3;
@@ -55,6 +56,20 @@
   .modulo-placeholder h2 { font-size: 18px; color: var(--text); margin-bottom: 8px; font-weight: 600; }
   .modulo-placeholder p { font-size: 14px; max-width: 360px; }
   .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-icon i { font-size: 16px; vertical-align: -3px; }
+  .nav-section-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; color: var(--text-3); text-transform: uppercase; padding: 14px 10px 6px; }
+  .nav-section-label:first-child { padding-top: 4px; }
+
+  /* Toasts */
+  .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+  .toast { display: flex; align-items: center; gap: 8px; background: var(--text); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.18); animation: toast-in .18s ease-out; }
+  .toast.toast-err { background: var(--red); }
+  .toast.toast-ok i { color: #8FD9A8; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Sombras suaves para dar un poco más de profundidad */
+  .table-card, .stat { box-shadow: 0 1px 3px rgba(26,25,23,.04); }
+  .page-btn:hover { box-shadow: 0 1px 4px rgba(26,25,23,.08); }
   .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
   .sync-status { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
   .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
@@ -212,24 +227,27 @@
     <div class="logo-sub" style="margin-top:4px">Buscador de OC — Mercado Público</div>
   </div>
   <div class="nav" id="nav-modulos">
+    <div class="nav-section-label">Compras</div>
     <div class="nav-item active" onclick="mostrarModulo('oc-modulo', this)">
-      <span class="nav-icon">📋</span><span>Órdenes de Compra</span>
+      <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span><span>Órdenes de Compra</span>
     </div>
     <div class="nav-item" onclick="mostrarModulo('facturas', this)">
-      <span class="nav-icon">🧾</span><span>Facturas</span>
+      <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas</span>
     </div>
     <div class="nav-item" onclick="mostrarModulo('fedex', this)">
-      <span class="nav-icon">🚚</span><span>Seguimiento FedEx</span>
+      <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>Seguimiento FedEx</span>
     </div>
+    <div class="nav-section-label">Operaciones</div>
     <div class="nav-item" onclick="mostrarModulo('elaboracion', this)" style="position:relative">
-      <span class="nav-icon">⚗️</span><span>Órdenes de Elaboración</span>
+      <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de Elaboración</span>
       <span id="badge-oe-digitar" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
     </div>
-    <div class="nav-item" onclick="mostrarModulo('rrhh', this)">
-      <span class="nav-icon">👥</span><span>Recursos Humanos</span>
-    </div>
     <div class="nav-item" onclick="mostrarModulo('farmacia-modulo', this)">
-      <span class="nav-icon">💊</span><span>Control Farmacia</span>
+      <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span><span>Control Farmacia</span>
+    </div>
+    <div class="nav-section-label">Gestión</div>
+    <div class="nav-item" onclick="mostrarModulo('rrhh', this)">
+      <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span>Recursos Humanos</span>
     </div>
   </div>
   <div class="nav" id="nav-submenu"></div>
@@ -662,6 +680,22 @@ const sb = (path, opts={}) => {
                'Content-Type': 'application/json', 'Prefer': 'return=minimal', ...extraHeaders }
   });
 };
+
+// ─── TOASTS ─────────────────────────────────────────────────────────────────
+function toast(msg, tipo = 'ok') {
+  let cont = document.getElementById('toast-container');
+  if (!cont) {
+    cont = document.createElement('div');
+    cont.id = 'toast-container';
+    cont.className = 'toast-container';
+    document.body.appendChild(cont);
+  }
+  const el = document.createElement('div');
+  el.className = `toast toast-${tipo}`;
+  el.innerHTML = `<i class="ti ti-${tipo === 'err' ? 'x' : 'check'}" aria-hidden="true"></i><span>${msg}</span>`;
+  cont.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let oc = [], items = [], hosp = [], fedex = [];
@@ -5452,13 +5486,14 @@ async function guardarFamiliaProducto(productoId, familiaIdStr) {
   await sb(`farmacia_productos?id=eq.${productoId}`, { method: 'PATCH', body: JSON.stringify({ familia_id: familiaId }) });
   const p = farmaciaProductos.find(x => x.id === productoId);
   if (p) p.familia_id = familiaId;
+  toast('Familia guardada');
 }
 
 async function guardarLoteCatastro(productoId) {
   const lote = document.getElementById('farmacia-nuevo-lote').value.trim() || null;
   const vencimiento = document.getElementById('farmacia-nuevo-vencimiento').value || null;
   const cantidad = Number(document.getElementById('farmacia-nueva-cantidad').value);
-  if (!cantidad && cantidad !== 0) { alert('Ingresa la cantidad contada.'); return; }
+  if (!cantidad && cantidad !== 0) { toast('Ingresa la cantidad contada.', 'err'); return; }
 
   const res = await sb('farmacia_lotes?on_conflict=producto_id,lote,vencimiento', {
     method: 'POST',
@@ -5478,6 +5513,7 @@ async function guardarLoteCatastro(productoId) {
   document.getElementById('farmacia-nuevo-vencimiento').value = '';
   document.getElementById('farmacia-nueva-cantidad').value = '';
   renderDetalleProductoFarmacia();
+  toast('Lote guardado');
 }
 
 async function eliminarLoteFarmacia(loteId) {
@@ -5701,7 +5737,7 @@ async function registrarMovimientoFarmacia(productoId) {
     const vencimiento = document.getElementById('mov-vencimiento').value || null;
     const cantidad = Number(document.getElementById('mov-cantidad').value);
     const precio = document.getElementById('mov-precio').value ? Number(document.getElementById('mov-precio').value) : null;
-    if (!cantidad || cantidad <= 0) { alert('Ingresa la cantidad que ingresa.'); return; }
+    if (!cantidad || cantidad <= 0) { toast('Ingresa la cantidad que ingresa.', 'err'); return; }
 
     const existente = farmaciaLotes.find(l => l.producto_id === productoId && (l.lote || null) === lote && (l.vencimiento || null) === vencimiento);
     let loteId;
@@ -5730,8 +5766,8 @@ async function registrarMovimientoFarmacia(productoId) {
     const loteId = Number(document.getElementById('mov-lote-select').value);
     const cantidad = Number(document.getElementById('mov-cantidad').value);
     const lote = farmaciaLotes.find(l => l.id === loteId);
-    if (!cantidad || cantidad <= 0) { alert('Ingresa la cantidad que sale.'); return; }
-    if (!lote || cantidad > Number(lote.cantidad)) { alert('La cantidad supera el stock disponible en ese lote.'); return; }
+    if (!cantidad || cantidad <= 0) { toast('Ingresa la cantidad que sale.', 'err'); return; }
+    if (!lote || cantidad > Number(lote.cantidad)) { toast('La cantidad supera el stock disponible en ese lote.', 'err'); return; }
 
     const nuevaCantidad = Number(lote.cantidad) - cantidad;
     await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
@@ -5747,9 +5783,9 @@ async function registrarMovimientoFarmacia(productoId) {
     const loteId = Number(document.getElementById('mov-lote-select').value);
     const cantidadReal = Number(document.getElementById('mov-cantidad').value);
     const lote = farmaciaLotes.find(l => l.id === loteId);
-    if (cantidadReal < 0 || isNaN(cantidadReal)) { alert('Ingresa la cantidad real contada.'); return; }
+    if (cantidadReal < 0 || isNaN(cantidadReal)) { toast('Ingresa la cantidad real contada.', 'err'); return; }
     const diferencia = cantidadReal - Number(lote.cantidad);
-    if (diferencia === 0) { alert('No hay diferencia que registrar.'); return; }
+    if (diferencia === 0) { toast('No hay diferencia que registrar.', 'err'); return; }
 
     await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: cantidadReal, actualizado_en: new Date().toISOString() }) });
     lote.cantidad = cantidadReal;
@@ -5766,6 +5802,7 @@ async function registrarMovimientoFarmacia(productoId) {
   document.getElementById('farmacia-mov-formulario').innerHTML = '';
   farmaciaMovProductoId = null;
   renderHistorialMovFarmacia();
+  toast('Movimiento registrado');
 }
 
 function renderHistorialMovFarmacia() {
@@ -5844,7 +5881,7 @@ async function darDeBajaLote(loteId) {
   const entrada = prompt(`Dar de baja "${p ? p.nombre : ''}" (lote ${lote.lote || 'sin número'}).\nCantidad disponible: ${lote.cantidad}.\n¿Cuánto quieres dar de baja?`, lote.cantidad);
   if (entrada === null) return;
   const cantidad = Number(entrada);
-  if (!cantidad || cantidad <= 0 || cantidad > Number(lote.cantidad)) { alert('Cantidad inválida.'); return; }
+  if (!cantidad || cantidad <= 0 || cantidad > Number(lote.cantidad)) { toast('Cantidad inválida.', 'err'); return; }
 
   const nuevaCantidad = Number(lote.cantidad) - cantidad;
   await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
@@ -5856,6 +5893,7 @@ async function darDeBajaLote(loteId) {
   const movFilas = await movRes.json();
   farmaciaMovimientos.unshift(movFilas[0]);
   renderVencimientos();
+  toast('Baja registrada');
 }
 
 // ─── FARMACIA: CONCILIACIÓN CON MAESTRO DEL PC (ajuste automático FEFO) ────
@@ -6038,31 +6076,31 @@ showPage = function(id, el) {
 const SUBMENUS = {
   'oc-modulo': {
     items: [
-      { icon: '📋', label: 'Órdenes de compra', page: 'oc' },
-      { icon: '💊', label: 'Productos', page: 'items' },
-      { icon: '🏥', label: 'Hospitales', page: 'hospitales' },
-      { icon: '📊', label: 'Estadísticas', page: 'estadisticas' },
-      { icon: '⬆️', label: 'Importar Excel', page: 'importar' },
+      { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Órdenes de compra', page: 'oc' },
+      { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'items' },
+      { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
+      { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
+      { icon: '<i class="ti ti-upload"></i>', label: 'Importar Excel', page: 'importar' },
     ],
   },
   'facturas': { items: [
-    { icon: '🔎', label: 'Buscador de documentos', page: 'facturas' },
-    { icon: '💰', label: 'Seguimiento pago de facturas', page: 'pagos' },
-    { icon: '📊', label: 'Gráficos de pagos', page: 'pagos-graficos' },
-    { icon: '🚫', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
+    { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
+    { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
   ] },
-  'fedex': { items: [{ icon: '🚚', label: 'Seguimiento FedEx', page: 'fedex' }] },
+  'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
-    { icon: '⚗️', label: 'Órdenes de Elaboración', page: 'elaboracion' },
-    { icon: '🧑‍⚕️', label: 'Pacientes', page: 'pacientes' },
+    { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes de Elaboración', page: 'elaboracion' },
+    { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
   ] },
-  'rrhh': { items: [{ icon: '👥', label: 'Recursos Humanos', page: 'rrhh' }] },
+  'rrhh': { items: [{ icon: '<i class="ti ti-users"></i>', label: 'Recursos Humanos', page: 'rrhh' }] },
   'farmacia-modulo': { items: [
-    { icon: '📋', label: 'Catastro de stock', page: 'farmacia-catastro' },
-    { icon: '📦', label: 'Stock actual', page: 'farmacia-stock' },
-    { icon: '🔁', label: 'Movimientos', page: 'farmacia-movimientos' },
-    { icon: '⏰', label: 'Vencimientos', page: 'farmacia-vencimientos' },
-    { icon: '🧮', label: 'Conciliación con PC', page: 'farmacia-conciliacion' },
+    { icon: '<i class="ti ti-clipboard-list"></i>', label: 'Catastro de stock', page: 'farmacia-catastro' },
+    { icon: '<i class="ti ti-package"></i>', label: 'Stock actual', page: 'farmacia-stock' },
+    { icon: '<i class="ti ti-refresh"></i>', label: 'Movimientos', page: 'farmacia-movimientos' },
+    { icon: '<i class="ti ti-clock-exclamation"></i>', label: 'Vencimientos', page: 'farmacia-vencimientos' },
+    { icon: '<i class="ti ti-calculator"></i>', label: 'Conciliación con PC', page: 'farmacia-conciliacion' },
   ] },
 };
 
