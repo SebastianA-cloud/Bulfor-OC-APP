@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C0392B'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <meta name="theme-color" content="#C0392B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -34,6 +35,11 @@
     --mono: 'JetBrains Mono', monospace;
     --radius: 8px;
     --radius-lg: 12px;
+    /* Escala de espaciado: usar SIEMPRE uno de estos valores, nunca un
+       número suelto, para que el aire entre elementos sea consistente
+       en toda la app. */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+    --focus-ring: 0 0 0 3px rgba(192,57,43,.25);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
@@ -62,6 +68,27 @@
 
   /* Toasts */
   .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ─── Sistema de modales ───────────────────────────────────────────────
+     3 anchos fijos nada más — nunca un ancho suelto. sm para confirmaciones
+     y formularios cortos, md para fichas de detalle, lg para fichas con
+     tablas adentro (ítems, historial). Header y footer con el mismo padding
+     siempre, para que ninguna ventana "se sienta" distinta a otra. */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(26,25,23,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-5); }
+  .modal-shell { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 12px 32px rgba(26,25,23,.18); }
+  .modal-sm { max-width: 420px; }
+  .modal-md { max-width: 520px; }
+  .modal-lg { max-width: 640px; }
+  .modal-xl { max-width: 760px; } /* excepción: solo para fichas con tabla ancha adentro (ítems con 4+ columnas) */
+  .modal-header { padding: var(--sp-5); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-4); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .modal-eyebrow { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+  .modal-title { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
+  .modal-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .modal-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-2); padding: 4px 8px; border-radius: var(--radius); }
+  .modal-close:hover { background: var(--bg); color: var(--text); }
+  .modal-body { padding: var(--sp-5); }
+  .modal-footer { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-2); }
   .toast { display: flex; align-items: center; gap: 8px; background: var(--text); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.18); animation: toast-in .18s ease-out; }
   .toast.toast-err { background: var(--red); }
   .toast.toast-ok i { color: #8FD9A8; }
@@ -102,6 +129,9 @@
   }
   select { padding-left: 12px; min-width: 160px; width: auto; cursor: pointer; }
   input[type=text]:focus, select:focus { border-color: var(--accent); }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .page-btn:focus-visible, [tabindex]:focus-visible {
+    outline: none; box-shadow: var(--focus-ring); border-color: var(--accent);
+  }
 
   /* Table */
   .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
@@ -120,6 +150,19 @@
 
   /* Badges */
   .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  /* Un solo componente de "estado" para toda la app — Aceptada/Anulada/
+     Pendiente siempre se ven igual, tengan la data que tengan alrededor. */
+  .badge-estado { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .badge-estado::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge-estado.ok { background: var(--green-light); color: var(--green); }
+  .badge-estado.err { background: var(--red-light); color: var(--red); }
+  .badge-estado.warn { background: var(--amber-light); color: var(--amber); }
+  .badge-estado.neutral { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); }
+
+  /* Skeleton loader: un rectángulo gris que "respira" mientras carga algo,
+     en vez del texto plano "Cargando…". */
+  .skeleton { background: linear-gradient(90deg, var(--bg) 25%, #EFEEE9 37%, var(--bg) 63%); background-size: 400% 100%; animation: skeleton-pulse 1.4s ease infinite; border-radius: var(--radius); }
+  @keyframes skeleton-pulse { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
   .badge-green { background: var(--green-light); color: var(--green); }
   .badge-amber { background: var(--amber-light); color: var(--amber); }
   .badge-red { background: var(--red-light); color: var(--red); }
@@ -1269,28 +1312,28 @@ function openOCDetail(codigoOC) {
 
   const modal = document.createElement('div');
   modal.id = 'oc-modal-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
   modal.onclick = (e) => { if (e.target === modal) closeOCDetail(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:85vh;overflow-y:auto;padding:0">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+    <div class="modal-shell modal-xl">
+      <div class="modal-header">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
             <span class="mono" style="font-size:13px">${r.codigooc||''}</span>
             ${tipoBadge(r.tipooc)}
             ${estadoBadge(r.estadooc)}
           </div>
-          <div style="font-size:15px;font-weight:600">${r.nombreoc||'—'}</div>
+          <div class="modal-title">${r.nombreoc||'—'}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <div class="modal-actions">
           ${botonNavOCHtml(r.codigooc)}
           ${botonFacturasAsociadasOCHtml(r.codigooc)}
           ${botonVerEnMPHtml(r.codigooc)}
           ${botonAtrasHtml()}
-          <button onclick="closeOCDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="closeOCDetail()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         ${(() => {
           const totalOC = Number(r.totaloc || 0);
           if (!totalOC) return '';
@@ -3278,9 +3321,9 @@ function estadoAceptacionFusionado(d) {
 }
 
 function badgeEstadoDocGdexpress(estado) {
-  if (estado === 'N') return '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>';
-  if (estado === 'A') return '<span style="color:var(--green);font-size:12px">Aceptada</span>';
-  return '—';
+  if (estado === 'N') return '<span class="badge-estado err">Anulada/Rechazada</span>';
+  if (estado === 'A') return '<span class="badge-estado ok">Aceptada</span>';
+  return '<span class="badge-estado neutral">—</span>';
 }
 
 function renderDocumentosGdexpress(soloTabla) {
@@ -3353,28 +3396,28 @@ async function abrirDetalleDocumentoGdexpress(id) {
 
   const modal = document.createElement('div');
   modal.id = 'doc-gdexpress-detalle-overlay';
-  modal.style = 'position:fixed;inset:0;background:rgba(26,25,23,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.className = 'modal-overlay';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:0" onclick="event.stopPropagation()">
-      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
         <div>
-          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">${info.singular}</div>
+          <div class="modal-eyebrow">${info.singular}</div>
           <div class="mono" style="font-size:16px">${d.folio}</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
+          <div class="modal-title" style="margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <div class="modal-actions">
           ${botonAtrasHtml()}
-          <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-2);padding:4px 8px">✕</button>
+          <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div style="padding:20px 24px">
+      <div class="modal-body">
         <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
           <div class="detail-field"><label>Fecha emisión</label><span>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</span></div>
           <div class="detail-field"><label>Monto neto</label><span>${clp(d.monto)}</span></div>
           <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(d))}</span></div>
           <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${estadoFusionado === 'N' ? 'Anulada/Rechazada' : estadoFusionado === 'A' ? 'Aceptada' : '—'}</span></div>
+          <div class="detail-field"><label>Estado</label><span>${badgeEstadoDocGdexpress(estadoFusionado)}</span></div>
           <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || 'No detectada')}</span></div>
           ${d.tipo_dte === '33' && notaCreditoQueAnula(d.folio) ? `
           <div class="detail-field" style="grid-column:span 2">
@@ -3389,7 +3432,10 @@ async function abrirDetalleDocumentoGdexpress(id) {
         </div>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos / Ítems</div>
-        <div id="doc-items-cuerpo" style="font-size:12px;color:var(--text-3)">Cargando…</div>
+        <div id="doc-items-cuerpo">
+          <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+          <div class="skeleton" style="height:38px;width:80%"></div>
+        </div>
 
         ${d.doc_url ? `<div style="margin-top:16px;text-align:right"><a href="${d.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
       </div>
@@ -6247,7 +6293,11 @@ function showPage(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+    const label = el.querySelector('span:last-child')?.textContent?.trim();
+    if (label) document.title = `${label} — Farmacia Bulfor`;
+  }
 }
 
 init();
