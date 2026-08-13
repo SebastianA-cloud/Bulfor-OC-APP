@@ -801,6 +801,7 @@ let facturasPago = [];
 let documentosGdexpress = [];
 let docTipoActual = '33';
 let docBusqueda = '';
+let docF = []; // última lista filtrada/ordenada que se mostró en la tabla — para el botón anterior/siguiente del detalle
 let oeCategoria = 'todos';
 let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
@@ -3348,6 +3349,7 @@ function renderDocumentosGdexpress(soloTabla) {
   }
 
   lista = lista.slice().sort((a,b) => (b.fecha_emision||'').localeCompare(a.fecha_emision||''));
+  docF = lista;
 
   const info = TIPOS_DTE_INFO[docTipoActual];
   if (!lista.length) {
@@ -3396,6 +3398,18 @@ function verDocumentoDeFactura(numeroFactura, facturaPagoId) {
   abrirDetalleDocumentoGdexpress(doc.id);
 }
 
+function botonNavDocHtml(idActual) {
+  const idx = docF.findIndex(d => d.id === idActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0;
+  const haySiguiente = idx < docF.length - 1;
+  const idAnterior = hayAnterior ? docF[idx-1].id : '';
+  const idSiguiente = haySiguiente ? docF[idx+1].id : '';
+  return `
+    <button onclick="abrirDetalleDocumentoGdexpress(${idAnterior})" ${hayAnterior?'':'disabled'} title="Documento anterior (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="abrirDetalleDocumentoGdexpress(${idSiguiente})" ${haySiguiente?'':'disabled'} title="Documento siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
 async function abrirDetalleDocumentoGdexpress(id) {
   const d = documentosGdexpress.find(x => x.id === id);
   if (!d) return;
@@ -3417,6 +3431,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="modal-title" style="margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
         </div>
         <div class="modal-actions">
+          ${botonNavDocHtml(d.id)}
           ${botonAtrasHtml()}
           <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
