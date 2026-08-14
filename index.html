@@ -2514,7 +2514,11 @@ async function abrirDetallePaciente(id) {
         </div>
         <button onclick="cerrarDetallePaciente()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
-      <div style="padding:20px 24px" id="pac-detalle-cuerpo">
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="pac-tab-recetas" onclick="cambiarTabOC(this)">Recetas</div>
+        <div class="modal-tab" data-tab="pac-tab-ordenes" onclick="cambiarTabOC(this)">Órdenes de elaboración</div>
+      </div>
+      <div class="modal-body" id="pac-detalle-cuerpo">
         <div style="font-size:13px;color:var(--text-3)">Cargando historial…</div>
       </div>
     </div>`;
@@ -2555,13 +2559,19 @@ async function abrirDetallePaciente(id) {
       </div>`).join('');
 
   document.getElementById('pac-detalle-cuerpo').innerHTML = `
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em">Recetas (${recetasDelPaciente?.length||0})</div>
-    ${recetasHtml}
-    <div style="font-size:12px;color:var(--text-3);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.03em">Órdenes de elaboración (${ordenesDelPaciente.length})</div>
-    ${ordenesHtml}
+    <div id="pac-tab-recetas" class="modal-tab-panel active">
+      ${recetasHtml}
+    </div>
+    <div id="pac-tab-ordenes" class="modal-tab-panel">
+      ${ordenesHtml}
+    </div>
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:right">
       <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarPaciente(${id}, ${ordenesDelPaciente.length}, ${recetasDelPaciente?.length||0}, this)">Eliminar paciente</button>
     </div>`;
+  const _tabRecetas = document.querySelector('[data-tab="pac-tab-recetas"]');
+  const _tabOrdenes = document.querySelector('[data-tab="pac-tab-ordenes"]');
+  if (_tabRecetas) _tabRecetas.textContent = `Recetas (${recetasDelPaciente?.length||0})`;
+  if (_tabOrdenes) _tabOrdenes.textContent = `Órdenes de elaboración (${ordenesDelPaciente.length})`;
 }
 
 function cerrarDetallePaciente() {
@@ -3062,23 +3072,20 @@ async function abrirDetalleFacturaPago(id) {
       </div>
 
       <div class="modal-body">
-        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
-          <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</span></div>
-          <div class="detail-field"><label>Vencimiento</label><span>${vencHtmlDetalle}</span></div>
+        <table class="clinical-grid">
+          <tr><td>Fecha emisión</td><td>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td></tr>
+          <tr><td>Vencimiento</td><td>${vencHtmlDetalle}</td></tr>
           ${doc ? `
-          <div class="detail-field"><label>Monto neto</label><span>${clp(doc.monto)}</span></div>
-          <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(doc))}</span></div>
-          <div class="detail-field"><label>RUT Hospital</label><span>${doc.rut_hospital||'—'}</span></div>
-          ` : `<div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>`}
-          <div class="detail-field"><label>Estado</label><span>${badgeEstadoDocGdexpress(estadoFusionado)}</span></div>
+          <tr><td>Monto neto</td><td>${clp(doc.monto)}</td></tr>
+          <tr><td>Monto total (con IVA)</td><td style="font-weight:600">${clp(montoTotalDoc(doc))}</td></tr>
+          <tr><td>RUT Hospital</td><td>${doc.rut_hospital||'—'}</td></tr>
+          ` : `<tr><td>Monto</td><td>${clp(f.monto)}</td></tr>`}
+          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado)}</td></tr>
           ${doc && doc.orden_compra_ref ? `
-          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</span></div>` : ''}
+          <tr><td>N° Orden de Compra relacionada</td><td>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</td></tr>` : ''}
           ${doc && notaCreditoQueAnula(doc.folio) ? `
-          <div class="detail-field" style="grid-column:span 2">
-            <label>Anulada por Nota de Crédito</label>
-            <span style="color:var(--red);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(doc.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(doc.folio).folio} ↗</span>
-          </div>` : ''}
-        </div>
+          <tr><td>Anulada por Nota de Crédito</td><td><span style="color:var(--red);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(doc.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(doc.folio).folio} ↗</span></td></tr>` : ''}
+        </table>
 
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
         <div id="fp-items-cuerpo">
@@ -4296,20 +4303,20 @@ function abrirDetalleOE(id) {
         </div>
       </div>
       <div class="modal-body">
-        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
-          <div class="detail-field"><label>Preparado</label><span>${o.indicacion||'—'}</span></div>
-          <div class="detail-field"><label>Valor</label><span>${o.valor ? clp(o.valor) : '—'}</span></div>
-          <div class="detail-field"><label>Pago</label><span>${o.pago||'—'}</span></div>
-          <div class="detail-field"><label>Tipo de pago</label><span>${o.tipo_pago === 'abonado' ? 'Abonado' : 'Pago total'}</span></div>
+        <table class="clinical-grid">
+          <tr><td>Preparado</td><td>${o.indicacion||'—'}</td></tr>
+          <tr><td>Valor</td><td>${o.valor ? clp(o.valor) : '—'}</td></tr>
+          <tr><td>Pago</td><td>${o.pago||'—'}</td></tr>
+          <tr><td>Tipo de pago</td><td>${o.tipo_pago === 'abonado' ? 'Abonado' : 'Pago total'}</td></tr>
           ${o.tipo_pago === 'abonado' ? `
-          <div class="detail-field"><label>Abonado</label><span>${clp(o.monto_abonado)}</span></div>
-          <div class="detail-field"><label>Saldo pendiente</label><span style="color:var(--red);font-weight:600">${clp((o.valor||0) - (o.monto_abonado||0))}</span></div>
+          <tr><td>Abonado</td><td>${clp(o.monto_abonado)}</td></tr>
+          <tr><td>Saldo pendiente</td><td style="color:var(--red);font-weight:600">${clp((o.valor||0) - (o.monto_abonado||0))}</td></tr>
           ` : ''}
-          ${(o.fecha_retiro || o.hora_retiro) ? `<div class="detail-field"><label>Retiro</label><span>${o.fecha_retiro ? fDate(o.fecha_retiro) : ''}${o.hora_retiro ? ' a las '+o.hora_retiro.slice(0,5)+' hrs' : ''}</span></div>` : ''}
-          <div class="detail-field"><label>Observaciones</label><span>${o.observaciones||'—'}</span></div>
-          <div class="detail-field"><label>Estado digitación</label><span>${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</span></div>
-          <div class="detail-field"><label>Estado entrega</label><span>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</span></div>
-        </div>
+          ${(o.fecha_retiro || o.hora_retiro) ? `<tr><td>Retiro</td><td>${o.fecha_retiro ? fDate(o.fecha_retiro) : ''}${o.hora_retiro ? ' a las '+o.hora_retiro.slice(0,5)+' hrs' : ''}</td></tr>` : ''}
+          <tr><td>Observaciones</td><td>${o.observaciones||'—'}</td></tr>
+          <tr><td>Estado digitación</td><td>${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</td></tr>
+          <tr><td>Estado entrega</td><td>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</td></tr>
+        </table>
 
         ${receta.fecha_emision ? `
         <div style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:var(--radius)">
@@ -4831,7 +4838,7 @@ function abrirDetalleEnvio(id) {
         </div>
         <button onclick="cerrarDetalleEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
-      <div style="padding:20px 24px" id="fedex-detalle-cuerpo"></div>
+      <div class="modal-body" style="padding:20px 24px" id="fedex-detalle-cuerpo"></div>
     </div>`;
   document.body.appendChild(modal);
   renderDetalleEnvio(f, false);
@@ -4841,13 +4848,13 @@ function renderDetalleEnvio(f, modoEdicion) {
   const cuerpo = document.getElementById('fedex-detalle-cuerpo');
   if (!modoEdicion) {
     cuerpo.innerHTML = `
-      <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);margin-bottom:0;grid-template-columns:repeat(2,1fr)">
-        <div class="detail-field"><label>Factura</label><span>${chipsFacturaHtml(f.factura)}</span></div>
-        <div class="detail-field"><label>Estado</label><span>${badgeEstadoFedex(f.estado_envio)}</span></div>
-        <div class="detail-field"><label>Fecha ingreso</label><span>${fDate(f.fecha_ingreso)}</span></div>
-        <div class="detail-field"><label>Fecha entrega</label><span>${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</span></div>
-        <div class="detail-field"><label>Recibido por</label><span>${f.recibido_por||'—'}</span></div>
-      </div>
+      <table class="clinical-grid">
+        <tr><td>Factura</td><td>${chipsFacturaHtml(f.factura)}</td></tr>
+        <tr><td>Estado</td><td>${badgeEstadoFedex(f.estado_envio)}</td></tr>
+        <tr><td>Fecha ingreso</td><td>${fDate(f.fecha_ingreso)}</td></tr>
+        <tr><td>Fecha entrega</td><td>${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</td></tr>
+        <tr><td>Recibido por</td><td>${f.recibido_por||'—'}</td></tr>
+      </table>
       <div style="font-size:11px;color:var(--text-3);margin-top:14px">El estado y la fecha de entrega se actualizan automáticamente con las notificaciones de FedEx. Si este envío no llegó por correo (ej: se hizo directo en el mostrador), puedes actualizarlo a mano.</div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
         <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarEnvio(${f.id})">Eliminar envío</button>
