@@ -1331,10 +1331,10 @@ function openOCDetail(codigoOC) {
           <div class="modal-title">${r.nombreoc||'—'}</div>
         </div>
         <div class="modal-actions">
-          ${botonNavOCHtml(r.codigooc)}
           ${botonFacturasAsociadasOCHtml(r.codigooc)}
           ${botonVerEnMPHtml(r.codigooc)}
           ${botonAtrasHtml()}
+          ${botonNavOCHtml(r.codigooc)}
           <button onclick="closeOCDetail()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
@@ -3432,8 +3432,8 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <div class="modal-title" style="margin-top:2px">${nombreHosp(d.hospital)||d.hospital||'—'}</div>
         </div>
         <div class="modal-actions">
-          ${botonNavDocHtml(d.id)}
           ${botonAtrasHtml()}
+          ${botonNavDocHtml(d.id)}
           <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
