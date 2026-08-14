@@ -90,6 +90,19 @@
   .modal-close:hover { background: var(--bg); color: var(--text); }
   .modal-body { padding: var(--sp-5); }
   .modal-footer { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-2); }
+
+  /* Pestañas dentro de una ficha (estilo sistema hospitalario: la info se
+     separa por pestaña en vez de un solo bloque largo con scroll). */
+  .modal-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--sp-5); position: sticky; top: 61px; background: var(--surface); z-index: 1; }
+  .modal-tab { padding: var(--sp-3) var(--sp-2); margin-right: var(--sp-4); font-size: 13px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; }
+  .modal-tab:hover { color: var(--text); }
+  .modal-tab.active { color: #185FA5; border-bottom-color: #185FA5; font-weight: 500; }
+  .modal-tab-panel { display: none; }
+  .modal-tab-panel.active { display: block; }
+  /* Grilla tipo "ficha clínica": bordes marcados entre celdas, no solo una línea sutil. */
+  .clinical-grid { width: 100%; font-size: 13px; border-collapse: collapse; border: 1px solid var(--border); }
+  .clinical-grid td { padding: 8px 12px; border: 1px solid var(--border); }
+  .clinical-grid td:first-child { color: var(--text-2); background: var(--bg); width: 40%; }
   .toast { display: flex; align-items: center; gap: 8px; background: var(--text); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.18); animation: toast-in .18s ease-out; }
   .toast.toast-err { background: var(--red); }
   .toast.toast-ok i { color: #8FD9A8; }
@@ -167,7 +180,7 @@
   .badge-green { background: var(--green-light); color: var(--green); }
   .badge-amber { background: var(--amber-light); color: var(--amber); }
   .badge-red { background: var(--red-light); color: var(--red); }
-  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .badge-blue { background: #E6F1FB; color: #185FA5; }
   .badge-gray { background: #F1F0EC; color: var(--text-2); }
 
   /* Mono text */
@@ -1315,6 +1328,27 @@ function openOCDetail(codigoOC) {
         </table>
       </div>`;
 
+  const facturasDeEstaOC = facturasAsociadasA(r.codigooc);
+  const facturasHtml = facturasDeEstaOC.length === 0
+    ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No encontramos facturas asociadas a esta orden de compra.</div>`
+    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0"><thead><tr>
+          <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
+          <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
+        </tr></thead><tbody>
+          ${facturasDeEstaOC.map(d => {
+            const estado = estadoAceptacionFusionado(d);
+            const anulada = estado === 'N';
+            return `<tr style="cursor:pointer;${anulada ? 'opacity:.6' : ''}" onclick="const _cod='${(r.codigooc||'').replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
+              <td class="mono" style="color:${anulada ? 'var(--red)' : '#185FA5'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
+              <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody></table>
+      </div>`;
+
   const modal = document.createElement('div');
   modal.id = 'oc-modal-overlay';
   modal.className = 'modal-overlay';
@@ -1331,44 +1365,63 @@ function openOCDetail(codigoOC) {
           <div class="modal-title">${r.nombreoc||'—'}</div>
         </div>
         <div class="modal-actions">
-          ${botonFacturasAsociadasOCHtml(r.codigooc)}
           ${botonVerEnMPHtml(r.codigooc)}
           ${botonAtrasHtml()}
           ${botonNavOCHtml(r.codigooc)}
           <button onclick="closeOCDetail()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="oc-tab-general" onclick="cambiarTabOC(this)">Datos generales</div>
+        <div class="modal-tab" data-tab="oc-tab-productos" onclick="cambiarTabOC(this)">Productos${relacionados.length ? ` (${relacionados.length})` : ''}</div>
+        <div class="modal-tab" data-tab="oc-tab-facturas" onclick="cambiarTabOC(this)">Facturas asociadas${facturasDeEstaOC.length ? ` (${facturasDeEstaOC.length})` : ''}</div>
+      </div>
       <div class="modal-body">
-        ${(() => {
-          const totalOC = Number(r.totaloc || 0);
-          if (!totalOC) return '';
-          const facturasValidas = facturasAsociadasA(r.codigooc).filter(d => estadoAceptacionFusionado(d) !== 'N');
-          const totalFacturado = facturasValidas.reduce((s, d) => s + montoTotalDoc(d), 0);
-          const sinStock = totalFacturado >= totalOC - 1; // tolerancia de $1 por redondeo
-          return `<div style="margin-bottom:18px;padding:12px 16px;border-radius:var(--radius);font-weight:700;text-align:center;letter-spacing:.3px;${sinStock ? 'background:#fdecea;color:var(--red)' : 'background:#e6f4ea;color:var(--green)'}">
-            ${sinStock ? '🔴 ORDEN SIN STOCK' : '🟢 ORDEN CON STOCK DISPONIBLE'}
-            <div style="font-weight:400;font-size:11px;margin-top:2px;opacity:.85">Facturado (facturas aceptadas): ${clp(totalFacturado)} de ${clp(totalOC)}</div>
-          </div>`;
-        })()}
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
-          <div class="stat" style="padding:12px"><div class="stat-label">Total neto</div><div class="stat-val" style="font-size:16px">${clp(r.totalneto)}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Total OC (con IVA)</div><div class="stat-val" style="font-size:16px">${clp(r.totaloc)}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Fecha OC</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaoc)}</div></div>
+        <div id="oc-tab-general" class="modal-tab-panel active">
+          ${(() => {
+            const totalOC = Number(r.totaloc || 0);
+            if (!totalOC) return '';
+            const facturasValidas = facturasDeEstaOC.filter(d => estadoAceptacionFusionado(d) !== 'N');
+            const totalFacturado = facturasValidas.reduce((s, d) => s + montoTotalDoc(d), 0);
+            const sinStock = totalFacturado >= totalOC - 1; // tolerancia de $1 por redondeo
+            return `<div style="margin-bottom:18px;padding:12px 16px;border-radius:var(--radius);font-weight:700;text-align:center;letter-spacing:.3px;${sinStock ? 'background:#fdecea;color:var(--red)' : 'background:#e6f4ea;color:var(--green)'}">
+              ${sinStock ? '🔴 ORDEN SIN STOCK' : '🟢 ORDEN CON STOCK DISPONIBLE'}
+              <div style="font-weight:400;font-size:11px;margin-top:2px;opacity:.85">Facturado (facturas aceptadas): ${clp(totalFacturado)} de ${clp(totalOC)}</div>
+            </div>`;
+          })()}
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+            <div class="stat" style="padding:12px"><div class="stat-label">Total neto</div><div class="stat-val" style="font-size:16px">${clp(r.totalneto)}</div></div>
+            <div class="stat" style="padding:12px"><div class="stat-label">Total OC (con IVA)</div><div class="stat-val" style="font-size:16px">${clp(r.totaloc)}</div></div>
+            <div class="stat" style="padding:12px"><div class="stat-label">Fecha OC</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaoc)}</div></div>
+          </div>
+          <table class="clinical-grid">
+            <tr><td>Hospital</td><td>${nombreHosp(r.hospital)||'—'}</td></tr>
+            <tr><td>Unidad compradora</td><td>${r.unidadcompradora||'—'}</td></tr>
+            <tr><td>Código licitación</td><td class="mono">${r.codigolicitacion||'—'}</td></tr>
+            <tr><td>Estado proveedor</td><td>${r.estadoproveedor||'—'}</td></tr>
+            <tr><td>Región / Comuna</td><td>${r.region||''} / ${r.comuna||''}</td></tr>
+            <tr><td>Fecha aceptación</td><td>${fDate(r.fechaaceptacion)}</td></tr>
+            <tr><td>Fecha envío</td><td>${fDate(r.fechaenvio)}</td></tr>
+          </table>
         </div>
-        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
-          <div class="detail-field"><label>Hospital</label><span>${nombreHosp(r.hospital)||'—'}</span></div>
-          <div class="detail-field"><label>Unidad compradora</label><span>${r.unidadcompradora||'—'}</span></div>
-          <div class="detail-field"><label>Código licitación</label><span class="mono">${r.codigolicitacion||'—'}</span></div>
-          <div class="detail-field"><label>Estado proveedor</label><span>${r.estadoproveedor||'—'}</span></div>
-          <div class="detail-field"><label>Región / Comuna</label><span>${r.region||''} / ${r.comuna||''}</span></div>
-          <div class="detail-field"><label>Fecha aceptación</label><span>${fDate(r.fechaaceptacion)}</span></div>
-          <div class="detail-field"><label>Fecha envío</label><span>${fDate(r.fechaenvio)}</span></div>
+        <div id="oc-tab-productos" class="modal-tab-panel">
+          ${itemsHtml}
         </div>
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Productos de esta OC</div>
-        ${itemsHtml}
+        <div id="oc-tab-facturas" class="modal-tab-panel">
+          ${facturasHtml}
+        </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
+}
+
+function cambiarTabOC(el) {
+  const tabs = el.parentElement.querySelectorAll('.modal-tab');
+  const panels = el.closest('.modal-shell').querySelectorAll('.modal-tab-panel');
+  tabs.forEach(t => t.classList.remove('active'));
+  panels.forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(el.dataset.tab).classList.add('active');
 }
 
 function closeOCDetail() {
