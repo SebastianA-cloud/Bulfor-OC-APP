@@ -52,7 +52,7 @@
   .nav { padding: 12px 10px; flex: 1; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; transition: all .15s; margin-bottom: 2px; }
   .nav-item:hover { background: var(--bg); color: var(--text); }
-  .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .nav-item.active { background: #E6F1FB; color: #185FA5; font-weight: 500; }
   .nav-back { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; margin-bottom: 4px; transition: all .15s; }
   .nav-back:hover { background: var(--bg); color: var(--text); }
   .nav-divider { height: 1px; background: var(--border); margin: 6px 10px 10px; }
@@ -115,7 +115,8 @@
   .sync-status { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
   .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 
-  .main { margin-left: 220px; padding: 28px 32px; min-height: 100vh; }
+  .system-bar { position: fixed; top: 0; left: 220px; right: 0; height: 34px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 11px; color: var(--text-3); z-index: 90; }
+  .main { margin-left: 220px; margin-top: 34px; padding: 28px 32px; min-height: calc(100vh - 34px); }
   .page { display: none; }
   .page.active { display: block; }
 
@@ -224,7 +225,8 @@
     .logo-title, .logo-sub, .nav-item span:not(.nav-icon), .nav-back span:not(.nav-icon) { display: none; }
     .nav-item, .nav-back { justify-content: center; }
     .nav-icon { margin: 0; font-size: 20px; }
-    .main { margin-left: 60px; padding: 20px 16px; }
+    .main { margin-left: 60px; padding: 20px 16px; margin-top: 34px; }
+    .system-bar { left: 60px; }
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
@@ -308,13 +310,18 @@
     </div>
   </div>
   <div class="nav" id="nav-submenu"></div>
-  <div class="sidebar-footer">
-    <div class="sync-status">
-      <div class="sync-dot" id="syncDot"></div>
-      <span id="syncText">Conectando…</span>
-    </div>
-  </div>
 </nav>
+
+<div class="system-bar">
+  <span>Bulfor OC — Sistema de gestión farmacéutica</span>
+  <span style="display:flex;align-items:center;gap:16px">
+    <span id="systemClock"></span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncText">Conectando…</span>
+    </span>
+  </span>
+</div>
 
 <main class="main">
 
@@ -3065,7 +3072,7 @@ async function abrirDetalleFacturaPago(id) {
           ` : `<div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>`}
           <div class="detail-field"><label>Estado</label><span>${badgeEstadoDocGdexpress(estadoFusionado)}</span></div>
           ${doc && doc.orden_compra_ref ? `
-          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</span></div>` : ''}
+          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</span></div>` : ''}
           ${doc && notaCreditoQueAnula(doc.folio) ? `
           <div class="detail-field" style="grid-column:span 2">
             <label>Anulada por Nota de Crédito</label>
@@ -3490,33 +3497,33 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="doc-tab-general" onclick="cambiarTabOC(this)">Datos generales</div>
+        <div class="modal-tab" data-tab="doc-tab-productos" onclick="cambiarTabOC(this)">Productos / Ítems</div>
+      </div>
       <div class="modal-body">
-        <div class="detail-inner" style="background:var(--bg);border-radius:var(--radius);grid-template-columns:repeat(2,1fr)">
-          <div class="detail-field"><label>Fecha emisión</label><span>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</span></div>
-          <div class="detail-field"><label>Monto neto</label><span>${clp(d.monto)}</span></div>
-          <div class="detail-field"><label>Monto total (con IVA)</label><span style="font-weight:600">${clp(montoTotalDoc(d))}</span></div>
-          <div class="detail-field"><label>RUT Hospital</label><span>${d.rut_hospital||'—'}</span></div>
-          <div class="detail-field"><label>Estado</label><span>${badgeEstadoDocGdexpress(estadoFusionado)}</span></div>
-          <div class="detail-field" style="grid-column:span 2"><label>N° Orden de Compra relacionada</label><span>${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="color:var(--accent);cursor:pointer" onclick="navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || 'No detectada')}</span></div>
+        <div id="doc-tab-general" class="modal-tab-panel active">
+        <table class="clinical-grid">
+          <tr><td>Fecha emisión</td><td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td></tr>
+          <tr><td>Monto neto</td><td>${clp(d.monto)}</td></tr>
+          <tr><td>Monto total (con IVA)</td><td style="font-weight:600">${clp(montoTotalDoc(d))}</td></tr>
+          <tr><td>RUT Hospital</td><td>${d.rut_hospital||'—'}</td></tr>
+          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado)}</td></tr>
+          <tr><td>N° Orden de Compra relacionada</td><td>${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || 'No detectada')}</td></tr>
           ${d.tipo_dte === '33' && notaCreditoQueAnula(d.folio) ? `
-          <div class="detail-field" style="grid-column:span 2">
-            <label>Anulada por Nota de Crédito</label>
-            <span style="color:var(--red);cursor:pointer" onclick="verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(d.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(d.folio).folio} ↗</span>
-          </div>` : ''}
+          <tr><td>Anulada por Nota de Crédito</td><td><span style="color:var(--red);cursor:pointer" onclick="verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(d.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(d.folio).folio} ↗</span></td></tr>` : ''}
           ${d.tipo_dte === '61' && d.nc_factura_ref ? `
-          <div class="detail-field" style="grid-column:span 2">
-            <label>Anula la Factura</label>
-            <span style="color:var(--accent);cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{toast('Esa factura no está sincronizada todavía.', 'err')}">N° ${d.nc_factura_ref} ↗</span>
-          </div>` : ''}
+          <tr><td>Anula la Factura</td><td><span style="color:#185FA5;cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{toast('Esa factura no está sincronizada todavía.', 'err')}">N° ${d.nc_factura_ref} ↗</span></td></tr>` : ''}
+        </table>
         </div>
-
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos / Ítems</div>
+        <div id="doc-tab-productos" class="modal-tab-panel">
         <div id="doc-items-cuerpo">
           <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
           <div class="skeleton" style="height:38px;width:80%"></div>
         </div>
 
         ${d.doc_url ? `<div style="margin-top:16px;text-align:right"><a href="${d.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
+        </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -6392,6 +6399,16 @@ function showPage(id, el) {
     if (label) document.title = `${label} — Farmacia Bulfor`;
   }
 }
+
+function actualizarRelojSistema() {
+  const el = document.getElementById('systemClock');
+  if (!el) return;
+  const ahora = new Date();
+  el.textContent = ahora.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' — ' +
+    ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+}
+actualizarRelojSistema();
+setInterval(actualizarRelojSistema, 30000);
 
 init();
 </script>
