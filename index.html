@@ -233,6 +233,40 @@
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
+  /* ─── Celular: barra inferior fija + submenú como pestañas horizontales,
+     en vez del sidebar de escritorio — para que se sienta como una app
+     nativa instalada, no como una página web angosta. */
+  .bottom-tabbar { display: none; }
+  @media (max-width: 640px) {
+    .sidebar { display: contents; }
+    .logo, #nav-modulos { display: none; }
+    .system-bar { left: 0; padding: 0 12px; justify-content: flex-end; }
+    .system-bar > span:first-child { display: none; } /* el texto largo del sistema no cabe ni hace falta en celular */
+
+    .bottom-tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 58px;
+      background: var(--surface); border-top: 1px solid var(--border); z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom, 0); }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; font-size: 10px; color: var(--text-2); cursor: pointer; }
+    .tab-item i { font-size: 20px; }
+    .tab-item.active { color: #185FA5; }
+
+    /* El submenú de cada módulo (antes vertical en el sidebar) pasa a ser
+       una fila de pestañas horizontal, pegada arriba, con scroll lateral. */
+    #nav-submenu { position: fixed !important; top: 34px; left: 0; right: 0; z-index: 95;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex !important; overflow-x: auto; white-space: nowrap;
+      padding: 6px 10px; gap: 6px; }
+    #nav-submenu .nav-back, #nav-submenu .nav-divider { display: none; }
+    #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: 20px; }
+    #nav-submenu .nav-item span:not(.nav-icon) { display: inline !important; }
+    #nav-submenu .nav-icon { width: auto; font-size: 14px; }
+
+    .main { margin-left: 0 !important; margin-top: 34px; padding: 16px 12px 74px; }
+    body:has(#nav-submenu:not(:empty)) .main { margin-top: 78px; }
+    .stats { grid-template-columns: 1fr 1fr !important; }
+  }
+
   /* Tablas -> tarjetas apiladas en celular. Cada <tr> con onclick sigue
      funcionando como fila clicable, solo que se ve como una tarjeta con
      una fila por dato (usando el texto de data-label como etiqueta). */
@@ -313,6 +347,28 @@
     </div>
   </div>
   <div class="nav" id="nav-submenu"></div>
+</nav>
+
+<nav class="bottom-tabbar" id="bottom-tabbar">
+  <div class="tab-item active" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo', this)">
+    <i class="ti ti-shopping-cart" aria-hidden="true"></i><span>OC</span>
+  </div>
+  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas', this)">
+    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
+  </div>
+  <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex', this)">
+    <i class="ti ti-truck" aria-hidden="true"></i><span>FedEx</span>
+  </div>
+  <div class="tab-item" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion', this)" style="position:relative">
+    <i class="ti ti-flask" aria-hidden="true"></i><span>Elaborac.</span>
+    <span id="badge-oe-digitar-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
+  </div>
+  <div class="tab-item" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo', this)">
+    <i class="ti ti-first-aid-kit" aria-hidden="true"></i><span>Farmacia</span>
+  </div>
+  <div class="tab-item" data-modulo="rrhh" onclick="mostrarModulo('rrhh', this)">
+    <i class="ti ti-users" aria-hidden="true"></i><span>RRHH</span>
+  </div>
 </nav>
 
 <div class="system-bar">
@@ -2409,13 +2465,13 @@ function filterOE() {
 
 function actualizarBadgeOEDigitar() {
   const cantidad = ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length;
-  const badge = document.getElementById('badge-oe-digitar');
-  if (!cantidad) {
-    badge.style.display = 'none';
-    return;
-  }
-  badge.textContent = cantidad > 3 ? '3+' : String(cantidad);
-  badge.style.display = 'flex';
+  const texto = cantidad > 3 ? '3+' : String(cantidad);
+  [document.getElementById('badge-oe-digitar'), document.getElementById('badge-oe-digitar-mobile')].forEach(badge => {
+    if (!badge) return;
+    if (!cantidad) { badge.style.display = 'none'; return; }
+    badge.textContent = texto;
+    badge.style.display = 'flex';
+  });
 }
 
 function renderOE() {
@@ -6386,6 +6442,10 @@ function mostrarModulo(modulo, el) {
   document.getElementById('nav-modulos').style.display = 'none';
   document.getElementById('nav-submenu').style.display = 'block';
   showPage(config.items[0].page, document.querySelector('#nav-submenu .nav-item'));
+
+  // Barra inferior de celular: marcamos el módulo activo ahí también,
+  // sin importar si el clic vino del sidebar de escritorio o de la barra.
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
 }
 
 function volverAModulos() {
