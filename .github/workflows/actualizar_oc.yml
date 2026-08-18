@@ -2,7 +2,7 @@ name: Actualizar OC desde Mercado Público
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 3am hora Chile
+    - cron: '0 */2 * * *'  # cada 2 horas, todo el día (antes: solo 3am hora Chile)
   workflow_dispatch:  # permite ejecutarlo manualmente con un botón
 
 jobs:
