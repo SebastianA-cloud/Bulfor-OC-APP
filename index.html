@@ -1180,6 +1180,7 @@ const MODAL_OVERLAY_IDS = [
   'doc-gdexpress-detalle-overlay',
   'oc-facturas-asociadas-overlay',
   'producto-factura-modal-overlay',
+  'facturas-producto-hosp-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -2049,16 +2050,63 @@ function openProductoFacturaDetail(nombreProducto) {
           <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
         </div>
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital</div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
         <table class="clinical-grid">
-          ${hospitales.map(h => `<tr><td>${h.hospital}</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
+          ${hospitales.map(h => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail('${nombreProducto.replace(/'/g,"\\'")}'));abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')"><td style="color:#185FA5">${h.hospital} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
         </table>
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
-// ─── RENDER HOSPITALES ─────────────────────────────────────────────────────
+function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
+  cerrarTodosLosModales();
+  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  const facturas = ventas
+    .map(v => {
+      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
+      return doc ? { doc, item: v } : null;
+    })
+    .filter(x => x && (nombreHosp(x.doc.hospital) || x.doc.hospital || 'Sin hospital') === hospitalNombre)
+    .sort((a, b) => (b.doc.fecha_emision || '').localeCompare(a.doc.fecha_emision || ''));
+
+  const modal = document.createElement('div');
+  modal.id = 'facturas-producto-hosp-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">${nombreProducto}</div>
+          <div class="modal-title">${hospitalNombre}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('facturas-producto-hosp-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0"><thead><tr>
+            <th style="font-size:10px">Folio</th><th style="font-size:10px">Fecha</th>
+            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
+          </tr></thead><tbody>
+            ${facturas.map(({doc, item}) => `
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${hospitalNombre.replace(/'/g,"\\'")}'));abrirDetalleDocumentoGdexpress(${doc.id})">
+                <td class="mono" style="color:#185FA5">${doc.folio} ↗</td>
+                <td>${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
+                <td style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
+              </tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+
 function renderHosp() {
   const { slice, pages, total } = paginate(hospF, hospPage);
   document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
