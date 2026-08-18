@@ -242,6 +242,7 @@
     .logo, #nav-modulos { display: none; }
     .system-bar { left: 0; padding: 0 12px; justify-content: flex-end; }
     .system-bar > span:first-child { display: none; } /* el texto largo del sistema no cabe ni hace falta en celular */
+    .refresh-label { display: none; }
 
     .bottom-tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 58px;
       background: var(--surface); border-top: 1px solid var(--border); z-index: 100;
@@ -376,6 +377,9 @@
   <span>Bulfor OC — Sistema de gestión farmacéutica</span>
   <span style="display:flex;align-items:center;gap:16px">
     <span id="systemClock"></span>
+    <button onclick="location.reload()" title="Actualizar datos" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:5px">
+      <i class="ti ti-refresh" style="font-size:13px" aria-hidden="true"></i><span class="refresh-label">Actualizar</span>
+    </button>
     <span style="display:flex;align-items:center;gap:6px">
       <span class="sync-dot" id="syncDot"></span>
       <span id="syncText">Conectando…</span>
@@ -4880,6 +4884,18 @@ async function guardarNuevoEnvio(hospital) {
   }
 }
 
+function botonNavFedexHtml(idActual) {
+  const idx = fedexF.findIndex(f => f.id === idActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0;
+  const haySiguiente = idx < fedexF.length - 1;
+  const idAnterior = hayAnterior ? fedexF[idx-1].id : '';
+  const idSiguiente = haySiguiente ? fedexF[idx+1].id : '';
+  return `
+    <button onclick="abrirDetalleEnvio(${idAnterior})" ${hayAnterior?'':'disabled'} title="Envío anterior (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="abrirDetalleEnvio(${idSiguiente})" ${haySiguiente?'':'disabled'} title="Envío siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
 function abrirDetalleEnvio(id) {
   const f = fedex.find(x => x.id === id);
   if (!f) return;
@@ -4896,7 +4912,10 @@ function abrirDetalleEnvio(id) {
           <div style="font-size:13px;color:var(--text-2);margin-bottom:2px"><span class="mono">${f.orden_transporte}</span> ${botonCopiar(f.orden_transporte)}</div>
           <div style="font-size:16px;font-weight:600">${nombreHosp(f.hospital)}</div>
         </div>
-        <button onclick="cerrarDetalleEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
+        <div class="modal-actions">
+          ${botonNavFedexHtml(f.id)}
+          <button onclick="cerrarDetalleEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
       </div>
       <div class="modal-body" style="padding:20px 24px" id="fedex-detalle-cuerpo"></div>
     </div>`;
