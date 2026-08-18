@@ -2013,6 +2013,18 @@ function renderFacturaItems() {
 }
 function goFacturaItems(p) { const {pages}=paginate(facturaProductosUnicosF,facturaItemsPage); if(p<1||p>pages) return; facturaItemsPage=p; renderFacturaItems(); }
 
+function botonNavProductoFacturaHtml(nombreActual) {
+  const idx = facturaProductosUnicosF.findIndex(p => p.nombre === nombreActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0;
+  const haySiguiente = idx < facturaProductosUnicosF.length - 1;
+  const nombreAnterior = hayAnterior ? facturaProductosUnicosF[idx-1].nombre.replace(/'/g,"\\'") : '';
+  const nombreSiguiente = haySiguiente ? facturaProductosUnicosF[idx+1].nombre.replace(/'/g,"\\'") : '';
+  return `
+    <button onclick="openProductoFacturaDetail('${nombreAnterior}')" ${hayAnterior?'':'disabled'} title="Producto anterior (respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="openProductoFacturaDetail('${nombreSiguiente}')" ${haySiguiente?'':'disabled'} title="Producto siguiente (respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
 function openProductoFacturaDetail(nombreProducto) {
   cerrarTodosLosModales();
   const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
@@ -2043,7 +2055,10 @@ function openProductoFacturaDetail(nombreProducto) {
           <div class="modal-eyebrow">Producto facturado</div>
           <div class="modal-title">${nombreProducto}</div>
         </div>
-        <button onclick="document.getElementById('producto-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        <div class="modal-actions">
+          ${botonNavProductoFacturaHtml(nombreProducto)}
+          <button onclick="document.getElementById('producto-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
       </div>
       <div class="modal-body">
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
