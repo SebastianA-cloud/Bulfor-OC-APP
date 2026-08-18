@@ -453,7 +453,39 @@
     </div>
   </div>
 
-  <!-- HOSPITALES PAGE -->
+  <!-- PRODUCTOS DE FACTURAS PAGE -->
+  <div class="page" id="page-facturas-productos">
+    <div class="page-header">
+      <div class="page-title">Productos</div>
+      <div class="page-sub">Historial de productos facturados (Facturas, con IVA)</div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fp-items-search" placeholder="Buscar producto…" oninput="filterFacturaItems()">
+      </div>
+    </div>
+    <div id="fp-items-cargando" style="display:none">
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;width:80%"></div>
+    </div>
+    <div class="table-card" id="fp-items-tabla" style="display:none">
+      <table>
+        <thead><tr>
+          <th>Producto</th>
+          <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
+        </tr></thead>
+        <tbody id="fp-items-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="fp-items-info"></span>
+        <div class="page-btns" id="fp-items-pages"></div>
+      </div>
+    </div>
+  </div>
+
+
   <div class="page" id="page-hospitales">
     <div class="page-header">
       <div class="page-title">Hospitales</div>
@@ -1147,6 +1179,7 @@ const MODAL_OVERLAY_IDS = [
   'factura-pago-detalle-overlay',
   'doc-gdexpress-detalle-overlay',
   'oc-facturas-asociadas-overlay',
+  'producto-factura-modal-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -1918,6 +1951,111 @@ function closeProductoHospitalOCs_() {
 function closeProductDetail() {
   const m = document.getElementById('product-modal-overlay');
   if (m) m.remove();
+}
+
+// ─── PRODUCTOS DE FACTURAS (Facturas → Productos) ──────────────────────────
+// Los ítems de cada factura no se traen todos de entrada (son ~18.000 filas,
+// pesan poco pero no hace falta cargarlos si nadie entra a esta pantalla) —
+// se piden UNA vez, la primera vez que alguien navega aquí, y quedan en
+// memoria para el resto de la sesión.
+let facturaItemsCargados = false;
+let facturaProductosUnicos = [];
+let facturaProductosUnicosF = [];
+let facturaItemsPage = 1;
+let facturaItemsRaw = []; // ítems crudos, para poder armar el detalle por hospital al hacer clic
+
+async function cargarProductosFacturas() {
+  if (facturaItemsCargados) { renderFacturaItems(); return; }
+  document.getElementById('fp-items-cargando').style.display = 'block';
+  document.getElementById('fp-items-tabla').style.display = 'none';
+  try {
+    const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
+    const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
+    facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
+
+    const map = new Map();
+    facturaItemsRaw.forEach(it => {
+      const key = (it.nombre_producto || 'Sin nombre').trim();
+      if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+      const entry = map.get(key);
+      entry.facturas += 1;
+      entry.totalFacturado += Number(it.monto_item || 0);
+    });
+    facturaProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+    facturaProductosUnicosF = [...facturaProductosUnicos];
+    facturaItemsCargados = true;
+    document.getElementById('fp-items-cargando').style.display = 'none';
+    document.getElementById('fp-items-tabla').style.display = 'block';
+    renderFacturaItems();
+  } catch (e) {
+    document.getElementById('fp-items-cargando').innerHTML = `<div style="color:var(--red);font-size:13px">No se pudo cargar: ${e.message}</div>`;
+  }
+}
+
+function filterFacturaItems() {
+  const q = document.getElementById('fp-items-search').value;
+  facturaProductosUnicosF = facturaProductosUnicos.filter(p => coincideBusqueda(p.nombre, q));
+  facturaItemsPage = 1;
+  renderFacturaItems();
+}
+
+function renderFacturaItems() {
+  const { slice, pages, total } = paginate(facturaProductosUnicosF, facturaItemsPage);
+  document.getElementById('fp-items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
+  renderPages('fp-items-pages', total, pages, facturaItemsPage, 'goFacturaItems');
+  if (!slice.length) { document.getElementById('fp-items-body').innerHTML = `<tr><td colspan="3" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  document.getElementById('fp-items-body').innerHTML = slice.map(p => `<tr onclick="navReset();openProductoFacturaDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
+    <td style="font-weight:500;color:#185FA5">${p.nombre} ↗</td>
+    <td style="text-align:right">${p.facturas}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
+  </tr>`).join('');
+}
+function goFacturaItems(p) { const {pages}=paginate(facturaProductosUnicosF,facturaItemsPage); if(p<1||p>pages) return; facturaItemsPage=p; renderFacturaItems(); }
+
+function openProductoFacturaDetail(nombreProducto) {
+  cerrarTodosLosModales();
+  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  if (!ventas.length) return;
+
+  const totalFacturado = ventas.reduce((s, v) => s + Number(v.monto_item || 0), 0);
+
+  // Agrupamos por hospital (vía el documento al que pertenece cada ítem).
+  const porHospital = new Map();
+  ventas.forEach(v => {
+    const doc = documentosGdexpress.find(d => d.id === v.documento_id);
+    const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
+    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
+    const entry = porHospital.get(h);
+    entry.facturas += 1;
+    entry.total += Number(v.monto_item || 0);
+  });
+  const hospitales = Array.from(porHospital.values()).sort((a, b) => b.total - a.total);
+
+  const modal = document.createElement('div');
+  modal.id = 'producto-factura-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Producto facturado</div>
+          <div class="modal-title">${nombreProducto}</div>
+        </div>
+        <button onclick="document.getElementById('producto-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+          <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital</div>
+        <table class="clinical-grid">
+          ${hospitales.map(h => `<tr><td>${h.hospital}</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
+        </table>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 // ─── RENDER HOSPITALES ─────────────────────────────────────────────────────
@@ -6403,6 +6541,9 @@ showPage = function(id, el) {
   if (id === 'farmacia-vencimientos') {
     renderVencimientos();
   }
+  if (id === 'facturas-productos') {
+    cargarProductosFacturas();
+  }
 };
 
 // ─── NAV ───────────────────────────────────────────────────────────────────
@@ -6422,6 +6563,7 @@ const SUBMENUS = {
   },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'facturas-productos' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
