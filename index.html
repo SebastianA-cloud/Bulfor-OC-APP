@@ -334,9 +334,10 @@
       <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>Seguimiento FedEx</span>
     </div>
     <div class="nav-section-label">Operaciones</div>
-    <div class="nav-item" onclick="mostrarModulo('elaboracion', this)" style="position:relative">
-      <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de Elaboración</span>
-      <span id="badge-oe-digitar" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
+    <div class="nav-item" onclick="mostrarModulo('elaboracion', this)">
+      <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de Elaboración</span>
+      <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
     </div>
     <div class="nav-item" onclick="mostrarModulo('farmacia-modulo', this)">
       <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span><span>Control Farmacia</span>
