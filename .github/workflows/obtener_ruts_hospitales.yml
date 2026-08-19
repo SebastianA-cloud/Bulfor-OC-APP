@@ -20,6 +20,6 @@ jobs:
       - name: Ejecutar script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: se salta las reglas de seguridad, para que el robot pueda escribir
           MP_TICKET:    ${{ secrets.MP_TICKET }}
         run: python obtener_ruts_hospitales.py
