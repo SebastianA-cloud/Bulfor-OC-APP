@@ -2,7 +2,7 @@ name: Sincronizar Buscador de Documentos
 
 on:
   schedule:
-    - cron: '30 6 * * *'  # 3:30am hora Chile
+    - cron: '35 */2 * * *'  # cada 2 horas, 35 min después de las OC (antes: solo 3:30am hora Chile)
   workflow_dispatch:
     inputs:
       limite_detalle:
