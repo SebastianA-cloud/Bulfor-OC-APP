@@ -612,10 +612,10 @@
     </div>
     <!-- Tarjetas de estado -->
     <div class="stats" id="oe-stats">
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('todos')"><div class="stat-label">Total</div><div class="stat-val" id="oe-total">—</div></div>
       <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('elaboracion')"><div class="stat-label">En elaboración</div><div class="stat-val" id="oe-elaboracion">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entrega')"><div class="stat-label">Para entrega</div><div class="stat-val" id="oe-entrega">—</div></div>
       <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entregado')"><div class="stat-label">Entregados hoy</div><div class="stat-val" id="oe-entregados">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entrega')"><div class="stat-label">Para entrega</div><div class="stat-val" id="oe-entrega">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('todos')"><div class="stat-label">Total</div><div class="stat-val" id="oe-total">—</div></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -2651,7 +2651,7 @@ function coincideOECategoria(o, cat) {
 function filtrarOECategoria(cat) {
   oeCategoria = cat;
   document.querySelectorAll('#oe-stats .stat').forEach(s => s.style.outline = '');
-  const indices = { todos:0, elaboracion:1, entrega:2, entregado:3 };
+  const indices = { elaboracion:0, entregado:1, entrega:2, todos:3 };
   const cards = document.querySelectorAll('#oe-stats .stat');
   if (cards[indices[cat]]) cards[indices[cat]].style.outline = '2px solid var(--accent)';
   document.getElementById('oe-estado-entrega').value = '';
