@@ -534,6 +534,46 @@
   </div>
 
 
+  <!-- FACTURAS POR PAGAR PAGE -->
+  <div class="page" id="page-facturas-por-pagar">
+    <div class="page-header">
+      <div class="page-title">Facturas por pagar</div>
+      <div class="page-sub">Lo que los proveedores le facturan a Bulfor — para saber cuánto, cuándo y a quién pagar</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Pendiente de pago</div><div class="stat-val" id="fpp-pendiente">—</div></div>
+      <div class="stat"><div class="stat-label">Vencidas</div><div class="stat-val" id="fpp-vencidas" style="color:var(--red)">—</div></div>
+      <div class="stat"><div class="stat-label">Por vencer (7 días)</div><div class="stat-val" id="fpp-por-vencer" style="color:#b8860b">—</div></div>
+      <div class="stat"><div class="stat-label">Pagado este mes</div><div class="stat-val" id="fpp-pagado-mes">—</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fpp-search" placeholder="Buscar por proveedor, RUT, N° factura…" oninput="filterFacturasPorPagar()">
+      </div>
+      <select id="fpp-estado" onchange="filterFacturasPorPagar()">
+        <option value="">Todos los estados</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="Pagado">Pagado</option>
+      </select>
+      <button class="page-btn" onclick="abrirGestionProveedores()" style="white-space:nowrap"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Emisión</th><th>Vencimiento</th><th>Proveedor</th><th>RUT</th><th>N° Factura</th>
+          <th style="text-align:right">Monto</th><th>Estado</th><th></th>
+        </tr></thead>
+        <tbody id="fpp-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="fpp-info"></span>
+        <div class="page-btns" id="fpp-pages"></div>
+      </div>
+    </div>
+  </div>
+
+
   <div class="page" id="page-hospitales">
     <div class="page-header">
       <div class="page-title">Hospitales</div>
@@ -1052,6 +1092,8 @@ function promptModal(mensaje, valorInicial = '') {
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
 let oc = [], items = [], hosp = [], fedex = [];
+let facturasPorPagar = [], facturasPorPagarF = [], fppPage = 1;
+let proveedoresCuentas = [];
 let hospitalesMaestro = [];
 let ordenesElaboracion = [], ordenesElaboracionF = [], oePage = 1;
 let pacientes = [];
@@ -1129,7 +1171,7 @@ function recalcularProductoPorOC() {
 
 async function init() {
   try {
-    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR, farmMovR] = await Promise.all([
+    const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR, farmMovR, fppR, provCtaR] = await Promise.all([
       fetchAll('ordenes_compra', 'select=*&order=fechaenvio.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
@@ -1143,6 +1185,8 @@ async function init() {
       fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_lotes', 'select=*'),
       fetchAll('farmacia_movimientos', 'select=*&order=creado_en.desc'),
+      fetchAll('facturas_por_pagar', 'select=*&order=fecha_vencimiento.asc'),
+      fetchAll('proveedores_cuentas', 'select=*&order=nombre_proveedor.asc'),
     ]);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -1160,6 +1204,9 @@ async function init() {
     farmaciaFamilias = Array.isArray(farmFamR) ? farmFamR : [];
     farmaciaLotes = Array.isArray(farmLotesR) ? farmLotesR : [];
     farmaciaMovimientos = Array.isArray(farmMovR) ? farmMovR : [];
+    facturasPorPagar = Array.isArray(fppR) ? fppR : [];
+    facturasPorPagarF = [...facturasPorPagar];
+    proveedoresCuentas = Array.isArray(provCtaR) ? provCtaR : [];
     diccionarioNormalizacion = {};
     diccionarioCampos = {};
     (Array.isArray(diccR) ? diccR : []).forEach(d => {
@@ -1176,7 +1223,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33');
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); renderFacturasPorPagar();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1322,6 +1369,8 @@ const MODAL_OVERLAY_IDS = [
   'oc-facturas-asociadas-overlay',
   'producto-factura-modal-overlay',
   'facturas-producto-hosp-overlay',
+  'fpp-detalle-overlay',
+  'proveedores-gestion-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -4050,6 +4099,246 @@ function filtrarRechazadas(valor) {
   renderRechazadas(true);
 }
 
+// ─── FACTURAS POR PAGAR (lo que los proveedores le facturan a Bulfor) ──────
+function nombreProveedorCuenta(rutProveedor) {
+  const p = proveedoresCuentas.find(x => x.rut_proveedor === rutProveedor);
+  return p;
+}
+
+function filterFacturasPorPagar() {
+  const q = document.getElementById('fpp-search').value;
+  const estado = document.getElementById('fpp-estado').value;
+  facturasPorPagarF = facturasPorPagar.filter(f => {
+    const s = `${f.proveedor||''} ${f.rut_proveedor||''} ${f.factura||''}`;
+    return coincideBusqueda(s, q) && (!estado || (f.estado_pago||'Pendiente') === estado);
+  });
+  fppPage = 1;
+  renderFacturasPorPagar();
+}
+
+function renderFacturasPorPagar() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const en7dias = new Date(Date.now() + 7*86400000).toISOString().slice(0, 10);
+  const pendientes = facturasPorPagar.filter(f => (f.estado_pago||'Pendiente') !== 'Pagado');
+  const totalPendiente = pendientes.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const vencidas = pendientes.filter(f => f.fecha_vencimiento && f.fecha_vencimiento < hoy);
+  const porVencer = pendientes.filter(f => f.fecha_vencimiento && f.fecha_vencimiento >= hoy && f.fecha_vencimiento <= en7dias);
+  const pagadoEsteMes = facturasPorPagar
+    .filter(f => f.estado_pago === 'Pagado' && (f.fecha_pago||'').slice(0,7) === hoy.slice(0,7))
+    .reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+
+  document.getElementById('fpp-pendiente').textContent = clp(totalPendiente);
+  document.getElementById('fpp-vencidas').textContent = vencidas.length;
+  document.getElementById('fpp-por-vencer').textContent = porVencer.length;
+  document.getElementById('fpp-pagado-mes').textContent = clp(pagadoEsteMes);
+
+  const { slice, pages, total } = paginate(facturasPorPagarF, fppPage);
+  document.getElementById('fpp-info').textContent = `${total.toLocaleString('es-CL')} facturas`;
+  renderPages('fpp-pages', total, pages, fppPage, 'goFPP');
+
+  if (!slice.length) {
+    document.getElementById('fpp-body').innerHTML = `<tr><td colspan="8" class="empty"><div class="empty-icon">💳</div><p>Sin resultados</p></td></tr>`;
+    return;
+  }
+  document.getElementById('fpp-body').innerHTML = slice.map(f => {
+    const pagado = f.estado_pago === 'Pagado';
+    const vencida = !pagado && f.fecha_vencimiento && f.fecha_vencimiento < hoy;
+    return `<tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+      <td style="white-space:nowrap;color:var(--text-2)">${fDate(f.fecha_emision)}</td>
+      <td style="white-space:nowrap;${vencida?'color:var(--red);font-weight:600':''}">${fDate(f.fecha_vencimiento)}${vencida?' ⚠':''}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
+      <td class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
+      <td class="mono" style="color:#185FA5">${f.factura}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(f.monto_total ?? f.monto)}</td>
+      <td>${pagado ? '<span class="badge-estado ok">Pagado</span>' : (vencida ? '<span class="badge-estado err">Vencida</span>' : '<span class="badge-estado neutral">Pendiente</span>')}</td>
+      <td style="text-align:right">${f.doc_url ? `<a href="${f.doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ver documento" style="color:var(--text-2)"><i class="ti ti-file-text" aria-hidden="true"></i></a>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+function goFPP(p) { const {pages}=paginate(facturasPorPagarF,fppPage); if(p<1||p>pages) return; fppPage=p; renderFacturasPorPagar(); }
+
+function botonNavFPPHtml(idActual) {
+  const idx = facturasPorPagarF.findIndex(f => f.id === idActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0, haySiguiente = idx < facturasPorPagarF.length - 1;
+  return `
+    <button onclick="abrirDetalleFacturaPorPagar(${hayAnterior?facturasPorPagarF[idx-1].id:''})" ${hayAnterior?'':'disabled'} title="Anterior (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="abrirDetalleFacturaPorPagar(${haySiguiente?facturasPorPagarF[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
+function abrirDetalleFacturaPorPagar(id) {
+  const f = facturasPorPagar.find(x => x.id === id);
+  if (!f) return;
+  cerrarTodosLosModales();
+  const cuenta = nombreProveedorCuenta(f.rut_proveedor);
+  const opcionesCuenta = proveedoresCuentas.map(p => `<option value="${p.id}" ${f.cuenta_pago_id===p.id?'selected':''}>${p.nombre_proveedor||p.rut_proveedor} — ${p.banco||'sin banco'} ${p.numero_cuenta||''}</option>`).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'fpp-detalle-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Factura de proveedor</div>
+          <div class="mono" style="font-size:16px">${f.factura}</div>
+          <div class="modal-title" style="margin-top:2px">${f.proveedor||'—'}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonNavFPPHtml(f.id)}
+          <button onclick="document.getElementById('fpp-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <table class="clinical-grid">
+          <tr><td>RUT proveedor</td><td class="mono">${f.rut_proveedor||'—'}</td></tr>
+          <tr><td>Fecha emisión</td><td>${fDate(f.fecha_emision)}</td></tr>
+          <tr><td>Fecha vencimiento</td><td>${fDate(f.fecha_vencimiento)}</td></tr>
+          <tr><td>Monto</td><td style="font-weight:600">${clp(f.monto_total ?? f.monto)}</td></tr>
+          <tr><td>Cuenta de pago registrada</td><td>${cuenta ? `${cuenta.banco||'—'} · ${cuenta.tipo_cuenta||''} ${cuenta.numero_cuenta||''}` : '<span style="color:var(--text-3)">Sin cuenta registrada — agrégala en "Cuentas de proveedores"</span>'}</td></tr>
+        </table>
+
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Pago</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:140px">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Estado</div>
+            <select id="fpp-detalle-estado" style="width:100%">
+              <option value="Pendiente" ${f.estado_pago!=='Pagado'?'selected':''}>Pendiente</option>
+              <option value="Pagado" ${f.estado_pago==='Pagado'?'selected':''}>Pagado</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:140px">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Fecha de pago</div>
+            <input type="date" id="fpp-detalle-fecha-pago" value="${f.fecha_pago||''}" style="width:100%">
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Pagar a la cuenta</div>
+          <select id="fpp-detalle-cuenta" style="width:100%"><option value="">— sin asignar —</option>${opcionesCuenta}</select>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px">
+          <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarPagoFacturaPorPagar(${f.id}, this)">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function guardarPagoFacturaPorPagar(id, btnEl) {
+  const estado = document.getElementById('fpp-detalle-estado').value;
+  const fechaPago = document.getElementById('fpp-detalle-fecha-pago').value || null;
+  const cuentaId = document.getElementById('fpp-detalle-cuenta').value || null;
+  btnEl.disabled = true; btnEl.textContent = 'Guardando…';
+  try {
+    const cambios = { estado_pago: estado, fecha_pago: estado === 'Pagado' ? (fechaPago || new Date().toISOString().slice(0,10)) : fechaPago, cuenta_pago_id: cuentaId ? Number(cuentaId) : null };
+    await sb(`facturas_por_pagar?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
+    const f = facturasPorPagar.find(x => x.id === id);
+    if (f) Object.assign(f, cambios);
+    document.getElementById('fpp-detalle-overlay').remove();
+    renderFacturasPorPagar();
+    toast('Guardado');
+  } catch (e) {
+    toast('No se pudo guardar: ' + e.message, 'err');
+  } finally {
+    btnEl.disabled = false; btnEl.textContent = 'Guardar';
+  }
+}
+
+// ─── Cuentas de proveedores (para saber a quién pagarle y con qué datos) ───
+function abrirGestionProveedores() {
+  cerrarTodosLosModales();
+  const modal = document.createElement('div');
+  modal.id = 'proveedores-gestion-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Cuentas de proveedores</div>
+          <div class="modal-sub">Se carga una vez por proveedor y queda disponible al pagar cualquiera de sus facturas</div>
+        </div>
+        <button onclick="document.getElementById('proveedores-gestion-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Agregar / actualizar proveedor</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+            <div><label style="font-size:11px;color:var(--text-2)">RUT proveedor</label><input type="text" id="prov-rut" placeholder="76XXXXXXX-X" style="width:100%"></div>
+            <div><label style="font-size:11px;color:var(--text-2)">Nombre</label><input type="text" id="prov-nombre" style="width:100%"></div>
+            <div><label style="font-size:11px;color:var(--text-2)">Banco</label><input type="text" id="prov-banco" style="width:100%"></div>
+            <div><label style="font-size:11px;color:var(--text-2)">Tipo de cuenta</label><input type="text" id="prov-tipo" placeholder="Corriente / Vista / RUT" style="width:100%"></div>
+            <div><label style="font-size:11px;color:var(--text-2)">N° de cuenta</label><input type="text" id="prov-numero" style="width:100%"></div>
+            <div><label style="font-size:11px;color:var(--text-2)">Correo para el pago</label><input type="email" id="prov-email" style="width:100%"></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarProveedorCuenta(this)">Guardar proveedor</button>
+          </div>
+        </div>
+        <div id="prov-lista"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  renderListaProveedoresCuentas();
+}
+
+function renderListaProveedoresCuentas() {
+  const cont = document.getElementById('prov-lista');
+  if (!proveedoresCuentas.length) { cont.innerHTML = `<div style="font-size:12px;color:var(--text-3)">Todavía no hay proveedores cargados.</div>`; return; }
+  cont.innerHTML = `<table class="clinical-grid">
+    ${proveedoresCuentas.map(p => `<tr>
+      <td style="width:auto">${p.nombre_proveedor||p.rut_proveedor}<div class="mono" style="font-size:11px;color:var(--text-3)">${p.rut_proveedor}</div></td>
+      <td>${p.banco||'—'} · ${p.tipo_cuenta||''} ${p.numero_cuenta||''}<button onclick="editarProveedorCuenta(${p.id})" style="margin-left:10px;background:none;border:none;color:#185FA5;cursor:pointer;font-size:12px">Editar</button></td>
+    </tr>`).join('')}
+  </table>`;
+}
+
+function editarProveedorCuenta(id) {
+  const p = proveedoresCuentas.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('prov-rut').value = p.rut_proveedor || '';
+  document.getElementById('prov-nombre').value = p.nombre_proveedor || '';
+  document.getElementById('prov-banco').value = p.banco || '';
+  document.getElementById('prov-tipo').value = p.tipo_cuenta || '';
+  document.getElementById('prov-numero').value = p.numero_cuenta || '';
+  document.getElementById('prov-email').value = p.email_pago || '';
+}
+
+async function guardarProveedorCuenta(btnEl) {
+  const rut = document.getElementById('prov-rut').value.trim();
+  if (!rut) { toast('Ingresa el RUT del proveedor.', 'err'); return; }
+  const fila = {
+    rut_proveedor: rut,
+    nombre_proveedor: document.getElementById('prov-nombre').value.trim() || null,
+    banco: document.getElementById('prov-banco').value.trim() || null,
+    tipo_cuenta: document.getElementById('prov-tipo').value.trim() || null,
+    numero_cuenta: document.getElementById('prov-numero').value.trim() || null,
+    email_pago: document.getElementById('prov-email').value.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  btnEl.disabled = true;
+  try {
+    const res = await sb('proveedores_cuentas?on_conflict=rut_proveedor', {
+      method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([fila]),
+    });
+    const filas = await res.json();
+    if (Array.isArray(filas) && filas[0]) {
+      proveedoresCuentas = proveedoresCuentas.filter(p => p.rut_proveedor !== rut);
+      proveedoresCuentas.push(filas[0]);
+      proveedoresCuentas.sort((a,b) => (a.nombre_proveedor||'').localeCompare(b.nombre_proveedor||''));
+    }
+    ['prov-rut','prov-nombre','prov-banco','prov-tipo','prov-numero','prov-email'].forEach(id => document.getElementById(id).value = '');
+    renderListaProveedoresCuentas();
+    toast('Proveedor guardado');
+  } catch (e) {
+    toast('No se pudo guardar: ' + e.message, 'err');
+  } finally {
+    btnEl.disabled = false;
+  }
+}
+
 function renderRechazadas(soloTabla) {
   let lista = facturasRechazadas();
   if (rechazadasSoloHoy) {
@@ -6770,6 +7059,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'facturas-productos' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
+    { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
   ] },
