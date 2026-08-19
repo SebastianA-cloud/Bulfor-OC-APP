@@ -151,6 +151,21 @@
     outline: none; box-shadow: var(--focus-ring); border-color: var(--accent);
   }
 
+  /* ─── Pantalla de login ───────────────────────────────────────────────── */
+  #login-overlay { background: radial-gradient(circle at 30% 20%, #FBEAE9 0%, var(--bg) 55%); }
+  .login-card { background: var(--surface); border-radius: 20px; box-shadow: 0 24px 64px rgba(26,25,23,.16), 0 2px 8px rgba(26,25,23,.08); max-width: 400px; width: 100%; padding: 44px 40px 36px; }
+  .login-badge { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; box-shadow: 0 6px 16px rgba(192,57,43,.35); }
+  .login-field { margin-bottom: 18px; }
+  .login-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+  .login-input-wrap { position: relative; }
+  .login-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 17px; color: var(--text-3); pointer-events: none; }
+  .login-input-wrap input { width: 100%; padding: 13px 14px 13px 42px; font-size: 15px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s, background .15s; }
+  .login-input-wrap input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px rgba(192,57,43,.1); }
+  .login-btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s; box-shadow: 0 4px 12px rgba(192,57,43,.25); }
+  .login-btn:hover:not(:disabled) { background: #A93225; }
+  .login-btn:active:not(:disabled) { transform: scale(.98); }
+  .login-btn:disabled { opacity: .6; cursor: default; }
+
   /* Table */
   .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
@@ -318,19 +333,30 @@
 </head>
 <body>
 
-<div id="login-overlay" style="position:fixed;inset:0;background:var(--bg);z-index:5000;display:flex;align-items:center;justify-content:center;padding:24px">
-  <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:0 12px 32px rgba(26,25,23,.18);max-width:380px;width:100%;padding:36px 32px">
-    <div style="text-align:center;margin-bottom:28px">
-      <div style="font-size:26px;font-weight:700;line-height:1"><span style="color:var(--text)">Farmacia</span><br><span style="color:var(--accent)">Bulfor</span></div>
-      <div style="font-size:12px;color:var(--text-2);margin-top:8px">Bulfor OC — Sistema de gestión farmacéutica</div>
+<div id="login-overlay" style="position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div class="login-card">
+    <div style="text-align:center;margin-bottom:30px">
+      <div class="login-badge">B</div>
+      <div style="font-size:24px;font-weight:700;line-height:1.15"><span style="color:var(--text)">Farmacia</span> <span style="color:var(--accent)">Bulfor</span></div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:6px">Bulfor OC — Sistema de gestión farmacéutica</div>
     </div>
     <form id="login-form" onsubmit="return manejarLogin(event)">
-      <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Correo</label>
-      <input type="email" id="login-email" required autocomplete="username" style="width:100%;margin-bottom:14px">
-      <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Contraseña</label>
-      <input type="password" id="login-password" required autocomplete="current-password" style="width:100%;margin-bottom:18px">
-      <div id="login-error" style="display:none;background:var(--red-light);color:var(--red);font-size:12px;padding:8px 12px;border-radius:var(--radius);margin-bottom:14px"></div>
-      <button type="submit" id="login-btn" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-size:14px;font-weight:500;cursor:pointer">Iniciar sesión</button>
+      <div class="login-field">
+        <label>Correo</label>
+        <div class="login-input-wrap">
+          <i class="ti ti-mail" aria-hidden="true"></i>
+          <input type="email" id="login-email" required autocomplete="username" placeholder="tu@farmaciabulfor.cl">
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Contraseña</label>
+        <div class="login-input-wrap">
+          <i class="ti ti-lock" aria-hidden="true"></i>
+          <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">
+        </div>
+      </div>
+      <div id="login-error" style="display:none;background:var(--red-light);color:var(--red);font-size:13px;padding:10px 14px;border-radius:10px;margin-bottom:16px"></div>
+      <button type="submit" id="login-btn" class="login-btn">Iniciar sesión</button>
     </form>
   </div>
 </div>
