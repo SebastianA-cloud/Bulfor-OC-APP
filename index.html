@@ -613,7 +613,7 @@
     <!-- Tarjetas de estado -->
     <div class="stats" id="oe-stats">
       <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('elaboracion')"><div class="stat-label">En elaboración</div><div class="stat-val" id="oe-elaboracion">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entregado')"><div class="stat-label">Entregados hoy</div><div class="stat-val" id="oe-entregados">—</div></div>
+      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entregado')"><div class="stat-label">Entregados</div><div class="stat-val" id="oe-entregados">—</div></div>
       <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entrega')"><div class="stat-label">Para entrega</div><div class="stat-val" id="oe-entrega">—</div></div>
       <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('todos')"><div class="stat-label">Total</div><div class="stat-val" id="oe-total">—</div></div>
     </div>
@@ -2632,11 +2632,10 @@ function recetaVigente(fechaEmision) {
 }
 
 function updateOEStats() {
-  const hoy = new Date().toISOString().slice(0,10);
   document.getElementById('oe-total').textContent = ordenesElaboracion.length;
   document.getElementById('oe-elaboracion').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='En elaboracion').length;
   document.getElementById('oe-entrega').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='Para entrega').length;
-  document.getElementById('oe-entregados').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='Entregado' && (o.updated_at||'').slice(0,10)===hoy).length;
+  document.getElementById('oe-entregados').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='Entregado').length;
   document.getElementById('oe-subtitle').textContent = `${ordenesElaboracion.length.toLocaleString('es-CL')} órdenes registradas`;
 }
 
