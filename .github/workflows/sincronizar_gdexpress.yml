@@ -22,7 +22,7 @@ jobs:
       - name: Ejecutar sincronización
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: se salta las reglas de seguridad, para que el robot pueda escribir
           DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
           GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
         run: python sincronizar_gdexpress.py
