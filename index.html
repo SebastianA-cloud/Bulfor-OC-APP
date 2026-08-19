@@ -1130,7 +1130,7 @@ function recalcularProductoPorOC() {
 async function init() {
   try {
     const [ocR, itemsR, diccR, fedexR, hospMaestroR, oeR, pacR, facPagoR, docGdexR, farmProdR, farmFamR, farmLotesR, farmMovR] = await Promise.all([
-      fetchAll('ordenes_compra', 'select=*&order=fechaoc.desc'),
+      fetchAll('ordenes_compra', 'select=*&order=fechaenvio.desc'),
       fetchAll('items_oc', 'select=*&order=fechaoc.desc'),
       fetchAll('diccionario_normalizacion', 'select=*'),
       fetchAll('seguimiento_fedex', 'select=*&order=fecha_ingreso.desc'),
@@ -1510,7 +1510,7 @@ function renderOC() {
       <td data-label="N° OC"><span class="mono">${r.codigooc||''}</span></td>
       <td data-label="Tipo">${tipoBadge(r.tipooc)}</td>
       <td data-label="Descripción" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
-      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
       <td data-label="Hospital" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
       <td data-label="Región" style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
       <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
@@ -1638,7 +1638,7 @@ function openOCDetail(codigoOC) {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
             <div class="stat" style="padding:12px"><div class="stat-label">Total neto</div><div class="stat-val" style="font-size:16px">${clp(r.totalneto)}</div></div>
             <div class="stat" style="padding:12px"><div class="stat-label">Total OC (con IVA)</div><div class="stat-val" style="font-size:16px">${clp(r.totaloc)}</div></div>
-            <div class="stat" style="padding:12px"><div class="stat-label">Fecha OC</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaoc)}</div></div>
+            <div class="stat" style="padding:12px"><div class="stat-label">Fecha</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaenvio || r.fechaoc)}</div></div>
           </div>
           <table class="clinical-grid">
             <tr><td>Hospital</td><td>${nombreHosp(r.hospital)||'—'}</td></tr>
@@ -1647,7 +1647,7 @@ function openOCDetail(codigoOC) {
             <tr><td>Estado proveedor</td><td>${r.estadoproveedor||'—'}</td></tr>
             <tr><td>Región / Comuna</td><td>${r.region||''} / ${r.comuna||''}</td></tr>
             <tr><td>Fecha aceptación</td><td>${fDate(r.fechaaceptacion)}</td></tr>
-            <tr><td>Fecha envío</td><td>${fDate(r.fechaenvio)}</td></tr>
+            <tr><td>Fecha creación (Mercado Público)</td><td>${fDate(r.fechaoc)}</td></tr>
           </table>
         </div>
         <div id="oc-tab-productos" class="modal-tab-panel">
@@ -2312,16 +2312,17 @@ function calcularHospitalesDesdeOC() {
   const grupos = {};
   oc.forEach(r => {
     const nombre = nombreHosp(r.hospital) || r.hospital;
+    const fecha = r.fechaenvio || r.fechaoc;
     if (!nombre) return;
     if (!grupos[nombre]) {
       grupos[nombre] = { hospital: nombre, region: r.region, comuna: r.comuna,
-        numerooc: 0, totalcomprado: 0, primeracompra: r.fechaoc, ultimacompra: r.fechaoc };
+        numerooc: 0, totalcomprado: 0, primeracompra: fecha, ultimacompra: fecha };
     }
     const g = grupos[nombre];
     g.numerooc += 1;
     g.totalcomprado += (r.totalneto || 0);
-    if (r.fechaoc && (!g.primeracompra || r.fechaoc < g.primeracompra)) g.primeracompra = r.fechaoc;
-    if (r.fechaoc && (!g.ultimacompra || r.fechaoc > g.ultimacompra)) g.ultimacompra = r.fechaoc;
+    if (fecha && (!g.primeracompra || fecha < g.primeracompra)) g.primeracompra = fecha;
+    if (fecha && (!g.ultimacompra || fecha > g.ultimacompra)) g.ultimacompra = fecha;
   });
   return Object.values(grupos).sort((a,b) => (b.totalcomprado||0) - (a.totalcomprado||0));
 }
@@ -5366,7 +5367,7 @@ async function eliminarEnvio(id) {
 function openHospitalOCs(hospital) {
   cerrarTodosLosModales();
   window.__hospActualOCs = oc.filter(r => nombreHosp(r.hospital) === hospital)
-    .sort((a,b) => new Date(b.fechaoc) - new Date(a.fechaoc));
+    .sort((a,b) => new Date(b.fechaenvio||b.fechaoc) - new Date(a.fechaenvio||a.fechaoc));
   window.__hospActualNombre = hospital;
 
   const modal = document.createElement('div');
@@ -5411,7 +5412,7 @@ function renderHospitalOCsTable(lista) {
               return `<tr style="cursor:pointer" onclick="navPush(()=>openHospitalOCs('${window.__hospActualNombre.replace(/'/g,"\\'")}'));cerrarTodosLosModales();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
                 <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
                 <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
-                <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaoc)}</td>
+                <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
               </tr>`;
             }).join('')}
@@ -5439,7 +5440,7 @@ function closeHospitalOCs() {
 function updateStats() {
   const total = oc.reduce((s,r)=>s+(r.totalneto||0),0);
   const hosps = new Set(oc.map(r=>nombreHosp(r.hospital))).size;
-  const ultima = oc[0]?.fechaoc;
+  const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc;
   document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
   document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
@@ -5555,8 +5556,9 @@ function abrirTopProductos(criterio) {
 function abrirEvolucionMensual() {
   const porMes = {};
   oc.forEach(r => {
-    if (!r.fechaoc) return;
-    const d = new Date(r.fechaoc);
+    const fecha = r.fechaenvio || r.fechaoc;
+    if (!fecha) return;
+    const d = new Date(fecha);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     porMes[key] = (porMes[key] || 0) + (r.totalneto || 0);
   });
@@ -5635,7 +5637,7 @@ function abrirVentasPorRegion() {
 
 function abrirVentasPorAnio() {
   const byYear = {};
-  oc.forEach(r => { if(r.fechaoc) { const y=new Date(r.fechaoc).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totalneto||0); }});
+  oc.forEach(r => { const fecha = r.fechaenvio || r.fechaoc; if(fecha) { const y=new Date(fecha).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totalneto||0); }});
   const lista = Object.entries(byYear).sort((a,b)=>a[0]-b[0]);
   const max = Math.max(...lista.map(l=>l[1]), 1);
   const html = lista.map(([y, v]) => barraHtml(y, v, max, clp(v), 'var(--green)')).join('');
