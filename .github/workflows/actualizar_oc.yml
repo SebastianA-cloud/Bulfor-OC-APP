@@ -22,7 +22,7 @@ jobs:
       - name: Ejecutar script de actualización
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: se salta las reglas de seguridad, para que el robot pueda escribir
           MP_TICKET:    ${{ secrets.MP_TICKET }}
           MP_CODIGO_PROVEEDOR: ${{ secrets.MP_CODIGO_PROVEEDOR }}
         run: python actualizar_oc_final.py
