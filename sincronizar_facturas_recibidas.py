@@ -6,6 +6,11 @@ EMITE a los hospitales (GRUPO=E, filtrando por RUTEmisor), trae lo que los
 PROVEEDORES le emiten A Bulfor (GRUPO=R, filtrando por RUTRecep) — o sea,
 las cuentas por pagar.
 
+Rango de fechas: igual que actualizar_oc_final.py — busca en Supabase cuál
+es la fecha de emisión más reciente ya guardada y sigue desde ahí (así cada
+corrida es rápida). La PRIMERA vez que corre (tabla vacía) no encuentra
+nada guardado, así que parte desde el 01-01-2026.
+
 Guarda/actualiza en facturas_por_pagar:
   - Si la factura NO existía (por rut_proveedor + factura), la crea.
   - Si YA existía, actualiza los datos que vienen del documento (proveedor,
@@ -22,7 +27,7 @@ import os
 import base64
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import requests
 from supabase import create_client
@@ -37,9 +42,24 @@ GRUPO = 'R'      # R = Recibidos (lo que los proveedores le facturan a Bulfor)
 RUT_RECEPTOR = '76186755-5'  # RUT de Farmacia Bulfor
 TAMANO_PAGINA = 300  # máximo permitido por la API
 
-# Ventana móvil de 30 días — igual que sincronizar_gdexpress.py: liviano y
-# no importa cuántas veces al día se corra.
-FECHA_MINIMA = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+# Nunca se busca antes de esta fecha, ni siquiera la primera vez.
+FECHA_MINIMA_ABSOLUTA = '2026-01-01'
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def obtener_ultima_fecha_guardada():
+    """Busca la fecha de emisión más reciente que ya tengamos guardada, para
+    seguir desde ahí. Si la tabla está vacía (primera corrida), parte desde
+    FECHA_MINIMA_ABSOLUTA."""
+    res = supabase.table('facturas_por_pagar').select('fecha_emision') \
+        .order('fecha_emision', desc=True).limit(1).execute()
+    if res.data and res.data[0].get('fecha_emision'):
+        return max(res.data[0]['fecha_emision'], FECHA_MINIMA_ABSOLUTA)
+    return FECHA_MINIMA_ABSOLUTA
+
+
+FECHA_MINIMA = obtener_ultima_fecha_guardada()
 FECHA_MAXIMA = datetime.now().strftime('%Y-%m-%d')
 
 CONSULTA = f'(RUTRecep:{RUT_RECEPTOR} AND TipoDTE:33 AND FchEmis:[{FECHA_MINIMA} TO {FECHA_MAXIMA}])'
@@ -123,6 +143,7 @@ def documentos_desde_xml(xml_bytes):
 
 def main():
     print(f"Sincronizando facturas RECIBIDAS de proveedores — Ambiente: {AMBIENTE}")
+    print(f"Desde: {FECHA_MINIMA}  Hasta: {FECHA_MAXIMA}")
     print(f"Consulta: {CONSULTA}\n")
 
     pagina = 1
