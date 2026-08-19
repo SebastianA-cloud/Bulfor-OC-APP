@@ -2,7 +2,7 @@ name: Sincronizar facturas desde GDExpress
 
 on:
   schedule:
-    - cron: '15 6 * * *'  # 3:15am hora Chile (15 min después de Mercado Público)
+    - cron: '20 */2 * * *'  # cada 2 horas, 20 min después de las OC (antes: solo 3:15am hora Chile)
   workflow_dispatch:  # permite ejecutarlo manualmente con un botón
 
 jobs:
