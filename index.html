@@ -538,39 +538,16 @@
   <div class="page" id="page-facturas-por-pagar">
     <div class="page-header">
       <div class="page-title">Facturas por pagar</div>
-      <div class="page-sub">Lo que los proveedores le facturan a Bulfor — para saber cuánto, cuándo y a quién pagar</div>
+      <div class="page-sub" id="fpp-breadcrumb">Todos los años</div>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="stat-label">Pendiente de pago</div><div class="stat-val" id="fpp-pendiente">—</div></div>
-      <div class="stat"><div class="stat-label">Vencidas</div><div class="stat-val" id="fpp-vencidas" style="color:var(--red)">—</div></div>
-      <div class="stat"><div class="stat-label">Por vencer (7 días)</div><div class="stat-val" id="fpp-por-vencer" style="color:#b8860b">—</div></div>
-      <div class="stat"><div class="stat-label">Pagado este mes</div><div class="stat-val" id="fpp-pagado-mes">—</div></div>
-    </div>
-    <div class="toolbar">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="fpp-search" placeholder="Buscar por proveedor, RUT, N° factura…" oninput="filterFacturasPorPagar()">
-      </div>
-      <select id="fpp-estado" onchange="filterFacturasPorPagar()">
-        <option value="">Todos los estados</option>
-        <option value="Pendiente">Pendiente</option>
-        <option value="Pagado">Pagado</option>
-      </select>
+    <div id="fpp-contexto-grande"></div>
+    <div class="toolbar" style="flex-wrap:wrap">
+      <div id="fpp-resumen" style="display:flex;gap:24px;align-items:center"></div>
       <button class="page-btn" onclick="abrirGestionProveedores()" style="white-space:nowrap"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="toggleFPPPendientes()">⏳ Pendientes</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="mostrarFPPAnios()">📅 Años</button>
     </div>
-    <div class="table-card">
-      <table>
-        <thead><tr>
-          <th>Emisión</th><th>Vencimiento</th><th>Proveedor</th><th>RUT</th><th>N° Factura</th>
-          <th style="text-align:right">Monto</th><th>Estado</th><th></th>
-        </tr></thead>
-        <tbody id="fpp-body"></tbody>
-      </table>
-      <div class="pagination">
-        <span id="fpp-info"></span>
-        <div class="page-btns" id="fpp-pages"></div>
-      </div>
-    </div>
+    <div id="fpp-contenido"></div>
   </div>
 
 
@@ -1223,7 +1200,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); renderFacturasPorPagar();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); mostrarFPPAnios();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -2222,45 +2199,17 @@ function openProductoFacturaDetail(nombreProducto) {
 
   const totalFacturado = ventas.reduce((s, v) => s + Number(v.monto_item || 0), 0);
 
-  // Agrupamos por mes (según la fecha de emisión del documento de cada venta).
-  const mesDeVenta = v => {
+  // Agrupamos por hospital (vía el documento al que pertenece cada ítem).
+  const porHospital = new Map();
+  ventas.forEach(v => {
     const doc = documentosGdexpress.find(d => d.id === v.documento_id);
-    return doc && doc.fecha_emision ? doc.fecha_emision.slice(0, 7) : null; // 'YYYY-MM'
-  };
-  const mesesSet = new Set(ventas.map(mesDeVenta).filter(Boolean));
-  const meses = Array.from(mesesSet).sort().reverse(); // más reciente primero
-
-  const nombreMes = clave => {
-    const [y, m] = clave.split('-');
-    const nombres = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    return `${nombres[Number(m)-1]} ${y}`;
-  };
-
-  // Arma el bloque de "stats + por hospital" para un subconjunto de ventas
-  // (todo el histórico, o solo un mes puntual).
-  const armarPanel = (ventasDelPanel, mesFiltro) => {
-    const total = ventasDelPanel.reduce((s, v) => s + Number(v.monto_item || 0), 0);
-    const porHospital = new Map();
-    ventasDelPanel.forEach(v => {
-      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
-      const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
-      if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
-      const entry = porHospital.get(h);
-      entry.facturas += 1;
-      entry.total += Number(v.monto_item || 0);
-    });
-    const hospitales = Array.from(porHospital.values()).sort((a, b) => b.total - a.total);
-    const mesArg = mesFiltro ? `,'${mesFiltro}'` : '';
-    return `
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
-        <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventasDelPanel.length}</div></div>
-        <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(total)}</div></div>
-      </div>
-      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
-      <table class="clinical-grid">
-        ${hospitales.map(h => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail('${nombreProducto.replace(/'/g,"\\'")}'));abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}'${mesArg})"><td style="color:#185FA5">${h.hospital} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
-      </table>`;
-  };
+    const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
+    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
+    const entry = porHospital.get(h);
+    entry.facturas += 1;
+    entry.total += Number(v.monto_item || 0);
+  });
+  const hospitales = Array.from(porHospital.values()).sort((a, b) => b.total - a.total);
 
   const modal = document.createElement('div');
   modal.id = 'producto-factura-modal-overlay';
@@ -2278,32 +2227,23 @@ function openProductoFacturaDetail(nombreProducto) {
           <button onclick="document.getElementById('producto-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div class="modal-tabs">
-        <div class="modal-tab active" data-tab="pf-tab-todos" onclick="cambiarTabOC(this)">Todos</div>
-        ${meses.map(m => `<div class="modal-tab" data-tab="pf-tab-${m}" onclick="cambiarTabOC(this)">${nombreMes(m)}</div>`).join('')}
-      </div>
       <div class="modal-body">
-        <div id="pf-tab-todos" class="modal-tab-panel active">
-          ${armarPanel(ventas, null)}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+          <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
         </div>
-        ${meses.map(m => `
-        <div id="pf-tab-${m}" class="modal-tab-panel">
-          ${armarPanel(ventas.filter(v => mesDeVenta(v) === m), m)}
-        </div>`).join('')}
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
+        <table class="clinical-grid">
+          ${hospitales.map(h => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail('${nombreProducto.replace(/'/g,"\\'")}'));abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')"><td style="color:#185FA5">${h.hospital} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
+        </table>
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
-function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre, mesFiltro) {
+function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
   cerrarTodosLosModales();
-  let ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
-  if (mesFiltro) {
-    ventas = ventas.filter(v => {
-      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
-      return doc && doc.fecha_emision && doc.fecha_emision.slice(0, 7) === mesFiltro;
-    });
-  }
+  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
   const facturas = ventas
     .map(v => {
       const doc = documentosGdexpress.find(d => d.id === v.documento_id);
@@ -2335,7 +2275,7 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre, mesFilt
             <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
           </tr></thead><tbody>
             ${facturas.map(({doc, item}) => `
-              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${hospitalNombre.replace(/'/g,"\\'")}'${mesFiltro?`,'${mesFiltro}'`:''}));abrirDetalleDocumentoGdexpress(${doc.id})">
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${hospitalNombre.replace(/'/g,"\\'")}'));abrirDetalleDocumentoGdexpress(${doc.id})">
                 <td class="mono" style="color:#185FA5">${doc.folio} ↗</td>
                 <td>${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
                 <td style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
@@ -4142,65 +4082,275 @@ function nombreProveedorCuenta(rutProveedor) {
   return p;
 }
 
-function filterFacturasPorPagar() {
-  const q = document.getElementById('fpp-search').value;
-  const estado = document.getElementById('fpp-estado').value;
-  facturasPorPagarF = facturasPorPagar.filter(f => {
-    const s = `${f.proveedor||''} ${f.rut_proveedor||''} ${f.factura||''}`;
-    return coincideBusqueda(s, q) && (!estado || (f.estado_pago||'Pendiente') === estado);
-  });
-  fppPage = 1;
-  renderFacturasPorPagar();
+// ─── Drill-down Años → Meses → tabla, igual que Seguimiento de pago ───────
+function fppAniosDisponibles() {
+  const anios = new Set();
+  facturasPorPagar.forEach(f => { if (f.fecha_emision) anios.add(f.fecha_emision.slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
 }
 
-function renderFacturasPorPagar() {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const en7dias = new Date(Date.now() + 7*86400000).toISOString().slice(0, 10);
-  const pendientes = facturasPorPagar.filter(f => (f.estado_pago||'Pendiente') !== 'Pagado');
-  const totalPendiente = pendientes.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
-  const vencidas = pendientes.filter(f => f.fecha_vencimiento && f.fecha_vencimiento < hoy);
-  const porVencer = pendientes.filter(f => f.fecha_vencimiento && f.fecha_vencimiento >= hoy && f.fecha_vencimiento <= en7dias);
-  const pagadoEsteMes = facturasPorPagar
-    .filter(f => f.estado_pago === 'Pagado' && (f.fecha_pago||'').slice(0,7) === hoy.slice(0,7))
-    .reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+function esPendienteRealFPP(f) {
+  return (f.estado_pago || 'Pendiente') !== 'Pagado' && f.estado_aceptacion !== 'N';
+}
 
-  document.getElementById('fpp-pendiente').textContent = clp(totalPendiente);
-  document.getElementById('fpp-vencidas').textContent = vencidas.length;
-  document.getElementById('fpp-por-vencer').textContent = porVencer.length;
-  document.getElementById('fpp-pagado-mes').textContent = clp(pagadoEsteMes);
+let fppContexto = { anio: null, mes: null, viendoPendientes: false };
+let fppBusqueda = '';
+let fppBusquedaAnio = '';
 
-  const { slice, pages, total } = paginate(facturasPorPagarF, fppPage);
-  document.getElementById('fpp-info').textContent = `${total.toLocaleString('es-CL')} facturas`;
-  renderPages('fpp-pages', total, pages, fppPage, 'goFPP');
+function setBreadcrumbFPP(texto) { document.getElementById('fpp-breadcrumb').innerHTML = texto; }
+function migaAniosFPP() { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPAnios()">Todos los años</span>`; }
+function migaAnioFPP(anio) { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPMeses('${anio}')">${anio}</span>`; }
 
-  if (!slice.length) {
-    document.getElementById('fpp-body').innerHTML = `<tr><td colspan="8" class="empty"><div class="empty-icon">💳</div><p>Sin resultados</p></td></tr>`;
+function mostrarFPPAnios() {
+  fppContexto = { anio: null, mes: null, viendoPendientes: false };
+  fppBusqueda = ''; fppBusquedaAnio = '';
+  renderFPPVista();
+}
+function mostrarFPPMeses(anio) {
+  fppContexto = { anio, mes: null, viendoPendientes: false };
+  fppBusqueda = ''; fppBusquedaAnio = '';
+  renderFPPVista();
+}
+function mostrarFPPMes(anio, mesIdx) {
+  let a = parseInt(anio, 10), m = mesIdx;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  fppContexto = { anio: String(a), mes: m, viendoPendientes: false };
+  fppBusqueda = ''; fppBusquedaAnio = '';
+  renderFPPVista();
+}
+function cambiarMesFPP(delta) { mostrarFPPMes(fppContexto.anio, fppContexto.mes + delta); }
+function volverAMesesFPPDelAnio() { mostrarFPPMeses(fppContexto.anio); }
+function toggleFPPPendientes() {
+  fppContexto.viendoPendientes = !fppContexto.viendoPendientes;
+  fppBusqueda = ''; fppBusquedaAnio = '';
+  renderFPPVista();
+}
+function filtrarFPPBusqueda(valor) { fppBusqueda = valor; renderFPPVista(true); }
+function filtrarFPPEnAnio(valor) { fppBusquedaAnio = valor; renderTarjetasMesesFPP(fppContexto.anio, true); }
+
+function aplicarFiltroFPP(lista) {
+  if (!fppBusqueda) return lista;
+  return lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''} ${f.estado_pago||''}`, fppBusqueda));
+}
+
+function calcularResumenFPP(lista) {
+  const validas = lista.filter(f => f.estado_aceptacion !== 'N');
+  const totalFacturado = validas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const pagadas = validas.filter(f => f.estado_pago === 'Pagado');
+  const totalPagado = pagadas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const pendientesCount = validas.filter(esPendienteRealFPP).length;
+  const pct = totalFacturado ? (totalPagado / totalFacturado * 100) : 0;
+  return { totalFacturado, totalPagado, pct, pendientesCount };
+}
+
+function renderResumenFPP(lista) {
+  const cont = document.getElementById('fpp-resumen');
+  if (!lista) { cont.innerHTML = ''; return; }
+  const r = calcularResumenFPP(lista);
+  cont.innerHTML = `
+    <div><div style="font-size:11px;color:var(--text-2)">Total facturado</div><div style="font-size:14px;font-weight:600">${clp(r.totalFacturado)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">Total pagado</div><div style="font-size:14px;font-weight:600;color:var(--green)">${clp(r.totalPagado)}</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">% pagado</div><div style="font-size:14px;font-weight:600">${r.pct.toFixed(0)}%</div></div>
+    <div><div style="font-size:11px;color:var(--text-2)">Pendientes</div><div style="font-size:14px;font-weight:600;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
+}
+
+function renderContextoGrandeFPP(texto) {
+  const cont = document.getElementById('fpp-contexto-grande');
+  if (!texto) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-light);color:var(--accent);font-size:18px;font-weight:700;padding:8px 18px;border-radius:var(--radius);margin-bottom:14px">📅 ${texto}</div>`;
+}
+
+function renderFPPVista(soloTabla) {
+  const { anio, mes, viendoPendientes } = fppContexto;
+
+  if (anio === null) {
+    renderResumenFPP(null);
+    renderContextoGrandeFPP(null);
+    if (!viendoPendientes) { setBreadcrumbFPP('Todos los años'); renderTarjetasAniosFPP(); return; }
+    setBreadcrumbFPP(`${migaAniosFPP()} › Pendientes`);
+    const lista = aplicarFiltroFPP(facturasPorPagar.filter(esPendienteRealFPP)).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+    renderTablaFPP(lista, { esPendientes: true, soloTabla });
     return;
   }
-  document.getElementById('fpp-body').innerHTML = slice.map(f => {
-    const pagado = f.estado_pago === 'Pagado';
-    const vencida = !pagado && f.fecha_vencimiento && f.fecha_vencimiento < hoy;
-    return `<tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
-      <td style="white-space:nowrap;color:var(--text-2)">${fDate(f.fecha_emision)}</td>
-      <td style="white-space:nowrap;${vencida?'color:var(--red);font-weight:600':''}">${fDate(f.fecha_vencimiento)}${vencida?' ⚠':''}</td>
+
+  if (mes === null) {
+    const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
+    renderResumenFPP(delAnio);
+    renderContextoGrandeFPP(anio);
+    if (!viendoPendientes) { setBreadcrumbFPP(`${migaAniosFPP()} › ${anio}`); renderTarjetasMesesFPP(anio); return; }
+    setBreadcrumbFPP(`${migaAniosFPP()} › ${migaAnioFPP(anio)} › Pendientes`);
+    const lista = aplicarFiltroFPP(delAnio.filter(esPendienteRealFPP)).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+    renderTablaFPP(lista, { esPendientes: true, soloTabla });
+    return;
+  }
+
+  const delMes = facturasPorPagar.filter(f => (f.fecha_emision||'') >= `${anio}-${String(mes+1).padStart(2,'0')}-01` && (f.fecha_emision||'') < (mes===11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`));
+  renderResumenFPP(delMes);
+  renderContextoGrandeFPP(`${MESES_NOMBRE[mes]} ${anio}`);
+  const base = viendoPendientes ? delMes.filter(esPendienteRealFPP) : delMes;
+  const lista = aplicarFiltroFPP(base).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+  setBreadcrumbFPP(`${migaAniosFPP()} › ${migaAnioFPP(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
+  renderTablaFPP(lista, { conNavMes: true, anio, esPendientes: viendoPendientes, soloTabla });
+}
+
+function renderTarjetasAniosFPP() {
+  const anios = fppAniosDisponibles();
+  const cont = document.getElementById('fpp-contenido');
+  if (!anios.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas de proveedores sincronizadas.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
+    ${anios.map(anio => {
+      const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
+      const pendientes = delAnio.filter(esPendienteRealFPP).length;
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarFPPMeses('${anio}')">
+        <div style="font-size:22px;font-weight:600">${anio}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delAnio.length} factura${delAnio.length===1?'':'s'}</div>
+        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderTarjetasMesesFPP(anio, soloTabla) {
+  const cont = document.getElementById('fpp-contenido');
+  const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
+
+  const buscadorHtml = `
+    <div class="toolbar" style="margin-bottom:14px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fpp-search-anio" placeholder="Buscar por proveedor o RUT en ${anio}…" value="${fppBusquedaAnio.replace(/"/g,'&quot;')}" oninput="filtrarFPPEnAnio(this.value)">
+      </div>
+    </div>`;
+
+  if (fppBusquedaAnio) {
+    const resultado = delAnio.filter(f => coincideBusqueda(`${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusquedaAnio))
+      .sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+    cont.innerHTML = buscadorHtml + construirTablaFPPHtml(resultado, 'Sin resultados para esa búsqueda en este año.');
+    if (soloTabla) { const inp = document.getElementById('fpp-search-anio'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+    return;
+  }
+
+  const porMes = {};
+  delAnio.forEach(f => {
+    const mesIdx = parseInt((f.fecha_emision||'').slice(5,7), 10) - 1;
+    if (mesIdx < 0 || mesIdx > 11) return;
+    if (!porMes[mesIdx]) porMes[mesIdx] = [];
+    porMes[mesIdx].push(f);
+  });
+  const mesesConDatos = Object.keys(porMes).map(Number).sort((a,b)=>a-b);
+  if (!mesesConDatos.length) {
+    cont.innerHTML = buscadorHtml + `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas para ${anio}.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = buscadorHtml + `<div style="display:flex;flex-wrap:wrap;gap:12px">
+    ${mesesConDatos.map(mesIdx => {
+      const delMes = porMes[mesIdx];
+      const pendientes = delMes.filter(esPendienteRealFPP).length;
+      return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarFPPMes('${anio}', ${mesIdx})">
+        <div style="font-size:16px;font-weight:600">${MESES_NOMBRE[mesIdx]}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delMes.length} factura${delMes.length===1?'':'s'}</div>
+        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function filaFPPHtml(f) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const pagado = f.estado_pago === 'Pagado';
+  const vencida = !pagado && f.fecha_vencimiento && f.fecha_vencimiento < hoy;
+  return `
+    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+      <td class="mono" style="color:var(--accent)">${f.factura}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
       <td class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
-      <td class="mono" style="color:#185FA5">${f.factura}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(f.monto_total ?? f.monto)}</td>
-      <td>${pagado ? '<span class="badge-estado ok">Pagado</span>' : (vencida ? '<span class="badge-estado err">Vencida</span>' : '<span class="badge-estado neutral">Pendiente</span>')}</td>
-      <td style="text-align:right">${f.doc_url ? `<a href="${f.doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ver documento" style="color:var(--text-2)"><i class="ti ti-file-text" aria-hidden="true"></i></a>` : ''}</td>
+      <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td style="font-size:12px;white-space:nowrap;${vencida?'color:var(--red);font-weight:600':''}">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${vencida?' ⚠':''}</td>
+      <td style="white-space:nowrap">${clp(f.monto_total ?? f.monto)}</td>
+      <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada</span>' : (pagado ? '<span class="badge-estado ok">Pagado</span>' : (vencida ? '<span class="badge-estado err">Vencida</span>' : '<span class="badge-estado neutral">Pendiente</span>'))}</td>
     </tr>`;
-  }).join('');
 }
-function goFPP(p) { const {pages}=paginate(facturasPorPagarF,fppPage); if(p<1||p>pages) return; fppPage=p; renderFacturasPorPagar(); }
+
+function construirTablaFPPHtml(lista, mensajeVacio) {
+  window.__ultimaListaFPP = lista;
+  if (!lista.length) {
+    return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
+  }
+  const normales = lista.filter(f => f.estado_aceptacion !== 'N');
+  const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
+
+  let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFPP()">⬇️ Descargar Excel (${lista.length})</button>
+  </div>`;
+
+  const tabla = arr => `<div class="table-card"><table><thead><tr>
+    <th>N° Factura</th><th>Proveedor</th><th>RUT</th><th>Emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th>
+  </tr></thead><tbody>${arr.map(filaFPPHtml).join('')}</tbody></table></div>`;
+
+  html += normales.length ? tabla(normales) : `<div class="table-card"><div class="empty"><p>Sin facturas normales — solo hay anuladas abajo.</p></div></div>`;
+
+  if (anuladas.length) {
+    html += `<div style="margin-top:24px;border:1px solid var(--red);border-radius:var(--radius-lg);overflow:hidden">
+      <div style="background:var(--red-light);padding:12px 20px;font-size:13px;font-weight:600;color:var(--red)">🚫 Anuladas (${anuladas.length})</div>
+      <div style="padding:14px">${tabla(anuladas)}</div>
+    </div>`;
+  }
+  return html;
+}
+
+function renderTablaFPP(lista, opts) {
+  opts = opts || {};
+  const cont = document.getElementById('fpp-contenido');
+  const toolbarHtml = `
+    <div class="toolbar" style="margin-bottom:12px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fpp-search" placeholder="Buscar por N° factura, RUT, proveedor…" value="${fppBusqueda.replace(/"/g,'&quot;')}" oninput="filtrarFPPBusqueda(this.value)">
+      </div>
+      ${opts.conNavMes ? `
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesFPP(-1)" title="Mes anterior">‹</button>
+        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesFPP(1)" title="Mes siguiente">›</button>
+        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="volverAMesesFPPDelAnio()">↩ Volver a los meses de ${opts.anio}</button>
+      ` : ''}
+    </div>`;
+  const mensajeVacio = fppBusqueda ? 'Sin resultados para tu búsqueda.' : (opts.esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.');
+  cont.innerHTML = toolbarHtml + construirTablaFPPHtml(lista, mensajeVacio);
+  if (opts.soloTabla) { const inp = document.getElementById('fpp-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+}
+
+function descargarExcelFPP() {
+  const lista = window.__ultimaListaFPP || [];
+  if (!lista.length) { toast('No hay nada para descargar.', 'err'); return; }
+  const filas = lista.map(f => ({
+    'N° Factura': f.factura,
+    'Proveedor': f.proveedor || '',
+    'RUT': f.rut_proveedor || '',
+    'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
+    'Vencimiento': f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '',
+    'Monto': f.monto_total ?? f.monto ?? 0,
+    'Estado': f.estado_aceptacion === 'N' ? 'Anulada' : (f.estado_pago === 'Pagado' ? 'Pagado' : 'Pendiente'),
+    'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Facturas por pagar');
+  XLSX.writeFile(libro, `facturas_por_pagar_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
 
 function botonNavFPPHtml(idActual) {
-  const idx = facturasPorPagarF.findIndex(f => f.id === idActual);
+  const lista = window.__ultimaListaFPP || [];
+  const idx = lista.findIndex(f => f.id === idActual);
   if (idx === -1) return '';
-  const hayAnterior = idx > 0, haySiguiente = idx < facturasPorPagarF.length - 1;
+  const hayAnterior = idx > 0, haySiguiente = idx < lista.length - 1;
   return `
-    <button onclick="abrirDetalleFacturaPorPagar(${hayAnterior?facturasPorPagarF[idx-1].id:''})" ${hayAnterior?'':'disabled'} title="Anterior (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
-    <button onclick="abrirDetalleFacturaPorPagar(${haySiguiente?facturasPorPagarF[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+    <button onclick="abrirDetalleFacturaPorPagar(${hayAnterior?lista[idx-1].id:''})" ${hayAnterior?'':'disabled'} title="Anterior (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="abrirDetalleFacturaPorPagar(${haySiguiente?lista[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
 function abrirDetalleFacturaPorPagar(id) {
@@ -4273,7 +4423,7 @@ async function guardarPagoFacturaPorPagar(id, btnEl) {
     const f = facturasPorPagar.find(x => x.id === id);
     if (f) Object.assign(f, cambios);
     document.getElementById('fpp-detalle-overlay').remove();
-    renderFacturasPorPagar();
+    renderFPPVista();
     toast('Guardado');
   } catch (e) {
     toast('No se pudo guardar: ' + e.message, 'err');
