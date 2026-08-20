@@ -2762,7 +2762,7 @@ function abrirFacturaDesdeFedex(numero) {
       </div>
       <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="detail-field"><label>Monto</label><span>${clp(montoConIVAPago(f))}</span></div>
-        <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion==='N'?'Anulada/Rechazada':f.estado_aceptacion==='A'?'Aceptada':'—'}</span></div>
+        <div class="detail-field"><label>Estado</label><span>${estadoFusionadoPago(f)==='N'?'Anulada/Rechazada':estadoFusionadoPago(f)==='A'?'Aceptada':'—'}</span></div>
         <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision?fDate(f.fecha_emision):'—'}</span></div>
         <div class="detail-field"><label>Fecha de pago</label><span>${f.fecha_pago?fDate(f.fecha_pago):'Pendiente'}</span></div>
         <div class="detail-field" style="grid-column:span 2"><label>Estado de pago</label><span>${f.estado_pago||'—'}</span></div>
@@ -3108,7 +3108,7 @@ function pagosAniosDisponibles() {
 // porque quedó reemplazada por otra factura. No cuenta como pendiente, solo
 // queda guardada como referencia de que existió y fue anulada.
 function esPendienteReal(f) {
-  return !f.fecha_pago && f.estado_aceptacion !== 'N';
+  return !f.fecha_pago && estadoFusionadoPago(f) !== 'N';
 }
 
 // facturas_pago solo guarda el monto NETO (viene del listado de pagos que
@@ -3189,7 +3189,7 @@ function filtrarPagosBusqueda(valor) {
 function aplicarFiltroPagos(lista) {
   if (!pagosBusqueda) return lista;
   return lista.filter(f => coincideBusqueda(
-    `${f.factura} ${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.estado_pago||''} ${f.estado_aceptacion==='A'?'aceptada':f.estado_aceptacion==='N'?'no aceptada anulada':''}`,
+    `${f.factura} ${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.estado_pago||''} ${estadoFusionadoPago(f)==='A'?'aceptada':estadoFusionadoPago(f)==='N'?'no aceptada anulada':''}`,
     pagosBusqueda
   ));
 }
@@ -3201,7 +3201,7 @@ function aplicarFiltroPagos(lista) {
 // de facturas. Las anuladas ('N') no cuentan para ningún monto ni porcentaje
 // — nunca se van a pagar, así que no deben inflar ni el total ni el % pendiente.
 function calcularResumenPagos(lista) {
-  const validas = lista.filter(f => f.estado_aceptacion !== 'N');
+  const validas = lista.filter(f => estadoFusionadoPago(f) !== 'N');
   const totalFacturado = validas.reduce((s,f) => s + montoConIVAPago(f), 0);
   const pagadas = validas.filter(f => f.fecha_pago);
   const totalPagado = pagadas.reduce((s,f) => s + montoConIVAPago(f), 0);
@@ -3347,8 +3347,18 @@ function renderTarjetasMeses(anio, soloTabla) {
   </div>`;
 }
 
+// Mismo cruce que ya se hacía en el detalle de la factura (abrirDetalleFacturaPago):
+// si GDExpress tiene una Nota de Crédito que anula esta factura, eso manda
+// por sobre lo que diga el campo estado_aceptacion guardado en facturas_pago
+// (que puede quedar desactualizado si nadie lo marca a mano).
+function estadoFusionadoPago(f) {
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  return doc ? estadoAceptacionFusionado(doc) : f.estado_aceptacion;
+}
+
 function filaFacturaHtml(f, opts) {
   opts = opts || {};
+  const estado = estadoFusionadoPago(f);
   const vencReal = !!f.fecha_vencimiento;
   const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
@@ -3359,7 +3369,7 @@ function filaFacturaHtml(f, opts) {
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
       <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
       <td style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-      <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+      <td>${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
       <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
       <td>${badgeEstadoPagoHtml(f)}</td>`}
@@ -3389,8 +3399,8 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
 
   // Las anuladas/rechazadas se muestran aparte, destacadas — no mezcladas
   // con las facturas normales, para que salten a la vista.
-  const normales = lista.filter(f => f.estado_aceptacion !== 'N');
-  const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
+  const normales = lista.filter(f => estadoFusionadoPago(f) !== 'N');
+  const anuladas = lista.filter(f => estadoFusionadoPago(f) === 'N');
 
   let html = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
@@ -3430,7 +3440,7 @@ function descargarExcelFacturasPago() {
       'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
       'Vencimiento': vencDate ? (vencReal ? fDate(vencDate) : `~${fDate(vencDate)} (estimado)`) : '',
       'Monto': montoConIVAPago(f),
-      'Estado': f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '',
+      'Estado': estadoFusionadoPago(f) === 'N' ? 'Anulada/Rechazada' : estadoFusionadoPago(f) === 'A' ? 'Aceptada' : '',
       'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
       'Estado de Pago': f.fecha_pago ? (f.estado_pago || 'Pagado') : 'Sin pagar',
     };
@@ -3692,7 +3702,7 @@ function calcularVencimientoFactura(f, nombreHospital) {
 function statsPagosPorHospital() {
   const grupos = {};
   facturasPago.forEach(f => {
-    if (f.estado_aceptacion === 'N') return;
+    if (estadoFusionadoPago(f) === 'N') return;
     const nombre = nombreHosp(f.hospital) || f.hospital || 'Sin hospital';
     if (!grupos[nombre]) grupos[nombre] = { hospital: nombre, totalFacturado: 0, totalPagado: 0, nFacturas: 0, nPagadas: 0, sumaAtraso: 0, nAtrasoValidos: 0 };
     const g = grupos[nombre];
@@ -3757,7 +3767,7 @@ function abrirGraficoPago(id) {
   } else if (id === 'evolucion-mensual-pagos') {
     const porMes = {};
     facturasPago.forEach(f => {
-      if (!f.fecha_pago || f.estado_aceptacion === 'N') return;
+      if (!f.fecha_pago || estadoFusionadoPago(f) === 'N') return;
       const key = f.fecha_pago.slice(0,7);
       porMes[key] = (porMes[key] || 0) + montoConIVAPago(f);
     });
