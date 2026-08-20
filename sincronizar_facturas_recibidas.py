@@ -114,6 +114,18 @@ def documentos_desde_xml(xml_bytes):
             el = doc.find(nombre)
             return el.text if el is not None else None
 
+        def campo_alt(*nombres):
+            """Prueba varios nombres de campo posibles y devuelve el primero
+            que venga con datos. Se usa para 'razón social del emisor', cuyo
+            nombre exacto en esta dirección (GRUPO=R) no está confirmado
+            todavía — apenas se vea cuál trae datos de verdad, se puede
+            dejar solo ese."""
+            for nombre in nombres:
+                valor = campo(nombre)
+                if valor:
+                    return valor
+            return None
+
         anulado = es_verdadero(campo('Anulado'))
         autorizado = es_verdadero(campo('AutorizadoSII'))
         fecha_emision = parse_fecha(campo('FchEmis'))
@@ -130,7 +142,7 @@ def documentos_desde_xml(xml_bytes):
         docs.append({
             'factura': campo('Folio'),
             'rut_proveedor': campo('RUTEmisor'),
-            'proveedor': campo('RznSocEmisor'),
+            'proveedor': campo_alt('RznSocEmisor', 'RznSocEmi', 'RazonSocialEmisor', 'NombreEmisor', 'RznSoc'),
             'fecha_emision': fecha_emision,
             'fecha_vencimiento': fecha_vencimiento,
             'monto': monto_neto,
