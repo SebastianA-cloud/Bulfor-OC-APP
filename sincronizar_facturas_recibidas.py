@@ -25,6 +25,7 @@ Se corre varias veces al día vía GitHub Actions (workflow_dispatch + cron).
 
 import os
 import base64
+import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -175,6 +176,119 @@ def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
     return docs
 
 
+def recuperar_xml_documento(folio):
+    """Trae el XML COMPLETO de una factura recibida puntual (con sus
+    productos) — mismo caso de uso 'Recuperar XML' que usa
+    sincronizar_documentos_gdexpress.py para las facturas emitidas, pero
+    apuntado a GRUPO=R."""
+    url = f"http://{DTEBOX_IP}/api/Core.svc/core/RecoverXML_V2"
+    headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
+    body = {
+        "Environment": AMBIENTE,
+        "Group": GRUPO,
+        "Rut": RUT_RECEPTOR,
+        "DocType": "33",
+        "Folio": str(folio),
+        "IsForDistribution": "true",
+    }
+    r = requests.post(url, headers=headers, json=body, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    if str(data.get('Result')) != '0':
+        raise RuntimeError(data.get('Description'))
+    return base64.b64decode(data['Data'])
+
+
+def sanitizar_xml(texto):
+    """Mismos arreglos que sincronizar_documentos_gdexpress.py: un '&' suelto
+    (típico en nombres de productos, ej. 'Sales & Geles') y caracteres de
+    control inválidos rompen el XML si no se limpian antes de leerlo."""
+    texto = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)', '&amp;', texto)
+    texto = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', texto)
+    return texto
+
+
+def items_desde_xml_completo(xml_texto_saneado):
+    """Extrae los ítems (productos) del XML completo — mismo bloque
+    <Detalle> repetido por producto que usa el estándar SII."""
+    root = ET.fromstring(xml_texto_saneado)
+
+    def buscar_todos(tag_objetivo):
+        return [el for el in root.iter() if el.tag.split('}')[-1].lower() == tag_objetivo.lower()]
+
+    def texto_de(padre, *nombres_posibles):
+        for nombre in nombres_posibles:
+            for hijo in padre.iter():
+                if hijo.tag.split('}')[-1].lower() == nombre.lower() and hijo is not padre:
+                    return hijo.text
+        return None
+
+    def codigo_de(padre):
+        for hijo in padre.iter():
+            if hijo.tag.split('}')[-1].lower() == 'cdgitem':
+                return texto_de(hijo, 'TpoCodigo'), texto_de(hijo, 'VlrCodigo')
+        return None, None
+
+    items = []
+    for det in buscar_todos('Detalle'):
+        codigo_tipo, codigo_valor = codigo_de(det)
+        items.append({
+            'nombre_producto': texto_de(det, 'NmbItem', 'NombreItem'),
+            'cantidad': texto_de(det, 'QtyItem', 'Cantidad'),
+            'unidad': texto_de(det, 'UnmdItem', 'Unidad'),
+            'precio_unitario': texto_de(det, 'PrcItem', 'PrecioUnitario', 'PrecioUnit'),
+            'monto_item': texto_de(det, 'MontoItem', 'MntItem'),
+            'codigo_tipo': codigo_tipo,
+            'codigo_valor': codigo_valor,
+            'descripcion': texto_de(det, 'DscItem', 'DescripcionItem'),
+        })
+    return items
+
+
+def sincronizar_detalle_pendiente(limite=150):
+    """Para las facturas que todavía no tienen sus productos guardados, los
+    trae y los guarda — igual que su contraparte para facturas emitidas.
+    Limitado por corrida para que no se demore demasiado."""
+    print(f"\n{'='*50}\nTrayendo el detalle (productos) de cada factura — hasta {limite} por corrida\n{'='*50}")
+    res = supabase.table('facturas_por_pagar').select('id,factura') \
+        .eq('detalle_sincronizado', False).order('fecha_emision', desc=True, nullsfirst=True).limit(limite).execute()
+    pendientes = res.data or []
+    print(f"{len(pendientes)} facturas sin detalle todavía")
+
+    ok, ok_sin_items, fallidos = 0, 0, 0
+    for f in pendientes:
+        try:
+            xml_bytes = recuperar_xml_documento(f['factura'])
+        except Exception as e:
+            print(f"  ✗ Factura {f['factura']}: no se pudo traer el XML — {e}")
+            fallidos += 1
+            time.sleep(1)
+            continue
+
+        xml_texto = xml_bytes.decode('iso-8859-1', errors='replace')
+        xml_saneado = sanitizar_xml(xml_texto)
+
+        items = []
+        try:
+            items = items_desde_xml_completo(xml_saneado)
+        except Exception as e:
+            print(f"  ⚠ Factura {f['factura']}: XML no se pudo interpretar ({e}) — se marca igual, sin productos.")
+            ok_sin_items += 1
+
+        try:
+            if items:
+                filas_items = [{**it, 'factura_id': f['id']} for it in items]
+                supabase.table('facturas_por_pagar_items').insert(filas_items).execute()
+            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}).eq('id', f['id']).execute()
+            ok += 1
+        except Exception as e:
+            print(f"  ✗ Factura {f['factura']}: no se pudo guardar en Supabase — {e}")
+            fallidos += 1
+        time.sleep(1)
+
+    print(f"✔ Detalle traído: {ok} facturas guardadas ({ok - ok_sin_items} con productos, {ok_sin_items} solo marcadas). Fallidos de verdad: {fallidos}.")
+
+
 def main():
     print(f"Sincronizando facturas RECIBIDAS de proveedores — Ambiente: {AMBIENTE}")
     print(f"Desde: {FECHA_MINIMA}  Hasta: {FECHA_MAXIMA}")
@@ -226,6 +340,8 @@ def main():
     if paginas_con_error:
         print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
         print("  Corre el script de nuevo para completarlas (no duplica nada, solo rellena lo que falte).")
+
+    sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
 
 
 if __name__ == '__main__':
