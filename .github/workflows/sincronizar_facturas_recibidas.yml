@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '50 */2 * * *'  # cada 2 horas, 50 min después de las OC
   workflow_dispatch:  # permite ejecutarlo manualmente con un botón
+    inputs:
+      historico_completo:
+        description: 'Traer TODO desde 2024 (ignora lo ya guardado) — úsalo solo puntualmente'
+        type: boolean
+        default: false
 
 jobs:
   sincronizar:
@@ -25,4 +30,5 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
           GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+          FORZAR_HISTORICO_COMPLETO: ${{ github.event.inputs.historico_completo || 'false' }}
         run: python sincronizar_facturas_recibidas.py
