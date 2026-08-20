@@ -104,12 +104,12 @@ def es_verdadero(texto):
     return t not in ('no', 'false', '0', 'indefinido', '')
 
 
-def documentos_desde_xml(xml_bytes):
+def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
     """El XML viene en ISO-8859-1 (lo declara en la cabecera) — se lo pasamos
     crudo a ElementTree para que respete esa codificación él solo."""
     root = ET.fromstring(xml_bytes)
     docs = []
-    for doc in root.findall('document'):
+    for i, doc in enumerate(root.findall('document')):
         def campo(nombre):
             el = doc.find(nombre)
             return el.text if el is not None else None
@@ -125,6 +125,16 @@ def documentos_desde_xml(xml_bytes):
                 if valor:
                     return valor
             return None
+
+        # Diagnóstico: en el primerísimo documento de toda la corrida,
+        # imprime CADA campo que trae el XML con su valor — así se ve en el
+        # log de GitHub Actions cuál es el nombre real del proveedor (y
+        # cualquier otro dato que convenga agregar después).
+        if imprimir_diagnostico and i == 0:
+            print("\n  🔎 DIAGNÓSTICO — campos del primer documento:")
+            for hijo in doc:
+                print(f"    {hijo.tag} = {hijo.text}")
+            print()
 
         anulado = es_verdadero(campo('Anulado'))
         autorizado = es_verdadero(campo('AutorizadoSII'))
@@ -186,7 +196,7 @@ def main():
             break
 
         xml_bytes = base64.b64decode(data['Data'])
-        docs = documentos_desde_xml(xml_bytes)
+        docs = documentos_desde_xml(xml_bytes, imprimir_diagnostico=(pagina == 1))
         print(f"  {len(docs)} facturas en esta página")
 
         filas = [d for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
