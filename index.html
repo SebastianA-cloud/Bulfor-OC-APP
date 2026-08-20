@@ -4386,6 +4386,12 @@ function abrirDetalleFacturaPorPagar(id) {
           <tr><td>Cuenta de pago registrada</td><td>${cuenta ? `${cuenta.banco||'—'} · ${cuenta.tipo_cuenta||''} ${cuenta.numero_cuenta||''}` : '<span style="color:var(--text-3)">Sin cuenta registrada — agrégala en "Cuentas de proveedores"</span>'}</td></tr>
         </table>
 
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
+        <div id="fpp-items-cuerpo">
+          <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+          <div class="skeleton" style="height:38px;width:80%"></div>
+        </div>
+
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Pago</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:140px">
@@ -4410,6 +4416,45 @@ function abrirDetalleFacturaPorPagar(id) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  cargarItemsFacturaPorPagar(f);
+}
+
+async function cargarItemsFacturaPorPagar(f) {
+  const cuerpo = document.getElementById('fpp-items-cuerpo');
+  if (!f.detalle_sincronizado) {
+    cuerpo.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;font-size:12px;color:var(--text-3)">Todavía no se ha traído el detalle de esta factura — se completa solo en la próxima sincronización.</div>`;
+    return;
+  }
+  try {
+    const items = await fetchAll('facturas_por_pagar_items', `select=*&factura_id=eq.${f.id}`);
+    if (!items.length) {
+      cuerpo.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;font-size:12px;color:var(--text-3)">No se encontraron productos para esta factura.</div>`;
+      return;
+    }
+    cuerpo.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table style="margin:0">
+          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
+          <tbody>
+            ${items.map(it => `<tr>
+              <td style="font-weight:500">
+                ${it.nombre_producto||'—'}
+                ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
+                  ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
+                  ${it.codigo_valor && it.descripcion ? ' · ' : ''}
+                  ${it.descripcion || ''}
+                </div>` : ''}
+              </td>
+              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    cuerpo.innerHTML = `<div style="color:var(--red);font-size:12px">No se pudo cargar el detalle: ${e.message}</div>`;
+  }
 }
 
 async function guardarPagoFacturaPorPagar(id, btnEl) {
