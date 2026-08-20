@@ -2222,17 +2222,45 @@ function openProductoFacturaDetail(nombreProducto) {
 
   const totalFacturado = ventas.reduce((s, v) => s + Number(v.monto_item || 0), 0);
 
-  // Agrupamos por hospital (vía el documento al que pertenece cada ítem).
-  const porHospital = new Map();
-  ventas.forEach(v => {
+  // Agrupamos por mes (según la fecha de emisión del documento de cada venta).
+  const mesDeVenta = v => {
     const doc = documentosGdexpress.find(d => d.id === v.documento_id);
-    const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
-    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
-    const entry = porHospital.get(h);
-    entry.facturas += 1;
-    entry.total += Number(v.monto_item || 0);
-  });
-  const hospitales = Array.from(porHospital.values()).sort((a, b) => b.total - a.total);
+    return doc && doc.fecha_emision ? doc.fecha_emision.slice(0, 7) : null; // 'YYYY-MM'
+  };
+  const mesesSet = new Set(ventas.map(mesDeVenta).filter(Boolean));
+  const meses = Array.from(mesesSet).sort().reverse(); // más reciente primero
+
+  const nombreMes = clave => {
+    const [y, m] = clave.split('-');
+    const nombres = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${nombres[Number(m)-1]} ${y}`;
+  };
+
+  // Arma el bloque de "stats + por hospital" para un subconjunto de ventas
+  // (todo el histórico, o solo un mes puntual).
+  const armarPanel = (ventasDelPanel, mesFiltro) => {
+    const total = ventasDelPanel.reduce((s, v) => s + Number(v.monto_item || 0), 0);
+    const porHospital = new Map();
+    ventasDelPanel.forEach(v => {
+      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
+      const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
+      if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
+      const entry = porHospital.get(h);
+      entry.facturas += 1;
+      entry.total += Number(v.monto_item || 0);
+    });
+    const hospitales = Array.from(porHospital.values()).sort((a, b) => b.total - a.total);
+    const mesArg = mesFiltro ? `,'${mesFiltro}'` : '';
+    return `
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+        <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventasDelPanel.length}</div></div>
+        <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(total)}</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
+      <table class="clinical-grid">
+        ${hospitales.map(h => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail('${nombreProducto.replace(/'/g,"\\'")}'));abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}'${mesArg})"><td style="color:#185FA5">${h.hospital} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
+      </table>`;
+  };
 
   const modal = document.createElement('div');
   modal.id = 'producto-factura-modal-overlay';
@@ -2250,23 +2278,32 @@ function openProductoFacturaDetail(nombreProducto) {
           <button onclick="document.getElementById('producto-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="pf-tab-todos" onclick="cambiarTabOC(this)">Todos</div>
+        ${meses.map(m => `<div class="modal-tab" data-tab="pf-tab-${m}" onclick="cambiarTabOC(this)">${nombreMes(m)}</div>`).join('')}
+      </div>
       <div class="modal-body">
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
-          <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
+        <div id="pf-tab-todos" class="modal-tab-panel active">
+          ${armarPanel(ventas, null)}
         </div>
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
-        <table class="clinical-grid">
-          ${hospitales.map(h => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail('${nombreProducto.replace(/'/g,"\\'")}'));abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${h.hospital.replace(/'/g,"\\'")}')"><td style="color:#185FA5">${h.hospital} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
-        </table>
+        ${meses.map(m => `
+        <div id="pf-tab-${m}" class="modal-tab-panel">
+          ${armarPanel(ventas.filter(v => mesDeVenta(v) === m), m)}
+        </div>`).join('')}
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
-function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
+function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre, mesFiltro) {
   cerrarTodosLosModales();
-  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  let ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  if (mesFiltro) {
+    ventas = ventas.filter(v => {
+      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
+      return doc && doc.fecha_emision && doc.fecha_emision.slice(0, 7) === mesFiltro;
+    });
+  }
   const facturas = ventas
     .map(v => {
       const doc = documentosGdexpress.find(d => d.id === v.documento_id);
@@ -2298,7 +2335,7 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
             <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
           </tr></thead><tbody>
             ${facturas.map(({doc, item}) => `
-              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${hospitalNombre.replace(/'/g,"\\'")}'));abrirDetalleDocumentoGdexpress(${doc.id})">
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital('${nombreProducto.replace(/'/g,"\\'")}','${hospitalNombre.replace(/'/g,"\\'")}'${mesFiltro?`,'${mesFiltro}'`:''}));abrirDetalleDocumentoGdexpress(${doc.id})">
                 <td class="mono" style="color:#185FA5">${doc.folio} ↗</td>
                 <td>${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
                 <td style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
