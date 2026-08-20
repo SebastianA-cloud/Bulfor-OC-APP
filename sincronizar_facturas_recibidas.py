@@ -43,8 +43,14 @@ GRUPO = 'R'      # R = Recibidos (lo que los proveedores le facturan a Bulfor)
 RUT_RECEPTOR = '76186755-5'  # RUT de Farmacia Bulfor
 TAMANO_PAGINA = 300  # máximo permitido por la API
 
-# Nunca se busca antes de esta fecha, ni siquiera la primera vez.
-FECHA_MINIMA_ABSOLUTA = '2026-01-01'
+# Nunca se busca antes de esta fecha, ni siquiera forzando el histórico completo.
+FECHA_MINIMA_ABSOLUTA = '2024-01-01'
+
+# Si se activa (desde el botón "Run workflow" en GitHub, marcando la casilla),
+# ignora todo lo guardado y vuelve a pedir TODO desde FECHA_MINIMA_ABSOLUTA —
+# para un respaldo histórico puntual. El resto de las corridas (automáticas
+# o manuales sin marcar la casilla) siguen siendo incrementales como siempre.
+FORZAR_HISTORICO_COMPLETO = os.environ.get('FORZAR_HISTORICO_COMPLETO', 'false').lower() == 'true'
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -52,12 +58,18 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def obtener_ultima_fecha_guardada():
     """Punto de partida de la búsqueda: normalmente es la fecha de emisión
     más reciente que ya tengamos guardada (para no revisar de nuevo todo el
-    histórico cada vez). Pero si hay facturas guardadas con el proveedor
-    vacío (por ejemplo, porque un cambio de código como este arregló cómo
-    se lee ese campo, pero las filas viejas quedaron con el dato en blanco),
-    la fecha de inicio retrocede hasta cubrir la más antigua de esas — así
-    se auto-corrigen solas en la próxima corrida, sin intervención manual.
-    Si la tabla está vacía (primera corrida), parte desde FECHA_MINIMA_ABSOLUTA."""
+    histórico cada vez — cada corrida solo trae lo nuevo desde la última
+    vez). Pero si hay facturas guardadas con algún dato importante vacío
+    (por ejemplo el proveedor, si un cambio de código arregló cómo se lee
+    pero las filas viejas quedaron con el dato en blanco), la fecha de
+    inicio retrocede hasta cubrir la más antigua de esas — así se
+    auto-corrigen solas en la próxima corrida, sin intervención manual.
+    Si la tabla está vacía, o si se pidió expresamente el histórico
+    completo, parte desde FECHA_MINIMA_ABSOLUTA."""
+    if FORZAR_HISTORICO_COMPLETO:
+        print("  ⚙ Se pidió el histórico completo — se ignora lo ya guardado y se busca desde el inicio.")
+        return FECHA_MINIMA_ABSOLUTA
+
     res = supabase.table('facturas_por_pagar').select('fecha_emision') \
         .order('fecha_emision', desc=True).limit(1).execute()
     ultima = res.data[0]['fecha_emision'] if res.data and res.data[0].get('fecha_emision') else None
