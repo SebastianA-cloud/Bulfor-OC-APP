@@ -176,17 +176,22 @@ def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
     return docs
 
 
-def recuperar_xml_documento(folio):
+def recuperar_xml_documento(folio, rut_proveedor):
     """Trae el XML COMPLETO de una factura recibida puntual (con sus
     productos) — mismo caso de uso 'Recuperar XML' que usa
-    sincronizar_documentos_gdexpress.py para las facturas emitidas, pero
-    apuntado a GRUPO=R."""
+    sincronizar_documentos_gdexpress.py para las facturas emitidas.
+
+    OJO: el parámetro "Rut" de esta API siempre significa 'RUT de quien
+    EMITIÓ el documento' — pase lo que pase con "Group". Para facturas
+    recibidas, quien emite es el PROVEEDOR (distinto en cada factura), no
+    Bulfor — por eso este parámetro cambia según la factura, y no es un
+    valor fijo como en el script de facturas emitidas."""
     url = f"http://{DTEBOX_IP}/api/Core.svc/core/RecoverXML_V2"
     headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     body = {
         "Environment": AMBIENTE,
         "Group": GRUPO,
-        "Rut": RUT_RECEPTOR,
+        "Rut": rut_proveedor,
         "DocType": "33",
         "Folio": str(folio),
         "IsForDistribution": "true",
@@ -250,7 +255,7 @@ def sincronizar_detalle_pendiente(limite=150):
     trae y los guarda — igual que su contraparte para facturas emitidas.
     Limitado por corrida para que no se demore demasiado."""
     print(f"\n{'='*50}\nTrayendo el detalle (productos) de cada factura — hasta {limite} por corrida\n{'='*50}")
-    res = supabase.table('facturas_por_pagar').select('id,factura') \
+    res = supabase.table('facturas_por_pagar').select('id,factura,rut_proveedor') \
         .eq('detalle_sincronizado', False).order('fecha_emision', desc=True, nullsfirst=True).limit(limite).execute()
     pendientes = res.data or []
     print(f"{len(pendientes)} facturas sin detalle todavía")
@@ -258,7 +263,7 @@ def sincronizar_detalle_pendiente(limite=150):
     ok, ok_sin_items, fallidos = 0, 0, 0
     for f in pendientes:
         try:
-            xml_bytes = recuperar_xml_documento(f['factura'])
+            xml_bytes = recuperar_xml_documento(f['factura'], f['rut_proveedor'])
         except Exception as e:
             print(f"  ✗ Factura {f['factura']}: no se pudo traer el XML — {e}")
             fallidos += 1
