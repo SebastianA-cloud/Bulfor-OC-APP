@@ -6,10 +6,16 @@ EMITE a los hospitales (GRUPO=E, filtrando por RUTEmisor), trae lo que los
 PROVEEDORES le emiten A Bulfor (GRUPO=R, filtrando por RUTRecep) — o sea,
 las cuentas por pagar.
 
+Además de las facturas (TipoDTE 33), también trae las Notas de Crédito que
+los proveedores le envían a Bulfor (TipoDTE 61) — son las que anulan una
+factura. Sin esto, una factura anulada por NC se seguía viendo como
+"pendiente" para siempre, porque el campo "Anulado" del documento no
+siempre se actualiza solo del lado de GDExpress.
+
 Rango de fechas: igual que actualizar_oc_final.py — busca en Supabase cuál
 es la fecha de emisión más reciente ya guardada y sigue desde ahí (así cada
 corrida es rápida). La PRIMERA vez que corre (tabla vacía) no encuentra
-nada guardado, así que parte desde el 01-01-2026.
+nada guardado, así que parte desde el 01-01-2024.
 
 Guarda/actualiza en facturas_por_pagar:
   - Si la factura NO existía (por rut_proveedor + factura), la crea.
@@ -19,6 +25,10 @@ Guarda/actualiza en facturas_por_pagar:
     la persona que va marcando qué se pagó, desde la app.
   - Si la factura no trae fecha de vencimiento (DueDate), se usa la misma
     fecha de emisión (vence "al día"), tal como se pidió.
+
+Guarda las Notas de Crédito recibidas en notas_credito_recibidas, y cuando
+se identifica a qué factura anulan (leyendo el XML completo), esa factura
+se marca como 'N' (anulada) en facturas_por_pagar automáticamente.
 
 Se corre varias veces al día vía GitHub Actions (workflow_dispatch + cron).
 """
@@ -55,45 +65,39 @@ FORZAR_HISTORICO_COMPLETO = os.environ.get('FORZAR_HISTORICO_COMPLETO', 'false')
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def obtener_ultima_fecha_guardada():
-    """Punto de partida de la búsqueda: normalmente es la fecha de emisión
-    más reciente que ya tengamos guardada (para no revisar de nuevo todo el
-    histórico cada vez — cada corrida solo trae lo nuevo desde la última
-    vez). Pero si hay facturas guardadas con algún dato importante vacío
-    (por ejemplo el proveedor, si un cambio de código arregló cómo se lee
-    pero las filas viejas quedaron con el dato en blanco), la fecha de
-    inicio retrocede hasta cubrir la más antigua de esas — así se
-    auto-corrigen solas en la próxima corrida, sin intervención manual.
-    Si la tabla está vacía, o si se pidió expresamente el histórico
-    completo, parte desde FECHA_MINIMA_ABSOLUTA."""
+def obtener_ultima_fecha_guardada(tabla):
+    """Punto de partida de la búsqueda para una tabla dada: normalmente es
+    la fecha de emisión más reciente que ya tengamos guardada ahí (para no
+    revisar de nuevo todo el histórico cada vez). Si hay filas guardadas con
+    el proveedor vacío, la fecha de inicio retrocede hasta cubrir la más
+    antigua de esas, para que se auto-corrijan solas. Si la tabla está
+    vacía, o si se pidió expresamente el histórico completo, parte desde
+    FECHA_MINIMA_ABSOLUTA."""
     if FORZAR_HISTORICO_COMPLETO:
-        print("  ⚙ Se pidió el histórico completo — se ignora lo ya guardado y se busca desde el inicio.")
         return FECHA_MINIMA_ABSOLUTA
 
-    res = supabase.table('facturas_por_pagar').select('fecha_emision') \
+    res = supabase.table(tabla).select('fecha_emision') \
         .order('fecha_emision', desc=True).limit(1).execute()
     ultima = res.data[0]['fecha_emision'] if res.data and res.data[0].get('fecha_emision') else None
     if not ultima:
         return FECHA_MINIMA_ABSOLUTA
 
-    res_incompletas = supabase.table('facturas_por_pagar').select('fecha_emision') \
+    res_incompletas = supabase.table(tabla).select('fecha_emision') \
         .is_('proveedor', 'null').order('fecha_emision').limit(1).execute()
     if res_incompletas.data and res_incompletas.data[0].get('fecha_emision'):
         mas_antigua_incompleta = res_incompletas.data[0]['fecha_emision']
-        print(f"  ⚠ Hay facturas sin proveedor desde el {mas_antigua_incompleta} — se revisan de nuevo.")
+        print(f"  ⚠ Hay filas en {tabla} sin proveedor desde el {mas_antigua_incompleta} — se revisan de nuevo.")
         ultima = min(ultima, mas_antigua_incompleta)
 
     return max(ultima, FECHA_MINIMA_ABSOLUTA)
 
 
-FECHA_MINIMA = obtener_ultima_fecha_guardada()
-FECHA_MAXIMA = datetime.now().strftime('%Y-%m-%d')
-
-CONSULTA = f'(RUTRecep:{RUT_RECEPTOR} AND TipoDTE:33 AND FchEmis:[{FECHA_MINIMA} TO {FECHA_MAXIMA}])'
+def construir_consulta(tipo_dte, fecha_minima, fecha_maxima):
+    return f'(RUTRecep:{RUT_RECEPTOR} AND TipoDTE:{tipo_dte} AND FchEmis:[{fecha_minima} TO {fecha_maxima}])'
 
 
-def gdexpress_get(pagina, max_reintentos=6):
-    query_b64 = base64.b64encode(CONSULTA.encode('utf-8')).decode('ascii')
+def gdexpress_get(pagina, consulta, max_reintentos=6):
+    query_b64 = base64.b64encode(consulta.encode('utf-8')).decode('ascii')
     url = f"http://{DTEBOX_IP}/api/Core.svc/core/PaginatedSearch/{AMBIENTE}/{GRUPO}/{query_b64}/{pagina}/{TAMANO_PAGINA}"
     headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     espera = 5
@@ -262,6 +266,28 @@ def items_desde_xml_completo(xml_texto_saneado):
     return items
 
 
+def nc_factura_ref_desde_xml_completo(xml_texto_saneado):
+    """Para una Nota de Crédito, qué factura anula: el bloque <Referencia>
+    del documento, con TpoDocRef=33 (código SII de Factura Electrónica)."""
+    try:
+        root = ET.fromstring(xml_texto_saneado)
+    except ET.ParseError:
+        return None
+    for el in root.iter():
+        if el.tag.split('}')[-1].lower() == 'referencia':
+            tpo_doc_ref = None
+            folio_ref = None
+            for hijo in el.iter():
+                tag = hijo.tag.split('}')[-1].lower()
+                if tag == 'tpodocref':
+                    tpo_doc_ref = (hijo.text or '').strip()
+                elif tag == 'folioref':
+                    folio_ref = (hijo.text or '').strip()
+            if tpo_doc_ref == '33' and folio_ref:
+                return folio_ref[:100]
+    return None
+
+
 def sincronizar_detalle_pendiente(limite=150):
     """Para las facturas que todavía no tienen sus productos guardados, los
     trae y los guarda — igual que su contraparte para facturas emitidas.
@@ -306,20 +332,17 @@ def sincronizar_detalle_pendiente(limite=150):
     print(f"✔ Detalle traído: {ok} facturas guardadas ({ok - ok_sin_items} con productos, {ok_sin_items} solo marcadas). Fallidos de verdad: {fallidos}.")
 
 
-def main():
-    print(f"Sincronizando facturas RECIBIDAS de proveedores — Ambiente: {AMBIENTE}")
-    print(f"Desde: {FECHA_MINIMA}  Hasta: {FECHA_MAXIMA}")
-    print(f"Consulta: {CONSULTA}\n")
+def sincronizar_facturas(fecha_minima, fecha_maxima):
+    """Trae las facturas (TipoDTE 33) que los proveedores le emiten a Bulfor."""
+    print(f"\n{'='*50}\nFacturas recibidas (TipoDTE 33)\n{'='*50}")
+    consulta = construir_consulta('33', fecha_minima, fecha_maxima)
+    print(f"Desde: {fecha_minima}  Hasta: {fecha_maxima}\nConsulta: {consulta}\n")
 
-    pagina = 1
-    total_procesadas = 0
-    total_paginas = None
-    paginas_con_error = []
-
+    pagina, total_procesadas, total_paginas, paginas_con_error = 1, 0, None, []
     while True:
         print(f"Página {pagina}" + (f"/{total_paginas}" if total_paginas else "") + "...")
         try:
-            data = gdexpress_get(pagina)
+            data = gdexpress_get(pagina, consulta)
         except Exception as e:
             print(f"  ✗ No se pudo traer la página {pagina} después de varios intentos: {e}")
             paginas_con_error.append(pagina)
@@ -342,8 +365,7 @@ def main():
         docs = documentos_desde_xml(xml_bytes, imprimir_diagnostico=(pagina == 1))
         print(f"  {len(docs)} facturas en esta página")
 
-        filas = [d for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
-
+        filas = [d for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
         if filas:
             supabase.table('facturas_por_pagar').upsert(filas, on_conflict='rut_proveedor,factura').execute()
             total_procesadas += len(filas)
@@ -358,7 +380,121 @@ def main():
         print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
         print("  Corre el script de nuevo para completarlas (no duplica nada, solo rellena lo que falte).")
 
+
+def sincronizar_notas_credito_recibidas(fecha_minima, fecha_maxima):
+    """Trae las Notas de Crédito (TipoDTE 61) que los proveedores le envían
+    a Bulfor — son las que anulan una factura. Sin esto, una factura
+    anulada por NC se seguía viendo como pendiente para siempre."""
+    print(f"\n{'='*50}\nNotas de Crédito recibidas (TipoDTE 61)\n{'='*50}")
+    consulta = construir_consulta('61', fecha_minima, fecha_maxima)
+    print(f"Desde: {fecha_minima}  Hasta: {fecha_maxima}\nConsulta: {consulta}\n")
+
+    pagina, total_procesadas, total_paginas, paginas_con_error = 1, 0, None, []
+    while True:
+        print(f"Página {pagina}" + (f"/{total_paginas}" if total_paginas else "") + "...")
+        try:
+            data = gdexpress_get(pagina, consulta)
+        except Exception as e:
+            print(f"  ✗ No se pudo traer la página {pagina} después de varios intentos: {e}")
+            paginas_con_error.append(pagina)
+            if total_paginas is None or pagina >= total_paginas:
+                break
+            pagina += 1
+            time.sleep(2)
+            continue
+
+        total_documentos = int(data.get('TotalDocuments', 0))
+        if total_paginas is None:
+            total_paginas = max(1, -(-total_documentos // TAMANO_PAGINA))
+            print(f"  Total de documentos en el rango: {total_documentos} ({total_paginas} página(s))")
+
+        if not data.get('Data'):
+            print("  Sin datos en esta página.")
+            break
+
+        xml_bytes = base64.b64decode(data['Data'])
+        docs = documentos_desde_xml(xml_bytes)
+        print(f"  {len(docs)} notas de crédito en esta página")
+
+        filas = [{
+            'folio': d['factura'], 'rut_proveedor': d['rut_proveedor'], 'proveedor': d['proveedor'],
+            'fecha_emision': d['fecha_emision'], 'monto': d['monto'], 'monto_total': d['monto_total'],
+        } for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
+        if filas:
+            supabase.table('notas_credito_recibidas').upsert(filas, on_conflict='rut_proveedor,folio').execute()
+            total_procesadas += len(filas)
+
+        if pagina >= total_paginas:
+            break
+        pagina += 1
+        time.sleep(2)
+
+    print(f"\n✔ Listo: {total_procesadas} notas de crédito recibidas sincronizadas.")
+    if paginas_con_error:
+        print(f"⚠ {len(paginas_con_error)} página(s) fallaron incluso con reintentos: {paginas_con_error}")
+
+
+def sincronizar_detalle_nc_pendiente(limite=150):
+    """Para las NC que todavía no sabemos a qué factura anulan, trae su XML
+    completo y lo averigua — y de paso marca esa factura como anulada."""
+    print(f"\n{'='*50}\nAveriguando a qué factura anula cada Nota de Crédito — hasta {limite} por corrida\n{'='*50}")
+    res = supabase.table('notas_credito_recibidas').select('id,folio,rut_proveedor') \
+        .eq('detalle_sincronizado', False).order('fecha_emision', desc=True, nullsfirst=True).limit(limite).execute()
+    pendientes = res.data or []
+    print(f"{len(pendientes)} notas de crédito sin revisar todavía")
+
+    ok, anuladas, fallidos = 0, 0, 0
+    for nc in pendientes:
+        try:
+            xml_bytes = recuperar_xml_documento(nc['folio'], nc['rut_proveedor'])
+        except Exception as e:
+            print(f"  ✗ NC {nc['folio']}: no se pudo traer el XML — {e}")
+            fallidos += 1
+            time.sleep(1)
+            continue
+
+        xml_texto = xml_bytes.decode('iso-8859-1', errors='replace')
+        xml_saneado = sanitizar_xml(xml_texto)
+
+        factura_ref = None
+        try:
+            factura_ref = nc_factura_ref_desde_xml_completo(xml_saneado)
+        except Exception as e:
+            print(f"  ⚠ NC {nc['folio']}: XML no se pudo interpretar ({e}).")
+
+        try:
+            supabase.table('notas_credito_recibidas').update({
+                'detalle_sincronizado': True,
+                'factura_ref': factura_ref,
+            }).eq('id', nc['id']).execute()
+
+            if factura_ref:
+                res_upd = supabase.table('facturas_por_pagar') \
+                    .update({'estado_aceptacion': 'N'}) \
+                    .eq('rut_proveedor', nc['rut_proveedor']).eq('factura', factura_ref).execute()
+                if res_upd.data:
+                    anuladas += 1
+                    print(f"  ✔ NC {nc['folio']} anula la factura {factura_ref} — marcada como anulada.")
+            ok += 1
+        except Exception as e:
+            print(f"  ✗ NC {nc['folio']}: no se pudo guardar en Supabase — {e}")
+            fallidos += 1
+        time.sleep(1)
+
+    print(f"✔ Revisadas: {ok} notas de crédito ({anuladas} facturas marcadas como anuladas). Fallidos de verdad: {fallidos}.")
+
+
+def main():
+    fecha_min_facturas = obtener_ultima_fecha_guardada('facturas_por_pagar')
+    fecha_min_nc = obtener_ultima_fecha_guardada('notas_credito_recibidas')
+    fecha_maxima = datetime.now().strftime('%Y-%m-%d')
+    if FORZAR_HISTORICO_COMPLETO:
+        print("⚙ Se pidió el histórico completo — se ignora lo ya guardado y se busca desde el inicio.\n")
+
+    sincronizar_facturas(fecha_min_facturas, fecha_maxima)
+    sincronizar_notas_credito_recibidas(fecha_min_nc, fecha_maxima)
     sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
+    sincronizar_detalle_nc_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
 
 
 if __name__ == '__main__':
