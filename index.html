@@ -445,7 +445,7 @@
     </div>
     <div class="stats" id="oc-stats">
       <div class="stat"><div class="stat-label">Total OC</div><div class="stat-val" id="s-oc">—</div></div>
-      <div class="stat"><div class="stat-label">Monto neto total</div><div class="stat-val" id="s-monto">—</div></div>
+      <div class="stat"><div class="stat-label">Monto total (con IVA)</div><div class="stat-val" id="s-monto">—</div></div>
       <div class="stat"><div class="stat-label">Hospitales</div><div class="stat-val" id="s-hosp">—</div></div>
       <div class="stat"><div class="stat-label">Última OC</div><div class="stat-val" id="s-fecha" style="font-size:15px">—</div></div>
     </div>
@@ -2348,7 +2348,7 @@ function calcularHospitalesDesdeOC() {
     }
     const g = grupos[nombre];
     g.numerooc += 1;
-    g.totalcomprado += (r.totalneto || 0);
+    g.totalcomprado += (r.totaloc || 0);
     if (fecha && (!g.primeracompra || fecha < g.primeracompra)) g.primeracompra = fecha;
     if (fecha && (!g.ultimacompra || fecha > g.ultimacompra)) g.ultimacompra = fecha;
   });
@@ -2761,7 +2761,7 @@ function abrirFacturaDesdeFedex(numero) {
         <button onclick="document.getElementById('factura-quickview-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="detail-field"><label>Monto</label><span>${clp(f.monto)}</span></div>
+        <div class="detail-field"><label>Monto</label><span>${clp(montoConIVAPago(f))}</span></div>
         <div class="detail-field"><label>Estado</label><span>${f.estado_aceptacion==='N'?'Anulada/Rechazada':f.estado_aceptacion==='A'?'Aceptada':'—'}</span></div>
         <div class="detail-field"><label>Fecha emisión</label><span>${f.fecha_emision?fDate(f.fecha_emision):'—'}</span></div>
         <div class="detail-field"><label>Fecha de pago</label><span>${f.fecha_pago?fDate(f.fecha_pago):'Pendiente'}</span></div>
@@ -3111,6 +3111,17 @@ function esPendienteReal(f) {
   return !f.fecha_pago && f.estado_aceptacion !== 'N';
 }
 
+// facturas_pago solo guarda el monto NETO (viene del listado de pagos que
+// se sube en Excel) — para mostrar el monto CON IVA (lo que de verdad
+// importa como "el total"), lo cruzamos con el documento ya sincronizado
+// de GDExpress por N° de factura, que sí trae monto_total. Si todavía no
+// hay ese documento sincronizado, se cae de vuelta al neto como único dato
+// disponible en ese momento.
+function montoConIVAPago(f) {
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  return doc ? montoTotalDoc(doc) : Number(f.monto || 0);
+}
+
 // Estado de navegación de la página: en qué año/mes estamos parados, si
 // estamos viendo "pendientes" (toggle) y el texto de búsqueda actual.
 let pagosContexto = { anio: null, mes: null, viendoPendientes: false };
@@ -3191,9 +3202,9 @@ function aplicarFiltroPagos(lista) {
 // — nunca se van a pagar, así que no deben inflar ni el total ni el % pendiente.
 function calcularResumenPagos(lista) {
   const validas = lista.filter(f => f.estado_aceptacion !== 'N');
-  const totalFacturado = validas.reduce((s,f) => s + (f.monto||0), 0);
+  const totalFacturado = validas.reduce((s,f) => s + montoConIVAPago(f), 0);
   const pagadas = validas.filter(f => f.fecha_pago);
-  const totalPagado = pagadas.reduce((s,f) => s + (f.monto||0), 0);
+  const totalPagado = pagadas.reduce((s,f) => s + montoConIVAPago(f), 0);
   const pendientesCount = validas.filter(esPendienteReal).length;
   const pct = totalFacturado ? (totalPagado / totalFacturado * 100) : 0;
   return { totalFacturado, totalPagado, pct, pendientesCount };
@@ -3347,7 +3358,7 @@ function filaFacturaHtml(f, opts) {
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
       <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
-      <td style="white-space:nowrap">${clp(f.monto)}</td>
+      <td style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
       <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : f.estado_aceptacion === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
       <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
@@ -3418,7 +3429,7 @@ function descargarExcelFacturasPago() {
       'RUT Hospital': f.rut_hospital || '',
       'Fecha Emisión': f.fecha_emision ? fDate(f.fecha_emision) : '',
       'Vencimiento': vencDate ? (vencReal ? fDate(vencDate) : `~${fDate(vencDate)} (estimado)`) : '',
-      'Monto': f.monto || 0,
+      'Monto': montoConIVAPago(f),
       'Estado': f.estado_aceptacion === 'N' ? 'Anulada/Rechazada' : f.estado_aceptacion === 'A' ? 'Aceptada' : '',
       'Fecha de Pago': f.fecha_pago ? fDate(f.fecha_pago) : '',
       'Estado de Pago': f.fecha_pago ? (f.estado_pago || 'Pagado') : 'Sin pagar',
@@ -3685,10 +3696,10 @@ function statsPagosPorHospital() {
     const nombre = nombreHosp(f.hospital) || f.hospital || 'Sin hospital';
     if (!grupos[nombre]) grupos[nombre] = { hospital: nombre, totalFacturado: 0, totalPagado: 0, nFacturas: 0, nPagadas: 0, sumaAtraso: 0, nAtrasoValidos: 0 };
     const g = grupos[nombre];
-    g.totalFacturado += (f.monto || 0);
+    g.totalFacturado += montoConIVAPago(f);
     g.nFacturas += 1;
     if (f.fecha_pago) {
-      g.totalPagado += (f.monto || 0);
+      g.totalPagado += montoConIVAPago(f);
       g.nPagadas += 1;
       if (f.fecha_emision || f.fecha_vencimiento) {
         const vencimiento = calcularVencimientoFactura(f, nombre);
@@ -3748,7 +3759,7 @@ function abrirGraficoPago(id) {
     facturasPago.forEach(f => {
       if (!f.fecha_pago || f.estado_aceptacion === 'N') return;
       const key = f.fecha_pago.slice(0,7);
-      porMes[key] = (porMes[key] || 0) + (f.monto || 0);
+      porMes[key] = (porMes[key] || 0) + montoConIVAPago(f);
     });
     const meses = Object.keys(porMes).sort();
     const max = Math.max(...meses.map(m => porMes[m]), 1);
@@ -4728,7 +4739,7 @@ function renderRechazadas(soloTabla) {
               <td class="mono">${f.factura}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠ sin registro de pago</span>' : ''}</td>
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-              <td style="white-space:nowrap">${clp(f.monto)}</td>
+              <td style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
               <td>${f.id != null ? `<input type="text" value="${(f.factura_reemplazo||'').replace(/"/g,'&quot;')}" id="rz-reemplazo-${rowKey}" placeholder="N° factura" style="font-size:12px;padding:5px 8px;max-width:130px">` : '<span style="color:var(--text-3);font-size:12px">—</span>'}</td>
               <td>${ncCelda}</td>
               <td>${f.id != null ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="guardarRechazada(${f.id}, this)">Guardar</button>` : ''}</td>
@@ -6046,7 +6057,7 @@ function renderHospitalOCsTable(lista) {
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
-            <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total neto</th>
+            <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total (con IVA)</th>
           </tr></thead>
           <tbody>
             ${lista.map(r => {
@@ -6055,7 +6066,7 @@ function renderHospitalOCsTable(lista) {
                 <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
                 <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
                 <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalneto)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -6080,7 +6091,7 @@ function closeHospitalOCs() {
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
 function updateStats() {
-  const total = oc.reduce((s,r)=>s+(r.totalneto||0),0);
+  const total = oc.reduce((s,r)=>s+(r.totaloc||0),0);
   const hosps = new Set(oc.map(r=>nombreHosp(r.hospital))).size;
   const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc;
   document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
@@ -6202,7 +6213,7 @@ function abrirEvolucionMensual() {
     if (!fecha) return;
     const d = new Date(fecha);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    porMes[key] = (porMes[key] || 0) + (r.totalneto || 0);
+    porMes[key] = (porMes[key] || 0) + (r.totaloc || 0);
   });
   const meses = Object.keys(porMes).sort();
   const max = Math.max(...Object.values(porMes), 1);
@@ -6270,7 +6281,7 @@ function abrirComparadorPrecios() {
 
 function abrirVentasPorRegion() {
   const byRegion = {};
-  oc.forEach(r => { if(r.region) byRegion[r.region] = (byRegion[r.region]||0) + (r.totalneto||0); });
+  oc.forEach(r => { if(r.region) byRegion[r.region] = (byRegion[r.region]||0) + (r.totaloc||0); });
   const lista = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]);
   const max = lista[0]?.[1] || 1;
   const html = lista.map(([reg, v]) => barraHtml(reg.replace('Región ',''), v, max, clp(v), 'var(--amber)')).join('');
@@ -6279,7 +6290,7 @@ function abrirVentasPorRegion() {
 
 function abrirVentasPorAnio() {
   const byYear = {};
-  oc.forEach(r => { const fecha = r.fechaenvio || r.fechaoc; if(fecha) { const y=new Date(fecha).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totalneto||0); }});
+  oc.forEach(r => { const fecha = r.fechaenvio || r.fechaoc; if(fecha) { const y=new Date(fecha).getFullYear(); byYear[y]=(byYear[y]||0)+(r.totaloc||0); }});
   const lista = Object.entries(byYear).sort((a,b)=>a[0]-b[0]);
   const max = Math.max(...lista.map(l=>l[1]), 1);
   const html = lista.map(([y, v]) => barraHtml(y, v, max, clp(v), 'var(--green)')).join('');
