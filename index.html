@@ -4311,8 +4311,10 @@ function filaFPPHtml(f) {
   const hoy = new Date().toISOString().slice(0, 10);
   const pagado = f.estado_pago === 'Pagado';
   const vencida = !pagado && f.fecha_vencimiento && f.fecha_vencimiento < hoy;
+  const marcada = fppSeleccionadas.has(f.id);
   return `
-    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+    <tr style="cursor:pointer${marcada ? ';background:var(--accent-light)' : ''}" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+      <td style="width:32px" onclick="event.stopPropagation()"><input type="checkbox" class="fpp-check" data-id="${f.id}" ${marcada?'checked':''} onchange="toggleFPPSeleccion(${f.id}, this.checked)"></td>
       <td class="mono" style="color:var(--accent)">${f.factura}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
       <td class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
@@ -4323,28 +4325,101 @@ function filaFPPHtml(f) {
     </tr>`;
 }
 
+// ─── Selección múltiple para marcar como pagadas de forma masiva ──────────
+let fppSeleccionadas = new Set();
+
+function toggleFPPSeleccion(id, marcada) {
+  if (marcada) fppSeleccionadas.add(id); else fppSeleccionadas.delete(id);
+  const fila = document.querySelector(`.fpp-check[data-id="${id}"]`)?.closest('tr');
+  if (fila) fila.style.background = marcada ? 'var(--accent-light)' : '';
+  actualizarSelectTodoFPP();
+  actualizarBarraSeleccionFPP();
+}
+
+function toggleFPPSeleccionarTodo(marcarTodo) {
+  document.querySelectorAll('.fpp-check').forEach(chk => {
+    const id = Number(chk.dataset.id);
+    chk.checked = marcarTodo;
+    if (marcarTodo) fppSeleccionadas.add(id); else fppSeleccionadas.delete(id);
+    const fila = chk.closest('tr');
+    if (fila) fila.style.background = marcarTodo ? 'var(--accent-light)' : '';
+  });
+  actualizarBarraSeleccionFPP();
+}
+
+function actualizarSelectTodoFPP() {
+  const master = document.getElementById('fpp-check-todo');
+  if (!master) return;
+  const casillas = Array.from(document.querySelectorAll('.fpp-check'));
+  const marcadas = casillas.filter(c => c.checked).length;
+  master.checked = casillas.length > 0 && marcadas === casillas.length;
+  master.indeterminate = marcadas > 0 && marcadas < casillas.length;
+}
+
+function actualizarBarraSeleccionFPP() {
+  const barra = document.getElementById('fpp-bulk-bar');
+  if (!barra) return;
+  if (fppSeleccionadas.size === 0) { barra.style.display = 'none'; return; }
+  barra.style.display = 'flex';
+  document.getElementById('fpp-bulk-count').textContent = `${fppSeleccionadas.size} factura${fppSeleccionadas.size===1?'':'s'} seleccionada${fppSeleccionadas.size===1?'':'s'}`;
+}
+
+async function marcarSeleccionadasComoPagadas() {
+  const fecha = document.getElementById('fpp-bulk-fecha').value || new Date().toISOString().slice(0,10);
+  const ids = Array.from(fppSeleccionadas);
+  if (!ids.length) return;
+  const btn = document.getElementById('fpp-bulk-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await sb(`facturas_por_pagar?id=in.(${ids.join(',')})`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado_pago: 'Pagado', fecha_pago: fecha }),
+    });
+    ids.forEach(id => {
+      const f = facturasPorPagar.find(x => x.id === id);
+      if (f) { f.estado_pago = 'Pagado'; f.fecha_pago = fecha; }
+    });
+    fppSeleccionadas.clear();
+    toast(`${ids.length} factura${ids.length===1?'':'s'} marcada${ids.length===1?'':'s'} como pagada${ids.length===1?'':'s'}`);
+    renderFPPVista();
+  } catch (e) {
+    toast('No se pudo guardar: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Marcar como pagadas';
+  }
+}
+
 function construirTablaFPPHtml(lista, mensajeVacio) {
   window.__ultimaListaFPP = lista;
+  fppSeleccionadas.clear(); // la tabla se acaba de reconstruir, no queremos casillas "fantasma" de la vista anterior
   if (!lista.length) {
     return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
   }
   const normales = lista.filter(f => f.estado_aceptacion !== 'N');
   const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
 
-  let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-    <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFPP()">⬇️ Descargar Excel (${lista.length})</button>
-  </div>`;
+  let html = `
+    <div id="fpp-bulk-bar" style="display:none;align-items:center;gap:12px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius);padding:10px 16px;margin-bottom:10px">
+      <span id="fpp-bulk-count" style="font-size:13px;font-weight:500;color:var(--accent)"></span>
+      <span style="font-size:12px;color:var(--text-2)">Fecha de pago:</span>
+      <input type="date" id="fpp-bulk-fecha" value="${new Date().toISOString().slice(0,10)}" style="width:auto">
+      <button id="fpp-bulk-btn" class="import-btn" style="margin-top:0;padding:7px 16px" onclick="marcarSeleccionadasComoPagadas()">Marcar como pagadas</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFPP()">⬇️ Descargar Excel (${lista.length})</button>
+    </div>`;
 
-  const tabla = arr => `<div class="table-card"><table><thead><tr>
+  const tabla = (arr, conCheckbox) => `<div class="table-card"><table><thead><tr>
+    ${conCheckbox ? `<th style="width:32px"><input type="checkbox" id="${arr===normales?'fpp-check-todo':''}" onchange="toggleFPPSeleccionarTodo(this.checked)"></th>` : ''}
     <th>N° Factura</th><th>Proveedor</th><th>RUT</th><th>Emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th>
   </tr></thead><tbody>${arr.map(filaFPPHtml).join('')}</tbody></table></div>`;
 
-  html += normales.length ? tabla(normales) : `<div class="table-card"><div class="empty"><p>Sin facturas normales — solo hay anuladas abajo.</p></div></div>`;
+  html += normales.length ? tabla(normales, true) : `<div class="table-card"><div class="empty"><p>Sin facturas normales — solo hay anuladas abajo.</p></div></div>`;
 
   if (anuladas.length) {
     html += `<div style="margin-top:24px;border:1px solid var(--red);border-radius:var(--radius-lg);overflow:hidden">
       <div style="background:var(--red-light);padding:12px 20px;font-size:13px;font-weight:600;color:var(--red)">🚫 Anuladas (${anuladas.length})</div>
-      <div style="padding:14px">${tabla(anuladas)}</div>
+      <div style="padding:14px">${tabla(anuladas, false)}</div>
     </div>`;
   }
   return html;
