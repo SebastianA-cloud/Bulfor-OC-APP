@@ -49,22 +49,34 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def obtener_ultima_fecha_guardada():
-    """Busca la fecha de emisión más reciente que ya tengamos guardada, para
-    seguir desde ahí. Si la tabla está vacía (primera corrida), parte desde
-    FECHA_MINIMA_ABSOLUTA."""
+    """Punto de partida de la búsqueda: normalmente es la fecha de emisión
+    más reciente que ya tengamos guardada (para no revisar de nuevo todo el
+    histórico cada vez). Pero si hay facturas guardadas con el proveedor
+    vacío (por ejemplo, porque un cambio de código como este arregló cómo
+    se lee ese campo, pero las filas viejas quedaron con el dato en blanco),
+    la fecha de inicio retrocede hasta cubrir la más antigua de esas — así
+    se auto-corrigen solas en la próxima corrida, sin intervención manual.
+    Si la tabla está vacía (primera corrida), parte desde FECHA_MINIMA_ABSOLUTA."""
     res = supabase.table('facturas_por_pagar').select('fecha_emision') \
         .order('fecha_emision', desc=True).limit(1).execute()
-    if res.data and res.data[0].get('fecha_emision'):
-        return max(res.data[0]['fecha_emision'], FECHA_MINIMA_ABSOLUTA)
-    return FECHA_MINIMA_ABSOLUTA
+    ultima = res.data[0]['fecha_emision'] if res.data and res.data[0].get('fecha_emision') else None
+    if not ultima:
+        return FECHA_MINIMA_ABSOLUTA
+
+    res_incompletas = supabase.table('facturas_por_pagar').select('fecha_emision') \
+        .is_('proveedor', 'null').order('fecha_emision').limit(1).execute()
+    if res_incompletas.data and res_incompletas.data[0].get('fecha_emision'):
+        mas_antigua_incompleta = res_incompletas.data[0]['fecha_emision']
+        print(f"  ⚠ Hay facturas sin proveedor desde el {mas_antigua_incompleta} — se revisan de nuevo.")
+        ultima = min(ultima, mas_antigua_incompleta)
+
+    return max(ultima, FECHA_MINIMA_ABSOLUTA)
 
 
 FECHA_MINIMA = obtener_ultima_fecha_guardada()
 FECHA_MAXIMA = datetime.now().strftime('%Y-%m-%d')
 
 CONSULTA = f'(RUTRecep:{RUT_RECEPTOR} AND TipoDTE:33 AND FchEmis:[{FECHA_MINIMA} TO {FECHA_MAXIMA}])'
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def gdexpress_get(pagina, max_reintentos=6):
@@ -152,7 +164,7 @@ def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
         docs.append({
             'factura': campo('Folio'),
             'rut_proveedor': campo('RUTEmisor'),
-            'proveedor': campo_alt('RznSocEmisor', 'RznSocEmi', 'RazonSocialEmisor', 'NombreEmisor', 'RznSoc'),
+            'proveedor': campo_alt('RznSoc', 'RznSocEmisor', 'IssuerName', 'RznSocEmi', 'RazonSocialEmisor', 'NombreEmisor'),
             'fecha_emision': fecha_emision,
             'fecha_vencimiento': fecha_vencimiento,
             'monto': monto_neto,
