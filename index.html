@@ -542,11 +542,13 @@
     </div>
     <div id="fpp-contexto-grande"></div>
     <div class="toolbar" style="flex-wrap:wrap">
-      <div id="fpp-resumen" style="display:flex;gap:24px;align-items:center"></div>
-      <button class="page-btn" onclick="abrirGestionProveedores()" style="white-space:nowrap"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
-      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="toggleFPPPendientes()">⏳ Pendientes</button>
-      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="mostrarFPPAnios()">📅 Años</button>
+      <button class="page-btn" id="fpp-tab-pendientes" style="padding:8px 16px" onclick="mostrarFPPPorEstado('pendientes')">⏳ Pendientes</button>
+      <button class="page-btn" id="fpp-tab-atrasadas" style="padding:8px 16px" onclick="mostrarFPPPorEstado('atrasadas')">⚠️ Atrasadas</button>
+      <button class="page-btn" id="fpp-tab-pagadas" style="padding:8px 16px" onclick="mostrarFPPPorEstado('pagadas')">✅ Pagadas</button>
+      <button class="page-btn" id="fpp-tab-anios" style="padding:8px 14px;white-space:nowrap" onclick="mostrarFPPAnios()">📅 Años</button>
+      <button class="page-btn" onclick="abrirGestionProveedores()" style="white-space:nowrap;margin-left:auto"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
     </div>
+    <div id="fpp-resumen" style="display:flex;gap:24px;align-items:center;margin-bottom:14px"></div>
     <div id="fpp-contenido"></div>
   </div>
 
@@ -4096,19 +4098,43 @@ function esPendienteRealFPP(f) {
 let fppContexto = { anio: null, mes: null, viendoPendientes: false };
 let fppBusqueda = '';
 let fppBusquedaAnio = '';
+let fppEstadoFiltro = null; // null = drill-down por año/mes normal; 'pendientes'|'atrasadas'|'pagadas' = pestaña plana
 
 function setBreadcrumbFPP(texto) { document.getElementById('fpp-breadcrumb').innerHTML = texto; }
 function migaAniosFPP() { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPAnios()">Todos los años</span>`; }
 function migaAnioFPP(anio) { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPMeses('${anio}')">${anio}</span>`; }
 
+function resaltarTabsFPP(activa) {
+  ['pendientes','atrasadas','pagadas','anios'].forEach(t => {
+    const btn = document.getElementById(`fpp-tab-${t}`);
+    if (!btn) return;
+    if (t === activa) { btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+    else { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+  });
+}
+
+// Clasificación de estado: pagada / atrasada (pendiente y ya venció) /
+// pendiente (todavía dentro de plazo). Las anuladas no cuentan en ninguna.
+function categoriaFPP(f) {
+  if (f.estado_aceptacion === 'N') return null;
+  if (f.estado_pago === 'Pagado') return 'pagadas';
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (f.fecha_vencimiento && f.fecha_vencimiento < hoy) return 'atrasadas';
+  return 'pendientes';
+}
+
 function mostrarFPPAnios() {
   fppContexto = { anio: null, mes: null, viendoPendientes: false };
+  fppEstadoFiltro = null;
   fppBusqueda = ''; fppBusquedaAnio = '';
+  resaltarTabsFPP('anios');
   renderFPPVista();
 }
 function mostrarFPPMeses(anio) {
   fppContexto = { anio, mes: null, viendoPendientes: false };
+  fppEstadoFiltro = null;
   fppBusqueda = ''; fppBusquedaAnio = '';
+  resaltarTabsFPP('anios');
   renderFPPVista();
 }
 function mostrarFPPMes(anio, mesIdx) {
@@ -4116,17 +4142,37 @@ function mostrarFPPMes(anio, mesIdx) {
   if (m < 0) { m = 11; a -= 1; }
   if (m > 11) { m = 0; a += 1; }
   fppContexto = { anio: String(a), mes: m, viendoPendientes: false };
+  fppEstadoFiltro = null;
   fppBusqueda = ''; fppBusquedaAnio = '';
+  resaltarTabsFPP('anios');
   renderFPPVista();
 }
 function cambiarMesFPP(delta) { mostrarFPPMes(fppContexto.anio, fppContexto.mes + delta); }
 function volverAMesesFPPDelAnio() { mostrarFPPMeses(fppContexto.anio); }
-function toggleFPPPendientes() {
-  fppContexto.viendoPendientes = !fppContexto.viendoPendientes;
-  fppBusqueda = ''; fppBusquedaAnio = '';
-  renderFPPVista();
+
+function mostrarFPPPorEstado(estado) {
+  fppEstadoFiltro = estado;
+  fppContexto = { anio: null, mes: null, viendoPendientes: false };
+  fppBusqueda = '';
+  resaltarTabsFPP(estado);
+  renderFPPPorEstado();
 }
-function filtrarFPPBusqueda(valor) { fppBusqueda = valor; renderFPPVista(true); }
+
+function renderFPPPorEstado(soloTabla) {
+  const nombres = { pendientes: 'Pendientes', atrasadas: 'Atrasadas', pagadas: 'Pagadas' };
+  const lista = facturasPorPagar.filter(f => categoriaFPP(f) === fppEstadoFiltro);
+  renderResumenFPP(lista);
+  renderContextoGrandeFPP(null);
+  setBreadcrumbFPP(nombres[fppEstadoFiltro]);
+  const listaFiltrada = aplicarFiltroFPP(lista).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+  renderTablaFPP(listaFiltrada, { esPendientes: fppEstadoFiltro !== 'pagadas', soloTabla });
+}
+
+function filtrarFPPBusqueda(valor) {
+  fppBusqueda = valor;
+  if (fppEstadoFiltro) renderFPPPorEstado(true);
+  else renderFPPVista(true);
+}
 function filtrarFPPEnAnio(valor) { fppBusquedaAnio = valor; renderTarjetasMesesFPP(fppContexto.anio, true); }
 
 function aplicarFiltroFPP(lista) {
