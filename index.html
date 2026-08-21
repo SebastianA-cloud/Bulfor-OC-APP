@@ -341,12 +341,14 @@
       <div style="font-size:13px;color:var(--text-2);margin-top:6px">Bulfor OC — Sistema de gestión farmacéutica</div>
     </div>
     <form id="login-form" onsubmit="return manejarLogin(event)">
-      <div class="login-field">
+      <div class="login-field" style="position:relative">
         <label>Correo</label>
         <div class="login-input-wrap">
           <i class="ti ti-mail" aria-hidden="true"></i>
-          <input type="email" id="login-email" required autocomplete="username" placeholder="tu@farmaciabulfor.cl">
+          <input type="email" id="login-email" required autocomplete="username" placeholder="tu@farmaciabulfor.cl"
+                 onfocus="mostrarListaUsuariosLogin()" oninput="mostrarListaUsuariosLogin()">
         </div>
+        <div id="login-usuarios-lista" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(26,25,23,.12);z-index:20;overflow:hidden"></div>
       </div>
       <div class="login-field">
         <label>Contraseña</label>
@@ -355,6 +357,9 @@
           <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">
         </div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);margin-bottom:16px;cursor:pointer">
+        <input type="checkbox" id="login-recordar" style="width:auto;margin:0"> Recordar mi usuario
+      </label>
       <div id="login-error" style="display:none;background:var(--red-light);color:var(--red);font-size:13px;padding:10px 14px;border-radius:10px;margin-bottom:16px"></div>
       <button type="submit" id="login-btn" class="login-btn">Iniciar sesión</button>
     </form>
@@ -7512,6 +7517,41 @@ actualizarRelojSistema();
 setInterval(actualizarRelojSistema, 30000);
 
 // ─── Arranque de la app: primero hay que estar logueado ────────────────────
+// Lista de correos con cuenta creada — se mantiene a mano (no hay forma de
+// leer la lista real de usuarios desde el navegador, ni la debería haber,
+// por seguridad). Cada vez que se crea una cuenta nueva, se agrega acá
+// también, para que aparezca en el desplegable del login.
+const USUARIOS_CONOCIDOS = [
+  'sebastian.a@farmaciabulfor.cl',
+  'genoveva@farmaciabulfor.cl',
+  'christian@farmaciabulfor.cl',
+];
+
+function mostrarListaUsuariosLogin() {
+  const input = document.getElementById('login-email');
+  const cont = document.getElementById('login-usuarios-lista');
+  const q = input.value.trim().toLowerCase();
+  const opciones = USUARIOS_CONOCIDOS.filter(u => u.toLowerCase().includes(q));
+  if (!opciones.length) { cont.style.display = 'none'; return; }
+  cont.innerHTML = opciones.map(u => `
+    <div onmousedown="event.preventDefault();elegirUsuarioLogin('${u}')"
+         style="padding:10px 14px;font-size:13px;cursor:pointer;color:var(--text)"
+         onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">${u}</div>
+  `).join('');
+  cont.style.display = 'block';
+}
+
+function elegirUsuarioLogin(correo) {
+  document.getElementById('login-email').value = correo;
+  document.getElementById('login-usuarios-lista').style.display = 'none';
+  document.getElementById('login-password').focus();
+}
+
+document.addEventListener('click', (e) => {
+  const cont = document.getElementById('login-usuarios-lista');
+  if (cont && !e.target.closest('.login-field')) cont.style.display = 'none';
+});
+
 async function manejarLogin(event) {
   event.preventDefault();
   const btn = document.getElementById('login-btn');
@@ -7519,8 +7559,14 @@ async function manejarLogin(event) {
   err.style.display = 'none';
   btn.disabled = true;
   btn.textContent = 'Ingresando…';
+  const correo = document.getElementById('login-email').value.trim();
   try {
-    await iniciarSesion(document.getElementById('login-email').value.trim(), document.getElementById('login-password').value);
+    await iniciarSesion(correo, document.getElementById('login-password').value);
+    if (document.getElementById('login-recordar').checked) {
+      localStorage.setItem('bulfor_correo_recordado', correo);
+    } else {
+      localStorage.removeItem('bulfor_correo_recordado');
+    }
     arrancarApp();
   } catch (e) {
     err.textContent = e.message;
@@ -7531,8 +7577,18 @@ async function manejarLogin(event) {
   return false;
 }
 
+function precargarCorreoRecordado() {
+  const correo = localStorage.getItem('bulfor_correo_recordado');
+  if (correo) {
+    document.getElementById('login-email').value = correo;
+    document.getElementById('login-recordar').checked = true;
+    document.getElementById('login-password').focus();
+  }
+}
+
 function mostrarPantallaLogin(mensaje) {
   document.getElementById('login-overlay').style.display = 'flex';
+  precargarCorreoRecordado();
   if (mensaje) {
     const err = document.getElementById('login-error');
     err.textContent = mensaje;
@@ -7567,8 +7623,11 @@ function arrancarApp() {
     // de pedir que inicie sesión de nuevo.
     sesionActual = guardada;
     refrescarSesion().then(ok => ok ? arrancarApp() : mostrarPantallaLogin());
+  } else {
+    // No hay sesión guardada — la pantalla de login ya está visible por
+    // defecto, solo falta precargar el correo si lo dejaron recordado.
+    precargarCorreoRecordado();
   }
-  // Si no hay sesión guardada, la pantalla de login ya está visible por defecto.
 })();
 
 // Registro del service worker — solo habilita el botón "Instalar app" del
