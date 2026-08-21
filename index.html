@@ -1648,17 +1648,19 @@ function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn
   }
 
   const ordenada = [...lista].sort((a,b) => nombreDe(a).localeCompare(nombreDe(b), 'es', {sensitivity:'base'}));
+  window.__alfabeticoOrden = window.__alfabeticoOrden || {};
+  window.__alfabeticoOrden[idContenedor] = ordenada; // para que cada fila pueda referenciar su propio item por índice, sin incrustar texto crudo (con comillas, comas, etc.) dentro del onclick
   const letrasPresentes = new Set();
   let letraActual = null;
   let html = '';
-  ordenada.forEach(item => {
+  ordenada.forEach((item, idx) => {
     const letra = letraDe(nombreDe(item));
     if (letra !== letraActual) {
       letraActual = letra;
       letrasPresentes.add(letra);
       html += `<tr class="letra-header" id="letra-${idContenedor}-${letra}"><td colspan="${colspan}">${letra}</td></tr>`;
     }
-    html += filaHtmlFn(item);
+    html += filaHtmlFn(item, idx);
   });
   contenedor.innerHTML = html;
 
@@ -2116,9 +2118,9 @@ function renderItems() {
   const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
   const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
   renderTablaAlfabetica('items-body', 'items-jump', productosUnicosF, p => p.nombre,
-    p => `<tr onclick="navReset();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
-      <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
-      <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
+    (p, idx) => `<tr onclick="navReset();openProductDetail(window.__alfabeticoOrden['items-body'][${idx}].nombre)" style="cursor:pointer">
+      <td style="font-weight:500;color:var(--accent)">${escapeHtml(p.nombre)} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${escapeHtml(p.familia)}</td>
       <td style="text-align:right">${p.ventas}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
     </tr>`, 4, mensajeVacio);
@@ -2465,9 +2467,9 @@ function renderHosp() {
   const hayFiltro = document.getElementById('hosp-limpiar').style.display !== 'none';
   const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos hospitales con estos filtros.' : 'No encontramos hospitales.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosHosp()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
   renderTablaAlfabetica('hosp-body', 'hosp-jump', hospF, r => nombreHosp(r.hospital) || r.hospital || '',
-    r => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
-      <td style="font-weight:500;max-width:240px;color:var(--accent)">${nombreHosp(r.hospital)||'—'} ↗</td>
-      <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
+    (r, idx) => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs(window.__alfabeticoOrden['hosp-body'][${idx}].hospital)">
+      <td style="font-weight:500;max-width:240px;color:var(--accent)">${escapeHtml(nombreHosp(r.hospital)||'—')} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${escapeHtml((r.region||'').replace('Región ',''))}</td>
       <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
       <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
       <td style="color:var(--text-2);font-size:12px">${fDate(r.ultimacompra)}</td>
