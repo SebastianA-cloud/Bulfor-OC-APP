@@ -485,11 +485,20 @@
       <div class="page-title">Órdenes de compra</div>
       <div class="page-sub" id="oc-subtitle">Cargando datos…</div>
     </div>
-    <div class="stats" id="oc-stats">
-      <div class="stat"><div class="stat-label">Total OC</div><div class="stat-val" id="s-oc">—</div></div>
-      <div class="stat"><div class="stat-label">Monto total (con IVA)</div><div class="stat-val" id="s-monto">—</div></div>
-      <div class="stat"><div class="stat-label">Hospitales</div><div class="stat-val" id="s-hosp">—</div></div>
-      <div class="stat"><div class="stat-label">Última OC</div><div class="stat-val" id="s-fecha" style="font-size:15px">—</div></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="ocCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="oc-select-mes" onchange="ocSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="oc-select-anio" onchange="ocSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="ocCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <button class="page-btn" id="oc-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="ocVerTodasLasFechas()" title="Ver órdenes de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
+    </div>
+    <div class="fpp-resumen" id="oc-stats">
+      <div class="stat destacado"><div class="stat-label">Monto total (con IVA)</div><div class="stat-val" style="font-size:20px" id="s-monto">—</div></div>
+      <div class="stat"><div class="stat-label">Total OC</div><div class="stat-val" style="font-size:16px" id="s-oc">—</div></div>
+      <div class="stat"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px" id="s-hosp">—</div></div>
+      <div class="stat"><div class="stat-label">Última OC</div><div class="stat-val" style="font-size:16px" id="s-fecha">—</div></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -1268,7 +1277,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); fppInit();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); fppInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1312,11 +1321,12 @@ function filterOC() {
   const reg = document.getElementById('oc-region').value;
   const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
-  ocF = oc.filter(r => {
+  ocF = ocListaDelPeriodo().filter(r => {
     const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
   document.getElementById('oc-limpiar').style.display = (q || reg || est || tipo) ? 'inline-flex' : 'none';
+  updateStats();
   ocPage = 1; renderOC();
 }
 
@@ -6126,15 +6136,77 @@ function closeHospitalOCs() {
 }
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
+// ─── Período (mes/año) para Órdenes de compra — mismo patrón que Facturas
+// por pagar. null = "todas las fechas" (sin filtrar por período); el
+// buscador y los filtros de Región/Estado/Tipo siguen funcionando igual,
+// encima del período que esté activo en ese momento.
+let ocPeriodo = null;
+
+function ocInit() {
+  const hoy = new Date();
+  ocPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  ocPoblarSelectoresPeriodo();
+  filterOC();
+}
+
+function ocAniosDisponibles() {
+  const anios = new Set();
+  oc.forEach(r => { const f = r.fechaenvio || r.fechaoc; if (f) anios.add(f.slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function ocPoblarSelectoresPeriodo() {
+  const selMes = document.getElementById('oc-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  const selAnio = document.getElementById('oc-select-anio');
+  const anios = new Set(ocAniosDisponibles());
+  if (ocPeriodo) anios.add(ocPeriodo.anio);
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (ocPeriodo) { selMes.value = ocPeriodo.mes; selAnio.value = ocPeriodo.anio; }
+}
+
+function ocSeleccionarPeriodo() {
+  ocPeriodo = { anio: document.getElementById('oc-select-anio').value, mes: Number(document.getElementById('oc-select-mes').value) };
+  document.getElementById('oc-todas-fechas').classList.remove('active');
+  filterOC();
+}
+
+function ocCambiarMes(delta) {
+  if (!ocPeriodo) { ocInit(); return; } // si estaba en "todas las fechas", primero vuelve a un período concreto
+  let a = parseInt(ocPeriodo.anio, 10), m = ocPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  ocPeriodo = { anio: String(a), mes: m };
+  ocPoblarSelectoresPeriodo();
+  filterOC();
+}
+
+function ocVerTodasLasFechas() {
+  ocPeriodo = null;
+  document.getElementById('oc-todas-fechas').classList.add('active');
+  filterOC();
+}
+
+function ocListaDelPeriodo() {
+  if (!ocPeriodo) return oc;
+  const { anio, mes } = ocPeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return oc.filter(r => { const f = r.fechaenvio || r.fechaoc || ''; return f >= desde && f < hasta; });
+}
+
 function updateStats() {
-  const total = oc.reduce((s,r)=>s+(r.totaloc||0),0);
-  const hosps = new Set(oc.map(r=>nombreHosp(r.hospital))).size;
-  const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc;
-  document.getElementById('s-oc').textContent = oc.length.toLocaleString('es-CL');
+  const base = ocListaDelPeriodo();
+  const total = base.reduce((s,r)=>s+(r.totaloc||0),0);
+  const hosps = new Set(base.map(r=>nombreHosp(r.hospital))).size;
+  const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc; // "Última OC" es siempre la más reciente de verdad, no depende del período
+  document.getElementById('s-oc').textContent = base.length.toLocaleString('es-CL');
   document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
   document.getElementById('s-fecha').textContent = fDate(ultima);
-  document.getElementById('oc-subtitle').textContent = `${oc.length.toLocaleString('es-CL')} órdenes registradas — última actualización: ${fDate(ultima)}`;
+  const nombrePeriodo = ocPeriodo ? `${MESES_NOMBRE[ocPeriodo.mes]} ${ocPeriodo.anio}` : 'todos los períodos';
+  document.getElementById('oc-subtitle').textContent = `${base.length.toLocaleString('es-CL')} órdenes en ${nombrePeriodo} — última actualización: ${fDate(ultima)}`;
 }
 
 const ESTADISTICAS_DISPONIBLES = [
