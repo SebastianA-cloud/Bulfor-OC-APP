@@ -499,6 +499,7 @@
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
       <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
       <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
+      <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
     </div>
     <div class="table-card">
       <table>
@@ -527,6 +528,7 @@
         <input type="text" id="items-search" placeholder="Buscar producto, familia, hospital…" oninput="filterItems()">
       </div>
       <select id="items-familia" onchange="filterItems()"><option value="">Todas las familias</option></select>
+      <button class="page-btn" id="items-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosItems()">✕ Limpiar filtros</button>
     </div>
     <div class="table-card">
       <table>
@@ -627,7 +629,8 @@
         <input type="text" id="hosp-search" placeholder="Buscar hospital, región, comuna…" oninput="filterHosp()">
       </div>
       <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
-      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirNormalizacionHospitales()">⚙️ Normalizar nombres</button>
+      <button class="page-btn" id="hosp-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosHosp()">✕ Limpiar filtros</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="abrirNormalizacionHospitales()" title="Unificar nombres distintos que corresponden al mismo hospital"><i class="ti ti-settings" aria-hidden="true"></i> Normalizar nombres</button>
     </div>
     <div class="table-card">
       <table>
@@ -1313,7 +1316,16 @@ function filterOC() {
     const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
+  document.getElementById('oc-limpiar').style.display = (q || reg || est || tipo) ? 'inline-flex' : 'none';
   ocPage = 1; renderOC();
+}
+
+function limpiarFiltrosOC() {
+  document.getElementById('oc-search').value = '';
+  document.getElementById('oc-region').value = '';
+  document.getElementById('oc-estado').value = '';
+  document.getElementById('oc-tipo').value = '';
+  filterOC();
 }
 
 const RUIDO_PATRONES_JS = [
@@ -1438,9 +1450,9 @@ function navReset() {
   navStack = [];
 }
 
-function botonAtrasHtml() {
+function botonAtrasHtml(etiqueta) {
   return navStack.length
-    ? `<button onclick="navBack()" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--accent);padding:4px 8px;display:flex;align-items:center;gap:4px"><span style="font-size:16px">←</span> Atrás</button>`
+    ? `<button onclick="navBack()" style="background:none;border:none;font-size:13px;cursor:pointer;color:var(--accent);padding:4px 8px;display:flex;align-items:center;gap:4px"><span style="font-size:16px">←</span> ${etiqueta || 'Atrás'}</button>`
     : '';
 }
 
@@ -1523,7 +1535,14 @@ function filterItems() {
     const s = `${p.nombre} ${p.familia}`;
     return coincideBusqueda(s, q) && (!fam || p.familia===fam);
   });
+  document.getElementById('items-limpiar').style.display = (q || fam) ? 'inline-flex' : 'none';
   itemsPage = 1; renderItems();
+}
+
+function limpiarFiltrosItems() {
+  document.getElementById('items-search').value = '';
+  document.getElementById('items-familia').value = '';
+  filterItems();
 }
 
 function filterHosp() {
@@ -1533,7 +1552,14 @@ function filterHosp() {
     const s = `${nombreHosp(r.hospital)} ${r.hospital} ${r.region} ${r.comuna}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg);
   });
+  document.getElementById('hosp-limpiar').style.display = (q || reg) ? 'inline-flex' : 'none';
   hospPage = 1; renderHosp();
+}
+
+function limpiarFiltrosHosp() {
+  document.getElementById('hosp-search').value = '';
+  document.getElementById('hosp-region').value = '';
+  filterHosp();
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
@@ -1593,7 +1619,11 @@ function renderOC() {
   const { slice, pages, total } = paginate(ocF, ocPage);
   document.getElementById('oc-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oc-pages', total, pages, ocPage, 'goOC');
-  if (!slice.length) { document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  if (!slice.length) {
+    const hayFiltro = document.getElementById('oc-limpiar').style.display !== 'none';
+    document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos órdenes con estos filtros.' : 'Todavía no hay órdenes registradas.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosOC()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
+    return;
+  }
   document.getElementById('oc-body').innerHTML = slice.map((r) => {
     const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
     return `
@@ -1731,12 +1761,16 @@ function openOCDetail(codigoOC) {
             <div class="stat" style="padding:12px"><div class="stat-label">Total OC (con IVA)</div><div class="stat-val" style="font-size:16px">${clp(r.totaloc)}</div></div>
             <div class="stat" style="padding:12px"><div class="stat-label">Fecha</div><div class="stat-val" style="font-size:16px">${fDate(r.fechaenvio || r.fechaoc)}</div></div>
           </div>
-          <table class="clinical-grid">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Comprador</div>
+          <table class="clinical-grid" style="margin-bottom:16px">
             <tr><td>Hospital</td><td>${nombreHosp(r.hospital)||'—'}</td></tr>
             <tr><td>Unidad compradora</td><td>${r.unidadcompradora||'—'}</td></tr>
+            <tr><td>Región / Comuna</td><td>${r.region||''} / ${r.comuna||''}</td></tr>
+          </table>
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Compra</div>
+          <table class="clinical-grid">
             <tr><td>Código licitación</td><td class="mono">${r.codigolicitacion||'—'}</td></tr>
             <tr><td>Estado proveedor</td><td>${r.estadoproveedor||'—'}</td></tr>
-            <tr><td>Región / Comuna</td><td>${r.region||''} / ${r.comuna||''}</td></tr>
             <tr><td>Fecha aceptación</td><td>${fDate(r.fechaaceptacion)}</td></tr>
             <tr><td>Fecha creación (Mercado Público)</td><td>${fDate(r.fechaoc)}</td></tr>
           </table>
@@ -1803,7 +1837,7 @@ function abrirNormalizacion(textoOriginal) {
 
         <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:6px">
           <div>
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre del producto</div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nombre normalizado</div>
             <input type="text" id="norm-nombre" value="${campos.nombre_producto.replace(/"/g,'&quot;')}" placeholder="Ej: Tintura Benjuí, Polietilenglicol 3350" list="norm-nombre-lista" style="width:100%">
             <datalist id="norm-nombre-lista">
               ${nombresProductoGuardados().map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('')}
@@ -2009,7 +2043,11 @@ function renderItems() {
   const { slice, pages, total } = paginate(productosUnicosF, itemsPage);
   document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
   renderPages('items-pages', total, pages, itemsPage, 'goItems');
-  if (!slice.length) { document.getElementById('items-body').innerHTML = `<tr><td colspan="4" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  if (!slice.length) {
+    const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
+    document.getElementById('items-body').innerHTML = `<tr><td colspan="4" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
+    return;
+  }
   document.getElementById('items-body').innerHTML = slice.map(p => `<tr onclick="navReset();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
     <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
@@ -2133,7 +2171,7 @@ function openProductoHospitalOCs(nombreProducto, hospital) {
           <div style="font-size:16px;font-weight:600">${hospital}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          ${botonAtrasHtml()}
+          ${botonAtrasHtml('Volver al producto')}
           <button onclick="closeProductoHospitalOCs_()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
@@ -2358,7 +2396,11 @@ function renderHosp() {
   const { slice, pages, total } = paginate(hospF, hospPage);
   document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
   renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
-  if (!slice.length) { document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`; return; }
+  if (!slice.length) {
+    const hayFiltro = document.getElementById('hosp-limpiar').style.display !== 'none';
+    document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos hospitales con estos filtros.' : 'No encontramos hospitales.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosHosp()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
+    return;
+  }
   document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
     <td style="font-weight:500;max-width:240px;color:var(--accent)">${nombreHosp(r.hospital)||'—'} ↗</td>
     <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
