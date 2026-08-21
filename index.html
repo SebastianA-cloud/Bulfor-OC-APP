@@ -168,6 +168,19 @@
 
   /* Table */
   .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+
+  /* ─── Índice alfabético (Productos, Hospitales) ─────────────────────────
+     Barra fija de letras A-Z a la derecha para saltar directo a esa
+     sección, y encabezados de letra dentro de la tabla — igual que una
+     libreta de contactos clásica. */
+  .alfabetico-wrap { display: flex; gap: 0; }
+  .alfabetico-tabla { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
+  .alfabetico-jump { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg); }
+  .alfabetico-jump button { border: none; background: none; font-size: 10px; font-weight: 600; color: var(--text-3); cursor: pointer; padding: 1px 5px; border-radius: 3px; font-family: var(--font); line-height: 1.5; }
+  .alfabetico-jump button:hover { background: var(--surface); color: var(--accent); }
+  .alfabetico-jump button:disabled { color: var(--border); cursor: default; }
+  .alfabetico-jump button:disabled:hover { background: none; }
+  tr.letra-header td { background: var(--bg); font-weight: 700; font-size: 12px; color: var(--accent); padding: 5px 16px; position: sticky; top: 0; z-index: 1; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   table { width: 100%; border-collapse: collapse; }
   th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
   td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: middle; }
@@ -540,16 +553,18 @@
       <button class="page-btn" id="items-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosItems()">✕ Limpiar filtros</button>
     </div>
     <div class="table-card">
-      <table>
-        <thead><tr>
-          <th>Producto</th><th>Familia</th>
-          <th style="text-align:right">N° ventas</th><th style="text-align:right">Total vendido</th>
-        </tr></thead>
-        <tbody id="items-body"></tbody>
-      </table>
-      <div class="pagination">
-        <span id="items-info"></span>
-        <div class="page-btns" id="items-pages"></div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="items-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Producto</th><th>Familia</th>
+              <th style="text-align:right">N° ventas</th><th style="text-align:right">Total vendido</th>
+            </tr></thead>
+            <tbody id="items-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="items-jump"></div>
       </div>
     </div>
   </div>
@@ -642,16 +657,18 @@
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="abrirNormalizacionHospitales()" title="Unificar nombres distintos que corresponden al mismo hospital"><i class="ti ti-settings" aria-hidden="true"></i> Normalizar nombres</button>
     </div>
     <div class="table-card">
-      <table>
-        <thead><tr>
-          <th>Hospital</th><th>Región</th><th>N° OC</th>
-          <th>Primera compra</th><th>Última compra</th><th>Total comprado</th>
-        </tr></thead>
-        <tbody id="hosp-body"></tbody>
-      </table>
-      <div class="pagination">
-        <span id="hosp-info"></span>
-        <div class="page-btns" id="hosp-pages"></div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="hosp-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Hospital</th><th>Región</th><th>N° OC</th>
+              <th>Primera compra</th><th>Última compra</th><th>Total comprado</th>
+            </tr></thead>
+            <tbody id="hosp-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="hosp-jump"></div>
       </div>
     </div>
   </div>
@@ -1608,6 +1625,51 @@ function paginate(data, page) {
   return { slice: data.slice((page-1)*PS, page*PS), pages, total: data.length };
 }
 
+// ─── Índice alfabético A-Z (Productos, Hospitales) ─────────────────────────
+// Agrupa una lista ya ordenada alfabéticamente por letra inicial, arma las
+// filas con encabezado de letra intercalado, y la barra de salto A-Z que
+// hace scroll directo a cada sección — como una libreta de contactos.
+const LETRAS_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+function letraDe(texto) {
+  const l = (texto || '').trim().charAt(0).toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // quita tildes: Á -> A
+  return /[A-Z]/.test(l) ? l : '#';
+}
+
+function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn, colspan, mensajeVacioHtml) {
+  const contenedor = document.getElementById(idContenedor);
+  const jump = document.getElementById(idJump);
+
+  if (!lista.length) {
+    contenedor.innerHTML = `<tr>${mensajeVacioHtml.replace('COLSPAN', colspan)}</tr>`;
+    if (jump) jump.innerHTML = '';
+    return;
+  }
+
+  const ordenada = [...lista].sort((a,b) => nombreDe(a).localeCompare(nombreDe(b), 'es', {sensitivity:'base'}));
+  const letrasPresentes = new Set();
+  let letraActual = null;
+  let html = '';
+  ordenada.forEach(item => {
+    const letra = letraDe(nombreDe(item));
+    if (letra !== letraActual) {
+      letraActual = letra;
+      letrasPresentes.add(letra);
+      html += `<tr class="letra-header" id="letra-${idContenedor}-${letra}"><td colspan="${colspan}">${letra}</td></tr>`;
+    }
+    html += filaHtmlFn(item);
+  });
+  contenedor.innerHTML = html;
+
+  if (jump) {
+    jump.innerHTML = LETRAS_ALFABETO.map(l => {
+      const activa = letrasPresentes.has(l);
+      return `<button ${activa ? '' : 'disabled'} onclick="document.getElementById('letra-${idContenedor}-${l}').scrollIntoView({block:'start'})">${l}</button>`;
+    }).join('');
+  }
+}
+
 function renderPages(container, total, pages, cur, setPage) {
   const inputId = container + '-goto';
   let h = `<button class="page-btn" onclick="${setPage}(${cur-1})" ${cur<=1?'disabled':''}>‹</button>`;
@@ -2050,20 +2112,16 @@ function goOC(p) { const {pages}=paginate(ocF,ocPage); if(p<1||p>pages) return; 
 
 // ─── RENDER ITEMS (productos únicos) ───────────────────────────────────────
 function renderItems() {
-  const { slice, pages, total } = paginate(productosUnicosF, itemsPage);
-  document.getElementById('items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
-  renderPages('items-pages', total, pages, itemsPage, 'goItems');
-  if (!slice.length) {
-    const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
-    document.getElementById('items-body').innerHTML = `<tr><td colspan="4" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
-    return;
-  }
-  document.getElementById('items-body').innerHTML = slice.map(p => `<tr onclick="navReset();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
-    <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
-    <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
-    <td style="text-align:right">${p.ventas}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
-  </tr>`).join('');
+  document.getElementById('items-info').textContent = `${productosUnicosF.length.toLocaleString('es-CL')} productos`;
+  const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
+  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
+  renderTablaAlfabetica('items-body', 'items-jump', productosUnicosF, p => p.nombre,
+    p => `<tr onclick="navReset();openProductDetail('${p.nombre.replace(/'/g,"\\'")}')" style="cursor:pointer">
+      <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${p.familia}</td>
+      <td style="text-align:right">${p.ventas}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
+    </tr>`, 4, mensajeVacio);
 }
 function goItems(p) { const {pages}=paginate(productosUnicosF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
 
@@ -2403,22 +2461,18 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
 
 
 function renderHosp() {
-  const { slice, pages, total } = paginate(hospF, hospPage);
-  document.getElementById('hosp-info').textContent = `${total.toLocaleString('es-CL')} hospitales`;
-  renderPages('hosp-pages', total, pages, hospPage, 'goHosp');
-  if (!slice.length) {
-    const hayFiltro = document.getElementById('hosp-limpiar').style.display !== 'none';
-    document.getElementById('hosp-body').innerHTML = `<tr><td colspan="6" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos hospitales con estos filtros.' : 'No encontramos hospitales.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosHosp()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
-    return;
-  }
-  document.getElementById('hosp-body').innerHTML = slice.map(r => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
-    <td style="font-weight:500;max-width:240px;color:var(--accent)">${nombreHosp(r.hospital)||'—'} ↗</td>
-    <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
-    <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
-    <td style="color:var(--text-2);font-size:12px">${fDate(r.ultimacompra)}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalcomprado)}</td>
-  </tr>`).join('');
+  document.getElementById('hosp-info').textContent = `${hospF.length.toLocaleString('es-CL')} hospitales`;
+  const hayFiltro = document.getElementById('hosp-limpiar').style.display !== 'none';
+  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos hospitales con estos filtros.' : 'No encontramos hospitales.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosHosp()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
+  renderTablaAlfabetica('hosp-body', 'hosp-jump', hospF, r => nombreHosp(r.hospital) || r.hospital || '',
+    r => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs('${(r.hospital||'').replace(/'/g,"\\'")}')">
+      <td style="font-weight:500;max-width:240px;color:var(--accent)">${nombreHosp(r.hospital)||'—'} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','')}</td>
+      <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
+      <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
+      <td style="color:var(--text-2);font-size:12px">${fDate(r.ultimacompra)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totalcomprado)}</td>
+    </tr>`, 6, mensajeVacio);
 }
 function goHosp(p) { const {pages}=paginate(hospF,hospPage); if(p<1||p>pages) return; hospPage=p; renderHosp(); }
 
