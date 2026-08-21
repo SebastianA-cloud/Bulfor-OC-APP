@@ -192,6 +192,43 @@
   .badge-estado.warn { background: var(--amber-light); color: var(--amber); }
   .badge-estado.neutral { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); }
 
+  /* ─── Facturas por pagar: selector de período + pestañas de estado ──────
+     Separados a propósito: el período es NAVEGACIÓN (a dónde voy), las
+     pestañas son FILTRO (qué veo) — nunca se mezclan en el mismo control. */
+  .fpp-toolbar-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .fpp-period { display: flex; align-items: center; gap: 6px; }
+  .fpp-period-btn { width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); cursor: pointer; font-size: 15px; color: var(--text); display: flex; align-items: center; justify-content: center; transition: background .12s; }
+  .fpp-period-btn:hover { background: var(--bg); }
+  .fpp-period select { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; font-size: 14px; font-weight: 600; font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; }
+  .fpp-status-tabs { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; }
+  .fpp-status-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; border: none; background: none; font-family: var(--font); }
+  .fpp-status-tab:hover { color: var(--text); }
+  .fpp-status-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(26,25,23,.08); }
+  .fpp-status-tab.active[data-estado="paid"] { color: var(--green); }
+  .fpp-status-tab.active[data-estado="overdue"] { color: var(--red); }
+  .fpp-status-tab.active[data-estado="pending"] { color: var(--amber); }
+
+  .fpp-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .fpp-resumen .stat { padding: 12px 14px; }
+  .fpp-resumen .stat.destacado { background: var(--accent-light); border-color: var(--accent); }
+  .fpp-resumen .stat.destacado .stat-val { color: var(--accent); }
+
+  .fpp-bulk-bar { align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius); padding: 9px 16px; margin-bottom: 10px; font-size: 13px; }
+  .fpp-bulk-bar #fpp-bulk-count { font-weight: 600; color: var(--accent); }
+  .fpp-bulk-sep { width: 1px; height: 18px; background: var(--accent); opacity: .3; }
+  .fpp-bulk-bar input[type=date] { width: auto; padding: 6px 10px; }
+  .fpp-bulk-cancelar { background: none; border: none; color: var(--text-2); font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: auto; font-family: var(--font); }
+  .fpp-bulk-cancelar:hover { color: var(--text); }
+
+  .fpp-venc-contexto { font-size: 11px; display: block; margin-top: 1px; }
+  .fpp-venc-contexto.hoy, .fpp-venc-contexto.atraso { color: var(--red); font-weight: 500; }
+  .fpp-venc-contexto.proximo { color: var(--amber); }
+  .fpp-venc-contexto.normal { color: var(--text-3); }
+
+  .fpp-empty { text-align: center; padding: 48px 20px; color: var(--text-2); }
+  .fpp-empty .fpp-empty-icon { font-size: 15px; margin-bottom: 8px; }
+  .fpp-empty a { color: var(--accent); cursor: pointer; }
+
   /* Skeleton loader: un rectángulo gris que "respira" mientras carga algo,
      en vez del texto plano "Cargando…". */
   .skeleton { background: linear-gradient(90deg, var(--bg) 25%, #EFEEE9 37%, var(--bg) 63%); background-size: 400% 100%; animation: skeleton-pulse 1.4s ease infinite; border-radius: var(--radius); }
@@ -543,17 +580,38 @@
   <div class="page" id="page-facturas-por-pagar">
     <div class="page-header">
       <div class="page-title">Facturas por pagar</div>
-      <div class="page-sub" id="fpp-breadcrumb">Todos los años</div>
     </div>
-    <div id="fpp-contexto-grande"></div>
-    <div class="toolbar" style="flex-wrap:wrap">
-      <button class="page-btn" id="fpp-tab-pendientes" style="padding:8px 16px" onclick="mostrarFPPPorEstado('pendientes')">⏳ Pendientes</button>
-      <button class="page-btn" id="fpp-tab-atrasadas" style="padding:8px 16px" onclick="mostrarFPPPorEstado('atrasadas')">⚠️ Atrasadas</button>
-      <button class="page-btn" id="fpp-tab-pagadas" style="padding:8px 16px" onclick="mostrarFPPPorEstado('pagadas')">✅ Pagadas</button>
-      <button class="page-btn" id="fpp-tab-anios" style="padding:8px 14px;white-space:nowrap" onclick="mostrarFPPAnios()">📅 Años</button>
-      <button class="page-btn" onclick="abrirGestionProveedores()" style="white-space:nowrap;margin-left:auto"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
+
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="fppCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="fpp-select-mes" onchange="fppSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="fpp-select-anio" onchange="fppSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="fppCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <div class="fpp-status-tabs" id="fpp-status-tabs"></div>
     </div>
-    <div id="fpp-resumen" style="display:flex;gap:24px;align-items:center;margin-bottom:14px"></div>
+
+    <div id="fpp-resumen" class="fpp-resumen"></div>
+
+    <div class="toolbar" style="margin-bottom:10px">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fpp-search" placeholder="Buscar por N° factura, proveedor o RUT…" oninput="fppBuscar(this.value)">
+      </div>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
+    </div>
+
+    <div id="fpp-bulk-bar" class="fpp-bulk-bar" style="display:none">
+      <span id="fpp-bulk-count"></span>
+      <span class="fpp-bulk-sep"></span>
+      <label style="font-size:12px;color:var(--text-2)">Fecha de pago para todas</label>
+      <input type="date" id="fpp-bulk-fecha">
+      <button id="fpp-bulk-btn" class="import-btn" style="margin-top:0;padding:7px 16px" onclick="marcarSeleccionadasComoPagadas()">Marcar como pagadas</button>
+      <button class="fpp-bulk-cancelar" onclick="fppCancelarSeleccion()">Cancelar selección</button>
+    </div>
+
     <div id="fpp-contenido"></div>
   </div>
 
@@ -1207,7 +1265,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); mostrarFPPAnios();
+    populateFilters(); updateStats(); renderOC(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); mostrarPagosAnios(); renderGraficosPagos(); renderRechazadas(); cambiarTipoDocumento('33'); fppInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -4111,249 +4169,216 @@ function nombreProveedorCuenta(rutProveedor) {
 }
 
 // ─── Drill-down Años → Meses → tabla, igual que Seguimiento de pago ───────
+// ─── FACTURAS POR PAGAR — vista única de trabajo ───────────────────────────
+// Una sola fuente de verdad: qué período se ve + qué estado se filtra +
+// qué se busca + qué está seleccionado. Cada control cambia solo lo suyo:
+// el selector de período NUNCA toca el filtro de estado, y viceversa.
 function fppAniosDisponibles() {
   const anios = new Set();
   facturasPorPagar.forEach(f => { if (f.fecha_emision) anios.add(f.fecha_emision.slice(0,4)); });
   return Array.from(anios).sort((a,b) => b.localeCompare(a));
 }
 
-function esPendienteRealFPP(f) {
-  return (f.estado_pago || 'Pendiente') !== 'Pagado' && f.estado_aceptacion !== 'N';
-}
-
-let fppContexto = { anio: null, mes: null, viendoPendientes: false };
+let fppPeriodo = { anio: null, mes: null };
+let fppEstado = 'all'; // 'all' | 'pending' | 'overdue' | 'paid'
 let fppBusqueda = '';
-let fppBusquedaAnio = '';
-let fppEstadoFiltro = null; // null = drill-down por año/mes normal; 'pendientes'|'atrasadas'|'pagadas' = pestaña plana
+let fppSeleccionadas = new Set();
 
-function setBreadcrumbFPP(texto) { document.getElementById('fpp-breadcrumb').innerHTML = texto; }
-function migaAniosFPP() { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPAnios()">Todos los años</span>`; }
-function migaAnioFPP(anio) { return `<span style="cursor:pointer;color:var(--accent)" onclick="mostrarFPPMeses('${anio}')">${anio}</span>`; }
-
-function resaltarTabsFPP(activa) {
-  ['pendientes','atrasadas','pagadas','anios'].forEach(t => {
-    const btn = document.getElementById(`fpp-tab-${t}`);
-    if (!btn) return;
-    if (t === activa) { btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
-    else { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
-  });
-}
-
-// Clasificación de estado: pagada / atrasada (pendiente y ya venció) /
-// pendiente (todavía dentro de plazo). Las anuladas no cuentan en ninguna.
+// "Atrasada" sigue siendo una condición derivada (pendiente + venció), no
+// un estado nuevo guardado en la base de datos — se mantiene igual que
+// antes a propósito.
 function categoriaFPP(f) {
   if (f.estado_aceptacion === 'N') return null;
-  if (f.estado_pago === 'Pagado') return 'pagadas';
+  if (f.estado_pago === 'Pagado') return 'paid';
   const hoy = new Date().toISOString().slice(0, 10);
-  if (f.fecha_vencimiento && f.fecha_vencimiento < hoy) return 'atrasadas';
-  return 'pendientes';
+  if (f.fecha_vencimiento && f.fecha_vencimiento < hoy) return 'overdue';
+  return 'pending';
+}
+function esPendienteRealFPP(f) { return categoriaFPP(f) === 'pending' || categoriaFPP(f) === 'overdue'; }
+
+function fppInit() {
+  const hoy = new Date();
+  fppPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  fppPoblarSelectores();
+  fppRender();
 }
 
-function mostrarFPPAnios() {
-  fppContexto = { anio: null, mes: null, viendoPendientes: false };
-  fppEstadoFiltro = null;
-  fppBusqueda = ''; fppBusquedaAnio = '';
-  resaltarTabsFPP('anios');
-  renderFPPVista();
+function fppPoblarSelectores() {
+  const selMes = document.getElementById('fpp-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  selMes.value = fppPeriodo.mes;
+
+  const anios = new Set(fppAniosDisponibles());
+  anios.add(fppPeriodo.anio); // por si el período actual (ej. el año en curso) todavía no tiene ninguna factura
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  const selAnio = document.getElementById('fpp-select-anio');
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  selAnio.value = fppPeriodo.anio;
 }
-function mostrarFPPMeses(anio) {
-  fppContexto = { anio, mes: null, viendoPendientes: false };
-  fppEstadoFiltro = null;
-  fppBusqueda = ''; fppBusquedaAnio = '';
-  resaltarTabsFPP('anios');
-  renderFPPVista();
+
+function fppSeleccionarPeriodo() {
+  fppPeriodo = { anio: document.getElementById('fpp-select-anio').value, mes: Number(document.getElementById('fpp-select-mes').value) };
+  fppCancelarSeleccion(true);
+  fppRender();
 }
-function mostrarFPPMes(anio, mesIdx) {
-  let a = parseInt(anio, 10), m = mesIdx;
+
+function fppCambiarMes(delta) {
+  let a = parseInt(fppPeriodo.anio, 10), m = fppPeriodo.mes + delta;
   if (m < 0) { m = 11; a -= 1; }
   if (m > 11) { m = 0; a += 1; }
-  fppContexto = { anio: String(a), mes: m, viendoPendientes: false };
-  fppEstadoFiltro = null;
-  fppBusqueda = ''; fppBusquedaAnio = '';
-  resaltarTabsFPP('anios');
-  renderFPPVista();
-}
-function cambiarMesFPP(delta) { mostrarFPPMes(fppContexto.anio, fppContexto.mes + delta); }
-function volverAMesesFPPDelAnio() { mostrarFPPMeses(fppContexto.anio); }
-
-function mostrarFPPPorEstado(estado) {
-  fppEstadoFiltro = estado;
-  fppContexto = { anio: null, mes: null, viendoPendientes: false };
-  fppBusqueda = '';
-  resaltarTabsFPP(estado);
-  renderFPPPorEstado();
+  fppPeriodo = { anio: String(a), mes: m };
+  fppPoblarSelectores(); // por si el año nuevo no estaba en la lista todavía
+  fppCancelarSeleccion(true);
+  fppRender();
 }
 
-function renderFPPPorEstado(soloTabla) {
-  const nombres = { pendientes: 'Pendientes', atrasadas: 'Atrasadas', pagadas: 'Pagadas' };
-  const lista = facturasPorPagar.filter(f => categoriaFPP(f) === fppEstadoFiltro);
-  renderResumenFPP(lista);
-  renderContextoGrandeFPP(null);
-  setBreadcrumbFPP(nombres[fppEstadoFiltro]);
-  const listaFiltrada = aplicarFiltroFPP(lista).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
-  renderTablaFPP(listaFiltrada, { esPendientes: fppEstadoFiltro !== 'pagadas', soloTabla });
+function fppSetEstado(estado) {
+  fppEstado = estado;
+  fppCancelarSeleccion(true);
+  fppRender();
 }
 
-function filtrarFPPBusqueda(valor) {
+function fppBuscar(valor) {
   fppBusqueda = valor;
-  if (fppEstadoFiltro) renderFPPPorEstado(true);
-  else renderFPPVista(true);
-}
-function filtrarFPPEnAnio(valor) { fppBusquedaAnio = valor; renderTarjetasMesesFPP(fppContexto.anio, true); }
-
-function aplicarFiltroFPP(lista) {
-  if (!fppBusqueda) return lista;
-  return lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''} ${f.estado_pago||''}`, fppBusqueda));
+  fppCancelarSeleccion(true);
+  fppRenderTabla(true);
 }
 
-function calcularResumenFPP(lista) {
-  const validas = lista.filter(f => f.estado_aceptacion !== 'N');
-  const totalFacturado = validas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
-  const pagadas = validas.filter(f => f.estado_pago === 'Pagado');
-  const totalPagado = pagadas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
-  const pendientesCount = validas.filter(esPendienteRealFPP).length;
-  const pct = totalFacturado ? (totalPagado / totalFacturado * 100) : 0;
-  return { totalFacturado, totalPagado, pct, pendientesCount };
+function fppListaDelPeriodo() {
+  const { anio, mes } = fppPeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return facturasPorPagar.filter(f => (f.fecha_emision||'') >= desde && (f.fecha_emision||'') < hasta);
 }
 
-function renderResumenFPP(lista) {
+function fppListaFiltrada() {
+  const delPeriodo = fppListaDelPeriodo();
+  let lista = fppEstado === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaFPP(f) === fppEstado);
+  if (fppBusqueda) lista = lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusqueda));
+  return lista.sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+}
+
+function fppRender() {
+  const delPeriodo = fppListaDelPeriodo();
+  fppRenderTabsEstado(delPeriodo);
+  fppRenderResumen(delPeriodo);
+  fppRenderTabla();
+}
+
+function fppRenderTabsEstado(delPeriodo) {
+  const validas = delPeriodo.filter(f => f.estado_aceptacion !== 'N');
+  const cuenta = {
+    all: validas.length,
+    pending: validas.filter(f => categoriaFPP(f) === 'pending').length,
+    overdue: validas.filter(f => categoriaFPP(f) === 'overdue').length,
+    paid: validas.filter(f => categoriaFPP(f) === 'paid').length,
+  };
+  const tabs = [
+    { id: 'all', label: 'Todas' },
+    { id: 'pending', label: 'Pendientes' },
+    { id: 'overdue', label: 'Atrasadas' },
+    { id: 'paid', label: 'Pagadas' },
+  ];
+  document.getElementById('fpp-status-tabs').innerHTML = tabs.map(t =>
+    `<button class="fpp-status-tab${fppEstado===t.id?' active':''}" data-estado="${t.id}" onclick="fppSetEstado('${t.id}')">${t.label} (${cuenta[t.id]})</button>`
+  ).join('');
+}
+
+function fppRenderResumen(delPeriodo) {
   const cont = document.getElementById('fpp-resumen');
-  if (!lista) { cont.innerHTML = ''; return; }
-  const r = calcularResumenFPP(lista);
+  const validas = delPeriodo.filter(f => f.estado_aceptacion !== 'N');
+  const totalFacturado = validas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const pendientesYAtrasadas = validas.filter(f => categoriaFPP(f) !== 'paid');
+  const totalPendiente = pendientesYAtrasadas.reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const totalPagado = validas.filter(f => categoriaFPP(f) === 'paid').reduce((s,f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const pct = totalFacturado ? Math.round(totalPagado / totalFacturado * 100) : 0;
+
   cont.innerHTML = `
-    <div><div style="font-size:11px;color:var(--text-2)">Total facturado</div><div style="font-size:14px;font-weight:600">${clp(r.totalFacturado)}</div></div>
-    <div><div style="font-size:11px;color:var(--text-2)">Total pagado</div><div style="font-size:14px;font-weight:600;color:var(--green)">${clp(r.totalPagado)}</div></div>
-    <div><div style="font-size:11px;color:var(--text-2)">% pagado</div><div style="font-size:14px;font-weight:600">${r.pct.toFixed(0)}%</div></div>
-    <div><div style="font-size:11px;color:var(--text-2)">Pendientes</div><div style="font-size:14px;font-weight:600;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
+    <div class="stat destacado"><div class="stat-label">Total pendiente</div><div class="stat-val" style="font-size:20px">${clp(totalPendiente)}</div></div>
+    <div class="stat"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
+    <div class="stat"><div class="stat-label">Total pagado</div><div class="stat-val" style="font-size:16px;color:var(--green)">${clp(totalPagado)}</div></div>
+    <div class="stat"><div class="stat-label">% pagado</div><div class="stat-val" style="font-size:16px">${pct}%</div></div>`;
 }
 
-function renderContextoGrandeFPP(texto) {
-  const cont = document.getElementById('fpp-contexto-grande');
-  if (!texto) { cont.innerHTML = ''; return; }
-  cont.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-light);color:var(--accent);font-size:18px;font-weight:700;padding:8px 18px;border-radius:var(--radius);margin-bottom:14px">📅 ${texto}</div>`;
+// Contexto relativo de la fecha de vencimiento — discreto, sin pintar toda
+// la fila. Solo se muestra para facturas todavía no pagadas.
+function fppContextoVencimiento(f) {
+  if (categoriaFPP(f) === 'paid' || !f.fecha_vencimiento) return '';
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const venc = new Date(f.fecha_vencimiento + 'T00:00:00');
+  const dias = Math.round((venc - hoy) / 86400000);
+  if (dias < 0) return `<span class="fpp-venc-contexto atraso">${Math.abs(dias)} día${Math.abs(dias)===1?'':'s'} de atraso</span>`;
+  if (dias === 0) return `<span class="fpp-venc-contexto hoy">Vence hoy</span>`;
+  if (dias <= 7) return `<span class="fpp-venc-contexto proximo">Vence en ${dias} día${dias===1?'':'s'}</span>`;
+  return `<span class="fpp-venc-contexto normal">Vence en ${dias} días</span>`;
 }
 
-function renderFPPVista(soloTabla) {
-  const { anio, mes, viendoPendientes } = fppContexto;
-
-  if (anio === null) {
-    renderResumenFPP(null);
-    renderContextoGrandeFPP(null);
-    if (!viendoPendientes) { setBreadcrumbFPP('Todos los años'); renderTarjetasAniosFPP(); return; }
-    setBreadcrumbFPP(`${migaAniosFPP()} › Pendientes`);
-    const lista = aplicarFiltroFPP(facturasPorPagar.filter(esPendienteRealFPP)).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
-    renderTablaFPP(lista, { esPendientes: true, soloTabla });
-    return;
-  }
-
-  if (mes === null) {
-    const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
-    renderResumenFPP(delAnio);
-    renderContextoGrandeFPP(anio);
-    if (!viendoPendientes) { setBreadcrumbFPP(`${migaAniosFPP()} › ${anio}`); renderTarjetasMesesFPP(anio); return; }
-    setBreadcrumbFPP(`${migaAniosFPP()} › ${migaAnioFPP(anio)} › Pendientes`);
-    const lista = aplicarFiltroFPP(delAnio.filter(esPendienteRealFPP)).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
-    renderTablaFPP(lista, { esPendientes: true, soloTabla });
-    return;
-  }
-
-  const delMes = facturasPorPagar.filter(f => (f.fecha_emision||'') >= `${anio}-${String(mes+1).padStart(2,'0')}-01` && (f.fecha_emision||'') < (mes===11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`));
-  renderResumenFPP(delMes);
-  renderContextoGrandeFPP(`${MESES_NOMBRE[mes]} ${anio}`);
-  const base = viendoPendientes ? delMes.filter(esPendienteRealFPP) : delMes;
-  const lista = aplicarFiltroFPP(base).sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
-  setBreadcrumbFPP(`${migaAniosFPP()} › ${migaAnioFPP(anio)} › ${MESES_NOMBRE[mes]}${viendoPendientes ? ' › Pendientes' : ''}`);
-  renderTablaFPP(lista, { conNavMes: true, anio, esPendientes: viendoPendientes, soloTabla });
+function fppBadgeEstado(f) {
+  const cat = categoriaFPP(f);
+  if (cat === null) return '<span class="badge-estado neutral" style="opacity:.7">Anulada</span>';
+  if (cat === 'paid') return '<span class="badge-estado ok">Pagado</span>';
+  if (cat === 'overdue') return '<span class="badge-estado err">Atrasado</span>';
+  return '<span class="badge-estado warn">Pendiente</span>';
 }
 
-function renderTarjetasAniosFPP() {
-  const anios = fppAniosDisponibles();
+function fppMensajeVacio() {
+  const nombrePeriodo = `${MESES_NOMBRE[fppPeriodo.mes]} ${fppPeriodo.anio}`;
+  if (fppBusqueda) return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
+  const nombres = { pending: 'pendientes', overdue: 'atrasadas', paid: 'pagadas' };
+  if (fppEstado === 'all') return { icono: '🧾', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
+  if (fppEstado === 'paid') return { icono: '⏳', texto: `Todavía no hay facturas pagadas en ${nombrePeriodo}.`, accion: 'Ver todas' };
+  return { icono: '✓', texto: `No hay facturas ${nombres[fppEstado]} en ${nombrePeriodo}.`, accion: 'Ver todas' };
+}
+
+function fppRenderTabla(soloTabla) {
   const cont = document.getElementById('fpp-contenido');
-  if (!anios.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay facturas de proveedores sincronizadas.</p></div></div>`;
-    return;
-  }
-  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px">
-    ${anios.map(anio => {
-      const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
-      const pendientes = delAnio.filter(esPendienteRealFPP).length;
-      return `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarFPPMeses('${anio}')">
-        <div style="font-size:22px;font-weight:600">${anio}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delAnio.length} factura${delAnio.length===1?'':'s'}</div>
-        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
-      </div>`;
-    }).join('')}
-  </div>`;
-}
+  const lista = fppListaFiltrada();
+  window.__ultimaListaFPP = lista;
+  fppSeleccionadas.clear();
+  actualizarBarraSeleccionFPP();
 
-function renderTarjetasMesesFPP(anio, soloTabla) {
-  const cont = document.getElementById('fpp-contenido');
-  const delAnio = facturasPorPagar.filter(f => (f.fecha_emision||'').startsWith(anio));
-
-  const buscadorHtml = `
-    <div class="toolbar" style="margin-bottom:14px">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="fpp-search-anio" placeholder="Buscar por proveedor o RUT en ${anio}…" value="${fppBusquedaAnio.replace(/"/g,'&quot;')}" oninput="filtrarFPPEnAnio(this.value)">
-      </div>
-    </div>`;
-
-  if (fppBusquedaAnio) {
-    const resultado = delAnio.filter(f => coincideBusqueda(`${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusquedaAnio))
-      .sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
-    cont.innerHTML = buscadorHtml + construirTablaFPPHtml(resultado, 'Sin resultados para esa búsqueda en este año.');
-    if (soloTabla) { const inp = document.getElementById('fpp-search-anio'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+  if (!lista.length) {
+    const m = fppMensajeVacio();
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty">
+      <div class="fpp-empty-icon">${m.icono}</div><p>${m.texto}</p>
+      ${m.accion ? `<a onclick="fppSetEstado('all')">${m.accion}</a>` : ''}
+    </div></div>`;
     return;
   }
 
-  const porMes = {};
-  delAnio.forEach(f => {
-    const mesIdx = parseInt((f.fecha_emision||'').slice(5,7), 10) - 1;
-    if (mesIdx < 0 || mesIdx > 11) return;
-    if (!porMes[mesIdx]) porMes[mesIdx] = [];
-    porMes[mesIdx].push(f);
-  });
-  const mesesConDatos = Object.keys(porMes).map(Number).sort((a,b)=>a-b);
-  if (!mesesConDatos.length) {
-    cont.innerHTML = buscadorHtml + `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas para ${anio}.</p></div></div>`;
-    return;
-  }
-  cont.innerHTML = buscadorHtml + `<div style="display:flex;flex-wrap:wrap;gap:12px">
-    ${mesesConDatos.map(mesIdx => {
-      const delMes = porMes[mesIdx];
-      const pendientes = delMes.filter(esPendienteRealFPP).length;
-      return `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:20px 28px;cursor:pointer;min-width:160px" onclick="mostrarFPPMes('${anio}', ${mesIdx})">
-        <div style="font-size:16px;font-weight:600">${MESES_NOMBRE[mesIdx]}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:4px">${delMes.length} factura${delMes.length===1?'':'s'}</div>
-        ${pendientes ? `<div style="font-size:11px;color:var(--red);margin-top:4px">${pendientes} pendiente${pendientes===1?'':'s'}</div>` : `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ todas con pago</div>`}
-      </div>`;
-    }).join('')}
-  </div>`;
-}
+  const normales = lista.filter(f => f.estado_aceptacion !== 'N');
+  const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
 
-function filaFPPHtml(f) {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const pagado = f.estado_pago === 'Pagado';
-  const vencida = !pagado && f.fecha_vencimiento && f.fecha_vencimiento < hoy;
-  const marcada = fppSeleccionadas.has(f.id);
-  return `
-    <tr style="cursor:pointer${marcada ? ';background:var(--accent-light)' : ''}" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
-      <td style="width:32px" onclick="event.stopPropagation()"><input type="checkbox" class="fpp-check" data-id="${f.id}" ${marcada?'checked':''} onchange="toggleFPPSeleccion(${f.id}, this.checked)"></td>
+  const filaHtml = f => `
+    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+      <td style="width:32px" onclick="event.stopPropagation()"><input type="checkbox" class="fpp-check" data-id="${f.id}" onchange="toggleFPPSeleccion(${f.id}, this.checked)"></td>
       <td class="mono" style="color:var(--accent)">${f.factura}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
       <td class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
       <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td style="font-size:12px;white-space:nowrap;${vencida?'color:var(--red);font-weight:600':''}">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${vencida?' ⚠':''}</td>
-      <td style="white-space:nowrap">${clp(f.monto_total ?? f.monto)}</td>
-      <td>${f.estado_aceptacion === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada</span>' : (pagado ? '<span class="badge-estado ok">Pagado</span>' : (vencida ? '<span class="badge-estado err">Vencida</span>' : '<span class="badge-estado neutral">Pendiente</span>'))}</td>
+      <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${fppContextoVencimiento(f)}</td>
+      <td style="white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums">${clp(f.monto_total ?? f.monto)}</td>
+      <td>${fppBadgeEstado(f)}</td>
     </tr>`;
+
+  const tabla = (arr, conCheckbox) => `<div class="table-card"><table><thead><tr>
+    ${conCheckbox ? `<th style="width:32px"><input type="checkbox" id="fpp-check-todo" onchange="toggleFPPSeleccionarTodo(this.checked)"></th>` : '<th style="width:32px"></th>'}
+    <th>N° Factura</th><th>Proveedor</th><th>RUT</th><th>Emisión</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th>Estado</th>
+  </tr></thead><tbody>${arr.map(filaHtml).join('')}</tbody></table></div>`;
+
+  let html = tabla(normales, true);
+  if (anuladas.length) {
+    html += `<div style="margin-top:16px">
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">🚫 Anuladas (${anuladas.length}) — no se contabilizan en ningún total</div>
+      ${tabla(anuladas, false)}
+    </div>`;
+  }
+  cont.innerHTML = html;
+
+  if (soloTabla) { const inp = document.getElementById('fpp-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
 }
 
 // ─── Selección múltiple para marcar como pagadas de forma masiva ──────────
-let fppSeleccionadas = new Set();
-
 function toggleFPPSeleccion(id, marcada) {
   if (marcada) fppSeleccionadas.add(id); else fppSeleccionadas.delete(id);
   const fila = document.querySelector(`.fpp-check[data-id="${id}"]`)?.closest('tr');
@@ -4387,7 +4412,18 @@ function actualizarBarraSeleccionFPP() {
   if (!barra) return;
   if (fppSeleccionadas.size === 0) { barra.style.display = 'none'; return; }
   barra.style.display = 'flex';
-  document.getElementById('fpp-bulk-count').textContent = `${fppSeleccionadas.size} factura${fppSeleccionadas.size===1?'':'s'} seleccionada${fppSeleccionadas.size===1?'':'s'}`;
+  const n = fppSeleccionadas.size;
+  document.getElementById('fpp-bulk-count').textContent = `${n} factura${n===1?'':'s'} seleccionada${n===1?'':'s'}`;
+  const fechaInput = document.getElementById('fpp-bulk-fecha');
+  if (!fechaInput.value) fechaInput.value = new Date().toISOString().slice(0,10);
+}
+
+function fppCancelarSeleccion(silencioso) {
+  fppSeleccionadas.clear();
+  document.querySelectorAll('.fpp-check').forEach(chk => { chk.checked = false; const fila = chk.closest('tr'); if (fila) fila.style.background = ''; });
+  const master = document.getElementById('fpp-check-todo');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  if (!silencioso) actualizarBarraSeleccionFPP();
 }
 
 async function marcarSeleccionadasComoPagadas() {
@@ -4405,70 +4441,13 @@ async function marcarSeleccionadasComoPagadas() {
       const f = facturasPorPagar.find(x => x.id === id);
       if (f) { f.estado_pago = 'Pagado'; f.fecha_pago = fecha; }
     });
-    fppSeleccionadas.clear();
-    toast(`${ids.length} factura${ids.length===1?'':'s'} marcada${ids.length===1?'':'s'} como pagada${ids.length===1?'':'s'}`);
-    renderFPPVista();
+    toast(`✓ ${ids.length} factura${ids.length===1?'':'s'} marcada${ids.length===1?'':'s'} como pagada${ids.length===1?'':'s'}`);
+    fppRender();
   } catch (e) {
     toast('No se pudo guardar: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = 'Marcar como pagadas';
   }
-}
-
-function construirTablaFPPHtml(lista, mensajeVacio) {
-  window.__ultimaListaFPP = lista;
-  fppSeleccionadas.clear(); // la tabla se acaba de reconstruir, no queremos casillas "fantasma" de la vista anterior
-  if (!lista.length) {
-    return `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
-  }
-  const normales = lista.filter(f => f.estado_aceptacion !== 'N');
-  const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
-
-  let html = `
-    <div id="fpp-bulk-bar" style="display:none;align-items:center;gap:12px;background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius);padding:10px 16px;margin-bottom:10px">
-      <span id="fpp-bulk-count" style="font-size:13px;font-weight:500;color:var(--accent)"></span>
-      <span style="font-size:12px;color:var(--text-2)">Fecha de pago:</span>
-      <input type="date" id="fpp-bulk-fecha" value="${new Date().toISOString().slice(0,10)}" style="width:auto">
-      <button id="fpp-bulk-btn" class="import-btn" style="margin-top:0;padding:7px 16px" onclick="marcarSeleccionadasComoPagadas()">Marcar como pagadas</button>
-    </div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFPP()">⬇️ Descargar Excel (${lista.length})</button>
-    </div>`;
-
-  const tabla = (arr, conCheckbox) => `<div class="table-card"><table><thead><tr>
-    ${conCheckbox ? `<th style="width:32px"><input type="checkbox" id="${arr===normales?'fpp-check-todo':''}" onchange="toggleFPPSeleccionarTodo(this.checked)"></th>` : ''}
-    <th>N° Factura</th><th>Proveedor</th><th>RUT</th><th>Emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th>
-  </tr></thead><tbody>${arr.map(filaFPPHtml).join('')}</tbody></table></div>`;
-
-  html += normales.length ? tabla(normales, true) : `<div class="table-card"><div class="empty"><p>Sin facturas normales — solo hay anuladas abajo.</p></div></div>`;
-
-  if (anuladas.length) {
-    html += `<div style="margin-top:24px;border:1px solid var(--red);border-radius:var(--radius-lg);overflow:hidden">
-      <div style="background:var(--red-light);padding:12px 20px;font-size:13px;font-weight:600;color:var(--red)">🚫 Anuladas (${anuladas.length})</div>
-      <div style="padding:14px">${tabla(anuladas, false)}</div>
-    </div>`;
-  }
-  return html;
-}
-
-function renderTablaFPP(lista, opts) {
-  opts = opts || {};
-  const cont = document.getElementById('fpp-contenido');
-  const toolbarHtml = `
-    <div class="toolbar" style="margin-bottom:12px">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="fpp-search" placeholder="Buscar por N° factura, RUT, proveedor…" value="${fppBusqueda.replace(/"/g,'&quot;')}" oninput="filtrarFPPBusqueda(this.value)">
-      </div>
-      ${opts.conNavMes ? `
-        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesFPP(-1)" title="Mes anterior">‹</button>
-        <button class="page-btn" style="padding:8px 12px" onclick="cambiarMesFPP(1)" title="Mes siguiente">›</button>
-        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="volverAMesesFPPDelAnio()">↩ Volver a los meses de ${opts.anio}</button>
-      ` : ''}
-    </div>`;
-  const mensajeVacio = fppBusqueda ? 'Sin resultados para tu búsqueda.' : (opts.esPendientes ? 'No hay facturas pendientes de pago.' : 'Sin facturas.');
-  cont.innerHTML = toolbarHtml + construirTablaFPPHtml(lista, mensajeVacio);
-  if (opts.soloTabla) { const inp = document.getElementById('fpp-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
 }
 
 function descargarExcelFPP() {
@@ -4487,7 +4466,7 @@ function descargarExcelFPP() {
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Facturas por pagar');
-  XLSX.writeFile(libro, `facturas_por_pagar_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(libro, `facturas_por_pagar_${MESES_NOMBRE[fppPeriodo.mes]}_${fppPeriodo.anio}.xlsx`);
 }
 
 function botonNavFPPHtml(idActual) {
@@ -4525,15 +4504,15 @@ function abrirDetalleFacturaPorPagar(id) {
         </div>
       </div>
       <div class="modal-body">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Factura</div>
         <table class="clinical-grid">
           <tr><td>RUT proveedor</td><td class="mono">${f.rut_proveedor||'—'}</td></tr>
           <tr><td>Fecha emisión</td><td>${fDate(f.fecha_emision)}</td></tr>
           <tr><td>Fecha vencimiento</td><td>${fDate(f.fecha_vencimiento)}</td></tr>
           <tr><td>Monto</td><td style="font-weight:600">${clp(f.monto_total ?? f.monto)}</td></tr>
-          <tr><td>Cuenta de pago registrada</td><td>${cuenta ? `${cuenta.banco||'—'} · ${cuenta.tipo_cuenta||''} ${cuenta.numero_cuenta||''}` : '<span style="color:var(--text-3)">Sin cuenta registrada — agrégala en "Cuentas de proveedores"</span>'}</td></tr>
         </table>
 
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Productos de esta factura</div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px">Detalle — productos de esta factura</div>
         <div id="fpp-items-cuerpo">
           <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
           <div class="skeleton" style="height:38px;width:80%"></div>
@@ -4554,11 +4533,11 @@ function abrirDetalleFacturaPorPagar(id) {
           </div>
         </div>
         <div style="margin-top:12px">
-          <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Pagar a la cuenta</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Cuenta de pago${cuenta ? ` — ${cuenta.banco||'—'} · ${cuenta.tipo_cuenta||''} ${cuenta.numero_cuenta||''}` : ''}</div>
           <select id="fpp-detalle-cuenta" style="width:100%"><option value="">— sin asignar —</option>${opcionesCuenta}</select>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:16px">
-          <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarPagoFacturaPorPagar(${f.id}, this)">Guardar</button>
+          <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarPagoFacturaPorPagar(${f.id}, this)">Guardar cambios</button>
         </div>
       </div>
     </div>`;
@@ -4615,7 +4594,7 @@ async function guardarPagoFacturaPorPagar(id, btnEl) {
     const f = facturasPorPagar.find(x => x.id === id);
     if (f) Object.assign(f, cambios);
     document.getElementById('fpp-detalle-overlay').remove();
-    renderFPPVista();
+    fppRender();
     toast('Guardado');
   } catch (e) {
     toast('No se pudo guardar: ' + e.message, 'err');
