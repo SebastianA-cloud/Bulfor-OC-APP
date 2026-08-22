@@ -596,16 +596,18 @@
       <div class="skeleton" style="height:38px;width:80%"></div>
     </div>
     <div class="table-card" id="fp-items-tabla" style="display:none">
-      <table>
-        <thead><tr>
-          <th>Producto</th>
-          <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
-        </tr></thead>
-        <tbody id="fp-items-body"></tbody>
-      </table>
-      <div class="pagination">
-        <span id="fp-items-info"></span>
-        <div class="page-btns" id="fp-items-pages"></div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="fp-items-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Producto</th>
+              <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
+            </tr></thead>
+            <tbody id="fp-items-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="fp-items-jump"></div>
       </div>
     </div>
   </div>
@@ -2369,9 +2371,7 @@ function filterFacturaItems() {
 }
 
 function renderFacturaItems() {
-  const { slice, pages, total } = paginate(facturaProductosUnicosF, facturaItemsPage);
-  document.getElementById('fp-items-info').textContent = `${total.toLocaleString('es-CL')} productos`;
-  renderPages('fp-items-pages', total, pages, facturaItemsPage, 'goFacturaItems');
+  document.getElementById('fp-items-info').textContent = `${facturaProductosUnicosF.length.toLocaleString('es-CL')} productos`;
 
   const totalFacturado = facturaProductosUnicosF.reduce((s,p) => s + (p.totalFacturado||0), 0);
   const totalFacturas = facturaProductosUnicosF.reduce((s,p) => s + (p.facturas||0), 0);
@@ -2379,21 +2379,18 @@ function renderFacturaItems() {
   resumen.style.display = 'grid';
   resumen.innerHTML = `
     <div class="stat destacado"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
-    <div class="stat"><div class="stat-label">Productos</div><div class="stat-val" style="font-size:16px">${total.toLocaleString('es-CL')}</div></div>
+    <div class="stat"><div class="stat-label">Productos</div><div class="stat-val" style="font-size:16px">${facturaProductosUnicosF.length.toLocaleString('es-CL')}</div></div>
     <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${totalFacturas.toLocaleString('es-CL')}</div></div>`;
 
-  if (!slice.length) {
-    document.getElementById('fp-items-body').innerHTML = `<tr><td colspan="3"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${document.getElementById('fp-items-search').value ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td></tr>`;
-    return;
-  }
-  window.__facturaItemsVisibles = slice; // para referenciar por índice, sin incrustar texto crudo en el onclick
-  document.getElementById('fp-items-body').innerHTML = slice.map((p, idx) => `<tr onclick="navReset();openProductoFacturaDetail(window.__facturaItemsVisibles[${idx}].nombre)" style="cursor:pointer">
-    <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
-    <td style="text-align:right">${p.facturas}</td>
-    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
-  </tr>`).join('');
+  const hayFiltro = document.getElementById('fp-items-search').value;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td>`;
+  renderTablaAlfabetica('fp-items-body', 'fp-items-jump', facturaProductosUnicosF, p => p.nombre,
+    (p, idx) => `<tr onclick="navReset();openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx}].nombre)" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
+      <td style="text-align:right">${p.facturas}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
+    </tr>`, 3, mensajeVacio);
 }
-function goFacturaItems(p) { const {pages}=paginate(facturaProductosUnicosF,facturaItemsPage); if(p<1||p>pages) return; facturaItemsPage=p; renderFacturaItems(); }
 
 function botonNavProductoFacturaHtml(nombreActual) {
   const idx = facturaProductosUnicosF.findIndex(p => p.nombre === nombreActual);
