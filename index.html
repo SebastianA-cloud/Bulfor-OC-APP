@@ -748,20 +748,18 @@
   <div class="page" id="page-fedex">
     <div class="page-header">
       <div class="page-title">Seguimiento FedEx</div>
-      <div class="page-sub" id="fedex-subtitle">Cargando envíos…</div>
+      <div class="page-sub">Seguimiento de despachos a hospitales</div>
     </div>
-    <div class="stats" id="fedex-stats">
-      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('todos')"><div class="stat-label">Total envíos</div><div class="stat-val" id="fx-total">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('entregado')"><div class="stat-label">Entregados</div><div class="stat-val" id="fx-entregados">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('transito')"><div class="stat-label">En tránsito</div><div class="stat-val" id="fx-transito">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarPorCategoriaFedex('retraso')"><div class="stat-label">Con retraso</div><div class="stat-val" id="fx-retraso">—</div></div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+      <div id="fedex-resumen-compacto" style="font-size:13px;color:var(--text-2)"></div>
+      <div class="fpp-status-tabs" id="fedex-tabs"></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="fedex-search" placeholder="Buscar por hospital, N° orden, factura…" oninput="filterFedex()">
       </div>
-      <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';document.querySelectorAll('#fedex-stats .stat').forEach(s=>s.style.outline='');filterFedex()"><option value="">Todos los estados</option></select>
+      <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
     <div class="table-card">
@@ -2858,7 +2856,7 @@ function urlRastreoFedex(numero) {
 }
 
 function badgeEstadoFedex(estado) {
-  if (!estado) return `<span class="badge badge-gray">Sin información</span>`;
+  if (!estado) return `<span class="badge badge-gray" title="Todavía no se recibió información de estado desde FedEx">Sin información</span>`;
   const e = ESTADOS_FEDEX.find(x => x.texto.toLowerCase() === estado.toLowerCase());
   if (e) return `<span class="badge" style="background:${e.color};color:${e.textColor}">${estado}</span>`;
   return `<span class="badge badge-gray">${estado}</span>`;
@@ -2873,21 +2871,37 @@ function populateFiltersFedex() {
 }
 
 function updateFedexStats() {
-  document.getElementById('fx-total').textContent = fedex.length.toLocaleString('es-CL');
-  document.getElementById('fx-entregados').textContent = fedex.filter(f => (f.estado_envio||'').toLowerCase() === 'entregado').length;
-  document.getElementById('fx-transito').textContent = fedex.filter(f => ['en ruta','recibido por fedex'].includes((f.estado_envio||'').toLowerCase())).length;
-  document.getElementById('fx-retraso').textContent = fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
-  document.getElementById('fedex-subtitle').textContent = `${fedex.length.toLocaleString('es-CL')} envíos registrados`;
+  const total = fedex.length;
+  const retrasos = fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
+  document.getElementById('fedex-resumen-compacto').innerHTML =
+    `<strong style="color:var(--text)">${total.toLocaleString('es-CL')} envíos</strong>` +
+    (retrasos ? ` · <strong style="color:var(--red)">⚠ ${retrasos} con retraso</strong>` : ` · <span style="color:var(--green)">sin retrasos</span>`);
 }
 
 let fedexCategoriaActiva = 'todos';
 
+const FEDEX_CATEGORIAS = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'retraso', label: 'Con retraso' },
+  { id: 'transito', label: 'En tránsito' },
+  { id: 'entregado', label: 'Entregados' },
+];
+
+function renderTabsFedex() {
+  const cuenta = {
+    todos: fedex.length,
+    entregado: fedex.filter(f => (f.estado_envio||'').toLowerCase() === 'entregado').length,
+    transito: fedex.filter(f => ['en ruta','recibido por fedex'].includes((f.estado_envio||'').toLowerCase())).length,
+    retraso: fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length,
+  };
+  document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
+    `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} (${cuenta[c.id]})</button>`
+  ).join('');
+}
+
 function filtrarPorCategoriaFedex(categoria) {
   fedexCategoriaActiva = categoria;
-  document.querySelectorAll('#fedex-stats .stat').forEach(s => s.style.outline = '');
-  const indices = { todos: 0, entregado: 1, transito: 2, retraso: 3 };
-  const cards = document.querySelectorAll('#fedex-stats .stat');
-  if (cards[indices[categoria]]) cards[indices[categoria]].style.outline = '2px solid var(--accent)';
+  renderTabsFedex();
   // Limpiamos el select de estado y la búsqueda para que la categoría se vea clara
   document.getElementById('fedex-estado').value = '';
   filterFedex();
@@ -2915,11 +2929,19 @@ function filterFedex() {
 function renderFedex() {
   populateFiltersFedex();
   updateFedexStats();
+  renderTabsFedex();
   const { slice, pages, total } = paginate(fedexF, fedexPage);
   document.getElementById('fedex-info').textContent = `${total.toLocaleString('es-CL')} envíos`;
   renderPages('fedex-pages', total, pages, fedexPage, 'goFedex');
   if (!slice.length) {
-    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`;
+    const mensajes = {
+      todos: 'No encontramos envíos con esos criterios.',
+      retraso: '✓ No hay envíos con retraso.',
+      transito: 'No hay envíos en tránsito en este momento.',
+      entregado: 'No hay envíos entregados con esos criterios.',
+    };
+    const hayFiltroActivo = document.getElementById('fedex-search').value || document.getElementById('fedex-estado').value;
+    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!hayFiltroActivo?'✓':'🔍'}</div><p>${hayFiltroActivo ? 'No encontramos envíos con esos criterios.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
     return;
   }
   document.getElementById('fedex-body').innerHTML = slice.map(f => `
@@ -6172,7 +6194,8 @@ function abrirDetalleEnvio(id) {
       <div class="modal-header">
         <div>
           <div style="font-size:13px;color:var(--text-2);margin-bottom:2px"><span class="mono" id="fedex-detalle-ot-header">${f.orden_transporte}</span> ${botonCopiar(f.orden_transporte)}</div>
-          <div style="font-size:16px;font-weight:600">${nombreHosp(f.hospital)}</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:4px">${nombreHosp(f.hospital)}</div>
+          <div id="fedex-detalle-estado-header">${badgeEstadoFedex(f.estado_envio)}</div>
         </div>
         <div class="modal-actions">
           ${botonNavFedexHtml(f.id)}
@@ -6197,11 +6220,13 @@ function renderDetalleEnvio(f, modoEdicion) {
         <tr><td>Recibido por</td><td>${f.recibido_por||'—'}</td></tr>
       </table>
       <div style="font-size:11px;color:var(--text-3);margin-top:14px">El estado y la fecha de entrega se actualizan automáticamente con las notificaciones de FedEx. Si este envío no llegó por correo (ej: se hizo directo en el mostrador), puedes actualizarlo a mano.</div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
-        <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarEnvio(${f.id})">Eliminar envío</button>
-        <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), true)">✎ Editar manualmente</button>
-        ${f.orden_transporte ? `<a href="${urlRastreoFedex(f.orden_transporte)}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-color:#4d148c;color:#4d148c" title="Abre fedex.com con este número ya cargado en el rastreador"><span>🚚</span> Rastrear en FedEx</a>` : ''}
-        <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
+      <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap">
+        <button class="page-btn" style="padding:7px 12px;color:var(--text-3);font-size:12px" onclick="eliminarEnvio(${f.id})" title="Elimina este envío permanentemente">Eliminar envío</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${f.orden_transporte ? `<a href="${urlRastreoFedex(f.orden_transporte)}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-color:#4d148c;color:#4d148c" title="Abre fedex.com con este número ya cargado en el rastreador">🚚 Rastrear en FedEx ↗</a>` : ''}
+          <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), true)">✎ Editar manualmente</button>
+          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
+        </div>
       </div>`;
     return;
   }
@@ -6222,7 +6247,7 @@ function renderDetalleEnvio(f, modoEdicion) {
       </div>
       <div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Estado</div>
-        <select id="fx-edit-estado" style="width:100%">
+        <select id="fx-edit-estado" style="width:100%" onchange="actualizarHabilitacionCamposEntregaFedex()">
           <option value="">Sin información</option>
           ${ESTADOS_FEDEX.map(e => `<option value="${e.texto}" ${f.estado_envio===e.texto?'selected':''}>${e.texto}</option>`).join('')}
         </select>
@@ -6235,12 +6260,29 @@ function renderDetalleEnvio(f, modoEdicion) {
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Recibido por</div>
         <input type="text" id="fx-edit-recibido" value="${(f.recibido_por||'').replace(/"/g,'&quot;')}" placeholder="Nombre de quien recibió" style="width:100%">
       </div>
-      <div style="font-size:11px;color:var(--text-3)">Si marcas estado distinto de "Entregado", la fecha de entrega y recibido por se guardan vacíos.</div>
+      <div id="fx-edit-aviso-entrega" style="font-size:11px;color:var(--text-3)"></div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
       <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), false)">Cancelar</button>
       <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="guardarEdicionEnvio(${f.id})">Guardar cambios</button>
     </div>`;
+  actualizarHabilitacionCamposEntregaFedex();
+}
+
+// Solo UX visual — NO cambia qué se guarda. La regla real (que si el estado
+// no es "Entregado" la fecha de entrega y recibido por se guardan vacíos)
+// sigue viviendo exclusivamente en guardarEdicionEnvio(), tal como estaba.
+function actualizarHabilitacionCamposEntregaFedex() {
+  const estado = document.getElementById('fx-edit-estado').value;
+  const esEntregado = estado.toLowerCase() === 'entregado';
+  const fecha = document.getElementById('fx-edit-fecha');
+  const recibido = document.getElementById('fx-edit-recibido');
+  const aviso = document.getElementById('fx-edit-aviso-entrega');
+  fecha.disabled = !esEntregado;
+  recibido.disabled = !esEntregado;
+  fecha.style.opacity = esEntregado ? '1' : '.5';
+  recibido.style.opacity = esEntregado ? '1' : '.5';
+  aviso.textContent = esEntregado ? '' : 'Estos campos solo se utilizan cuando el estado es "Entregado".';
 }
 
 async function guardarEdicionEnvio(id) {
@@ -6283,6 +6325,8 @@ async function guardarEdicionEnvio(id) {
     renderDetalleEnvio(actualizado, false);
     const headerOt = document.getElementById('fedex-detalle-ot-header');
     if (headerOt) headerOt.textContent = actualizado.orden_transporte;
+    const headerEstado = document.getElementById('fedex-detalle-estado-header');
+    if (headerEstado) headerEstado.innerHTML = badgeEstadoFedex(actualizado.estado_envio);
     toast('✓ Guardado');
   } catch(e) {
     toast('No se pudo guardar el cambio: ' + e.message, 'err');
