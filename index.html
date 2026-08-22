@@ -787,26 +787,29 @@
   <div class="page" id="page-elaboracion">
     <div class="page-header">
       <div class="page-title">Órdenes de Elaboración</div>
-      <div class="page-sub" id="oe-subtitle">Cargando…</div>
     </div>
-    <!-- Tarjetas de estado -->
-    <div class="stats" id="oe-stats">
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('elaboracion')"><div class="stat-label">En elaboración</div><div class="stat-val" id="oe-elaboracion">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entregado')"><div class="stat-label">Entregados</div><div class="stat-val" id="oe-entregados">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('entrega')"><div class="stat-label">Para entrega</div><div class="stat-val" id="oe-entrega">—</div></div>
-      <div class="stat" style="cursor:pointer" onclick="filtrarOECategoria('todos')"><div class="stat-label">Total</div><div class="stat-val" id="oe-total">—</div></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="oeCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="oe-select-mes" onchange="oeSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="oe-select-anio" onchange="oeSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="oeCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <div class="fpp-status-tabs" id="oe-tabs"></div>
     </div>
+    <div id="oe-resumen-compacto" style="font-size:13px;color:var(--text-2);margin-bottom:12px"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="oe-search" placeholder="Buscar por paciente, preparado…" oninput="filterOE()">
       </div>
-      <select id="oe-estado-entrega" onchange="oeCategoria='todos';filterOE()">
+      <select id="oe-estado-entrega" onchange="oeCategoria='todos';renderTabsOE();filterOE()">
         <option value="">Todos los estados</option>
         <option value="En elaboracion">En elaboración</option>
         <option value="Para entrega">Para entrega</option>
         <option value="Entregado">Entregado</option>
       </select>
+      <button class="page-btn" id="oe-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="oeVerTodasLasFechas()" title="Ver órdenes de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevaOrdenElaboracion()">+ Nueva orden</button>
     </div>
     <div class="table-card">
@@ -827,8 +830,8 @@
   <div class="page" id="page-pacientes">
     <div class="page-header">
       <div class="page-title">Pacientes</div>
-      <div class="page-sub">Buscador y gestor de pacientes de Órdenes de Elaboración</div>
     </div>
+    <div id="pac-resumen-compacto" style="font-size:13px;color:var(--text-2);margin-bottom:10px"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -836,15 +839,17 @@
       </div>
     </div>
     <div class="table-card">
-      <table>
-        <thead><tr>
-          <th>Paciente</th><th>Teléfono</th><th>N° Recetas</th><th>N° Órdenes</th><th>Última orden</th>
-        </tr></thead>
-        <tbody id="pac-body"></tbody>
-      </table>
-      <div class="pagination">
-        <span id="pac-info"></span>
-        <div class="page-btns" id="pac-pages"></div>
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="pac-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Paciente</th><th>Teléfono</th><th style="text-align:center">N° Recetas</th><th style="text-align:center">N° Órdenes</th><th>Última orden</th>
+            </tr></thead>
+            <tbody id="pac-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="pac-jump"></div>
       </div>
     </div>
   </div>
@@ -1327,7 +1332,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); renderOE(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit(); oeInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -3109,12 +3114,71 @@ function recetaVigente(fechaEmision) {
   return venc && venc >= new Date();
 }
 
+// ─── Período (mes/año) para Órdenes de Elaboración — mismo patrón que
+// FedEx/OC. La fecha que representa cuándo se creó la orden es fecha_orden.
+let oePeriodo = null;
+
+function oeInit() {
+  const hoy = new Date();
+  oePeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  oePoblarSelectoresPeriodo();
+  filterOE();
+}
+
+function oeAniosDisponibles() {
+  const anios = new Set();
+  ordenesElaboracion.forEach(o => { if (o.fecha_orden) anios.add(String(o.fecha_orden).slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function oePoblarSelectoresPeriodo() {
+  const selMes = document.getElementById('oe-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  const selAnio = document.getElementById('oe-select-anio');
+  const anios = new Set(oeAniosDisponibles());
+  if (oePeriodo) anios.add(oePeriodo.anio);
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (oePeriodo) { selMes.value = oePeriodo.mes; selAnio.value = oePeriodo.anio; }
+}
+
+function oeSeleccionarPeriodo() {
+  oePeriodo = { anio: document.getElementById('oe-select-anio').value, mes: Number(document.getElementById('oe-select-mes').value) };
+  document.getElementById('oe-todas-fechas').classList.remove('active');
+  filterOE();
+}
+
+function oeCambiarMes(delta) {
+  if (!oePeriodo) { oeInit(); return; }
+  let a = parseInt(oePeriodo.anio, 10), m = oePeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  oePeriodo = { anio: String(a), mes: m };
+  oePoblarSelectoresPeriodo();
+  filterOE();
+}
+
+function oeVerTodasLasFechas() {
+  oePeriodo = null;
+  document.getElementById('oe-todas-fechas').classList.add('active');
+  filterOE();
+}
+
+function oeListaDelPeriodo() {
+  if (!oePeriodo) return ordenesElaboracion;
+  const { anio, mes } = oePeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return ordenesElaboracion.filter(o => { const f = String(o.fecha_orden||'').slice(0,10); return f >= desde && f < hasta; });
+}
+
 function updateOEStats() {
-  document.getElementById('oe-total').textContent = ordenesElaboracion.length;
-  document.getElementById('oe-elaboracion').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='En elaboracion').length;
-  document.getElementById('oe-entrega').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='Para entrega').length;
-  document.getElementById('oe-entregados').textContent = ordenesElaboracion.filter(o=>o.estado_entrega==='Entregado').length;
-  document.getElementById('oe-subtitle').textContent = `${ordenesElaboracion.length.toLocaleString('es-CL')} órdenes registradas`;
+  const delPeriodo = oeListaDelPeriodo();
+  const pendientes = delPeriodo.filter(o => o.estado_entrega !== 'Entregado').length;
+  const nombrePeriodo = oePeriodo ? `${MESES_NOMBRE[oePeriodo.mes]} ${oePeriodo.anio}` : 'todos los períodos';
+  document.getElementById('oe-resumen-compacto').innerHTML =
+    `<strong style="color:var(--text)">${delPeriodo.length.toLocaleString('es-CL')} órdenes en ${nombrePeriodo}</strong>` +
+    (pendientes ? ` · <strong style="color:var(--amber)">${pendientes} pendiente${pendientes===1?'':'s'}</strong>` : ` · <span style="color:var(--green)">todo entregado</span>`);
 }
 
 function coincideOECategoria(o, cat) {
@@ -3125,12 +3189,29 @@ function coincideOECategoria(o, cat) {
   return true;
 }
 
+const OE_CATEGORIAS = [
+  { id: 'todos', label: 'Todas' },
+  { id: 'elaboracion', label: 'En elaboración' },
+  { id: 'entrega', label: 'Para entrega' },
+  { id: 'entregado', label: 'Entregadas' },
+];
+
+function renderTabsOE() {
+  const delPeriodo = oeListaDelPeriodo();
+  const cuenta = {
+    todos: delPeriodo.length,
+    elaboracion: delPeriodo.filter(o => o.estado_entrega === 'En elaboracion').length,
+    entrega: delPeriodo.filter(o => o.estado_entrega === 'Para entrega').length,
+    entregado: delPeriodo.filter(o => o.estado_entrega === 'Entregado').length,
+  };
+  document.getElementById('oe-tabs').innerHTML = OE_CATEGORIAS.map(c =>
+    `<button class="fpp-status-tab${oeCategoria===c.id?' active':''}" onclick="filtrarOECategoria('${c.id}')">${c.label} (${cuenta[c.id]})</button>`
+  ).join('');
+}
+
 function filtrarOECategoria(cat) {
   oeCategoria = cat;
-  document.querySelectorAll('#oe-stats .stat').forEach(s => s.style.outline = '');
-  const indices = { elaboracion:0, entregado:1, entrega:2, todos:3 };
-  const cards = document.querySelectorAll('#oe-stats .stat');
-  if (cards[indices[cat]]) cards[indices[cat]].style.outline = '2px solid var(--accent)';
+  renderTabsOE();
   document.getElementById('oe-estado-entrega').value = '';
   filterOE();
 }
@@ -3138,11 +3219,13 @@ function filtrarOECategoria(cat) {
 function filterOE() {
   const q = document.getElementById('oe-search').value;
   const estado = document.getElementById('oe-estado-entrega').value;
-  ordenesElaboracionF = ordenesElaboracion.filter(o => {
-    const nombre = (o.pacientes?.nombre || '');
-    const s = `${nombre} ${o.indicacion||''} ${o.observaciones||''}`;
-    return coincideBusqueda(s, q) && (!estado || o.estado_entrega === estado) && coincideOECategoria(o, oeCategoria);
-  });
+  ordenesElaboracionF = oeListaDelPeriodo()
+    .filter(o => {
+      const nombre = (o.pacientes?.nombre || '');
+      const s = `${nombre} ${o.indicacion||''} ${o.observaciones||''}`;
+      return coincideBusqueda(s, q) && (!estado || o.estado_entrega === estado) && coincideOECategoria(o, oeCategoria);
+    })
+    .sort((a,b) => (b.fecha_orden||'').localeCompare(a.fecha_orden||'')); // más reciente → más antigua, sobre el conjunto completo antes de paginar
   oePage = 1; renderOE();
 }
 
@@ -3159,12 +3242,21 @@ function actualizarBadgeOEDigitar() {
 
 function renderOE() {
   updateOEStats();
+  renderTabsOE();
   actualizarBadgeOEDigitar();
   const { slice, pages, total } = paginate(ordenesElaboracionF, oePage);
   document.getElementById('oe-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oe-pages', total, pages, oePage, 'goOE');
   if (!slice.length) {
-    document.getElementById('oe-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`;
+    const nombrePeriodo = oePeriodo ? `${MESES_NOMBRE[oePeriodo.mes]} ${oePeriodo.anio}` : 'todos los períodos';
+    const mensajes = {
+      todos: `No hay órdenes de elaboración en ${nombrePeriodo}.`,
+      elaboracion: `No hay órdenes en elaboración en ${nombrePeriodo}.`,
+      entrega: `No hay órdenes para entrega en ${nombrePeriodo}.`,
+      entregado: `No hay órdenes entregadas en ${nombrePeriodo}.`,
+    };
+    const hayFiltroActivo = document.getElementById('oe-search').value || document.getElementById('oe-estado-entrega').value;
+    document.getElementById('oe-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltroActivo ? 'No encontramos órdenes con estos criterios.' : mensajes[oeCategoria]}</p>${oeCategoria!=='todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
     return;
   }
   document.getElementById('oe-body').innerHTML = slice.map(o => {
@@ -3200,39 +3292,36 @@ function resumenPorPaciente() {
     r.numeroOrdenes += 1;
     if (o.fecha_orden && (!r.ultimaOrden || o.fecha_orden > r.ultimaOrden)) r.ultimaOrden = o.fecha_orden;
   });
+  // Orden por defecto de esta página: A → Z por nombre. El historial DENTRO
+  // de cada paciente (al abrirlo) es el que va más reciente → más antiguo,
+  // no esta lista general — son criterios distintos a propósito.
   return pacientes.map(p => {
     const r = porId[p.id] || { recetas: new Set(), numeroOrdenes: 0, ultimaOrden: null };
     return { ...p, numeroRecetas: r.recetas.size, numeroOrdenes: r.numeroOrdenes, ultimaOrden: r.ultimaOrden };
-  }).sort((a,b) => (b.ultimaOrden||'').localeCompare(a.ultimaOrden||''));
+  }).sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
 }
 
 function filterPacientes() {
   const q = document.getElementById('pac-search').value;
   const resumen = resumenPorPaciente();
   pacientesF = resumen.filter(p => coincideBusqueda(`${p.nombre} ${p.telefono||''}`, q));
-  pacPage = 1;
+  document.getElementById('pac-resumen-compacto').innerHTML = `<strong>${pacientesF.length.toLocaleString('es-CL')} pacientes</strong>`;
   renderPacientes();
 }
 
 function renderPacientes() {
-  const { slice, pages, total } = paginate(pacientesF, pacPage);
-  document.getElementById('pac-info').textContent = `${total.toLocaleString('es-CL')} pacientes`;
-  renderPages('pac-pages', total, pages, pacPage, 'goPacientes');
-  if (!slice.length) {
-    document.getElementById('pac-body').innerHTML = `<tr><td colspan="5" class="empty"><div class="empty-icon">🔍</div><p>Sin resultados</p></td></tr>`;
-    return;
-  }
-  document.getElementById('pac-body').innerHTML = slice.map(p => `
-    <tr style="cursor:pointer" onclick="abrirDetallePaciente(${p.id})">
-      <td style="font-weight:500;color:var(--accent)">${p.nombre} ↗</td>
-      <td style="font-size:12px">${p.telefono ? '📞 '+p.telefono : '—'}</td>
+  document.getElementById('pac-info').textContent = `${pacientesF.length.toLocaleString('es-CL')} pacientes`;
+  const hayFiltro = document.getElementById('pac-search').value;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos pacientes con esa búsqueda.' : 'No encontramos pacientes.'}</p></div></td>`;
+  renderTablaAlfabetica('pac-body', 'pac-jump', pacientesF, p => p.nombre,
+    (p, idx) => `<tr style="cursor:pointer" onclick="navReset();abrirDetallePaciente(window.__alfabeticoOrden['pac-body'][${idx}].id)">
+      <td style="font-weight:500">${escapeHtml(p.nombre)}</td>
+      <td style="font-size:12px">${p.telefono ? '📞 '+escapeHtml(p.telefono) : '—'}</td>
       <td style="text-align:center">${p.numeroRecetas}</td>
       <td style="text-align:center">${p.numeroOrdenes}</td>
       <td style="font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaOrden ? fDate(p.ultimaOrden) : '—'}</td>
-    </tr>`).join('');
+    </tr>`, 5, mensajeVacio);
 }
-
-function goPacientes(p) { const {pages}=paginate(pacientesF, pacPage); if(p<1||p>pages) return; pacPage=p; renderPacientes(); }
 
 async function abrirDetallePaciente(id) {
   cerrarTodosLosModales();
@@ -5472,25 +5561,30 @@ function mostrarAlertaPacienteExistente(nombre, ordenes, recetasVigentes, todasR
   modal.innerHTML = `
     <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <div style="font-size:16px;font-weight:600">⚠️ Paciente con historial</div>
-        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>${nombre}</strong> ha mandado a preparar ${ordenes.length} ${ordenes.length===1?'receta':'recetas'}. Haz clic en un preparado para prellenar el formulario.</div>
+        <div>
+          <div style="font-size:16px;font-weight:600">Paciente con historial</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>${nombre}</strong> tiene ${ordenes.length} ${ordenes.length===1?'orden':'órdenes'} anteriores. Haz clic en una para reutilizarla como referencia.</div>
+        </div>
+        <button onclick="document.getElementById('oe-paciente-alerta-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div style="padding:16px 24px">
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Preparados anteriores</div>
-        ${ordenes.slice(0,10).map(o => {
-          const recetaOrden = todasRecetas.find(r => r.id === o.receta_id);
-          const vigente = recetaOrden && recetaVigente(recetaOrden.fecha_emision);
-          return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;${vigente?'border-color:var(--accent)':''}"
-                       onclick="prerellenarOrdenDesdeHistorial(${JSON.stringify(o).replace(/"/g,'&quot;')},${JSON.stringify(recetaOrden||null).replace(/"/g,'&quot;')})">
-            <div style="font-weight:500">${o.indicacion||'—'}</div>
-            <div style="font-size:11px;color:var(--text-2);margin-top:3px;display:flex;gap:10px">
-              <span>${fDate(o.fecha_orden)}</span>
-              <span>${o.valor ? clp(o.valor) : '—'}</span>
-              <span>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</span>
-              ${vigente ? '<span style="color:var(--green);font-weight:500">✓ Receta vigente</span>' : '<span style="color:var(--text-3)">Receta vencida</span>'}
-            </div>
-          </div>`;
-        }).join('')}
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Recetas anteriores</div>
+        <div style="max-height:340px;overflow-y:auto">
+          ${ordenes.slice().sort((a,b) => (b.fecha_orden||'').localeCompare(a.fecha_orden||'')).slice(0,10).map(o => {
+            const recetaOrden = todasRecetas.find(r => r.id === o.receta_id);
+            const vigente = recetaOrden && recetaVigente(recetaOrden.fecha_emision);
+            return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;${vigente?'border-color:var(--accent)':''}"
+                         onclick="prerellenarOrdenDesdeHistorial(${JSON.stringify(o).replace(/"/g,'&quot;')},${JSON.stringify(recetaOrden||null).replace(/"/g,'&quot;')})">
+              <div style="font-weight:500">${o.indicacion||'—'}</div>
+              <div style="font-size:11px;color:var(--text-2);margin-top:3px;display:flex;gap:10px">
+                <span>${fDate(o.fecha_orden)}</span>
+                <span>${o.valor ? clp(o.valor) : '—'}</span>
+                <span>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</span>
+                ${vigente ? '<span style="color:var(--green);font-weight:500">✓ Receta vigente</span>' : '<span style="color:var(--text-3)">Receta vencida</span>'}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
         <div style="display:flex;justify-content:flex-end;margin-top:14px">
           <button class="page-btn" style="padding:8px 16px" onclick="document.getElementById('oe-paciente-alerta-overlay').remove();mostrarRecetasVigentesEnFormulario(${JSON.stringify(recetasVigentes).replace(/"/g,'&quot;')})">Continuar sin seleccionar</button>
         </div>
