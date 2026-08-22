@@ -4061,14 +4061,20 @@ function renderDocumentosGdexpress(soloTabla) {
     `<button class="fpp-status-tab${docTiposActivos[t] ? ' active' : ''}" onclick="docToggleTipo('${t}')">${docTiposActivos[t] ? '✓' : '○'} ${TIPOS_DTE_INFO[t].nombre} (${cuenta[t]})</button>`
   ).join('');
 
-  // Resumen compacto del período — sin sumar montos de tipos distintos entre
-  // sí (una NC y una guía no significan lo mismo que una factura en plata).
-  const totalFacturado = delPeriodo.filter(d => d.tipo_dte === '33').reduce((s,d) => s + montoTotalDoc(d), 0);
+  // Resumen compacto del período. "Total facturado" es el neto real:
+  // facturas MENOS notas de crédito (una NC anula o corrige plata ya
+  // facturada, así que sí corresponde restarla acá). Las guías se muestran
+  // aparte — no son una venta facturada todavía, son mercadería despachada
+  // que todavía no se convirtió en factura.
+  const totalFacturasBrutas = delPeriodo.filter(d => d.tipo_dte === '33').reduce((s,d) => s + montoTotalDoc(d), 0);
+  const totalNotasCredito = delPeriodo.filter(d => d.tipo_dte === '61').reduce((s,d) => s + montoTotalDoc(d), 0);
+  const totalFacturado = totalFacturasBrutas - totalNotasCredito;
+  const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
   document.getElementById('doc-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
+    <div class="stat destacado"><div class="stat-label">Total facturado (con IVA, neto de NC)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
     <div class="stat"><div class="stat-label">Facturas</div><div class="stat-val" style="font-size:16px">${cuenta['33']}</div></div>
-    <div class="stat"><div class="stat-label">Notas de crédito</div><div class="stat-val" style="font-size:16px">${cuenta['61']}</div></div>
-    <div class="stat"><div class="stat-label">Guías de despacho</div><div class="stat-val" style="font-size:16px">${cuenta['52']}</div></div>`;
+    <div class="stat"><div class="stat-label">Notas de crédito</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '-' + clp(totalNotasCredito) : '—'}</div></div>
+    <div class="stat"><div class="stat-label">Guías de despacho (por facturar)</div><div class="stat-val" style="font-size:16px;color:var(--amber)">${clp(totalGuiasPorFacturar)}</div></div>`;
 
   const ningunTipoActivo = !docTiposActivos['33'] && !docTiposActivos['61'] && !docTiposActivos['52'];
   if (ningunTipoActivo) {
@@ -4108,7 +4114,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
               <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
-              <td style="white-space:nowrap">${d.tipo_dte === '52' ? '—' : clp(montoTotalDoc(d))}</td>
+              <td style="white-space:nowrap">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
               <td>${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
         </tbody>
