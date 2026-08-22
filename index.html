@@ -6165,7 +6165,7 @@ function abrirDetalleEnvio(id) {
     <div class="modal-shell modal-md" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:2px"><span class="mono">${f.orden_transporte}</span> ${botonCopiar(f.orden_transporte)}</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:2px"><span class="mono" id="fedex-detalle-ot-header">${f.orden_transporte}</span> ${botonCopiar(f.orden_transporte)}</div>
           <div style="font-size:16px;font-weight:600">${nombreHosp(f.hospital)}</div>
         </div>
         <div class="modal-actions">
@@ -6204,6 +6204,11 @@ function renderDetalleEnvio(f, modoEdicion) {
   const fechaEntregaInput = f.fecha_entrega ? String(f.fecha_entrega).slice(0,10) : '';
   cuerpo.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">N° de orden de transporte (OT)</div>
+        <input type="text" id="fx-edit-ot" value="${(f.orden_transporte||'').replace(/"/g,'&quot;')}" placeholder="N° de OT" class="mono" style="width:100%">
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Tiene que calzar exacto con el número que trae el correo de FedEx — si no, el seguimiento automático no lo va a encontrar.</div>
+      </div>
       <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
       <div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Estado</div>
@@ -6229,12 +6234,16 @@ function renderDetalleEnvio(f, modoEdicion) {
 }
 
 async function guardarEdicionEnvio(id) {
+  const ot = document.getElementById('fx-edit-ot').value.trim();
   const estado = document.getElementById('fx-edit-estado').value;
   const fechaInput = document.getElementById('fx-edit-fecha').value;
   const recibido = document.getElementById('fx-edit-recibido').value.trim();
   const esEntregado = estado.toLowerCase() === 'entregado';
 
+  if (!ot) { toast('El N° de OT no puede quedar vacío.', 'err'); return; }
+
   const cambios = {
+    orden_transporte: ot,
     estado_envio: estado || null,
     fecha_entrega: esEntregado && fechaInput ? new Date(fechaInput).toISOString() : null,
     recibido_por: esEntregado ? (recibido || null) : null,
@@ -6247,13 +6256,22 @@ async function guardarEdicionEnvio(id) {
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify(cambios)
     });
-    if (!res.ok) { const err = await res.text(); throw new Error(err); }
+    if (!res.ok) {
+      const err = await res.text();
+      if (err.includes('duplicate') || err.includes('unique')) {
+        throw new Error('Ya existe otro envío guardado con ese mismo N° de OT.');
+      }
+      throw new Error(err);
+    }
     const actualizado = (await res.json())[0];
     const idx = fedex.findIndex(f => f.id === id);
     if (idx !== -1) fedex[idx] = actualizado;
     fedexF = fedexF.map(f => f.id === id ? actualizado : f);
     renderFedex();
     renderDetalleEnvio(actualizado, false);
+    const headerOt = document.getElementById('fedex-detalle-ot-header');
+    if (headerOt) headerOt.textContent = actualizado.orden_transporte;
+    toast('✓ Guardado');
   } catch(e) {
     toast('No se pudo guardar el cambio: ' + e.message, 'err');
   }
