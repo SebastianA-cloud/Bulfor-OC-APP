@@ -2393,13 +2393,17 @@ function renderFacturaItems() {
 }
 
 function botonNavProductoFacturaHtml(nombreActual) {
-  const idx = facturaProductosUnicosF.findIndex(p => p.nombre === nombreActual);
+  // Usamos el mismo orden alfabético que se ve en la lista (guardado por
+  // renderTablaAlfabetica) — así "siguiente" es de verdad el siguiente en
+  // pantalla, no el siguiente en el orden viejo (por monto).
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body']) || facturaProductosUnicosF;
+  const idx = lista.findIndex(p => p.nombre === nombreActual);
   if (idx === -1) return '';
   const hayAnterior = idx > 0;
-  const haySiguiente = idx < facturaProductosUnicosF.length - 1;
+  const haySiguiente = idx < lista.length - 1;
   return `
-    <button onclick="openProductoFacturaDetail(facturaProductosUnicosF[${idx-1}]?.nombre)" ${hayAnterior?'':'disabled'} title="Producto anterior (respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
-    <button onclick="openProductoFacturaDetail(facturaProductosUnicosF[${idx+1}]?.nombre)" ${haySiguiente?'':'disabled'} title="Producto siguiente (respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+    <button onclick="openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx-1}]?.nombre)" ${hayAnterior?'':'disabled'} title="Producto anterior (orden alfabético, respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx+1}]?.nombre)" ${haySiguiente?'':'disabled'} title="Producto siguiente (orden alfabético, respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
 function openProductoFacturaDetail(nombreProducto) {
