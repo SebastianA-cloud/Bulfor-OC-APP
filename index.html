@@ -6209,7 +6209,11 @@ function renderDetalleEnvio(f, modoEdicion) {
         <input type="text" id="fx-edit-ot" value="${(f.orden_transporte||'').replace(/"/g,'&quot;')}" placeholder="N° de OT" class="mono" style="width:100%">
         <div style="font-size:11px;color:var(--text-3);margin-top:4px">Tiene que calzar exacto con el número que trae el correo de FedEx — si no, el seguimiento automático no lo va a encontrar.</div>
       </div>
-      <div class="detail-field"><label>Factura</label><span>${f.factura||'—'}</span></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Factura</div>
+        <input type="text" id="fx-edit-factura" value="${(f.factura||'').replace(/"/g,'&quot;')}" placeholder="N° de factura" style="width:100%">
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Si son varias, sepáralas con coma (ej: 12345, 12346).</div>
+      </div>
       <div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Estado</div>
         <select id="fx-edit-estado" style="width:100%">
@@ -6235,6 +6239,7 @@ function renderDetalleEnvio(f, modoEdicion) {
 
 async function guardarEdicionEnvio(id) {
   const ot = document.getElementById('fx-edit-ot').value.trim();
+  const factura = document.getElementById('fx-edit-factura').value.trim();
   const estado = document.getElementById('fx-edit-estado').value;
   const fechaInput = document.getElementById('fx-edit-fecha').value;
   const recibido = document.getElementById('fx-edit-recibido').value.trim();
@@ -6244,6 +6249,7 @@ async function guardarEdicionEnvio(id) {
 
   const cambios = {
     orden_transporte: ot,
+    factura: factura || null,
     estado_envio: estado || null,
     fecha_entrega: esEntregado && fechaInput ? new Date(fechaInput).toISOString() : null,
     recibido_por: esEntregado ? (recibido || null) : null,
