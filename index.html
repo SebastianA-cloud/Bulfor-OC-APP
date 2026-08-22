@@ -750,16 +750,23 @@
       <div class="page-title">Seguimiento FedEx</div>
       <div class="page-sub">Seguimiento de despachos a hospitales</div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
-      <div id="fedex-resumen-compacto" style="font-size:13px;color:var(--text-2)"></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="fedexCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="fedex-select-mes" onchange="fedexSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="fedex-select-anio" onchange="fedexSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="fedexCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
       <div class="fpp-status-tabs" id="fedex-tabs"></div>
     </div>
+    <div id="fedex-resumen-compacto" style="font-size:13px;color:var(--text-2);margin-bottom:12px"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="fedex-search" placeholder="Buscar por hospital, N° orden, factura…" oninput="filterFedex()">
       </div>
       <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
+      <button class="page-btn" id="fedex-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="fedexVerTodasLasFechas()" title="Ver envíos de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
     <div class="table-card">
@@ -1320,7 +1327,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); renderFedex(); renderOE(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); renderOE(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -2870,11 +2877,71 @@ function populateFiltersFedex() {
   el.value = cur;
 }
 
+// ─── Período (mes/año) para FedEx — mismo patrón que Órdenes de Compra y
+// Buscador de documentos. null = "todas las fechas" (sin filtrar por período).
+let fedexPeriodo = null;
+
+function fedexInit() {
+  const hoy = new Date();
+  fedexPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  fedexPoblarSelectoresPeriodo();
+  filterFedex();
+}
+
+function fedexAniosDisponibles() {
+  const anios = new Set();
+  fedex.forEach(f => { if (f.fecha_ingreso) anios.add(String(f.fecha_ingreso).slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function fedexPoblarSelectoresPeriodo() {
+  const selMes = document.getElementById('fedex-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  const selAnio = document.getElementById('fedex-select-anio');
+  const anios = new Set(fedexAniosDisponibles());
+  if (fedexPeriodo) anios.add(fedexPeriodo.anio);
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (fedexPeriodo) { selMes.value = fedexPeriodo.mes; selAnio.value = fedexPeriodo.anio; }
+}
+
+function fedexSeleccionarPeriodo() {
+  fedexPeriodo = { anio: document.getElementById('fedex-select-anio').value, mes: Number(document.getElementById('fedex-select-mes').value) };
+  document.getElementById('fedex-todas-fechas').classList.remove('active');
+  filterFedex();
+}
+
+function fedexCambiarMes(delta) {
+  if (!fedexPeriodo) { fedexInit(); return; } // si estaba en "todas las fechas", primero vuelve a un período concreto
+  let a = parseInt(fedexPeriodo.anio, 10), m = fedexPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  fedexPeriodo = { anio: String(a), mes: m };
+  fedexPoblarSelectoresPeriodo();
+  filterFedex();
+}
+
+function fedexVerTodasLasFechas() {
+  fedexPeriodo = null;
+  document.getElementById('fedex-todas-fechas').classList.add('active');
+  filterFedex();
+}
+
+function fedexListaDelPeriodo() {
+  if (!fedexPeriodo) return fedex;
+  const { anio, mes } = fedexPeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return fedex.filter(f => { const fe = String(f.fecha_ingreso||'').slice(0,10); return fe >= desde && fe < hasta; });
+}
+
 function updateFedexStats() {
-  const total = fedex.length;
-  const retrasos = fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
+  const delPeriodo = fedexListaDelPeriodo();
+  const total = delPeriodo.length;
+  const retrasos = delPeriodo.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
+  const nombrePeriodo = fedexPeriodo ? `${MESES_NOMBRE[fedexPeriodo.mes]} ${fedexPeriodo.anio}` : 'todos los períodos';
   document.getElementById('fedex-resumen-compacto').innerHTML =
-    `<strong style="color:var(--text)">${total.toLocaleString('es-CL')} envíos</strong>` +
+    `<strong style="color:var(--text)">${total.toLocaleString('es-CL')} envíos en ${nombrePeriodo}</strong>` +
     (retrasos ? ` · <strong style="color:var(--red)">⚠ ${retrasos} con retraso</strong>` : ` · <span style="color:var(--green)">sin retrasos</span>`);
 }
 
@@ -2888,11 +2955,12 @@ const FEDEX_CATEGORIAS = [
 ];
 
 function renderTabsFedex() {
+  const delPeriodo = fedexListaDelPeriodo();
   const cuenta = {
-    todos: fedex.length,
-    entregado: fedex.filter(f => (f.estado_envio||'').toLowerCase() === 'entregado').length,
-    transito: fedex.filter(f => ['en ruta','recibido por fedex'].includes((f.estado_envio||'').toLowerCase())).length,
-    retraso: fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length,
+    todos: delPeriodo.length,
+    entregado: delPeriodo.filter(f => (f.estado_envio||'').toLowerCase() === 'entregado').length,
+    transito: delPeriodo.filter(f => ['en ruta','recibido por fedex'].includes((f.estado_envio||'').toLowerCase())).length,
+    retraso: delPeriodo.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length,
   };
   document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
     `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} (${cuenta[c.id]})</button>`
@@ -2919,7 +2987,7 @@ function coincideCategoriaFedex(f, categoria) {
 function filterFedex() {
   const q = document.getElementById('fedex-search').value;
   const estado = document.getElementById('fedex-estado').value;
-  fedexF = fedex.filter(f => {
+  fedexF = fedexListaDelPeriodo().filter(f => {
     const s = `${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.orden_transporte||''} ${f.factura||''} ${f.recibido_por||''}`;
     return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado) && coincideCategoriaFedex(f, fedexCategoriaActiva);
   });
@@ -2934,11 +3002,12 @@ function renderFedex() {
   document.getElementById('fedex-info').textContent = `${total.toLocaleString('es-CL')} envíos`;
   renderPages('fedex-pages', total, pages, fedexPage, 'goFedex');
   if (!slice.length) {
+    const nombrePeriodo = fedexPeriodo ? `${MESES_NOMBRE[fedexPeriodo.mes]} ${fedexPeriodo.anio}` : 'todos los períodos';
     const mensajes = {
-      todos: 'No encontramos envíos con esos criterios.',
-      retraso: '✓ No hay envíos con retraso.',
-      transito: 'No hay envíos en tránsito en este momento.',
-      entregado: 'No hay envíos entregados con esos criterios.',
+      todos: `No encontramos envíos en ${nombrePeriodo}.`,
+      retraso: `✓ No hay envíos con retraso en ${nombrePeriodo}.`,
+      transito: `No hay envíos en tránsito en ${nombrePeriodo}.`,
+      entregado: `No hay envíos entregados en ${nombrePeriodo}.`,
     };
     const hayFiltroActivo = document.getElementById('fedex-search').value || document.getElementById('fedex-estado').value;
     document.getElementById('fedex-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!hayFiltroActivo?'✓':'🔍'}</div><p>${hayFiltroActivo ? 'No encontramos envíos con esos criterios.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
