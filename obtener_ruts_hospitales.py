@@ -156,7 +156,7 @@ def main():
         time.sleep(1.5)  # pausa conservadora entre consultas
 
     if filas:
-        supabase.table("hospitales_maestro").upsert(filas, on_conflict="nombre_original").execute()
+        supabase.table("hospitales_maestro").upsert(filas, on_conflict="nombre_original", returning="minimal").execute()
         print(f"\n✔ {len(filas)} hospitales guardados en hospitales_maestro")
     else:
         print("\n⚠ No se guardó ningún hospital")
