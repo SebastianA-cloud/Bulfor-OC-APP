@@ -208,7 +208,7 @@ def transformar_items(codigo_oc, fecha_oc, hospital, region, items_raw):
 def guardar_oc(ocs_data):
     if not ocs_data:
         return
-    supabase.table("ordenes_compra").upsert(ocs_data, on_conflict="codigooc").execute()
+    supabase.table("ordenes_compra").upsert(ocs_data, on_conflict="codigooc", returning="minimal").execute()
     print(f"  ✔ {len(ocs_data)} OC guardadas en Supabase")
 
 
@@ -218,7 +218,7 @@ def guardar_items(items_data):
     CHUNK = 200
     for i in range(0, len(items_data), CHUNK):
         chunk = items_data[i:i + CHUNK]
-        supabase.table("items_oc").upsert(chunk, on_conflict="codigooc,correlativoitem").execute()
+        supabase.table("items_oc").upsert(chunk, on_conflict="codigooc,correlativoitem", returning="minimal").execute()
     print(f"  ✔ {len(items_data)} ítems guardados en Supabase")
 
 
