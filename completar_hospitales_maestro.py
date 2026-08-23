@@ -125,7 +125,7 @@ def main():
         time.sleep(1.5)  # pausa conservadora entre consultas a la API
 
     if filas:
-        supabase.table("hospitales_maestro").upsert(filas, on_conflict="nombre_original").execute()
+        supabase.table("hospitales_maestro").upsert(filas, on_conflict="nombre_original", returning="minimal").execute()
         print(f"\n✔ {len(filas)} hospitales agregados a hospitales_maestro")
         print(f"  → {heredados} quedaron normalizados solos (heredaron nombre estándar existente)")
         print(f"  → {len(filas) - heredados} quedaron pendientes de normalizar en la app")
