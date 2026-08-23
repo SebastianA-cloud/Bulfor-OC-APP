@@ -192,23 +192,27 @@ def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
     return docs
 
 
-def recuperar_xml_documento(folio, rut_proveedor):
-    """Trae el XML COMPLETO de una factura recibida puntual (con sus
-    productos) — mismo caso de uso 'Recuperar XML' que usa
-    sincronizar_documentos_gdexpress.py para las facturas emitidas.
+def recuperar_xml_documento(folio, rut_proveedor, doc_type="33"):
+    """Trae el XML COMPLETO de un documento recibido puntual (factura o
+    nota de crédito) — mismo caso de uso 'Recuperar XML' que usa
+    sincronizar_documentos_gdexpress.py para los documentos emitidos.
 
     OJO: el parámetro "Rut" de esta API siempre significa 'RUT de quien
-    EMITIÓ el documento' — pase lo que pase con "Group". Para facturas
-    recibidas, quien emite es el PROVEEDOR (distinto en cada factura), no
-    Bulfor — por eso este parámetro cambia según la factura, y no es un
-    valor fijo como en el script de facturas emitidas."""
+    EMITIÓ el documento' — pase lo que pase con "Group". Para documentos
+    recibidos, quien emite es el PROVEEDOR (distinto en cada documento), no
+    Bulfor — por eso este parámetro cambia según el documento, y no es un
+    valor fijo como en el script de documentos emitidos.
+
+    doc_type: "33" para facturas, "61" para notas de crédito — tienen que
+    coincidir con el tipo real del documento o GDExpress no lo encuentra
+    (aunque el folio y el RUT estén perfectos)."""
     url = f"http://{DTEBOX_IP}/api/Core.svc/core/RecoverXML_V2"
     headers = {'AuthKey': AUTH_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'}
     body = {
         "Environment": AMBIENTE,
         "Group": GRUPO,
         "Rut": rut_proveedor,
-        "DocType": "33",
+        "DocType": doc_type,
         "Folio": str(folio),
         "IsForDistribution": "true",
     }
@@ -321,8 +325,8 @@ def sincronizar_detalle_pendiente(limite=150):
         try:
             if items:
                 filas_items = [{**it, 'factura_id': f['id']} for it in items]
-                supabase.table('facturas_por_pagar_items').insert(filas_items, returning="minimal").execute()
-            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}, returning="minimal").eq('id', f['id']).execute()
+                supabase.table('facturas_por_pagar_items').insert(filas_items).execute()
+            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}).eq('id', f['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Factura {f['factura']}: no se pudo guardar en Supabase — {e}")
@@ -367,7 +371,7 @@ def sincronizar_facturas(fecha_minima, fecha_maxima):
 
         filas = [d for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
         if filas:
-            supabase.table('facturas_por_pagar').upsert(filas, on_conflict='rut_proveedor,factura', returning="minimal").execute()
+            supabase.table('facturas_por_pagar').upsert(filas, on_conflict='rut_proveedor,factura').execute()
             total_procesadas += len(filas)
 
         if pagina >= total_paginas:
@@ -421,7 +425,7 @@ def sincronizar_notas_credito_recibidas(fecha_minima, fecha_maxima):
             'fecha_emision': d['fecha_emision'], 'monto': d['monto'], 'monto_total': d['monto_total'],
         } for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
         if filas:
-            supabase.table('notas_credito_recibidas').upsert(filas, on_conflict='rut_proveedor,folio', returning="minimal").execute()
+            supabase.table('notas_credito_recibidas').upsert(filas, on_conflict='rut_proveedor,folio').execute()
             total_procesadas += len(filas)
 
         if pagina >= total_paginas:
@@ -446,7 +450,7 @@ def sincronizar_detalle_nc_pendiente(limite=150):
     ok, anuladas, fallidos = 0, 0, 0
     for nc in pendientes:
         try:
-            xml_bytes = recuperar_xml_documento(nc['folio'], nc['rut_proveedor'])
+            xml_bytes = recuperar_xml_documento(nc['folio'], nc['rut_proveedor'], doc_type="61")
         except Exception as e:
             print(f"  ✗ NC {nc['folio']}: no se pudo traer el XML — {e}")
             fallidos += 1
@@ -466,7 +470,7 @@ def sincronizar_detalle_nc_pendiente(limite=150):
             supabase.table('notas_credito_recibidas').update({
                 'detalle_sincronizado': True,
                 'factura_ref': factura_ref,
-            }, returning="minimal").eq('id', nc['id']).execute()
+            }).eq('id', nc['id']).execute()
 
             if factura_ref:
                 res_upd = supabase.table('facturas_por_pagar') \
