@@ -126,7 +126,7 @@ def main():
         docs = documentos_desde_xml(xml_bytes)
         recientes = [d for d in docs if d['factura'] and d['fecha_emision'] and d['fecha_emision'] >= FECHA_MINIMA]
         if recientes:
-            supabase.table('facturas_pago').upsert(recientes, on_conflict='factura').execute()
+            supabase.table('facturas_pago').upsert(recientes, on_conflict='factura', returning="minimal").execute()
             total_julio_en_adelante += len(recientes)
             facturas_encontradas.extend(d['factura'] for d in recientes)
 
