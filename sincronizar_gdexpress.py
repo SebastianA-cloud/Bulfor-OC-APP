@@ -326,8 +326,8 @@ def sincronizar_detalle_pendiente(limite=150):
         try:
             if items:
                 filas_items = [{**it, 'factura_id': f['id']} for it in items]
-                supabase.table('facturas_por_pagar_items').insert(filas_items).execute()
-            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}).eq('id', f['id']).execute()
+                supabase.table('facturas_por_pagar_items').insert(filas_items, returning="minimal").execute()
+            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}, returning="minimal").eq('id', f['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Factura {f['factura']}: no se pudo guardar en Supabase — {e}")
@@ -372,7 +372,7 @@ def sincronizar_facturas(fecha_minima, fecha_maxima):
 
         filas = [d for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
         if filas:
-            supabase.table('facturas_por_pagar').upsert(filas, on_conflict='rut_proveedor,factura').execute()
+            supabase.table('facturas_por_pagar').upsert(filas, on_conflict='rut_proveedor,factura', returning="minimal").execute()
             total_procesadas += len(filas)
 
         if pagina >= total_paginas:
@@ -426,7 +426,7 @@ def sincronizar_notas_credito_recibidas(fecha_minima, fecha_maxima):
             'fecha_emision': d['fecha_emision'], 'monto': d['monto'], 'monto_total': d['monto_total'],
         } for d in docs if d['factura'] and d['rut_proveedor'] and d['fecha_emision'] and d['fecha_emision'] >= fecha_minima]
         if filas:
-            supabase.table('notas_credito_recibidas').upsert(filas, on_conflict='rut_proveedor,folio').execute()
+            supabase.table('notas_credito_recibidas').upsert(filas, on_conflict='rut_proveedor,folio', returning="minimal").execute()
             total_procesadas += len(filas)
 
         if pagina >= total_paginas:
@@ -471,7 +471,7 @@ def sincronizar_detalle_nc_pendiente(limite=150):
             supabase.table('notas_credito_recibidas').update({
                 'detalle_sincronizado': True,
                 'factura_ref': factura_ref,
-            }).eq('id', nc['id']).execute()
+            }, returning="minimal").eq('id', nc['id']).execute()
 
             if factura_ref:
                 res_upd = supabase.table('facturas_por_pagar') \
