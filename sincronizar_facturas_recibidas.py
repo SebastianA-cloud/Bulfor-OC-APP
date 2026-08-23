@@ -302,13 +302,25 @@ def sincronizar_detalle_pendiente(limite=150):
     pendientes = res.data or []
     print(f"{len(pendientes)} facturas sin detalle todavía")
 
-    ok, ok_sin_items, fallidos = 0, 0, 0
+    ok, ok_sin_items, fallidos, sin_xml_disponible = 0, 0, 0, 0
     for f in pendientes:
         try:
             xml_bytes = recuperar_xml_documento(f['factura'], f['rut_proveedor'])
         except Exception as e:
-            print(f"  ✗ Factura {f['factura']}: no se pudo traer el XML — {e}")
-            fallidos += 1
+            mensaje = str(e)
+            # "no recibido en la plataforma" / "no encontrado" son respuestas
+            # DEFINITIVAS de GDExpress (no van a cambiar si lo reintentamos) —
+            # así que igual se marca como revisada, sin productos, para que
+            # no se quede bloqueando la cola por siempre y las demás
+            # facturas puedan tener su turno. Otros errores (red, timeout)
+            # sí se reintentan en la próxima corrida, como antes.
+            if 'no recibido en la plataforma' in mensaje.lower() or 'no encontrado' in mensaje.lower():
+                print(f"  — Factura {f['factura']}: GDExpress no tiene ese XML disponible — se marca igual, sin productos.")
+                supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}, returning="minimal").eq('id', f['id']).execute()
+                sin_xml_disponible += 1
+            else:
+                print(f"  ✗ Factura {f['factura']}: no se pudo traer el XML — {e}")
+                fallidos += 1
             time.sleep(1)
             continue
 
@@ -325,15 +337,15 @@ def sincronizar_detalle_pendiente(limite=150):
         try:
             if items:
                 filas_items = [{**it, 'factura_id': f['id']} for it in items]
-                supabase.table('facturas_por_pagar_items').insert(filas_items).execute()
-            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}).eq('id', f['id']).execute()
+                supabase.table('facturas_por_pagar_items').insert(filas_items, returning="minimal").execute()
+            supabase.table('facturas_por_pagar').update({'detalle_sincronizado': True}, returning="minimal").eq('id', f['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Factura {f['factura']}: no se pudo guardar en Supabase — {e}")
             fallidos += 1
         time.sleep(1)
 
-    print(f"✔ Detalle traído: {ok} facturas guardadas ({ok - ok_sin_items} con productos, {ok_sin_items} solo marcadas). Fallidos de verdad: {fallidos}.")
+    print(f"✔ Detalle traído: {ok} facturas guardadas ({ok - ok_sin_items} con productos, {ok_sin_items} solo marcadas). Sin XML disponible en GDExpress (marcadas igual, no se reintentan más): {sin_xml_disponible}. Fallidos de verdad (se reintentan): {fallidos}.")
 
 
 def sincronizar_facturas(fecha_minima, fecha_maxima):
@@ -447,13 +459,19 @@ def sincronizar_detalle_nc_pendiente(limite=150):
     pendientes = res.data or []
     print(f"{len(pendientes)} notas de crédito sin revisar todavía")
 
-    ok, anuladas, fallidos = 0, 0, 0
+    ok, anuladas, fallidos, sin_xml_disponible = 0, 0, 0, 0
     for nc in pendientes:
         try:
             xml_bytes = recuperar_xml_documento(nc['folio'], nc['rut_proveedor'], doc_type="61")
         except Exception as e:
-            print(f"  ✗ NC {nc['folio']}: no se pudo traer el XML — {e}")
-            fallidos += 1
+            mensaje = str(e)
+            if 'no recibido en la plataforma' in mensaje.lower() or 'no encontrado' in mensaje.lower():
+                print(f"  — NC {nc['folio']}: GDExpress no tiene ese XML disponible — se marca igual, sin poder saber a qué factura anula.")
+                supabase.table('notas_credito_recibidas').update({'detalle_sincronizado': True}, returning="minimal").eq('id', nc['id']).execute()
+                sin_xml_disponible += 1
+            else:
+                print(f"  ✗ NC {nc['folio']}: no se pudo traer el XML — {e}")
+                fallidos += 1
             time.sleep(1)
             continue
 
@@ -485,7 +503,7 @@ def sincronizar_detalle_nc_pendiente(limite=150):
             fallidos += 1
         time.sleep(1)
 
-    print(f"✔ Revisadas: {ok} notas de crédito ({anuladas} facturas marcadas como anuladas). Fallidos de verdad: {fallidos}.")
+    print(f"✔ Revisadas: {ok} notas de crédito ({anuladas} facturas marcadas como anuladas). Sin XML disponible en GDExpress: {sin_xml_disponible}. Fallidos de verdad (se reintentan): {fallidos}.")
 
 
 def main():
