@@ -163,7 +163,7 @@ def sincronizar_tipo(tipo_dte, nombre):
         docs = documentos_desde_xml(xml_bytes, tipo_dte)
         filas = [d for d in docs if d['folio']]
         if filas:
-            supabase.table('documentos_gdexpress').upsert(filas, on_conflict='tipo_dte,folio').execute()
+            supabase.table('documentos_gdexpress').upsert(filas, on_conflict='tipo_dte,folio', returning="minimal").execute()
             total_procesadas += len(filas)
         print(f"  {len(filas)} documentos guardados")
 
@@ -378,7 +378,7 @@ def sincronizar_detalle_pendiente(limite=150):
         try:
             if items:
                 filas_items = [{**it, 'documento_id': doc['id']} for it in items]
-                supabase.table('documentos_gdexpress_items').insert(filas_items).execute()
+                supabase.table('documentos_gdexpress_items').insert(filas_items, returning="minimal").execute()
 
             update = {
                 'detalle_sincronizado': True,
@@ -390,7 +390,7 @@ def sincronizar_detalle_pendiente(limite=150):
                 update['monto_total'] = monto_total
             if nc_factura_ref:
                 update['nc_factura_ref'] = nc_factura_ref
-            supabase.table('documentos_gdexpress').update(update).eq('id', doc['id']).execute()
+            supabase.table('documentos_gdexpress').update(update, returning="minimal").eq('id', doc['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): no se pudo guardar en Supabase — {e}")
@@ -450,7 +450,7 @@ def corregir_oc_ref_desde_xml_completo(limite=300):
         except Exception:
             oc_ref = None
         if oc_ref:
-            supabase.table('documentos_gdexpress').update({'orden_compra_ref': oc_ref}).eq('id', fila['id']).execute()
+            supabase.table('documentos_gdexpress').update({'orden_compra_ref': oc_ref}, returning="minimal").eq('id', fila['id']).execute()
             ok += 1
     print(f"✔ {ok} N° de OC rescatados del XML.")
 
@@ -470,7 +470,7 @@ def corregir_fechas_desde_xml_completo(limite=300):
         xml_texto = fila.get('xml_completo') or ''
         m = re.search(r'<FchEmis>([\d-]{10})</FchEmis>', xml_texto)
         if m:
-            supabase.table('documentos_gdexpress').update({'fecha_emision': m.group(1)}).eq('id', fila['id']).execute()
+            supabase.table('documentos_gdexpress').update({'fecha_emision': m.group(1)}, returning="minimal").eq('id', fila['id']).execute()
             ok += 1
     print(f"✔ {ok} fechas rescatadas del XML.")
 
@@ -506,7 +506,7 @@ def actualizar_estado_fiscal(limite=200):
                 update['estado_aceptacion'] = nuevo_estado
                 if nuevo_estado == 'N':
                     cambios_a_rechazado.append(f"{doc['tipo_dte']}-{doc['folio']}")
-            supabase.table('documentos_gdexpress').update(update).eq('id', doc['id']).execute()
+            supabase.table('documentos_gdexpress').update(update, returning="minimal").eq('id', doc['id']).execute()
             ok += 1
         except Exception as e:
             print(f"  ✗ Folio {doc['folio']} (tipo {doc['tipo_dte']}): {e}")
@@ -536,7 +536,7 @@ def corregir_monto_total_desde_xml_completo(limite=300):
         except Exception:
             monto_total = None
         if monto_total is not None:
-            supabase.table('documentos_gdexpress').update({'monto_total': monto_total}).eq('id', fila['id']).execute()
+            supabase.table('documentos_gdexpress').update({'monto_total': monto_total}, returning="minimal").eq('id', fila['id']).execute()
             ok += 1
     print(f"✔ {ok} montos totales rescatados del XML.")
 
@@ -558,7 +558,7 @@ def corregir_nc_factura_ref_desde_xml_completo(limite=300):
         except Exception:
             nc_ref = None
         if nc_ref:
-            supabase.table('documentos_gdexpress').update({'nc_factura_ref': nc_ref}).eq('id', fila['id']).execute()
+            supabase.table('documentos_gdexpress').update({'nc_factura_ref': nc_ref}, returning="minimal").eq('id', fila['id']).execute()
             ok += 1
     print(f"✔ {ok} referencias de factura rescatadas del XML.")
 
