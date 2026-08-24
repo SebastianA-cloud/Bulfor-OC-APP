@@ -5173,11 +5173,51 @@ function abrirGestionProveedores() {
             <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarProveedorCuenta(this)">Guardar proveedor</button>
           </div>
         </div>
+        <div id="prov-pendientes"></div>
         <div id="prov-lista"></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  renderProveedoresPendientes();
   renderListaProveedoresCuentas();
+}
+
+// Proveedores que aparecen en Facturas por pagar pero todavía no tienen
+// cuenta bancaria cargada — para saber a quién le falta sin tener que
+// revisar factura por factura ni repetir el trabajo ya hecho.
+function proveedoresSinCuenta() {
+  const conCuenta = new Set(proveedoresCuentas.map(p => p.rut_proveedor));
+  const vistos = new Map(); // rut -> nombre (el nombre más reciente que aparezca)
+  facturasPorPagar.forEach(f => {
+    if (!f.rut_proveedor || conCuenta.has(f.rut_proveedor)) return;
+    if (!vistos.has(f.rut_proveedor) || f.proveedor) vistos.set(f.rut_proveedor, f.proveedor || vistos.get(f.rut_proveedor) || '');
+  });
+  return Array.from(vistos.entries())
+    .map(([rut, nombre]) => ({ rut, nombre }))
+    .sort((a,b) => (a.nombre||a.rut).localeCompare(b.nombre||b.rut, 'es', {sensitivity:'base'}));
+}
+
+function renderProveedoresPendientes() {
+  const cont = document.getElementById('prov-pendientes');
+  const pendientes = proveedoresSinCuenta();
+  if (!pendientes.length) {
+    cont.innerHTML = `<div style="font-size:12px;color:var(--green);margin-bottom:16px">✓ Todos los proveedores de Facturas por pagar ya tienen cuenta cargada.</div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div style="border:1px solid var(--amber);background:var(--amber-light,rgba(217,119,6,.06));border-radius:var(--radius);padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Sin cuenta cargada (${pendientes.length})</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Aparecen en Facturas por pagar. Haz clic en uno para completar sus datos abajo.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${pendientes.map(p => `<button onclick="prellenarProveedorPendiente('${p.rut.replace(/'/g,"\\'")}','${(p.nombre||'').replace(/'/g,"\\'")}')" style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text)">${escapeHtml(p.nombre || p.rut)} <span class="mono" style="color:var(--text-3);font-size:10px">${p.rut}</span></button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function prellenarProveedorPendiente(rut, nombre) {
+  document.getElementById('prov-rut').value = rut;
+  document.getElementById('prov-nombre').value = nombre || '';
+  document.getElementById('prov-banco').focus();
 }
 
 function renderListaProveedoresCuentas() {
@@ -5227,6 +5267,7 @@ async function guardarProveedorCuenta(btnEl) {
       proveedoresCuentas.sort((a,b) => (a.nombre_proveedor||'').localeCompare(b.nombre_proveedor||''));
     }
     ['prov-rut','prov-nombre','prov-banco','prov-tipo','prov-numero','prov-email'].forEach(id => document.getElementById(id).value = '');
+    renderProveedoresPendientes();
     renderListaProveedoresCuentas();
     toast('Proveedor guardado');
   } catch (e) {
