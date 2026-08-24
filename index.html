@@ -4241,19 +4241,24 @@ function renderDocumentosGdexpress(soloTabla) {
     `<button class="fpp-status-tab${docTiposActivos[t] ? ' active' : ''}" onclick="docToggleTipo('${t}')">${docTiposActivos[t] ? '✓' : '○'} ${TIPOS_DTE_INFO[t].nombre} (${cuenta[t]})</button>`
   ).join('');
 
-  // Resumen compacto del período. "Total facturado" es el neto real:
-  // facturas MENOS notas de crédito (una NC anula o corrige plata ya
-  // facturada, así que sí corresponde restarla acá). Las guías se muestran
-  // aparte — no son una venta facturada todavía, son mercadería despachada
-  // que todavía no se convirtió en factura.
-  const totalFacturasBrutas = delPeriodo.filter(d => d.tipo_dte === '33').reduce((s,d) => s + montoTotalDoc(d), 0);
+  // Resumen compacto del período. "Total facturado" ahora usa EXACTAMENTE el
+  // mismo criterio que Seguimiento de pago: cada factura que tiene una NC
+  // que la anula (nc_factura_ref) se excluye por completo del total — no se
+  // le resta solo el monto de la NC. Antes estos dos números no calzaban
+  // porque cada pantalla los calculaba distinto; ahora es el mismo criterio
+  // en los dos lados. Las guías se muestran aparte — no son una venta
+  // facturada todavía, son mercadería despachada que no se ha facturado.
+  const facturasDelPeriodo = delPeriodo.filter(d => d.tipo_dte === '33');
+  const facturasAnuladasPorNC = facturasDelPeriodo.filter(d => estadoAceptacionFusionado(d) === 'N');
+  const totalFacturado = facturasDelPeriodo
+    .filter(d => estadoAceptacionFusionado(d) !== 'N')
+    .reduce((s,d) => s + montoTotalDoc(d), 0);
   const totalNotasCredito = delPeriodo.filter(d => d.tipo_dte === '61').reduce((s,d) => s + montoTotalDoc(d), 0);
-  const totalFacturado = totalFacturasBrutas - totalNotasCredito;
   const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
   document.getElementById('doc-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Total facturado (con IVA, neto de NC)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
+    <div class="stat destacado"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
     <div class="stat"><div class="stat-label">Facturas</div><div class="stat-val" style="font-size:16px">${cuenta['33']}</div></div>
-    <div class="stat"><div class="stat-label">Notas de crédito</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '-' + clp(totalNotasCredito) : '—'}</div></div>
+    <div class="stat" title="Facturas del período excluidas del total por tener una NC que las anula"><div class="stat-label">Anuladas por NC</div><div class="stat-val" style="font-size:16px;color:var(--red)">${facturasAnuladasPorNC.length || '—'}</div></div>
     <div class="stat"><div class="stat-label">Guías de despacho (por facturar)</div><div class="stat-val" style="font-size:16px;color:var(--amber)">${clp(totalGuiasPorFacturar)}</div></div>`;
 
   const ningunTipoActivo = !docTiposActivos['33'] && !docTiposActivos['61'] && !docTiposActivos['52'];
