@@ -1332,6 +1332,7 @@ async function init() {
     recalcularProductoPorOC();
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
+    await sincronizarFacturasPagoDesdeGdexpress();
     populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit(); oeInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
@@ -3476,6 +3477,44 @@ async function guardarTelefonoPaciente(id, btnEl) {
 // las facturas sin fecha de pago, sin importar el mes, para ir marcándolas.
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+// Seguimiento de pago (facturas_pago) antes SOLO se llenaba con el Excel de
+// pagos que se sube a mano — y ese Excel no trae la fecha de emisión real,
+// así que las facturas nuevas quedaban sin fila hasta que aparecían pagadas
+// en algún listado. Ahora, cada vez que se abre la app, se revisa si hay
+// facturas en documentos_gdexpress (la fuente completa y correcta) que
+// todavía no tengan su fila en facturas_pago, y se crean — SIN estado de
+// pago (quedan como pendientes hasta que tú las marques o subas el Excel).
+// El Excel de pagos sigue funcionando igual que antes para ACTUALIZAR pagos.
+async function sincronizarFacturasPagoDesdeGdexpress() {
+  if (sesionActual?.rol !== 'editor') return; // los viewers no pueden escribir — evitamos mostrarles un error por algo que no hicieron ellos
+  const existentes = new Set(facturasPago.map(f => String(f.factura)));
+  const faltantes = documentosGdexpress.filter(d => d.tipo_dte === '33' && d.folio && !existentes.has(String(d.folio)));
+  if (!faltantes.length) return;
+
+  const nuevas = faltantes.map(d => ({
+    factura: String(d.folio),
+    rut_hospital: d.rut_hospital || null,
+    hospital: d.hospital || null,
+    fecha_emision: d.fecha_emision || null,
+    monto: d.monto ?? null,
+    estado_aceptacion: d.estado_aceptacion || null,
+  }));
+
+  try {
+    const res = await sb(`facturas_pago?on_conflict=factura`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify(nuevas),
+    });
+    if (res.ok) {
+      const creadas = await res.json();
+      if (Array.isArray(creadas) && creadas.length) facturasPago = facturasPago.concat(creadas);
+    }
+  } catch (e) {
+    console.error('No se pudo sincronizar facturas_pago desde documentos_gdexpress:', e);
+  }
+}
+
 function fechaReferenciaFactura(f) {
   // Para agrupar por año/mes usamos la fecha de emisión; si no la tiene
   // (puede pasar con facturas creadas solo desde el listado de pagos),
@@ -5304,8 +5343,8 @@ function importarListadoPagos(file) {
       const porFactura = {};
       facturasPago.forEach(f => { porFactura[String(f.factura)] = f; });
 
-      let rellenadas = 0, creadas = 0, sinCambio = 0;
-      const nuevasParaCrear = [];
+      let rellenadas = 0, sinCambio = 0;
+      const noReconocidas = [];
 
       for (const fila of filas) {
         const factura = String(fila[iFactura]);
@@ -5328,40 +5367,21 @@ function importarListadoPagos(file) {
             sinCambio++; // ya tenía fecha de pago — no se toca, tal como pediste
           }
         } else {
-          nuevasParaCrear.push({
-            factura,
-            rut_hospital: iRut >= 0 ? fila[iRut] : null,
-            hospital: iHospital >= 0 ? fila[iHospital] : null,
-            fecha_emision: null,
-            monto: iMonto >= 0 ? parseMontoFlexible(fila[iMonto]) : null,
-            estado_aceptacion: null,
-            fecha_pago: fechaPago,
-            estado_pago: estadoPago || null,
-            mes_origen: null,
-          });
-        }
-      }
-
-      if (nuevasParaCrear.length) {
-        const CHUNK = 200;
-        for (let i=0; i<nuevasParaCrear.length; i+=CHUNK) {
-          const chunk = nuevasParaCrear.slice(i, i+CHUNK);
-          const res = await sb('facturas_pago?on_conflict=factura', {
-            method: 'POST',
-            headers: { 'Prefer': 'resolution=ignore-duplicates,return=representation' },
-            body: JSON.stringify(chunk)
-          });
-          if (res.ok) {
-            const insertadas = await res.json();
-            facturasPago = facturasPago.concat(insertadas);
-            creadas += insertadas.length;
-          }
+          // Este Excel es SOLO para actualizar pagos — ya no crea facturas
+          // nuevas con datos incompletos (sin fecha de emisión real). Las
+          // facturas nuevas se crean solas desde documentos_gdexpress al
+          // abrir la app (sincronizarFacturasPagoDesdeGdexpress). Si esta
+          // factura todavía no aparece aquí, probablemente GDExpress aún no
+          // la ha sincronizado — se resolverá sola apenas lo haga.
+          noReconocidas.push(factura);
         }
       }
 
       logPagos(`✔ ${rellenadas} facturas actualizadas con su fecha/estado de pago.`, 'ok');
-      logPagos(`✔ ${creadas} facturas nuevas creadas (no existían, solo tenían el pago).`, 'ok');
       logPagos(`— ${sinCambio} ya tenían fecha de pago, no se tocaron.`, 'ok');
+      if (noReconocidas.length) {
+        logPagos(`⚠ ${noReconocidas.length} factura${noReconocidas.length===1?'':'s'} de este Excel todavía no existe en Seguimiento de pago (probablemente GDExpress aún no la sincroniza) — no se creó a ciegas, se agregará sola apenas exista: ${noReconocidas.slice(0,15).join(', ')}${noReconocidas.length>15?'…':''}`, 'err');
+      }
       renderPagosVista();
     } catch(e) {
       logPagos('✗ Error: ' + e.message, 'err');
