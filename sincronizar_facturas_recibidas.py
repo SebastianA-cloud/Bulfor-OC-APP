@@ -120,10 +120,16 @@ def gdexpress_get(pagina, consulta, max_reintentos=6):
 def parse_fecha(texto):
     if not texto:
         return None
-    try:
-        return datetime.strptime(texto[:19], '%Y-%m-%dT%H:%M:%S').strftime('%Y-%m-%d')
-    except Exception:
-        return None
+    # GDExpress no es consistente: algunos campos (DueDate, FchEmis) traen
+    # fecha+hora ("2024-02-01T00:00:00") y otros (FchVenc) traen SOLO la
+    # fecha ("2024-02-01") — sin esto, cualquier campo del segundo tipo
+    # fallaba en silencio y el código caía al siguiente campo disponible.
+    for formato in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(texto[:19], formato).strftime('%Y-%m-%d')
+        except Exception:
+            continue
+    return None
 
 
 def es_verdadero(texto):
