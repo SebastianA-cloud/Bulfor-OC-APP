@@ -170,7 +170,7 @@ def documentos_desde_xml(xml_bytes, imprimir_diagnostico=False):
         fecha_emision = parse_fecha(campo('FchEmis'))
         # Si no trae vencimiento, vence "al día" (misma fecha de emisión) —
         # así lo pidió Sebastián en vez de dejarlo vacío.
-        fecha_vencimiento = parse_fecha(campo('DueDate')) or fecha_emision
+        fecha_vencimiento = parse_fecha(campo('FchVenc')) or parse_fecha(campo('DueDate')) or fecha_emision
 
         monto_neto = float(campo('MntNeto')) if campo('MntNeto') else None
         # Por si esta respuesta liviana sí trae el total con IVA — si no
