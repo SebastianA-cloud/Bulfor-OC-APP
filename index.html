@@ -493,7 +493,7 @@
     <div class="nav-section-label">Compras</div>
 
     <div class="nav-group" data-modulo="oc-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo')" title="Órdenes de Compra">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo', true)" title="Órdenes de Compra">
         <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span>
         <span style="flex:1">Órdenes de Compra</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
@@ -508,7 +508,7 @@
     </div>
 
     <div class="nav-group" data-modulo="facturas">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas')" title="Facturas">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas">
         <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
         <span style="flex:1">Facturas</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
@@ -524,7 +524,7 @@
     </div>
 
     <div class="nav-group" data-modulo="fedex">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="Seguimiento FedEx">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex', true)" title="Seguimiento FedEx">
         <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span style="flex:1">Seguimiento FedEx</span>
       </div>
     </div>
@@ -532,7 +532,7 @@
     <div class="nav-section-label">Operaciones</div>
 
     <div class="nav-group" data-modulo="elaboracion">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion')" title="Órdenes de Elaboración">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion', true)" title="Órdenes de Elaboración">
         <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de Elaboración</span>
         <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
@@ -545,7 +545,7 @@
     </div>
 
     <div class="nav-group" data-modulo="farmacia-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo')" title="Control Farmacia">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo', true)" title="Control Farmacia">
         <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span>
         <span style="flex:1">Control Farmacia</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
@@ -562,7 +562,7 @@
     <div class="nav-section-label">Gestión</div>
 
     <div class="nav-group" data-modulo="rrhh">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh')" title="Recursos Humanos">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh', true)" title="Recursos Humanos">
         <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span style="flex:1">Recursos Humanos</span>
       </div>
     </div>
@@ -574,23 +574,23 @@
   <div class="tab-item active" data-modulo="inicio" onclick="irAInicio()">
     <i class="ti ti-home" aria-hidden="true"></i><span>Inicio</span>
   </div>
-  <div class="tab-item" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo', this)">
+  <div class="tab-item" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')">
     <i class="ti ti-shopping-cart" aria-hidden="true"></i><span>OC</span>
   </div>
-  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas', this)">
+  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')">
     <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
   </div>
-  <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex', this)">
+  <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex')">
     <i class="ti ti-truck" aria-hidden="true"></i><span>FedEx</span>
   </div>
-  <div class="tab-item" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion', this)" style="position:relative">
+  <div class="tab-item" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')" style="position:relative">
     <i class="ti ti-flask" aria-hidden="true"></i><span>Elaborac.</span>
     <span id="badge-oe-digitar-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
   </div>
-  <div class="tab-item" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo', this)">
+  <div class="tab-item" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')">
     <i class="ti ti-first-aid-kit" aria-hidden="true"></i><span>Farmacia</span>
   </div>
-  <div class="tab-item" data-modulo="rrhh" onclick="mostrarModulo('rrhh', this)">
+  <div class="tab-item" data-modulo="rrhh" onclick="mostrarModulo('rrhh')">
     <i class="ti ti-users" aria-hidden="true"></i><span>RRHH</span>
   </div>
 </nav>
@@ -8186,11 +8186,15 @@ function marcarModuloActivoEnNav(modulo) {
   document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
 }
 
-// ─── Accordion: patrón "solo un módulo expandido a la vez". Un clic en un
-// módulo con varias subsecciones expande/colapsa su lista debajo del
-// propio ítem del sidebar, sin ocultar ni reemplazar el resto del menú
-// (reemplaza el viejo esquema de nav-submenu + "← Volver al menú").
-function mostrarModulo(modulo) {
+// ─── Accordion: patrón "solo un módulo expandido a la vez". Un clic en el
+// HEADER de un módulo con varias subsecciones (soloExpandir=true, viene del
+// sidebar de escritorio) solo despliega su lista hacia abajo — todavía no
+// navega a ninguna página, para no cargar la primera opción de golpe sin
+// que el usuario la haya elegido. Recién al hacer clic en una subsección
+// puntual (seleccionarSubpagina) se carga esa página. Cuando se llama sin
+// soloExpandir (barra inferior de celular, "Accesos frecuentes" de Inicio,
+// post-importación, etc.) navega directo, como antes.
+function mostrarModulo(modulo, soloExpandir) {
   const config = SUBMENUS[modulo];
   if (!config) return;
 
@@ -8198,7 +8202,12 @@ function mostrarModulo(modulo) {
   const esMultiItem = config.items.length > 1;
 
   document.querySelectorAll('.nav-group.abierto').forEach(g => { if (g !== grupo) g.classList.remove('abierto'); });
-  if (esMultiItem && grupo) grupo.classList.toggle('abierto');
+
+  if (esMultiItem && grupo && soloExpandir) {
+    grupo.classList.toggle('abierto');
+    return;
+  }
+  if (esMultiItem && grupo) grupo.classList.add('abierto');
 
   const pagina = ultimaSubpagina[modulo] || config.items[0].page;
   ultimaSubpagina[modulo] = pagina;
