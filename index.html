@@ -268,6 +268,14 @@
   .fpp-status-tab.active[data-estado="overdue"] { color: var(--red); }
   .fpp-status-tab.active[data-estado="pending"] { color: var(--amber); }
 
+  /* Alcance de búsqueda: "Este mes" vs "Todo" — aparece junto a un buscador
+     cuando hay período activo, para poder ampliar la búsqueda sin salir
+     del período que se está viendo. */
+  .alcance-busqueda { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; flex-shrink: 0; }
+  .alcance-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; border: none; background: none; font-family: var(--font); }
+  .alcance-btn:hover { color: var(--text); }
+  .alcance-btn.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(26,25,23,.08); }
+
   .fpp-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
   .fpp-resumen .stat { padding: 12px 14px; }
   .fpp-resumen .stat.destacado { background: var(--accent-light); border-color: var(--accent); }
@@ -673,6 +681,10 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="oc-search" placeholder="Buscar por hospital, N° OC, descripción…" oninput="filterOC()">
       </div>
+      <div class="alcance-busqueda" id="oc-alcance" style="display:none">
+        <button class="alcance-btn active" data-alcance="mes" onclick="ocSetAlcance('mes')">Este mes</button>
+        <button class="alcance-btn" data-alcance="todo" onclick="ocSetAlcance('todo')">Todo</button>
+      </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
       <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
       <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
@@ -783,6 +795,10 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="fpp-search" placeholder="Buscar por N° factura, proveedor o RUT…" oninput="fppBuscar(this.value)">
       </div>
+      <div class="alcance-busqueda" id="fpp-alcance" style="display:none">
+        <button class="alcance-btn active" data-alcance="mes" onclick="fppSetAlcance('mes')">Este mes</button>
+        <button class="alcance-btn" data-alcance="todo" onclick="fppSetAlcance('todo')">Todo</button>
+      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
     </div>
@@ -887,6 +903,10 @@
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="doc-search" placeholder="Buscar por N° documento, RUT, hospital, N° OC…" oninput="filtrarDocumentosGdexpress(this.value)">
+      </div>
+      <div class="alcance-busqueda" id="doc-alcance" style="display:none">
+        <button class="alcance-btn active" data-alcance="mes" onclick="docSetAlcance('mes')">Este mes</button>
+        <button class="alcance-btn" data-alcance="todo" onclick="docSetAlcance('todo')">Todo</button>
       </div>
     </div>
     <div id="doc-contenido"></div>
@@ -1028,6 +1048,10 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" oninput="filtrarPagosBusqueda(this.value)">
       </div>
+      <div class="alcance-busqueda" id="pagos-alcance" style="display:none">
+        <button class="alcance-btn active" data-alcance="mes" onclick="pagosSetAlcance('mes')">Este mes</button>
+        <button class="alcance-btn" data-alcance="todo" onclick="pagosSetAlcance('todo')">Todo</button>
+      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
     </div>
@@ -1051,13 +1075,26 @@
       <div class="page-title">Facturas rechazadas</div>
       <div class="page-sub">Bandeja de gestión — qué requiere que hagas algo, qué ya está en proceso, y qué quedó regularizado</div>
     </div>
-    <div class="fpp-status-tabs" id="rechazadas-tabs" style="margin-bottom:14px"></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="rechazadas-select-mes" onchange="rechazadasSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="rechazadas-select-anio" onchange="rechazadasSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <div class="fpp-status-tabs" id="rechazadas-tabs"></div>
+    </div>
     <div class="fpp-resumen" id="rechazadas-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="rechazadas-search" placeholder="Buscar por N° factura, RUT, hospital…" oninput="filtrarRechazadas(this.value)">
       </div>
+      <div class="alcance-busqueda" id="rechazadas-alcance" style="display:none">
+        <button class="alcance-btn active" data-alcance="mes" onclick="rechazadasSetAlcance('mes')">Este mes</button>
+        <button class="alcance-btn" data-alcance="todo" onclick="rechazadasSetAlcance('todo')">Todo</button>
+      </div>
+      <button class="page-btn" id="rechazadas-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="rechazadasVerTodasLasFechas()" title="Ver rechazadas de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
     </div>
     <div id="rechazadas-contenido"></div>
   </div>
@@ -1480,7 +1517,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit(); oeInit(); renderInicio();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); fedexInit(); oeInit(); renderInicio();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1519,12 +1556,22 @@ function rutDeHospital(nombreCrudo) {
   return mapaRutPorHospital[nombreCrudo] || mapaRutPorHospital[nombreHosp(nombreCrudo)] || '';
 }
 
+let ocAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
+
+function ocSetAlcance(v) {
+  ocAlcance = v;
+  document.querySelectorAll('#oc-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
+  filterOC();
+}
+
 function filterOC() {
   const q = document.getElementById('oc-search').value;
   const reg = document.getElementById('oc-region').value;
   const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
-  ocF = ocListaDelPeriodo().filter(r => {
+  document.getElementById('oc-alcance').style.display = (q && ocPeriodo) ? 'flex' : 'none';
+  const base = (q && ocAlcance === 'todo' && ocPeriodo) ? oc : ocListaDelPeriodo();
+  ocF = base.filter(r => {
     const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
@@ -3765,8 +3812,17 @@ function pagosSetEstado(estado) {
   renderPagosVista();
 }
 
+let pagosAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
+
+function pagosSetAlcance(v) {
+  pagosAlcance = v;
+  document.querySelectorAll('#pagos-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
+  renderPagosVista(true);
+}
+
 function filtrarPagosBusqueda(valor) {
   pagosBusqueda = valor;
+  document.getElementById('pagos-alcance').style.display = valor ? 'flex' : 'none';
   renderPagosVista(true);
 }
 
@@ -3827,6 +3883,9 @@ function renderPagosVista(soloTabla) {
     <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val" style="font-size:16px;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
 
   let lista = pagosEstadoFiltro === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaPago(f) === pagosEstadoFiltro);
+  if (pagosBusqueda && pagosAlcance === 'todo') {
+    lista = pagosEstadoFiltro === 'all' ? facturasPago : facturasPago.filter(f => categoriaPago(f) === pagosEstadoFiltro);
+  }
   lista = aplicarFiltroPagos(lista).sort(compararPorFolio);
 
   const nombrePeriodo = `${MESES_NOMBRE[pagosPeriodo.mes]} ${pagosPeriodo.anio}`;
@@ -3838,7 +3897,8 @@ function renderPagosVista(soloTabla) {
       overdue: `No hay facturas atrasadas en ${nombrePeriodo}.`,
       paid: `No hay facturas pagadas en ${nombrePeriodo}.`,
     };
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
+    const sugerenciaAmpliar = (pagosBusqueda && pagosAlcance === 'mes') ? ` <a onclick="pagosSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
     return;
   }
 
@@ -4350,8 +4410,17 @@ function cambiarTipoDocumento(tipo) {
   renderDocumentosGdexpress();
 }
 
+let docAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
+
+function docSetAlcance(v) {
+  docAlcance = v;
+  document.querySelectorAll('#doc-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
+  renderDocumentosGdexpress(true);
+}
+
 function filtrarDocumentosGdexpress(valor) {
   docBusqueda = valor;
+  document.getElementById('doc-alcance').style.display = valor ? 'flex' : 'none';
   renderDocumentosGdexpress(true);
 }
 
@@ -4454,7 +4523,7 @@ function renderDocumentosGdexpress(soloTabla) {
     return;
   }
 
-  let lista = delPeriodo.filter(d => docTiposActivos[d.tipo_dte]);
+  let lista = (docBusqueda && docAlcance === 'todo' ? documentosGdexpress : delPeriodo).filter(d => docTiposActivos[d.tipo_dte]);
   if (docBusqueda) {
     lista = lista.filter(d => coincideBusqueda(
       `${d.folio} ${d.rut_hospital||''} ${d.hospital||''} ${nombreHosp(d.hospital)||''} ${d.orden_compra_ref||''}`,
@@ -4466,7 +4535,8 @@ function renderDocumentosGdexpress(soloTabla) {
 
   if (!lista.length) {
     const nombrePeriodo = `${MESES_NOMBRE[docPeriodo.mes]} ${docPeriodo.anio}`;
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
+    const sugerenciaAmpliar = (docBusqueda && docAlcance === 'mes') ? ` <a onclick="docSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
     return;
   }
 
@@ -4690,6 +4760,70 @@ function estadoGestionRechazada(f) {
 }
 
 let rechazadasEstadoActivo = 'todas';
+let rechazadasPeriodo = null;
+let rechazadasAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
+
+function rechazadasInit() {
+  const hoy = new Date();
+  rechazadasPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  rechazadasPoblarSelectoresPeriodo();
+  renderRechazadas();
+}
+
+function rechazadasAniosDisponibles() {
+  const anios = new Set();
+  facturasRechazadas().forEach(f => { if (f.fecha_emision) anios.add(String(f.fecha_emision).slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function rechazadasPoblarSelectoresPeriodo() {
+  const selMes = document.getElementById('rechazadas-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  const selAnio = document.getElementById('rechazadas-select-anio');
+  const anios = new Set(rechazadasAniosDisponibles());
+  if (rechazadasPeriodo) anios.add(rechazadasPeriodo.anio);
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (rechazadasPeriodo) { selMes.value = rechazadasPeriodo.mes; selAnio.value = rechazadasPeriodo.anio; }
+}
+
+function rechazadasSeleccionarPeriodo() {
+  rechazadasPeriodo = { anio: document.getElementById('rechazadas-select-anio').value, mes: Number(document.getElementById('rechazadas-select-mes').value) };
+  document.getElementById('rechazadas-todas-fechas').classList.remove('active');
+  renderRechazadas();
+}
+
+function rechazadasCambiarMes(delta) {
+  if (!rechazadasPeriodo) { rechazadasInit(); return; }
+  let a = parseInt(rechazadasPeriodo.anio, 10), m = rechazadasPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  rechazadasPeriodo = { anio: String(a), mes: m };
+  rechazadasPoblarSelectoresPeriodo();
+  renderRechazadas();
+}
+
+function rechazadasVerTodasLasFechas() {
+  rechazadasPeriodo = null;
+  document.getElementById('rechazadas-todas-fechas').classList.add('active');
+  renderRechazadas();
+}
+
+function rechazadasListaDelPeriodo(base) {
+  if (!rechazadasPeriodo) return base;
+  const { anio, mes } = rechazadasPeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return base.filter(f => { const fe = String(f.fecha_emision||'').slice(0,10); return fe >= desde && fe < hasta; });
+}
+
+// El toggle "Este mes / Todo" solo importa cuando hay texto en el buscador
+// Y hay un período activo — si no, no hay nada que ampliar.
+function rechazadasSetAlcance(v) {
+  rechazadasAlcance = v;
+  document.querySelectorAll('#rechazadas-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
+  renderRechazadas(true);
+}
 
 function filtrarRechazadasPorEstado(estado) {
   rechazadasEstadoActivo = estado;
@@ -4698,6 +4832,7 @@ function filtrarRechazadasPorEstado(estado) {
 
 function filtrarRechazadas(valor) {
   rechazadasBusqueda = valor;
+  document.getElementById('rechazadas-alcance').style.display = (valor && rechazadasPeriodo) ? 'flex' : 'none';
   renderRechazadas(true);
 }
 
@@ -4777,8 +4912,18 @@ function fppSetEstado(estado) {
   fppRender();
 }
 
+let fppAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
+
+function fppSetAlcance(v) {
+  fppAlcance = v;
+  document.querySelectorAll('#fpp-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
+  fppCancelarSeleccion(true);
+  fppRenderTabla(true);
+}
+
 function fppBuscar(valor) {
   fppBusqueda = valor;
+  document.getElementById('fpp-alcance').style.display = valor ? 'flex' : 'none';
   fppCancelarSeleccion(true);
   fppRenderTabla(true);
 }
@@ -4791,7 +4936,7 @@ function fppListaDelPeriodo() {
 }
 
 function fppListaFiltrada() {
-  const delPeriodo = fppListaDelPeriodo();
+  const delPeriodo = (fppBusqueda && fppAlcance === 'todo') ? facturasPorPagar : fppListaDelPeriodo();
   let lista = fppEstado === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaFPP(f) === fppEstado);
   if (fppBusqueda) lista = lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusqueda));
   return lista.sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
@@ -4862,7 +5007,10 @@ function fppBadgeEstado(f) {
 
 function fppMensajeVacio() {
   const nombrePeriodo = `${MESES_NOMBRE[fppPeriodo.mes]} ${fppPeriodo.anio}`;
-  if (fppBusqueda) return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
+  if (fppBusqueda) {
+    if (fppAlcance === 'todo') return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ningún período.`, accion: null };
+    return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accionHtml: `<a onclick="fppSetAlcance('todo')">Buscar en todos los períodos</a>` };
+  }
   const nombres = { pending: 'pendientes', overdue: 'atrasadas', paid: 'pagadas' };
   if (fppEstado === 'all') return { icono: '🧾', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
   if (fppEstado === 'paid') return { icono: '⏳', texto: `Todavía no hay facturas pagadas en ${nombrePeriodo}.`, accion: 'Ver todas' };
@@ -4880,7 +5028,7 @@ function fppRenderTabla(soloTabla) {
     const m = fppMensajeVacio();
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty">
       <div class="fpp-empty-icon">${m.icono}</div><p>${m.texto}</p>
-      ${m.accion ? `<a onclick="fppSetEstado('all')">${m.accion}</a>` : ''}
+      ${m.accionHtml || (m.accion ? `<a onclick="fppSetEstado('all')">${m.accion}</a>` : '')}
     </div></div>`;
     return;
   }
@@ -5295,7 +5443,12 @@ function badgeGestionRechazada(f) {
 }
 
 function renderRechazadas(soloTabla) {
-  let todas = facturasRechazadas();
+  const todasSinPeriodo = facturasRechazadas();
+
+  // Si hay texto de búsqueda y elegiste "Todo", ignoramos el período —
+  // si no, respetamos el mes/año activo como en los demás módulos.
+  const buscandoFueraDelMes = rechazadasBusqueda && rechazadasAlcance === 'todo';
+  const todas = buscandoFueraDelMes ? todasSinPeriodo : rechazadasListaDelPeriodo(todasSinPeriodo);
 
   // Resumen y pestañas se calculan sobre TODAS (sin buscador), para que los
   // contadores no salten al escribir en el buscador.
@@ -5338,13 +5491,16 @@ function renderRechazadas(soloTabla) {
   window.__rechazadasVisibles = lista;
   const cont = document.getElementById('rechazadas-contenido');
   if (!lista.length) {
+    const nombrePeriodo = rechazadasPeriodo ? `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}` : 'todos los períodos';
     const mensajes = {
-      todas: 'No hay facturas rechazadas/anuladas.',
-      requiere_gestion: 'No hay facturas que requieran gestión — todo está en proceso o regularizado.',
-      en_proceso: 'No hay facturas en proceso de regularización en este momento.',
-      regularizada: 'Todavía no hay facturas regularizadas.',
+      todas: `No hay facturas rechazadas/anuladas en ${nombrePeriodo}.`,
+      requiere_gestion: `No hay facturas que requieran gestión en ${nombrePeriodo}.`,
+      en_proceso: `No hay facturas en proceso de regularización en ${nombrePeriodo}.`,
+      regularizada: `No hay facturas regularizadas en ${nombrePeriodo}.`,
     };
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
+    const sugerenciaAmpliar = (rechazadasBusqueda && rechazadasAlcance === 'mes' && rechazadasPeriodo)
+      ? ` <a onclick="rechazadasSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
     return;
   }
   cont.innerHTML = `
@@ -6867,7 +7023,7 @@ function updateStats() {
   const hosps = new Set(base.map(r=>nombreHosp(r.hospital))).size;
   const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc; // "Última OC" es siempre la más reciente de verdad, no depende del período
   document.getElementById('s-oc').textContent = base.length.toLocaleString('es-CL');
-  document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
+  document.getElementById('s-monto').textContent = clp(total);
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
   document.getElementById('s-fecha').textContent = fDate(ultima);
   const nombrePeriodo = ocPeriodo ? `${MESES_NOMBRE[ocPeriodo.mes]} ${ocPeriodo.anio}` : 'todos los períodos';
