@@ -81,10 +81,15 @@
   .nav-subitem { padding-left: 34px; font-size: 12.5px; }
 
   /* ─── Sub-bloques anidados dentro de un módulo (ej. Facturas: "Facturas
-     Bulfor" / "Otras Facturas Proveedor"), cada uno con su propio acordeón,
-     independiente del acordeón del módulo que los contiene. */
-  .nav-item-subbloque { padding-left: 24px; font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
-  .nav-item-subbloque:hover { color: var(--text-2); }
+     Bulfor" / "Facturas Proveedor"), cada uno con su propio acordeón,
+     independiente del acordeón del módulo que los contiene. El borde
+     izquierdo funciona como "guía" visual de que están anidados dentro
+     de Facturas, sin ser un simple rótulo en mayúsculas. */
+  .nav-item-subbloque { padding-left: 18px; margin-left: 10px; border-left: 2px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .nav-item-subbloque:hover { color: var(--text); background: var(--bg); border-left-color: var(--accent); }
+  .nav-subbloque.abierto > .nav-item-subbloque { color: var(--text); border-left-color: var(--accent); }
+  .nav-item-subbloque .nav-icon { font-size: 14px; color: var(--text-3); }
+  .nav-subbloque.abierto > .nav-item-subbloque .nav-icon { color: var(--accent); }
   .nav-chevron-sub { margin-left: auto; font-size: 12px !important; color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
   .nav-subbloque.abierto .nav-chevron-sub { transform: rotate(180deg); }
   .nav-subgroup-nivel2 { display: none; margin: 2px 0 6px; }
@@ -618,6 +623,7 @@
       <div class="nav-subgroup" id="subgroup-facturas">
         <div class="nav-subbloque" data-subbloque="facturas-bulfor">
           <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
+            <span class="nav-icon"><i class="ti ti-building" aria-hidden="true"></i></span>
             <span style="flex:1">Facturas Bulfor</span>
             <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
           </div>
@@ -631,7 +637,8 @@
         </div>
         <div class="nav-subbloque" data-subbloque="facturas-proveedor">
           <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
-            <span style="flex:1">Otras Facturas Proveedor</span>
+            <span class="nav-icon"><i class="ti ti-truck-delivery" aria-hidden="true"></i></span>
+            <span style="flex:1">Facturas Proveedor</span>
             <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
           </div>
           <div class="nav-subgroup-nivel2">
@@ -8363,7 +8370,7 @@ function marcarModuloActivoEnNav(modulo) {
   document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
 
   // Si el módulo tiene sub-bloques anidados (ej. Facturas: "Facturas Bulfor" /
-  // "Otras Facturas Proveedor"), abre automáticamente el que contiene la
+  // "Facturas Proveedor"), abre automáticamente el que contiene la
   // página activa, para que nunca quede escondida dentro de uno colapsado.
   const grupo = header ? header.closest('.nav-group') : null;
   if (grupo) {
