@@ -474,10 +474,10 @@
 
     /* Selector de gráficos de pagos: de columna fija de 270px a franja
        horizontal con scroll local, arriba del gráfico. */
-    #pagos-graficos-layout { flex-direction: column !important; }
-    #pagos-graficos-selector { width: 100% !important; flex-direction: row !important;
+    #pagos-graficos-layout, #pagos-graficos-prov-layout { flex-direction: column !important; }
+    #pagos-graficos-selector, #pagos-graficos-prov-selector { width: 100% !important; flex-direction: row !important;
       overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    #pagos-graficos-selector > * { flex-shrink: 0; }
+    #pagos-graficos-selector > *, #pagos-graficos-prov-selector > * { flex-shrink: 0; }
 
     /* Visor de receta (overlay a medida, no usa .modal-shell): mismo criterio
        de ancho y padding que el resto de los modales en celular. */
@@ -1228,10 +1228,13 @@
   </div>
 
   <div class="page" id="page-facturas-prov-graficos">
-    <div class="modulo-placeholder">
-      <div class="icono">📊</div>
-      <h2>Gráficos de pagos — Facturas Proveedor</h2>
-      <p>Esta sección está en construcción. Acá vas a poder ver gráficos de pago de las facturas de otros proveedores (distintas a las de Bulfor).</p>
+    <div class="page-header">
+      <div class="page-title">Gráficos de pagos</div>
+      <div class="page-sub">Facturas Proveedor — quién cobramos al día, quién se atrasa y cuánto les debemos hoy</div>
+    </div>
+    <div id="pagos-graficos-prov-layout" style="display:flex;gap:16px;align-items:flex-start">
+      <div id="pagos-graficos-prov-selector" style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;width:270px"></div>
+      <div class="table-card" style="flex:1;padding:20px;min-height:300px" id="pagos-graficos-prov-content"></div>
     </div>
   </div>
 
@@ -1689,7 +1692,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit(); oeInit(); renderInicio();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -3052,6 +3055,191 @@ function abrirFacturasProvDeProductoProveedor(nombreProducto, proveedorNombre) {
   document.body.appendChild(modal);
 }
 
+// ─── GRÁFICOS DE PAGOS — FACTURAS PROVEEDOR (facturas por pagar) ───────────
+// Mismo patrón visual que "Gráficos de pagos" de Facturas Bulfor (selector +
+// tarjeta de contenido, barras simples). A diferencia de ese, acá SÍ tenemos
+// fecha_vencimiento real de cada factura (no hay que estimarla por plazo),
+// así que el atraso se calcula directo contra esa fecha. 'N' (anulada) nunca
+// cuenta para nada de esto — mismo criterio que el resto de Facturas por pagar.
+const GRAFICOS_PAGOS_PROV_DISPONIBLES = [
+  { id: 'atrasadas-ahora', icono: '🔥', titulo: 'Facturas atrasadas ahora mismo', sub: 'Vencidas y sin pagar, factura por factura' },
+  { id: 'deuda-vigente', icono: '⚠️', titulo: 'Deuda vigente por proveedor', sub: 'Cuánto les debemos hoy (pendiente + atrasado)' },
+  { id: 'mas-puntuales', icono: '⚡', titulo: 'Proveedores que pagamos más puntual', sub: 'Comparado con la fecha de vencimiento real' },
+  { id: 'mas-atrasados', icono: '🐢', titulo: 'Proveedores con los que más nos atrasamos', sub: 'Comparado con la fecha de vencimiento real' },
+  { id: 'pct-a-tiempo', icono: '✅', titulo: '% de facturas pagadas a tiempo', sub: 'Qué tan cumplidor hemos sido con cada uno' },
+  { id: 'top-monto-pagado', icono: '💰', titulo: 'Proveedores a los que más hemos pagado', sub: 'Ranking por monto total pagado' },
+  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Proveedores que más nos facturan', sub: 'Ranking por monto total facturado' },
+  { id: 'evolucion-mensual-prov', icono: '📅', titulo: 'Evolución mensual de pagos', sub: 'Total pagado a proveedores, mes a mes' },
+];
+
+let graficoPagoProvActivo = null;
+
+function renderGraficosPagosProv() {
+  document.getElementById('pagos-graficos-prov-selector').innerHTML = GRAFICOS_PAGOS_PROV_DISPONIBLES.map(g => `
+    <div class="grafico-selector-item${graficoPagoProvActivo===g.id?' active':''}" onclick="abrirGraficoPagoProv('${g.id}')">
+      <span class="grafico-selector-icono">${g.icono}</span>
+      <div>
+        <div class="grafico-selector-titulo">${g.titulo}</div>
+        <div class="grafico-selector-sub">${g.sub}</div>
+      </div>
+    </div>`).join('');
+  abrirGraficoPagoProv(graficoPagoProvActivo || GRAFICOS_PAGOS_PROV_DISPONIBLES[0].id);
+}
+
+// Agrupa las facturas por pagar (no anuladas) por proveedor: monto
+// facturado, monto pagado, % pagado, atraso promedio contra el vencimiento
+// REAL, y % de las pagadas que se pagaron a tiempo (a diferencia del
+// atraso promedio, esto no se deja arrastrar por un solo caso extremo).
+function statsPagosPorProveedor() {
+  const grupos = {};
+  facturasPorPagar.forEach(f => {
+    if (f.estado_aceptacion === 'N') return;
+    const nombre = f.proveedor || 'Sin proveedor';
+    if (!grupos[nombre]) grupos[nombre] = { proveedor: nombre, totalFacturado: 0, totalPagado: 0, nFacturas: 0, nPagadas: 0, sumaAtraso: 0, nAtrasoValidos: 0, nATiempo: 0 };
+    const g = grupos[nombre];
+    const monto = Number(f.monto_total ?? f.monto ?? 0);
+    g.totalFacturado += monto;
+    g.nFacturas += 1;
+    if (categoriaFPP(f) === 'paid') {
+      g.totalPagado += monto;
+      g.nPagadas += 1;
+      if (f.fecha_vencimiento && f.fecha_pago) {
+        const atraso = Math.round((new Date(f.fecha_pago + 'T00:00:00') - new Date(f.fecha_vencimiento + 'T00:00:00')) / 86400000);
+        g.sumaAtraso += atraso;
+        g.nAtrasoValidos += 1;
+        if (atraso <= 0) g.nATiempo += 1;
+      }
+    }
+  });
+  return Object.values(grupos).map(g => ({
+    ...g,
+    atrasoPromedio: g.nAtrasoValidos ? (g.sumaAtraso / g.nAtrasoValidos) : null,
+    pctPagado: g.totalFacturado ? (g.totalPagado / g.totalFacturado * 100) : 0,
+    pctATiempo: g.nAtrasoValidos ? (g.nATiempo / g.nAtrasoValidos * 100) : null,
+  }));
+}
+
+// Deuda vigente = todo lo que hoy está pendiente o atrasado, agrupado por
+// proveedor — separa cuánto de esa deuda ya venció de la que todavía no.
+function statsDeudaVigentePorProveedor() {
+  const grupos = {};
+  facturasPorPagar.forEach(f => {
+    const cat = categoriaFPP(f);
+    if (cat !== 'pending' && cat !== 'overdue') return;
+    const nombre = f.proveedor || 'Sin proveedor';
+    if (!grupos[nombre]) grupos[nombre] = { proveedor: nombre, pendiente: 0, atrasado: 0, nPendientes: 0, nAtrasadas: 0 };
+    const g = grupos[nombre];
+    const monto = Number(f.monto_total ?? f.monto ?? 0);
+    if (cat === 'overdue') { g.atrasado += monto; g.nAtrasadas += 1; }
+    else { g.pendiente += monto; g.nPendientes += 1; }
+  });
+  return Object.values(grupos).map(g => ({ ...g, total: g.pendiente + g.atrasado }));
+}
+
+function pintarGraficoPagoProv(titulo, html) {
+  document.getElementById('pagos-graficos-prov-content').innerHTML = `
+    <div style="font-size:15px;font-weight:600;margin-bottom:14px">${titulo}</div>
+    ${html}`;
+}
+
+function abrirGraficoPagoProv(id) {
+  graficoPagoProvActivo = id;
+  document.querySelectorAll('#pagos-graficos-prov-selector .grafico-selector-item').forEach((el, i) => {
+    el.classList.toggle('active', GRAFICOS_PAGOS_PROV_DISPONIBLES[i].id === id);
+  });
+
+  const stats = statsPagosPorProveedor();
+  const MIN_MUESTRA = 3; // evita rankear puntualidad/% con 1-2 facturas, no es representativo
+
+  if (id === 'atrasadas-ahora') {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const atrasadas = facturasPorPagar
+      .filter(f => categoriaFPP(f) === 'overdue')
+      .map(f => ({ f, dias: Math.round((hoy - new Date(f.fecha_vencimiento + 'T00:00:00')) / 86400000) }))
+      .sort((a,b) => b.dias - a.dias);
+    pintarGraficoPagoProv('Facturas atrasadas ahora mismo',
+      !atrasadas.length ? '<div style="font-size:13px;color:var(--text-3)">🎉 No hay facturas atrasadas en este momento.</div>' :
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">${atrasadas.length} factura${atrasadas.length===1?'':'s'} vencida${atrasadas.length===1?'':'s'} sin pagar, ordenadas de más a menos atrasada.</div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden"><table style="margin:0"><thead><tr>
+        <th>N° Factura</th><th>Proveedor</th><th style="text-align:right">Monto</th><th>Venció</th><th style="text-align:right">Atraso</th>
+      </tr></thead><tbody>${atrasadas.slice(0,25).map(({f,dias}) => `
+        <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+          <td data-label="N° Factura" class="mono" style="color:var(--accent)">${f.factura}</td>
+          <td data-label="Proveedor" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
+          <td data-label="Monto" style="text-align:right;white-space:nowrap">${clp(f.monto_total ?? f.monto)}</td>
+          <td data-label="Venció" style="white-space:nowrap;font-size:12px">${fDate(f.fecha_vencimiento)}</td>
+          <td data-label="Atraso" style="text-align:right;white-space:nowrap;color:var(--red);font-weight:600">${dias} día${dias===1?'':'s'}</td>
+        </tr>`).join('')}</tbody></table></div>
+      ${atrasadas.length > 25 ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px">Mostrando las 25 más atrasadas de ${atrasadas.length}.</div>` : ''}`);
+
+  } else if (id === 'deuda-vigente') {
+    const deuda = statsDeudaVigentePorProveedor().filter(d => d.total > 0).sort((a,b) => b.total - a.total).slice(0, 15);
+    const max = Math.max(...deuda.map(d => d.total), 1);
+    pintarGraficoPagoProv('Deuda vigente por proveedor',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px"><span style="color:#185FA5">■</span> Pendiente (todavía no vence) &nbsp; <span style="color:var(--red)">■</span> Atrasado (ya venció)</div>` +
+      (deuda.map((d,i) => {
+        const pctPendiente = Math.round(d.pendiente / max * 100);
+        const pctAtrasado = Math.round(d.atrasado / max * 100);
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i+1}. ${escapeHtml(d.proveedor)}</div>
+          <div style="height:7px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;display:flex;gap:1px">
+            <div style="height:100%;width:${pctPendiente}%;background:#185FA5" title="Pendiente: ${clp(d.pendiente)}"></div>
+            <div style="height:100%;width:${pctAtrasado}%;background:var(--red)" title="Atrasado: ${clp(d.atrasado)}"></div>
+          </div>
+        </div>
+        <span style="font-size:12px;font-weight:500;white-space:nowrap;min-width:90px;text-align:right">${clp(d.total)}</span>
+      </div>`;
+      }).join('')) || '<div style="font-size:13px;color:var(--text-3)">Sin deuda vigente — todo al día 🎉</div>');
+
+  } else if (id === 'mas-puntuales') {
+    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => a.atrasoPromedio - b.atrasoPromedio).slice(0, 15);
+    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
+    pintarGraficoPagoProv('Proveedores que pagamos más puntual',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con la fecha de vencimiento real de cada factura. Negativo = pagamos antes del vencimiento. Solo proveedores con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.proveedor}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--green)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'mas-atrasados') {
+    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => b.atrasoPromedio - a.atrasoPromedio).slice(0, 15);
+    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
+    pintarGraficoPagoProv('Proveedores con los que más nos atrasamos',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con la fecha de vencimiento real de cada factura. Solo proveedores con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.proveedor}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--red)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'pct-a-tiempo') {
+    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => b.pctATiempo - a.pctATiempo).slice(0, 15);
+    pintarGraficoPagoProv('% de facturas pagadas a tiempo por proveedor',
+      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">De las facturas ya pagadas, qué porcentaje pagamos antes o el mismo día del vencimiento. Solo proveedores con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
+      (con.map((s,i) => barraHtml(`${i+1}. ${s.proveedor}`, s.pctATiempo, 100, `${s.pctATiempo.toFixed(0)}%`)).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
+
+  } else if (id === 'top-monto-pagado') {
+    const top = stats.filter(s => s.totalPagado > 0).sort((a,b) => b.totalPagado - a.totalPagado).slice(0, 15);
+    const max = Math.max(...top.map(s => s.totalPagado), 1);
+    pintarGraficoPagoProv('Proveedores a los que más hemos pagado',
+      top.map((s,i) => barraHtml(`${i+1}. ${s.proveedor}`, s.totalPagado, max, clp(s.totalPagado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+
+  } else if (id === 'top-monto-facturado') {
+    const top = stats.filter(s => s.totalFacturado > 0).sort((a,b) => b.totalFacturado - a.totalFacturado).slice(0, 15);
+    const max = Math.max(...top.map(s => s.totalFacturado), 1);
+    pintarGraficoPagoProv('Proveedores que más nos facturan',
+      top.map((s,i) => barraHtml(`${i+1}. ${s.proveedor}`, s.totalFacturado, max, clp(s.totalFacturado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+
+  } else if (id === 'evolucion-mensual-prov') {
+    const porMes = {};
+    facturasPorPagar.forEach(f => {
+      if (!f.fecha_pago || categoriaFPP(f) !== 'paid') return;
+      const key = f.fecha_pago.slice(0,7);
+      porMes[key] = (porMes[key] || 0) + Number(f.monto_total ?? f.monto ?? 0);
+    });
+    const meses = Object.keys(porMes).sort();
+    const max = Math.max(...meses.map(m => porMes[m]), 1);
+    pintarGraficoPagoProv('Evolución mensual de pagos a proveedores',
+      meses.map(m => {
+        const [a, mm] = m.split('-');
+        return barraHtml(`${MESES_NOMBRE[parseInt(mm,10)-1]} ${a}`, porMes[m], max, clp(porMes[m]));
+      }).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+  }
+}
 
 function renderHosp() {
   document.getElementById('hosp-info').textContent = `${hospF.length.toLocaleString('es-CL')} hospitales`;
