@@ -80,6 +80,17 @@
   .nav-group.abierto .nav-subgroup { display: block; }
   .nav-subitem { padding-left: 34px; font-size: 12.5px; }
 
+  /* ─── Sub-bloques anidados dentro de un módulo (ej. Facturas: "Facturas
+     Bulfor" / "Otras Facturas Proveedor"), cada uno con su propio acordeón,
+     independiente del acordeón del módulo que los contiene. */
+  .nav-item-subbloque { padding-left: 24px; font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
+  .nav-item-subbloque:hover { color: var(--text-2); }
+  .nav-chevron-sub { margin-left: auto; font-size: 12px !important; color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
+  .nav-subbloque.abierto .nav-chevron-sub { transform: rotate(180deg); }
+  .nav-subgroup-nivel2 { display: none; margin: 2px 0 6px; }
+  .nav-subbloque.abierto .nav-subgroup-nivel2 { display: block; }
+  .nav-subgroup-nivel2 .nav-subitem { padding-left: 44px; }
+
   /* ─── Sidebar colapsable: modo solo-iconos controlado por el usuario
      (distinto del modo ícono-solo forzado por ancho de pantalla, más
      abajo). Preferencia guardada en localStorage. */
@@ -605,12 +616,30 @@
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-facturas">
-        <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscador de documentos</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-productos" onclick="seleccionarSubpagina('facturas','facturas-productos',this)"><span>Productos</span></div>
-        <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('facturas','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
-        <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de pagos</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span>Facturas rechazadas</span></div>
+        <div class="nav-subbloque" data-subbloque="facturas-bulfor">
+          <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
+            <span style="flex:1">Facturas Bulfor</span>
+            <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
+          </div>
+          <div class="nav-subgroup-nivel2">
+            <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscador de documentos</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas-productos" onclick="seleccionarSubpagina('facturas','facturas-productos',this)"><span>Productos</span></div>
+            <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
+            <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de pagos</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span>Facturas rechazadas</span></div>
+          </div>
+        </div>
+        <div class="nav-subbloque" data-subbloque="facturas-proveedor">
+          <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
+            <span style="flex:1">Otras Facturas Proveedor</span>
+            <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
+          </div>
+          <div class="nav-subgroup-nivel2">
+            <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('facturas','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas-prov-productos" onclick="seleccionarSubpagina('facturas','facturas-prov-productos',this)"><span>Productos</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('facturas','facturas-prov-graficos',this)"><span>Gráficos de pagos</span></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1154,6 +1183,22 @@
       </div>
     </div>
     <div id="rechazadas-contenido"></div>
+  </div>
+
+  <div class="page" id="page-facturas-prov-productos">
+    <div class="modulo-placeholder">
+      <div class="icono">📦</div>
+      <h2>Productos — Facturas Proveedor</h2>
+      <p>Esta sección está en construcción. Acá vas a poder ver los productos de las facturas de otros proveedores (distintas a las de Bulfor).</p>
+    </div>
+  </div>
+
+  <div class="page" id="page-facturas-prov-graficos">
+    <div class="modulo-placeholder">
+      <div class="icono">📊</div>
+      <h2>Gráficos de pagos — Facturas Proveedor</h2>
+      <p>Esta sección está en construcción. Acá vas a poder ver gráficos de pago de las facturas de otros proveedores (distintas a las de Bulfor).</p>
+    </div>
   </div>
 
   <div class="page" id="page-farmacia-catastro">
@@ -8285,9 +8330,11 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'facturas-productos' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
-    { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
+    { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
+    { icon: '<i class="ti ti-building-store"></i>', label: 'Productos (proveedor)', page: 'facturas-prov-productos' },
+    { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos (proveedor)', page: 'facturas-prov-graficos' },
   ] },
   'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
@@ -8314,6 +8361,28 @@ function marcarModuloActivoEnNav(modulo) {
   const header = document.querySelector(`.nav-group[data-modulo="${modulo}"] .nav-item-modulo`);
   if (header) header.classList.add('active');
   document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
+
+  // Si el módulo tiene sub-bloques anidados (ej. Facturas: "Facturas Bulfor" /
+  // "Otras Facturas Proveedor"), abre automáticamente el que contiene la
+  // página activa, para que nunca quede escondida dentro de uno colapsado.
+  const grupo = header ? header.closest('.nav-group') : null;
+  if (grupo) {
+    const subitemActivo = grupo.querySelector('.nav-subitem.active');
+    const subbloqueActivo = subitemActivo ? subitemActivo.closest('.nav-subbloque') : null;
+    grupo.querySelectorAll('.nav-subbloque').forEach(b => b.classList.toggle('abierto', b === subbloqueActivo));
+  }
+}
+
+// Expande/colapsa un sub-bloque anidado (ej. "Facturas Bulfor") sin navegar
+// — igual criterio que el header de módulo: el clic solo despliega, recién
+// se navega al elegir una subsección puntual dentro del bloque.
+function toggleSubbloque(el) {
+  const bloque = el.closest('.nav-subbloque');
+  if (!bloque) return;
+  const grupo = bloque.closest('.nav-group');
+  const abrir = !bloque.classList.contains('abierto');
+  if (grupo) grupo.querySelectorAll('.nav-subbloque').forEach(b => b.classList.remove('abierto'));
+  bloque.classList.toggle('abierto', abrir);
 }
 
 // ─── Accordion: patrón "solo un módulo expandido a la vez". Un clic en el
