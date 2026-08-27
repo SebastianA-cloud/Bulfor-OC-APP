@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C0392B'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
@@ -45,7 +45,11 @@
     --focus-ring: 0 0 0 3px rgba(192,57,43,.25);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+  /* Red de seguridad secundaria: el objetivo real es que nada desborde
+     (ver reglas de .toolbar, .fpp-*, tablas, modales, etc. más abajo), pero
+     esto evita que un caso no contemplado abra scroll horizontal global. */
+  html, body { overflow-x: hidden; max-width: 100%; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; min-height: 100dvh; }
 
   /* Layout */
   .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; z-index: 100; }
@@ -166,6 +170,8 @@
   .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 
   .system-bar { position: fixed; top: 0; left: 220px; right: 0; height: 34px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 11px; color: var(--text-3); z-index: 90; }
+  .system-bar-brand { display: flex; align-items: baseline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-kebab-btn { display: none; background: none; border: 1px solid var(--border); border-radius: 6px; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--text-2); cursor: pointer; font-size: 15px; flex-shrink: 0; }
   .main { margin-left: 220px; margin-top: 34px; padding: 28px 32px; min-height: calc(100vh - 34px); }
   .page { display: none; }
   .page.active { display: block; }
@@ -268,14 +274,6 @@
   .fpp-status-tab.active[data-estado="overdue"] { color: var(--red); }
   .fpp-status-tab.active[data-estado="pending"] { color: var(--amber); }
 
-  /* Alcance de búsqueda: "Este mes" vs "Todo" — aparece junto a un buscador
-     cuando hay período activo, para poder ampliar la búsqueda sin salir
-     del período que se está viendo. */
-  .alcance-busqueda { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; flex-shrink: 0; }
-  .alcance-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; border: none; background: none; font-family: var(--font); }
-  .alcance-btn:hover { color: var(--text); }
-  .alcance-btn.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(26,25,23,.08); }
-
   .fpp-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
   .fpp-resumen .stat { padding: 12px 14px; }
   .fpp-resumen .stat.destacado { background: var(--accent-light); border-color: var(--accent); }
@@ -370,33 +368,118 @@
   @media (max-width: 640px) {
     .sidebar { display: contents; }
     .logo, #nav-modulos { display: none; }
-    .system-bar { left: 0; padding: 0 12px; justify-content: flex-end; }
-    .system-bar > span:first-child { display: none; } /* el texto largo del sistema no cabe ni hace falta en celular */
+    .system-bar { left: 0; right: 0; padding: 0 12px; padding-top: env(safe-area-inset-top, 0);
+      height: calc(34px + env(safe-area-inset-top, 0)); justify-content: space-between; }
+    .system-bar-brand-sub { display: none; } /* el texto largo del sistema no cabe ni hace falta en celular */
+    .system-bar-brand-main { font-size: 12px; font-weight: 600; color: var(--text-2); }
     .refresh-label { display: none; }
 
-    .bottom-tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 58px;
+    /* El resto del header (reloj, Actualizar, usuario, estado de conexión) se
+       agrupa detrás del botón "⋮" para no saturar la barra superior. */
+    .header-kebab-btn { display: flex; }
+    #header-more-panel { display: none !important; position: fixed;
+      top: calc(34px + env(safe-area-inset-top, 0) + 6px); right: 10px; left: auto;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      box-shadow: 0 8px 24px rgba(26,25,23,.16); padding: 12px; z-index: 120;
+      flex-direction: column !important; align-items: stretch !important; gap: 10px !important;
+      min-width: 200px; max-width: calc(100vw - 20px); }
+    .system-bar.header-menu-abierto #header-more-panel { display: flex !important; }
+    #header-more-panel #systemClock { order: 3; font-size: 11px; color: var(--text-3); text-align: right; }
+    #header-more-panel button { width: 100%; justify-content: center !important; }
+    #header-more-panel .refresh-label { display: inline !important; }
+    #header-more-panel #usuario-sesion { display: flex !important; flex-wrap: wrap; }
+
+    .bottom-tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(58px + env(safe-area-inset-bottom, 0));
       background: var(--surface); border-top: 1px solid var(--border); z-index: 100;
       padding-bottom: env(safe-area-inset-bottom, 0); }
     .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; font-size: 10px; color: var(--text-2); cursor: pointer; }
+      gap: 2px; font-size: 10px; color: var(--text-2); cursor: pointer; min-height: 44px; }
     .tab-item i { font-size: 20px; }
-    .tab-item.active { color: #185FA5; }
+    .tab-item.active { color: #185FA5; font-weight: 600; position: relative; }
+    .tab-item.active::before { content: ''; position: absolute; top: 2px; width: 18px; height: 2px;
+      border-radius: 2px; background: #185FA5; }
 
     /* El submenú de cada módulo (antes vertical en el sidebar) pasa a ser
-       una fila de pestañas horizontal, pegada arriba, con scroll lateral. */
-    #nav-submenu { position: fixed !important; top: 34px; left: 0; right: 0; z-index: 95;
+       una fila de pestañas horizontal, pegada arriba, con scroll lateral local
+       (solo esa barra se desplaza, nunca la página). */
+    #nav-submenu { position: fixed !important; top: calc(34px + env(safe-area-inset-top, 0)); left: 0; right: 0; z-index: 95;
       background: var(--surface); border-bottom: 1px solid var(--border);
-      display: flex !important; overflow-x: auto; white-space: nowrap;
-      padding: 6px 10px; gap: 6px; }
+      display: flex !important; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;
+      padding: 6px 10px; gap: 6px; scrollbar-width: thin; }
     #nav-submenu .nav-back, #nav-submenu .nav-divider { display: none; }
-    #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: 20px; }
+    #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: 20px; scroll-snap-align: start; }
     #nav-submenu .nav-item span:not(.nav-icon) { display: inline !important; }
     #nav-submenu .nav-icon { width: auto; font-size: 14px; }
     #nav-submenu:empty { display: none !important; }
 
-    .main { margin-left: 0 !important; margin-top: 34px; padding: 16px 12px 74px; }
-    body:has(#nav-submenu:not(:empty)) .main { margin-top: 78px; }
+    .main { margin-left: 0 !important; margin-top: calc(34px + env(safe-area-inset-top, 0));
+      padding: 16px 12px calc(74px + env(safe-area-inset-bottom, 0)); min-height: 0; }
+    body:has(#nav-submenu:not(:empty)) .main { margin-top: calc(78px + env(safe-area-inset-top, 0)); }
     .stats { grid-template-columns: 1fr 1fr !important; }
+
+    /* Componentes compartidos de alto impacto: sin estos, casi todas las
+       páginas de Facturas/Pagos/FedEx/Elaboración/Farmacia desbordan. */
+    .toolbar { gap: 8px; }
+    .search-wrap { min-width: 0; flex: 1 1 100%; }
+    .toolbar select, .toolbar input[type=text] { min-width: 0; flex: 1 1 auto; }
+    select { min-width: 0; max-width: 100%; }
+    input[type=text], input[type=number], input[type=date], input[type=email],
+    input[type=password], input[type=tel], textarea, select { max-width: 100%; }
+
+    .fpp-period { flex-wrap: wrap; }
+    .fpp-status-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap;
+      max-width: 100%; scrollbar-width: thin; }
+    .fpp-status-tab { flex-shrink: 0; }
+    .fpp-resumen { grid-template-columns: repeat(2, 1fr); }
+
+    /* Sistema de modales: nunca más angostos que la pantalla, headers que
+       envuelven en vez de comprimirse a texto vertical, y las fichas
+       largas (modal-lg / modal-xl, formularios como "Nueva Orden de
+       Elaboración") pasan a hoja casi de pantalla completa con scroll
+       interno, usable con el teclado abierto. */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal-shell { width: calc(100% - 24px); max-width: 100% !important;
+      margin: 12px auto calc(12px + env(safe-area-inset-bottom, 0));
+      max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0)); }
+    .modal-header { padding: 14px 16px; flex-wrap: wrap; }
+    .modal-body { padding: 16px; }
+    .modal-footer { padding: 12px 16px; flex-wrap: wrap; }
+    .modal-actions { width: 100%; justify-content: flex-start; }
+    .modal-tabs { top: 53px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+    .modal-tab { flex-shrink: 0; }
+
+    .modal-lg, .modal-xl {
+      width: 100%; max-width: 100% !important; margin: 0;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      max-height: calc(100dvh - env(safe-area-inset-top, 0) - 24px);
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    /* Selector de gráficos de pagos: de columna fija de 270px a franja
+       horizontal con scroll local, arriba del gráfico. */
+    #pagos-graficos-layout { flex-direction: column !important; }
+    #pagos-graficos-selector { width: 100% !important; flex-direction: row !important;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #pagos-graficos-selector > * { flex-shrink: 0; }
+
+    /* Visor de receta (overlay a medida, no usa .modal-shell): mismo criterio
+       de ancho y padding que el resto de los modales en celular. */
+    #oe-receta-visor-overlay { padding: 0 !important; align-items: flex-end !important; }
+    .receta-visor-shell { max-width: 100% !important; width: calc(100% - 24px) !important;
+      margin: 0 auto calc(12px + env(safe-area-inset-bottom, 0)); }
+    .receta-visor-header { padding: 12px !important; }
+
+    /* Barra de selección múltiple de Facturas por pagar: de una fila fija a
+       varias filas, para que la fecha y los botones no se corten. */
+    .fpp-bulk-bar { display: flex !important; flex-wrap: wrap; row-gap: 8px; }
+    .fpp-bulk-sep { display: none; }
+    .fpp-bulk-bar input[type=date] { flex: 1 1 auto; min-width: 0; }
+    .fpp-bulk-cancelar { margin-left: 0; }
+  }
+
+  @media (max-width: 400px) {
+    .fpp-resumen { grid-template-columns: 1fr; }
   }
 
   /* Tablas -> tarjetas apiladas en celular. Cada <tr> con onclick sigue
@@ -604,8 +687,11 @@
 </nav>
 
 <div class="system-bar">
-  <span>Bulfor OC — Sistema de gestión farmacéutica</span>
-  <span style="display:flex;align-items:center;gap:16px">
+  <span class="system-bar-brand"><span class="system-bar-brand-main">Bulfor OC</span><span class="system-bar-brand-sub"> — Sistema de gestión farmacéutica</span></span>
+  <button id="header-kebab-btn" class="header-kebab-btn" onclick="toggleHeaderMenu()" title="Más opciones" aria-label="Más opciones" aria-expanded="false">
+    <i class="ti ti-dots-vertical" aria-hidden="true"></i>
+  </button>
+  <span id="header-more-panel" style="display:flex;align-items:center;gap:16px">
     <span id="systemClock"></span>
     <button onclick="location.reload()" title="Actualizar datos" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:5px">
       <i class="ti ti-refresh" style="font-size:13px" aria-hidden="true"></i><span class="refresh-label">Actualizar</span>
@@ -680,10 +766,6 @@
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="oc-search" placeholder="Buscar por hospital, N° OC, descripción…" oninput="filterOC()">
-      </div>
-      <div class="alcance-busqueda" id="oc-alcance" style="display:none">
-        <button class="alcance-btn active" data-alcance="mes" onclick="ocSetAlcance('mes')">Este mes</button>
-        <button class="alcance-btn" data-alcance="todo" onclick="ocSetAlcance('todo')">Todo</button>
       </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
       <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
@@ -795,10 +877,6 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="fpp-search" placeholder="Buscar por N° factura, proveedor o RUT…" oninput="fppBuscar(this.value)">
       </div>
-      <div class="alcance-busqueda" id="fpp-alcance" style="display:none">
-        <button class="alcance-btn active" data-alcance="mes" onclick="fppSetAlcance('mes')">Este mes</button>
-        <button class="alcance-btn" data-alcance="todo" onclick="fppSetAlcance('todo')">Todo</button>
-      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
     </div>
@@ -903,10 +981,6 @@
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="doc-search" placeholder="Buscar por N° documento, RUT, hospital, N° OC…" oninput="filtrarDocumentosGdexpress(this.value)">
-      </div>
-      <div class="alcance-busqueda" id="doc-alcance" style="display:none">
-        <button class="alcance-btn active" data-alcance="mes" onclick="docSetAlcance('mes')">Este mes</button>
-        <button class="alcance-btn" data-alcance="todo" onclick="docSetAlcance('todo')">Todo</button>
       </div>
     </div>
     <div id="doc-contenido"></div>
@@ -1048,10 +1122,6 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" oninput="filtrarPagosBusqueda(this.value)">
       </div>
-      <div class="alcance-busqueda" id="pagos-alcance" style="display:none">
-        <button class="alcance-btn active" data-alcance="mes" onclick="pagosSetAlcance('mes')">Este mes</button>
-        <button class="alcance-btn" data-alcance="todo" onclick="pagosSetAlcance('todo')">Todo</button>
-      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
     </div>
@@ -1064,7 +1134,7 @@
       <div class="page-title">Gráficos de pagos</div>
       <div class="page-sub">Quién paga más, más rápido, y quién se demora</div>
     </div>
-    <div style="display:flex;gap:16px;align-items:flex-start">
+    <div id="pagos-graficos-layout" style="display:flex;gap:16px;align-items:flex-start">
       <div id="pagos-graficos-selector" style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;width:270px"></div>
       <div class="table-card" style="flex:1;padding:20px;min-height:300px" id="pagos-graficos-content"></div>
     </div>
@@ -1075,26 +1145,13 @@
       <div class="page-title">Facturas rechazadas</div>
       <div class="page-sub">Bandeja de gestión — qué requiere que hagas algo, qué ya está en proceso, y qué quedó regularizado</div>
     </div>
-    <div class="fpp-toolbar-top">
-      <div class="fpp-period">
-        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(-1)" title="Mes anterior">‹</button>
-        <select id="rechazadas-select-mes" onchange="rechazadasSeleccionarPeriodo()" aria-label="Mes"></select>
-        <select id="rechazadas-select-anio" onchange="rechazadasSeleccionarPeriodo()" aria-label="Año"></select>
-        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(1)" title="Mes siguiente">›</button>
-      </div>
-      <div class="fpp-status-tabs" id="rechazadas-tabs"></div>
-    </div>
+    <div class="fpp-status-tabs" id="rechazadas-tabs" style="margin-bottom:14px"></div>
     <div class="fpp-resumen" id="rechazadas-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="rechazadas-search" placeholder="Buscar por N° factura, RUT, hospital…" oninput="filtrarRechazadas(this.value)">
       </div>
-      <div class="alcance-busqueda" id="rechazadas-alcance" style="display:none">
-        <button class="alcance-btn active" data-alcance="mes" onclick="rechazadasSetAlcance('mes')">Este mes</button>
-        <button class="alcance-btn" data-alcance="todo" onclick="rechazadasSetAlcance('todo')">Todo</button>
-      </div>
-      <button class="page-btn" id="rechazadas-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="rechazadasVerTodasLasFechas()" title="Ver rechazadas de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
     </div>
     <div id="rechazadas-contenido"></div>
   </div>
@@ -1297,6 +1354,42 @@ function cerrarSesion() {
   borrarSesion();
   location.reload();
 }
+
+/* Menú "⋮" del header en celular: agrupa reloj, Actualizar, usuario y estado
+   de conexión sin eliminar ninguna función, solo la reorganiza visualmente. */
+function toggleHeaderMenu(forzarCerrado) {
+  const bar = document.querySelector('.system-bar');
+  const btn = document.getElementById('header-kebab-btn');
+  if (!bar || !btn) return;
+  const abrir = forzarCerrado === true ? false : !bar.classList.contains('header-menu-abierto');
+  bar.classList.toggle('header-menu-abierto', abrir);
+  btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+document.addEventListener('click', (e) => {
+  const bar = document.querySelector('.system-bar');
+  if (bar && bar.classList.contains('header-menu-abierto') && !bar.contains(e.target)) {
+    toggleHeaderMenu(true);
+  }
+});
+
+/* Las barras de pestañas de estado (.fpp-status-tabs, usadas en Facturas por
+   pagar/Rechazadas/Pagos/FedEx/Elaboración/Docs) tienen scroll horizontal
+   LOCAL en celular. Al elegir una pestaña, la dejamos visible dentro de esa
+   barra sin mover el resto de la página. Se captura antes de que el propio
+   onclick reconstruya el contenedor (innerHTML), y se aplica un frame
+   después, cuando ya existe la nueva pestaña ".active". */
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.fpp-status-tab');
+  if (!tab) return;
+  const contenedor = tab.closest('.fpp-status-tabs');
+  if (!contenedor) return;
+  const idContenedor = contenedor.id;
+  requestAnimationFrame(() => {
+    const cont2 = idContenedor ? document.getElementById(idContenedor) : null;
+    const activo = cont2 && cont2.querySelector('.fpp-status-tab.active');
+    if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+  });
+}, true);
 
 const sb = (path, opts={}) => {
   const { headers: extraHeaders, ...restOpts } = opts;
@@ -1517,7 +1610,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); fedexInit(); oeInit(); renderInicio();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); fedexInit(); oeInit(); renderInicio();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1556,22 +1649,12 @@ function rutDeHospital(nombreCrudo) {
   return mapaRutPorHospital[nombreCrudo] || mapaRutPorHospital[nombreHosp(nombreCrudo)] || '';
 }
 
-let ocAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
-
-function ocSetAlcance(v) {
-  ocAlcance = v;
-  document.querySelectorAll('#oc-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
-  filterOC();
-}
-
 function filterOC() {
   const q = document.getElementById('oc-search').value;
   const reg = document.getElementById('oc-region').value;
   const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
-  document.getElementById('oc-alcance').style.display = (q && ocPeriodo) ? 'flex' : 'none';
-  const base = (q && ocAlcance === 'todo' && ocPeriodo) ? oc : ocListaDelPeriodo();
-  ocF = base.filter(r => {
+  ocF = ocListaDelPeriodo().filter(r => {
     const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
   });
@@ -1746,7 +1829,7 @@ function abrirFacturasAsociadasOC(codigoOC) {
 
   const filasHtml = facturas.length === 0
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No encontramos facturas asociadas a esta orden de compra.</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0"><thead><tr>
           <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
           <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
@@ -1757,10 +1840,10 @@ function abrirFacturasAsociadasOC(codigoOC) {
             const estilo = anulada ? 'opacity:.6' : '';
             return `
             <tr style="cursor:pointer;${estilo}" onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>abrirFacturasAsociadasOC(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
-              <td class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
-              <td style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
-              <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
+              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td data-label="Hospital" style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
+              <td data-label="Fecha emisión">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td data-label="Monto" style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
             </tr>`;
           }).join('')}
         </tbody></table>
@@ -1977,7 +2060,7 @@ function openOCDetail(codigoOC) {
 
   const itemsHtml = !relacionados.length
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No se encontraron ítems para esta OC.</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th>
@@ -1989,13 +2072,13 @@ function openOCDetail(codigoOC) {
               const nombreMostrado = diccionarioNormalizacion[textoOriginal] || textoOriginal;
               const yaNormalizado = !!diccionarioNormalizacion[textoOriginal];
               return `<tr>
-                <td style="font-weight:500">
+                <td data-label="Producto" style="font-weight:500">
                   <span style="cursor:pointer;${yaNormalizado ? 'color:var(--green)' : 'color:var(--text)'}" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para normalizar este nombre">${nombreMostrado}${yaNormalizado ? ' ✓' : ' ✎'}</span>
                   <span style="cursor:pointer;color:var(--accent);margin-left:6px" onclick="const _cod='${(r.codigooc||'').replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));cerrarTodosLosModales();openProductDetail(window.__ocItemsTextos[${i}].nombreFinal)" title="Ver historial de este producto">↗</span>
                 </td>
-                <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td>
+                <td data-label="Cantidad" style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+                <td data-label="Precio unit." style="text-align:right;font-variant-numeric:tabular-nums">${clp(it.preciounitario)}</td>
+                <td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2005,7 +2088,7 @@ function openOCDetail(codigoOC) {
   const facturasDeEstaOC = facturasAsociadasA(r.codigooc);
   const facturasHtml = facturasDeEstaOC.length === 0
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No encontramos facturas asociadas a esta orden de compra.</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0"><thead><tr>
           <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
           <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
@@ -2014,10 +2097,10 @@ function openOCDetail(codigoOC) {
             const estado = estadoAceptacionFusionado(d);
             const anulada = estado === 'N';
             return `<tr style="cursor:pointer;${anulada ? 'opacity:.6' : ''}" onclick="const _cod='${(r.codigooc||'').replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
-              <td class="mono" style="color:${anulada ? 'var(--red)' : '#185FA5'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
-              <td style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
-              <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
+              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : '#185FA5'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td data-label="Hospital" style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
+              <td data-label="Fecha emisión">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td data-label="Monto" style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
             </tr>`;
           }).join('')}
         </tbody></table>
@@ -2425,7 +2508,7 @@ function renderProductoHospitalesTable(lista) {
   window.__productoHospitalesVisibles = lista; // para referenciar por índice, sin incrustar texto crudo (con comillas, etc.) en el onclick
   document.getElementById('product-hosp-table-wrap').innerHTML = !lista.length
     ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">Hospital</th>
@@ -2434,9 +2517,9 @@ function renderProductoHospitalesTable(lista) {
           </tr></thead>
           <tbody>
             ${lista.map((h, idx) => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs(window.__productoActual, window.__productoHospitalesVisibles[${idx}].hospital)">
-              <td style="font-weight:500;color:var(--accent)">${escapeHtml(h.hospital)} ↗</td>
-              <td style="text-align:right">${h.ventas}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
+              <td data-label="Hospital" style="font-weight:500;color:var(--accent)">${escapeHtml(h.hospital)} ↗</td>
+              <td data-label="N° OC" style="text-align:right">${h.ventas}</td>
+              <td data-label="Total comprado" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -2493,7 +2576,7 @@ function renderProductoHospitalOCsTabla(ventas) {
   window.__prodHospVentasVisibles = ventas; // para referenciar por índice, sin incrustar texto crudo en el onclick
   document.getElementById('product-hosp-oc-table-wrap').innerHTML = !ventas.length
     ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">N° OC</th><th style="font-size:10px">Fecha</th>
@@ -2501,11 +2584,11 @@ function renderProductoHospitalOCsTabla(ventas) {
           </tr></thead>
           <tbody>
             ${ventas.map((v, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoHospitalOCs(window.__prodHospNombreActual, window.__prodHospHospitalActual));cerrarTodosLosModales();openOCDetail(window.__prodHospVentasVisibles[${idx}].codigooc)">
-              <td><span class="mono" style="color:var(--accent)">${escapeHtml(v.codigooc||'')} ↗</span></td>
-              <td style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
-              <td style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(v.preciounitario)}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.totalitem)}</td>
+              <td data-label="N° OC"><span class="mono" style="color:var(--accent)">${escapeHtml(v.codigooc||'')} ↗</span></td>
+              <td data-label="Fecha" style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
+              <td data-label="Cantidad" style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
+              <td data-label="Precio unit." style="text-align:right;font-variant-numeric:tabular-nums">${clp(v.preciounitario)}</td>
+              <td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(v.totalitem)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -2693,17 +2776,17 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
         </div>
       </div>
       <div class="modal-body">
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
           <table style="margin:0"><thead><tr>
             <th style="font-size:10px">Folio</th><th style="font-size:10px">Fecha</th>
             <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
           </tr></thead><tbody>
             ${facturas.map(({doc, item}) => `
               <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital(window.__facturaProductoHospActualNombre, window.__facturaProductoHospActualHospital));abrirDetalleDocumentoGdexpress(${doc.id})">
-                <td class="mono" style="color:#185FA5">${doc.folio} ↗</td>
-                <td>${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
-                <td style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
+                <td data-label="Folio" class="mono" style="color:#185FA5">${doc.folio} ↗</td>
+                <td data-label="Fecha">${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
+                <td data-label="Cantidad" style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
+                <td data-label="Monto ítem" style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
               </tr>`).join('')}
           </tbody></table>
         </div>
@@ -3215,13 +3298,13 @@ function renderFedex() {
   }
   document.getElementById('fedex-body').innerHTML = slice.map(f => `
     <tr style="cursor:pointer" onclick="abrirDetalleEnvio(${f.id})">
-      <td style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(f.fecha_ingreso)}</td>
-      <td style="font-weight:500">${nombreHosp(f.hospital)||'—'}</td>
-      <td><span class="mono">${f.orden_transporte||''}</span> ${f.orden_transporte ? botonCopiar(f.orden_transporte) : ''}</td>
-      <td style="font-size:13px" onclick="event.stopPropagation()">${chipsFacturaHtml(f.factura)}</td>
-      <td>${badgeEstadoFedex(f.estado_envio)}</td>
-      <td style="font-size:12px;color:var(--text-2)">${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</td>
-      <td style="font-size:13px">${f.recibido_por||'—'}</td>
+      <td data-label="Fecha ingreso" style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(f.fecha_ingreso)}</td>
+      <td data-label="Hospital" style="font-weight:500">${nombreHosp(f.hospital)||'—'}</td>
+      <td data-label="N° Orden transporte"><span class="mono">${f.orden_transporte||''}</span> ${f.orden_transporte ? botonCopiar(f.orden_transporte) : ''}</td>
+      <td data-label="Factura" style="font-size:13px" onclick="event.stopPropagation()">${chipsFacturaHtml(f.factura)}</td>
+      <td data-label="Estado">${badgeEstadoFedex(f.estado_envio)}</td>
+      <td data-label="Fecha entrega" style="font-size:12px;color:var(--text-2)">${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</td>
+      <td data-label="Recibido por" style="font-size:13px">${f.recibido_por||'—'}</td>
     </tr>`).join('');
 }
 
@@ -3457,13 +3540,13 @@ function renderOE() {
   document.getElementById('oe-body').innerHTML = slice.map(o => {
     const nombre = o.pacientes?.nombre || '—';
     return `<tr style="cursor:pointer" onclick="abrirDetalleOE(${o.id})">
-      <td style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(o.fecha_orden)}</td>
-      <td style="font-weight:500">${nombre}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.indicacion||''}">${o.indicacion||'—'}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums">${o.valor ? clp(o.valor) : '—'}</td>
-      <td style="font-size:12px">${o.pago||'—'}</td>
-      <td>${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</td>
-      <td>${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</td>
+      <td data-label="Fecha" style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(o.fecha_orden)}</td>
+      <td data-label="Paciente" style="font-weight:500">${nombre}</td>
+      <td data-label="Preparado" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.indicacion||''}">${o.indicacion||'—'}</td>
+      <td data-label="Valor" style="text-align:right;font-variant-numeric:tabular-nums">${o.valor ? clp(o.valor) : '—'}</td>
+      <td data-label="Pago" style="font-size:12px">${o.pago||'—'}</td>
+      <td data-label="Digitación">${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</td>
+      <td data-label="Entrega">${badgeOE(o.estado_entrega, ESTADOS_ENTREGA_OE)}</td>
     </tr>`;
   }).join('');
 }
@@ -3812,17 +3895,8 @@ function pagosSetEstado(estado) {
   renderPagosVista();
 }
 
-let pagosAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
-
-function pagosSetAlcance(v) {
-  pagosAlcance = v;
-  document.querySelectorAll('#pagos-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
-  renderPagosVista(true);
-}
-
 function filtrarPagosBusqueda(valor) {
   pagosBusqueda = valor;
-  document.getElementById('pagos-alcance').style.display = valor ? 'flex' : 'none';
   renderPagosVista(true);
 }
 
@@ -3883,9 +3957,6 @@ function renderPagosVista(soloTabla) {
     <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val" style="font-size:16px;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
 
   let lista = pagosEstadoFiltro === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaPago(f) === pagosEstadoFiltro);
-  if (pagosBusqueda && pagosAlcance === 'todo') {
-    lista = pagosEstadoFiltro === 'all' ? facturasPago : facturasPago.filter(f => categoriaPago(f) === pagosEstadoFiltro);
-  }
   lista = aplicarFiltroPagos(lista).sort(compararPorFolio);
 
   const nombrePeriodo = `${MESES_NOMBRE[pagosPeriodo.mes]} ${pagosPeriodo.anio}`;
@@ -3897,8 +3968,7 @@ function renderPagosVista(soloTabla) {
       overdue: `No hay facturas atrasadas en ${nombrePeriodo}.`,
       paid: `No hay facturas pagadas en ${nombrePeriodo}.`,
     };
-    const sugerenciaAmpliar = (pagosBusqueda && pagosAlcance === 'mes') ? ` <a onclick="pagosSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
     return;
   }
 
@@ -3932,15 +4002,15 @@ function filaFacturaHtml(f, opts) {
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
   return `
     <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPago(${f.id})">
-      <td class="mono" style="color:var(--accent)" onclick="event.stopPropagation();navReset();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}', ${f.id})">${f.factura} ↗</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${vencHtml}</td>
-      <td style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-      <td>${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+      <td data-label="Factura" class="mono" style="color:var(--accent)" onclick="event.stopPropagation();navReset();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}', ${f.id})">${f.factura} ↗</td>
+      <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
+      <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td data-label="Vencimiento" style="font-size:12px;white-space:nowrap">${vencHtml}</td>
+      <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
+      <td data-label="Estado">${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
-      <td style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
-      <td>${badgeEstadoPagoHtml(f)}</td>`}
+      <td data-label="Fecha de pago" style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
+      <td data-label="Estado de pago">${badgeEstadoPagoHtml(f)}</td>`}
     </tr>`;
 }
 
@@ -4121,12 +4191,12 @@ async function abrirDetalleFacturaPago(id) {
       return;
     }
     cuerpoItems.innerHTML = `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
-              <td style="font-weight:500">
+              <td data-label="Producto" style="font-weight:500">
                 ${it.nombre_producto||'—'}
                 ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
                   ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
@@ -4134,9 +4204,9 @@ async function abrirDetalleFacturaPago(id) {
                   ${it.descripcion || ''}
                 </div>` : ''}
               </td>
-              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-              <td style="text-align:right">${clp(it.precio_unitario)}</td>
-              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+              <td data-label="Cantidad" style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td data-label="Precio unit." style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td data-label="Total" style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -4410,17 +4480,8 @@ function cambiarTipoDocumento(tipo) {
   renderDocumentosGdexpress();
 }
 
-let docAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
-
-function docSetAlcance(v) {
-  docAlcance = v;
-  document.querySelectorAll('#doc-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
-  renderDocumentosGdexpress(true);
-}
-
 function filtrarDocumentosGdexpress(valor) {
   docBusqueda = valor;
-  document.getElementById('doc-alcance').style.display = valor ? 'flex' : 'none';
   renderDocumentosGdexpress(true);
 }
 
@@ -4523,7 +4584,7 @@ function renderDocumentosGdexpress(soloTabla) {
     return;
   }
 
-  let lista = (docBusqueda && docAlcance === 'todo' ? documentosGdexpress : delPeriodo).filter(d => docTiposActivos[d.tipo_dte]);
+  let lista = delPeriodo.filter(d => docTiposActivos[d.tipo_dte]);
   if (docBusqueda) {
     lista = lista.filter(d => coincideBusqueda(
       `${d.folio} ${d.rut_hospital||''} ${d.hospital||''} ${nombreHosp(d.hospital)||''} ${d.orden_compra_ref||''}`,
@@ -4535,8 +4596,7 @@ function renderDocumentosGdexpress(soloTabla) {
 
   if (!lista.length) {
     const nombrePeriodo = `${MESES_NOMBRE[docPeriodo.mes]} ${docPeriodo.anio}`;
-    const sugerenciaAmpliar = (docBusqueda && docAlcance === 'mes') ? ` <a onclick="docSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
     return;
   }
 
@@ -4549,14 +4609,14 @@ function renderDocumentosGdexpress(soloTabla) {
         <tbody>
           ${lista.map(d => `
             <tr style="cursor:pointer" onclick="abrirDetalleDocumentoGdexpress(${d.id})">
-              <td>${docBadgeTipo(d.tipo_dte)}</td>
-              <td style="font-size:12px;white-space:nowrap">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td class="mono" style="color:var(--accent)">${d.folio} ↗</td>
-              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
-              <td style="white-space:nowrap">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
-              <td>${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
+              <td data-label="Tipo">${docBadgeTipo(d.tipo_dte)}</td>
+              <td data-label="Emisión" style="font-size:12px;white-space:nowrap">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td data-label="N° Documento" class="mono" style="color:var(--accent)">${d.folio} ↗</td>
+              <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
+              <td data-label="RUT Hospital" style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
+              <td data-label="N° OC" style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
+              <td data-label="Monto" style="white-space:nowrap">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
+              <td data-label="Estado">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -4663,12 +4723,12 @@ async function abrirDetalleDocumentoGdexpress(id) {
       return;
     }
     cuerpoItems.innerHTML = `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
-              <td style="font-weight:500">
+              <td data-label="Producto" style="font-weight:500">
                 ${it.nombre_producto||'—'}
                 ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
                   ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
@@ -4676,9 +4736,9 @@ async function abrirDetalleDocumentoGdexpress(id) {
                   ${it.descripcion || ''}
                 </div>` : ''}
               </td>
-              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-              <td style="text-align:right">${clp(it.precio_unitario)}</td>
-              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+              <td data-label="Cantidad" style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td data-label="Precio unit." style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td data-label="Total" style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -4760,70 +4820,6 @@ function estadoGestionRechazada(f) {
 }
 
 let rechazadasEstadoActivo = 'todas';
-let rechazadasPeriodo = null;
-let rechazadasAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
-
-function rechazadasInit() {
-  const hoy = new Date();
-  rechazadasPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
-  rechazadasPoblarSelectoresPeriodo();
-  renderRechazadas();
-}
-
-function rechazadasAniosDisponibles() {
-  const anios = new Set();
-  facturasRechazadas().forEach(f => { if (f.fecha_emision) anios.add(String(f.fecha_emision).slice(0,4)); });
-  return Array.from(anios).sort((a,b) => b.localeCompare(a));
-}
-
-function rechazadasPoblarSelectoresPeriodo() {
-  const selMes = document.getElementById('rechazadas-select-mes');
-  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
-  const selAnio = document.getElementById('rechazadas-select-anio');
-  const anios = new Set(rechazadasAniosDisponibles());
-  if (rechazadasPeriodo) anios.add(rechazadasPeriodo.anio);
-  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
-  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
-  if (rechazadasPeriodo) { selMes.value = rechazadasPeriodo.mes; selAnio.value = rechazadasPeriodo.anio; }
-}
-
-function rechazadasSeleccionarPeriodo() {
-  rechazadasPeriodo = { anio: document.getElementById('rechazadas-select-anio').value, mes: Number(document.getElementById('rechazadas-select-mes').value) };
-  document.getElementById('rechazadas-todas-fechas').classList.remove('active');
-  renderRechazadas();
-}
-
-function rechazadasCambiarMes(delta) {
-  if (!rechazadasPeriodo) { rechazadasInit(); return; }
-  let a = parseInt(rechazadasPeriodo.anio, 10), m = rechazadasPeriodo.mes + delta;
-  if (m < 0) { m = 11; a -= 1; }
-  if (m > 11) { m = 0; a += 1; }
-  rechazadasPeriodo = { anio: String(a), mes: m };
-  rechazadasPoblarSelectoresPeriodo();
-  renderRechazadas();
-}
-
-function rechazadasVerTodasLasFechas() {
-  rechazadasPeriodo = null;
-  document.getElementById('rechazadas-todas-fechas').classList.add('active');
-  renderRechazadas();
-}
-
-function rechazadasListaDelPeriodo(base) {
-  if (!rechazadasPeriodo) return base;
-  const { anio, mes } = rechazadasPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return base.filter(f => { const fe = String(f.fecha_emision||'').slice(0,10); return fe >= desde && fe < hasta; });
-}
-
-// El toggle "Este mes / Todo" solo importa cuando hay texto en el buscador
-// Y hay un período activo — si no, no hay nada que ampliar.
-function rechazadasSetAlcance(v) {
-  rechazadasAlcance = v;
-  document.querySelectorAll('#rechazadas-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
-  renderRechazadas(true);
-}
 
 function filtrarRechazadasPorEstado(estado) {
   rechazadasEstadoActivo = estado;
@@ -4832,7 +4828,6 @@ function filtrarRechazadasPorEstado(estado) {
 
 function filtrarRechazadas(valor) {
   rechazadasBusqueda = valor;
-  document.getElementById('rechazadas-alcance').style.display = (valor && rechazadasPeriodo) ? 'flex' : 'none';
   renderRechazadas(true);
 }
 
@@ -4912,18 +4907,8 @@ function fppSetEstado(estado) {
   fppRender();
 }
 
-let fppAlcance = 'mes'; // 'mes' = respeta el período activo | 'todo' = ignora el período mientras se busca
-
-function fppSetAlcance(v) {
-  fppAlcance = v;
-  document.querySelectorAll('#fpp-alcance .alcance-btn').forEach(b => b.classList.toggle('active', b.dataset.alcance === v));
-  fppCancelarSeleccion(true);
-  fppRenderTabla(true);
-}
-
 function fppBuscar(valor) {
   fppBusqueda = valor;
-  document.getElementById('fpp-alcance').style.display = valor ? 'flex' : 'none';
   fppCancelarSeleccion(true);
   fppRenderTabla(true);
 }
@@ -4936,7 +4921,7 @@ function fppListaDelPeriodo() {
 }
 
 function fppListaFiltrada() {
-  const delPeriodo = (fppBusqueda && fppAlcance === 'todo') ? facturasPorPagar : fppListaDelPeriodo();
+  const delPeriodo = fppListaDelPeriodo();
   let lista = fppEstado === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaFPP(f) === fppEstado);
   if (fppBusqueda) lista = lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusqueda));
   return lista.sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
@@ -5007,10 +4992,7 @@ function fppBadgeEstado(f) {
 
 function fppMensajeVacio() {
   const nombrePeriodo = `${MESES_NOMBRE[fppPeriodo.mes]} ${fppPeriodo.anio}`;
-  if (fppBusqueda) {
-    if (fppAlcance === 'todo') return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ningún período.`, accion: null };
-    return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accionHtml: `<a onclick="fppSetAlcance('todo')">Buscar en todos los períodos</a>` };
-  }
+  if (fppBusqueda) return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
   const nombres = { pending: 'pendientes', overdue: 'atrasadas', paid: 'pagadas' };
   if (fppEstado === 'all') return { icono: '🧾', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
   if (fppEstado === 'paid') return { icono: '⏳', texto: `Todavía no hay facturas pagadas en ${nombrePeriodo}.`, accion: 'Ver todas' };
@@ -5028,7 +5010,7 @@ function fppRenderTabla(soloTabla) {
     const m = fppMensajeVacio();
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty">
       <div class="fpp-empty-icon">${m.icono}</div><p>${m.texto}</p>
-      ${m.accionHtml || (m.accion ? `<a onclick="fppSetEstado('all')">${m.accion}</a>` : '')}
+      ${m.accion ? `<a onclick="fppSetEstado('all')">${m.accion}</a>` : ''}
     </div></div>`;
     return;
   }
@@ -5039,13 +5021,13 @@ function fppRenderTabla(soloTabla) {
   const filaHtml = f => `
     <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
       <td style="width:32px" onclick="event.stopPropagation()"><input type="checkbox" class="fpp-check" data-id="${f.id}" onchange="toggleFPPSeleccion(${f.id}, this.checked)"></td>
-      <td class="mono" style="color:var(--accent)">${f.factura}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
-      <td class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${fppContextoVencimiento(f)}</td>
-      <td style="white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums">${clp(f.monto_total ?? f.monto)}</td>
-      <td>${fppBadgeEstado(f)}</td>
+      <td data-label="N° Factura" class="mono" style="color:var(--accent)">${f.factura}</td>
+      <td data-label="Proveedor" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
+      <td data-label="RUT" class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
+      <td data-label="Emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td data-label="Vencimiento" style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${fppContextoVencimiento(f)}</td>
+      <td data-label="Monto" style="white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums">${clp(f.monto_total ?? f.monto)}</td>
+      <td data-label="Estado">${fppBadgeEstado(f)}</td>
     </tr>`;
 
   const tabla = (arr, conCheckbox) => `<div class="table-card"><table><thead><tr>
@@ -5245,12 +5227,12 @@ async function cargarItemsFacturaPorPagar(f) {
       return;
     }
     cuerpo.innerHTML = `
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
-              <td style="font-weight:500">
+              <td data-label="Producto" style="font-weight:500">
                 ${it.nombre_producto||'—'}
                 ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
                   ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
@@ -5258,9 +5240,9 @@ async function cargarItemsFacturaPorPagar(f) {
                   ${it.descripcion || ''}
                 </div>` : ''}
               </td>
-              <td style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-              <td style="text-align:right">${clp(it.precio_unitario)}</td>
-              <td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
+              <td data-label="Cantidad" style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
+              <td data-label="Precio unit." style="text-align:right">${clp(it.precio_unitario)}</td>
+              <td data-label="Total" style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -5321,51 +5303,11 @@ function abrirGestionProveedores() {
             <button class="import-btn" style="margin-top:0;padding:8px 18px" onclick="guardarProveedorCuenta(this)">Guardar proveedor</button>
           </div>
         </div>
-        <div id="prov-pendientes"></div>
         <div id="prov-lista"></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
-  renderProveedoresPendientes();
   renderListaProveedoresCuentas();
-}
-
-// Proveedores que aparecen en Facturas por pagar pero todavía no tienen
-// cuenta bancaria cargada — para saber a quién le falta sin tener que
-// revisar factura por factura ni repetir el trabajo ya hecho.
-function proveedoresSinCuenta() {
-  const conCuenta = new Set(proveedoresCuentas.map(p => p.rut_proveedor));
-  const vistos = new Map(); // rut -> nombre (el nombre más reciente que aparezca)
-  facturasPorPagar.forEach(f => {
-    if (!f.rut_proveedor || conCuenta.has(f.rut_proveedor)) return;
-    if (!vistos.has(f.rut_proveedor) || f.proveedor) vistos.set(f.rut_proveedor, f.proveedor || vistos.get(f.rut_proveedor) || '');
-  });
-  return Array.from(vistos.entries())
-    .map(([rut, nombre]) => ({ rut, nombre }))
-    .sort((a,b) => (a.nombre||a.rut).localeCompare(b.nombre||b.rut, 'es', {sensitivity:'base'}));
-}
-
-function renderProveedoresPendientes() {
-  const cont = document.getElementById('prov-pendientes');
-  const pendientes = proveedoresSinCuenta();
-  if (!pendientes.length) {
-    cont.innerHTML = `<div style="font-size:12px;color:var(--green);margin-bottom:16px">✓ Todos los proveedores de Facturas por pagar ya tienen cuenta cargada.</div>`;
-    return;
-  }
-  cont.innerHTML = `
-    <div style="border:1px solid var(--amber);background:var(--amber-light,rgba(217,119,6,.06));border-radius:var(--radius);padding:14px;margin-bottom:16px">
-      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Sin cuenta cargada (${pendientes.length})</div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Aparecen en Facturas por pagar. Haz clic en uno para completar sus datos abajo.</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${pendientes.map(p => `<button onclick="prellenarProveedorPendiente('${p.rut.replace(/'/g,"\\'")}','${(p.nombre||'').replace(/'/g,"\\'")}')" style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text)">${escapeHtml(p.nombre || p.rut)} <span class="mono" style="color:var(--text-3);font-size:10px">${p.rut}</span></button>`).join('')}
-      </div>
-    </div>`;
-}
-
-function prellenarProveedorPendiente(rut, nombre) {
-  document.getElementById('prov-rut').value = rut;
-  document.getElementById('prov-nombre').value = nombre || '';
-  document.getElementById('prov-banco').focus();
 }
 
 function renderListaProveedoresCuentas() {
@@ -5415,7 +5357,6 @@ async function guardarProveedorCuenta(btnEl) {
       proveedoresCuentas.sort((a,b) => (a.nombre_proveedor||'').localeCompare(b.nombre_proveedor||''));
     }
     ['prov-rut','prov-nombre','prov-banco','prov-tipo','prov-numero','prov-email'].forEach(id => document.getElementById(id).value = '');
-    renderProveedoresPendientes();
     renderListaProveedoresCuentas();
     toast('Proveedor guardado');
   } catch (e) {
@@ -5443,12 +5384,7 @@ function badgeGestionRechazada(f) {
 }
 
 function renderRechazadas(soloTabla) {
-  const todasSinPeriodo = facturasRechazadas();
-
-  // Si hay texto de búsqueda y elegiste "Todo", ignoramos el período —
-  // si no, respetamos el mes/año activo como en los demás módulos.
-  const buscandoFueraDelMes = rechazadasBusqueda && rechazadasAlcance === 'todo';
-  const todas = buscandoFueraDelMes ? todasSinPeriodo : rechazadasListaDelPeriodo(todasSinPeriodo);
+  let todas = facturasRechazadas();
 
   // Resumen y pestañas se calculan sobre TODAS (sin buscador), para que los
   // contadores no salten al escribir en el buscador.
@@ -5491,16 +5427,13 @@ function renderRechazadas(soloTabla) {
   window.__rechazadasVisibles = lista;
   const cont = document.getElementById('rechazadas-contenido');
   if (!lista.length) {
-    const nombrePeriodo = rechazadasPeriodo ? `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}` : 'todos los períodos';
     const mensajes = {
-      todas: `No hay facturas rechazadas/anuladas en ${nombrePeriodo}.`,
-      requiere_gestion: `No hay facturas que requieran gestión en ${nombrePeriodo}.`,
-      en_proceso: `No hay facturas en proceso de regularización en ${nombrePeriodo}.`,
-      regularizada: `No hay facturas regularizadas en ${nombrePeriodo}.`,
+      todas: 'No hay facturas rechazadas/anuladas.',
+      requiere_gestion: 'No hay facturas que requieran gestión — todo está en proceso o regularizado.',
+      en_proceso: 'No hay facturas en proceso de regularización en este momento.',
+      regularizada: 'Todavía no hay facturas regularizadas.',
     };
-    const sugerenciaAmpliar = (rechazadasBusqueda && rechazadasAlcance === 'mes' && rechazadasPeriodo)
-      ? ` <a onclick="rechazadasSetAlcance('todo')">Buscar en todos los períodos</a>` : '';
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda en este período.'+sugerenciaAmpliar : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
     return;
   }
   cont.innerHTML = `
@@ -5512,13 +5445,13 @@ function renderRechazadas(soloTabla) {
         <tbody>
           ${lista.map((f, idx) => `
             <tr style="cursor:pointer" onclick="abrirDetalleRechazada(${idx})">
-              <td class="mono">${f.factura}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠</span>' : ''}</td>
-              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
-              <td style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-              <td style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-              <td style="font-size:12px">${f.factura_reemplazo || '—'}</td>
-              <td style="font-size:12px">${f.nota_credito_asociada || f._ncAutoDetectada || '—'}</td>
-              <td>${badgeGestionRechazada(f)}</td>
+              <td data-label="Factura" class="mono">${f.factura}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠</span>' : ''}</td>
+              <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
+              <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+              <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
+              <td data-label="Reemplazada por" style="font-size:12px">${f.factura_reemplazo || '—'}</td>
+              <td data-label="N° Nota de crédito" style="font-size:12px">${f.nota_credito_asociada || f._ncAutoDetectada || '—'}</td>
+              <td data-label="Estado">${badgeGestionRechazada(f)}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -6420,10 +6353,10 @@ function verRecetaEnModal(url) {
   modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1200;display:flex;align-items:center;justify-content:center;padding:24px';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:700px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div class="receta-visor-shell" style="background:var(--surface);border-radius:var(--radius-lg);max-width:700px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+      <div class="receta-visor-header" style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <span style="font-size:14px;font-weight:500">Vista de receta</span>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button onclick="imprimirRecetaOE('${url}', ${esImagen})" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
           <button onclick="descargarRecetaOE('${url}')" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer">⬇ Descargar</button>
           ${botonAtrasHtml()}
@@ -6920,7 +6853,7 @@ function renderHospitalOCsTable(lista) {
   document.getElementById('hosp-oc-count').textContent = `${lista.length} órdenes de compra`;
   document.getElementById('hosp-oc-table-wrap').innerHTML = !lista.length
     ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
-    : `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
@@ -6930,10 +6863,10 @@ function renderHospitalOCsTable(lista) {
             ${lista.map(r => {
               const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
               return `<tr style="cursor:pointer" onclick="navPush(()=>openHospitalOCs('${window.__hospActualNombre.replace(/'/g,"\\'")}'));cerrarTodosLosModales();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
-                <td><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
-                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
-                <td style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
-                <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
+                <td data-label="N° OC"><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
+                <td data-label="Descripción" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+                <td data-label="Fecha" style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
+                <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -7023,7 +6956,7 @@ function updateStats() {
   const hosps = new Set(base.map(r=>nombreHosp(r.hospital))).size;
   const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc; // "Última OC" es siempre la más reciente de verdad, no depende del período
   document.getElementById('s-oc').textContent = base.length.toLocaleString('es-CL');
-  document.getElementById('s-monto').textContent = clp(total);
+  document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
   document.getElementById('s-fecha').textContent = fDate(ultima);
   const nombrePeriodo = ocPeriodo ? `${MESES_NOMBRE[ocPeriodo.mes]} ${ocPeriodo.anio}` : 'todos los períodos';
@@ -7187,7 +7120,7 @@ function abrirComparadorPrecios() {
 
   const html = !lista.length ? '<p style="color:var(--text-3)">Sin suficientes datos para comparar</p>' : `
     <div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Productos donde más varía el precio entre OC distintas (mayor diferencia primero)</div>
-    <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
       <table style="margin:0">
         <thead><tr>
           <th style="font-size:10px">Producto</th>
@@ -7197,10 +7130,10 @@ function abrirComparadorPrecios() {
         </tr></thead>
         <tbody>
           ${(window.__statsVariacionPrecio = lista).map((p, idx) => `<tr style="cursor:pointer" onclick="closeEstadistica();openProductDetail(window.__statsVariacionPrecio[${idx}].nombre)">
-            <td style="font-weight:500;color:var(--accent);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.nombre)} ↗</td>
-            <td style="text-align:right">${clp(p.min)}</td>
-            <td style="text-align:right">${clp(p.max)}</td>
-            <td style="text-align:right;font-weight:500;color:var(--red)">${clp(p.variacion)}</td>
+            <td data-label="Producto" style="font-weight:500;color:var(--accent);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.nombre)} ↗</td>
+            <td data-label="Precio mín." style="text-align:right">${clp(p.min)}</td>
+            <td data-label="Precio máx." style="text-align:right">${clp(p.max)}</td>
+            <td data-label="Diferencia" style="text-align:right;font-weight:500;color:var(--red)">${clp(p.variacion)}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -7642,9 +7575,9 @@ function abrirRevisionFamiliasCatastro(productoIds) {
         </tr></thead><tbody>
           ${sinFamilia.map(p => `
             <tr>
-              <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
-              <td>${p.nombre}</td>
-              <td><select onchange="guardarFamiliaProducto(${p.id}, this.value)"><option value="">— sin familia —</option>${opcionesFamilia}</select></td>
+              <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+              <td data-label="Producto">${p.nombre}</td>
+              <td data-label="Familia"><select onchange="guardarFamiliaProducto(${p.id}, this.value)"><option value="">— sin familia —</option>${opcionesFamilia}</select></td>
             </tr>`).join('')}
         </tbody></table></div>
       </div>
@@ -7679,9 +7612,9 @@ function buscarProductoFarmacia(q) {
   cont.innerHTML = `<div class="table-card"><table><tbody>
     ${resultados.map(p => `
       <tr style="cursor:pointer" onclick="seleccionarProductoFarmacia(${p.id})">
-        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
-        <td>${p.nombre}</td>
-        <td style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '— sin familia —'}</td>
+        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td data-label="Producto">${p.nombre}</td>
+        <td data-label="Familia" style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '— sin familia —'}</td>
       </tr>`).join('')}
   </tbody></table></div>`;
 }
@@ -7723,9 +7656,9 @@ function renderDetalleProductoFarmacia() {
       </tr></thead><tbody>
         ${lotes.map(l => `
           <tr>
-            <td class="mono">${l.lote || '—'}</td>
-            <td>${l.vencimiento ? fDate(l.vencimiento) : '—'}</td>
-            <td>${l.cantidad}</td>
+            <td data-label="Lote" class="mono">${l.lote || '—'}</td>
+            <td data-label="Vencimiento">${l.vencimiento ? fDate(l.vencimiento) : '—'}</td>
+            <td data-label="Cantidad">${l.cantidad}</td>
             <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="eliminarLoteFarmacia(${l.id})">Eliminar</button></td>
           </tr>`).join('')}
       </tbody></table>`}
@@ -7863,11 +7796,11 @@ function renderStockActual() {
     ${filas.map(({p, total}) => {
       const bajo = p.stock_minimo != null && total < Number(p.stock_minimo);
       return `<tr>
-        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
-        <td>${p.nombre}</td>
-        <td style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
-        <td style="text-align:right;font-weight:700;${bajo ? 'color:#d64545' : ''}">${total}</td>
-        <td style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
+        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td data-label="Producto">${p.nombre}</td>
+        <td data-label="Familia" style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
+        <td data-label="Stock actual" style="text-align:right;font-weight:700;${bajo ? 'color:#d64545' : ''}">${total}</td>
+        <td data-label="Mínimo" style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -7900,9 +7833,9 @@ function buscarProductoMovFarmacia(q) {
   cont.innerHTML = `<div class="table-card"><table><tbody>
     ${resultados.map(p => `
       <tr style="cursor:pointer" onclick="seleccionarProductoMovFarmacia(${p.id})">
-        <td class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
-        <td>${p.nombre}</td>
-        <td style="text-align:right;color:var(--text-2)">Stock: ${stockTotalProducto(p.id)}</td>
+        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+        <td data-label="Producto">${p.nombre}</td>
+        <td data-label="Stock" style="text-align:right;color:var(--text-2)">Stock: ${stockTotalProducto(p.id)}</td>
       </tr>`).join('')}
   </tbody></table></div>`;
 }
@@ -8083,10 +8016,10 @@ function renderHistorialMovFarmacia() {
       const p = farmaciaProductos.find(x => x.id === m.producto_id);
       const cant = Number(m.cantidad);
       return `<tr>
-        <td style="white-space:nowrap">${fDate(m.fecha)}</td>
-        <td style="white-space:nowrap">${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}</td>
-        <td>${p ? `${p.codigo} — ${p.nombre}` : '—'}</td>
-        <td style="text-align:right;font-weight:600;${cant < 0 ? 'color:#d64545' : ''}">${cant > 0 && m.tipo !== 'ajuste' ? '' : ''}${cant}</td>
+        <td data-label="Fecha" style="white-space:nowrap">${fDate(m.fecha)}</td>
+        <td data-label="Tipo" style="white-space:nowrap">${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}</td>
+        <td data-label="Producto">${p ? `${p.codigo} — ${p.nombre}` : '—'}</td>
+        <td data-label="Cantidad" style="text-align:right;font-weight:600;${cant < 0 ? 'color:#d64545' : ''}">${cant > 0 && m.tipo !== 'ajuste' ? '' : ''}${cant}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -8115,14 +8048,14 @@ function renderVencimientos() {
 
   const filaHtml = (f, esVencido) => `
     <tr>
-      <td class="mono" style="color:var(--accent);white-space:nowrap">${f.p.codigo}</td>
-      <td>${f.p.nombre}</td>
-      <td class="mono">${f.l.lote || '—'}</td>
-      <td style="white-space:nowrap">${fDate(f.l.vencimiento)}</td>
-      <td style="white-space:nowrap;font-weight:600;${esVencido ? 'color:#d64545' : 'color:#b8860b'}">
+      <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${f.p.codigo}</td>
+      <td data-label="Producto">${f.p.nombre}</td>
+      <td data-label="Lote" class="mono">${f.l.lote || '—'}</td>
+      <td data-label="Vencimiento" style="white-space:nowrap">${fDate(f.l.vencimiento)}</td>
+      <td data-label="Estado" style="white-space:nowrap;font-weight:600;${esVencido ? 'color:#d64545' : 'color:#b8860b'}">
         ${esVencido ? `Venció hace ${Math.abs(f.dias)} día${Math.abs(f.dias) === 1 ? '' : 's'}` : (f.dias === 0 ? 'Vence hoy' : `Vence en ${f.dias} día${f.dias === 1 ? '' : 's'}`)}
       </td>
-      <td style="text-align:right">${f.l.cantidad}</td>
+      <td data-label="Cantidad" style="text-align:right">${f.l.cantidad}</td>
       <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="darDeBajaLote(${f.l.id})">Dar de baja</button></td>
     </tr>`;
 
@@ -8267,12 +8200,12 @@ function renderResultadoConciliacion(r) {
       </tr></thead><tbody>
         ${r.ajustados.map(a => `
           <tr>
-            <td class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
-            <td>${a.p.nombre}</td>
-            <td style="text-align:right">${a.actual}</td>
-            <td style="text-align:right">${a.pcTotal}</td>
-            <td style="text-align:right;font-weight:600;color:#d64545">-${a.diff}</td>
-            <td style="font-size:12px;color:var(--text-2)">
+            <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
+            <td data-label="Producto">${a.p.nombre}</td>
+            <td data-label="Antes" style="text-align:right">${a.actual}</td>
+            <td data-label="Maestro PC" style="text-align:right">${a.pcTotal}</td>
+            <td data-label="Se quitó" style="text-align:right;font-weight:600;color:#d64545">-${a.diff}</td>
+            <td data-label="Lotes afectados" style="font-size:12px;color:var(--text-2)">
               ${a.detalle.map(d => `Lote ${d.lote || 's/n'} (vence ${d.vencimiento ? fDate(d.vencimiento) : '—'}): -${d.quitado}`).join('<br>')}
               ${a.faltante > 0 ? `<br><span style="color:#d64545">⚠ No había stock suficiente, faltaron ${a.faltante} por quitar</span>` : ''}
             </td>
@@ -8288,11 +8221,11 @@ function renderResultadoConciliacion(r) {
       </tr></thead><tbody>
         ${r.masEnMaestro.map(a => `
           <tr>
-            <td class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
-            <td>${a.p.nombre}</td>
-            <td style="text-align:right">${a.actual}</td>
-            <td style="text-align:right">${a.pcTotal}</td>
-            <td style="text-align:right;font-weight:600;color:#b8860b">+${a.diff}</td>
+            <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${a.p.codigo}</td>
+            <td data-label="Producto">${a.p.nombre}</td>
+            <td data-label="En Bulfor" style="text-align:right">${a.actual}</td>
+            <td data-label="Maestro PC" style="text-align:right">${a.pcTotal}</td>
+            <td data-label="Diferencia" style="text-align:right;font-weight:600;color:#b8860b">+${a.diff}</td>
           </tr>`).join('')}
       </tbody></table></div>
       <p style="font-size:12px;color:var(--text-3);margin-top:6px">No los subí solo porque no sé a qué lote/vencimiento pertenece la diferencia — probablemente sea una compra que llegó y todavía no se registró en Movimientos.</p>`;
@@ -8453,6 +8386,8 @@ function renderNavSubmenuMobile(modulo, pagina) {
     <div class="nav-item${it.page === pagina ? ' active' : ''}" data-page="${it.page}" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
       <span class="nav-icon">${it.icon}</span><span>${it.label}</span>
     </div>`).join('');
+  const activo = cont.querySelector('.nav-item.active');
+  if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
 
 function showPage(id, el) {
