@@ -1192,11 +1192,38 @@
     <div id="rechazadas-contenido"></div>
   </div>
 
+  <!-- PRODUCTOS DE FACTURAS PROVEEDOR (Facturas por pagar) PAGE -->
   <div class="page" id="page-facturas-prov-productos">
-    <div class="modulo-placeholder">
-      <div class="icono">📦</div>
-      <h2>Productos — Facturas Proveedor</h2>
-      <p>Esta sección está en construcción. Acá vas a poder ver los productos de las facturas de otros proveedores (distintas a las de Bulfor).</p>
+    <div class="page-header">
+      <div class="page-title">Productos</div>
+      <div class="page-sub">Historial de productos de Facturas por pagar (proveedores)</div>
+    </div>
+    <div class="fpp-resumen" id="fpprov-items-resumen" style="display:none"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fpprov-items-search" placeholder="Buscar producto…" oninput="filterFacturaProvItems()">
+      </div>
+    </div>
+    <div id="fpprov-items-cargando" style="display:none">
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;width:80%"></div>
+    </div>
+    <div class="table-card" id="fpprov-items-tabla" style="display:none">
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="fpprov-items-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Producto</th>
+              <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
+            </tr></thead>
+            <tbody id="fpprov-items-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="fpprov-items-jump"></div>
+      </div>
     </div>
   </div>
 
@@ -2837,6 +2864,184 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
               <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital(window.__facturaProductoHospActualNombre, window.__facturaProductoHospActualHospital));abrirDetalleDocumentoGdexpress(${doc.id})">
                 <td data-label="Folio" class="mono" style="color:#185FA5">${doc.folio} ↗</td>
                 <td data-label="Fecha">${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
+                <td data-label="Cantidad" style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
+                <td data-label="Monto ítem" style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
+              </tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ─── PRODUCTOS DE FACTURAS PROVEEDOR (Facturas por pagar) ──────────────────
+// Mismo patrón que "Productos" de Facturas Bulfor (libreta de direcciones
+// A-Z + modal de detalle), pero usando facturas_por_pagar_items en vez de
+// documentos_gdexpress_items, y agrupando por PROVEEDOR en vez de hospital
+// (acá el contraparte de cada factura es quien nos vende a nosotros).
+let facturaProvItemsCargados = false;
+let facturaProvProductosUnicos = [];
+let facturaProvProductosUnicosF = [];
+let facturaProvItemsRaw = []; // ítems crudos, para armar el detalle por proveedor al hacer clic
+
+async function cargarProductosFacturasProveedor() {
+  if (facturaProvItemsCargados) { renderFacturaProvItems(); return; }
+  document.getElementById('fpprov-items-cargando').style.display = 'block';
+  document.getElementById('fpprov-items-tabla').style.display = 'none';
+  try {
+    const todos = await fetchAll('facturas_por_pagar_items', 'select=factura_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
+    const idsValidas = new Set(facturasPorPagar.filter(f => f.estado_aceptacion !== 'N').map(f => f.id));
+    facturaProvItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsValidas.has(it.factura_id));
+
+    const map = new Map();
+    facturaProvItemsRaw.forEach(it => {
+      const key = (it.nombre_producto || 'Sin nombre').trim();
+      if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+      const entry = map.get(key);
+      entry.facturas += 1;
+      entry.totalFacturado += Number(it.monto_item || 0);
+    });
+    facturaProvProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+    facturaProvProductosUnicosF = [...facturaProvProductosUnicos];
+    facturaProvItemsCargados = true;
+    document.getElementById('fpprov-items-cargando').style.display = 'none';
+    document.getElementById('fpprov-items-tabla').style.display = 'block';
+    renderFacturaProvItems();
+  } catch (e) {
+    document.getElementById('fpprov-items-cargando').innerHTML = `<div style="color:var(--red);font-size:13px">No se pudo cargar: ${e.message}</div>`;
+  }
+}
+
+function filterFacturaProvItems() {
+  const q = document.getElementById('fpprov-items-search').value;
+  facturaProvProductosUnicosF = facturaProvProductosUnicos.filter(p => coincideBusqueda(p.nombre, q));
+  renderFacturaProvItems();
+}
+
+function renderFacturaProvItems() {
+  document.getElementById('fpprov-items-info').textContent = `${facturaProvProductosUnicosF.length.toLocaleString('es-CL')} productos`;
+
+  const totalFacturado = facturaProvProductosUnicosF.reduce((s,p) => s + (p.totalFacturado||0), 0);
+  const totalFacturas = facturaProvProductosUnicosF.reduce((s,p) => s + (p.facturas||0), 0);
+  const resumen = document.getElementById('fpprov-items-resumen');
+  resumen.style.display = 'grid';
+  resumen.innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
+    <div class="stat"><div class="stat-label">Productos</div><div class="stat-val" style="font-size:16px">${facturaProvProductosUnicosF.length.toLocaleString('es-CL')}</div></div>
+    <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${totalFacturas.toLocaleString('es-CL')}</div></div>`;
+
+  const hayFiltro = document.getElementById('fpprov-items-search').value;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos de facturas de proveedor.'}</p></div></td>`;
+  renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', facturaProvProductosUnicosF, p => p.nombre,
+    (p, idx) => `<tr onclick="navReset();openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx}].nombre)" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
+      <td style="text-align:right">${p.facturas}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
+    </tr>`, 3, mensajeVacio);
+}
+
+function botonNavProductoFacturaProvHtml(nombreActual) {
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body']) || facturaProvProductosUnicosF;
+  const idx = lista.findIndex(p => p.nombre === nombreActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0;
+  const haySiguiente = idx < lista.length - 1;
+  return `
+    <button onclick="openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx-1}]?.nombre)" ${hayAnterior?'':'disabled'} title="Producto anterior (orden alfabético, respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx+1}]?.nombre)" ${haySiguiente?'':'disabled'} title="Producto siguiente (orden alfabético, respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
+function openProductoFacturaProvDetail(nombreProducto) {
+  cerrarTodosLosModales();
+  const compras = facturaProvItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  if (!compras.length) return;
+
+  const totalFacturado = compras.reduce((s, v) => s + Number(v.monto_item || 0), 0);
+
+  // Agrupamos por proveedor (vía la factura por pagar a la que pertenece cada ítem).
+  const porProveedor = new Map();
+  compras.forEach(v => {
+    const f = facturasPorPagar.find(x => x.id === v.factura_id);
+    const p = f ? (f.proveedor || 'Sin proveedor') : 'Sin proveedor';
+    if (!porProveedor.has(p)) porProveedor.set(p, { proveedor: p, facturas: 0, total: 0 });
+    const entry = porProveedor.get(p);
+    entry.facturas += 1;
+    entry.total += Number(v.monto_item || 0);
+  });
+  const proveedores = Array.from(porProveedor.values()).sort((a, b) => b.total - a.total);
+  window.__prodFacturaProvNombreActual = nombreProducto;
+  window.__prodFacturaProvProveedoresVisibles = proveedores;
+
+  const modal = document.createElement('div');
+  modal.id = 'producto-factura-prov-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Producto — Facturas Proveedor</div>
+          <div class="modal-title">${escapeHtml(nombreProducto)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonNavProductoFacturaProvHtml(nombreProducto)}
+          <button onclick="document.getElementById('producto-factura-prov-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+          <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${compras.length}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por proveedor — clic para ver las facturas</div>
+        <table class="clinical-grid">
+          ${proveedores.map((p, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaProvDetail(window.__prodFacturaProvNombreActual));abrirFacturasProvDeProductoProveedor(window.__prodFacturaProvNombreActual, window.__prodFacturaProvProveedoresVisibles[${idx}].proveedor)"><td style="color:#185FA5">${escapeHtml(p.proveedor)} ↗</td><td style="text-align:right">${p.facturas} factura${p.facturas===1?'':'s'} — ${clp(p.total)}</td></tr>`).join('')}
+        </table>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function abrirFacturasProvDeProductoProveedor(nombreProducto, proveedorNombre) {
+  cerrarTodosLosModales();
+  const compras = facturaProvItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  const facturas = compras
+    .map(v => {
+      const f = facturasPorPagar.find(x => x.id === v.factura_id);
+      return f ? { f, item: v } : null;
+    })
+    .filter(x => x && (x.f.proveedor || 'Sin proveedor') === proveedorNombre)
+    .sort((a, b) => (b.f.fecha_emision || '').localeCompare(a.f.fecha_emision || ''));
+
+  window.__facturaProdProvActualNombre = nombreProducto;
+  window.__facturaProdProvActualProveedor = proveedorNombre;
+
+  const modal = document.createElement('div');
+  modal.id = 'facturas-producto-prov-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">${escapeHtml(nombreProducto)}</div>
+          <div class="modal-title">${escapeHtml(proveedorNombre)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('facturas-producto-prov-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0"><thead><tr>
+            <th style="font-size:10px">N° Factura</th><th style="font-size:10px">Fecha</th>
+            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
+          </tr></thead><tbody>
+            ${facturas.map(({f, item}) => `
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasProvDeProductoProveedor(window.__facturaProdProvActualNombre, window.__facturaProdProvActualProveedor));abrirDetalleFacturaPorPagar(${f.id})">
+                <td data-label="N° Factura" class="mono" style="color:#185FA5">${f.factura} ↗</td>
+                <td data-label="Fecha">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
                 <td data-label="Cantidad" style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
                 <td data-label="Monto ítem" style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
               </tr>`).join('')}
@@ -8315,6 +8520,9 @@ showPage = function(id, el) {
   }
   if (id === 'facturas-productos') {
     cargarProductosFacturas();
+  }
+  if (id === 'facturas-prov-productos') {
+    cargarProductosFacturasProveedor();
   }
 };
 
