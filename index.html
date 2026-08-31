@@ -4935,6 +4935,24 @@ function docBadgeTipo(tipoDte) {
   return `<span class="badge-estado ${clases[tipoDte]||'neutral'}">${TIPOS_DTE_INFO[tipoDte]?.singular || tipoDte}</span>`;
 }
 
+// Orden del listado del Buscador de documentos, en dos niveles:
+//   1. fecha de emisión, de la más reciente a la más antigua;
+//   2. dentro de un mismo día, N° de documento de mayor a menor.
+// Es UN solo criterio para la lista unificada: facturas, guías de despacho
+// y notas de crédito se ordenan entre sí, no se agrupan por tipo.
+// Ojo con los folios: se guardan como texto aunque casi siempre sean
+// números, y comparados como texto quedan mal ("9" saldría después de
+// "100"). Por eso, cuando los dos folios son enteramente numéricos se
+// comparan como números; si alguno trae letras, guiones o cualquier otro
+// carácter, cae de vuelta a comparación de texto para no romper el listado.
+function compararDocumentosGdexpress(a, b) {
+  const porFecha = (b.fecha_emision || '').localeCompare(a.fecha_emision || '');
+  if (porFecha !== 0) return porFecha;
+  const folioA = String(a.folio ?? ''), folioB = String(b.folio ?? '');
+  if (/^\d+$/.test(folioA) && /^\d+$/.test(folioB)) return Number(folioB) - Number(folioA);
+  return folioB.localeCompare(folioA);
+}
+
 // Para Facturas (tipo 33), cruzamos con facturas_pago por N° de factura —
 // esa tabla tiene datos de tu Excel original (revisados a mano, más
 // confiables históricamente) además de la sincronización de GDExpress.
@@ -5036,7 +5054,11 @@ function renderDocumentosGdexpress(soloTabla) {
       docBusqueda
     ));
   }
-  lista = lista.slice().sort((a,b) => (b.fecha_emision||'').localeCompare(a.fecha_emision||''));
+  // Único punto de ordenamiento de la lista: se aplica DESPUÉS de los
+  // filtros de período, tipo y búsqueda, y docF (que alimenta el
+  // anterior/siguiente del detalle) se queda con exactamente esta lista,
+  // así que la navegación respeta siempre este mismo orden.
+  lista = lista.slice().sort(compararDocumentosGdexpress);
   docF = lista;
 
   if (!lista.length) {
