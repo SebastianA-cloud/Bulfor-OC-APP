@@ -207,6 +207,22 @@
   /* Search + filters */
   .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
   .search-wrap { position: relative; flex: 1; min-width: 260px; }
+
+  /* Alcance de la búsqueda: "Este mes" / "Todo". Control segmentado
+     compacto que vive al lado del buscador (y debajo en celular, porque
+     .search-wrap pasa a ocupar el 100% del ancho). */
+  .scope-toggle { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .scope-toggle button { border: none; background: none; padding: 8px 13px; font-size: 12px;
+    font-family: var(--font); color: var(--text-2); cursor: pointer; white-space: nowrap;
+    transition: background .12s, color .12s; }
+  .scope-toggle button + button { border-left: 1px solid var(--border); }
+  .scope-toggle button:hover { background: var(--bg); }
+  .scope-toggle button.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+  /* Aviso de que lo que se está viendo YA NO corresponde al mes de arriba. */
+  .scope-aviso { display: flex; align-items: center; gap: 7px; margin: -6px 0 14px;
+    padding: 8px 12px; border-radius: var(--radius); background: var(--amber-light);
+    color: var(--amber); font-size: 12px; line-height: 1.35; }
   .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 15px; pointer-events: none; }
   input[type=text], select {
     width: 100%; padding: 9px 12px 9px 34px;
@@ -805,7 +821,6 @@
         <select id="oc-select-anio" onchange="ocSeleccionarPeriodo()" aria-label="Año"></select>
         <button class="fpp-period-btn" onclick="ocCambiarMes(1)" title="Mes siguiente">›</button>
       </div>
-      <button class="page-btn" id="oc-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="ocVerTodasLasFechas()" title="Ver órdenes de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
     </div>
     <div class="fpp-resumen" id="oc-stats">
       <div class="stat destacado"><div class="stat-label">Monto total (con IVA)</div><div class="stat-val" style="font-size:20px" id="s-monto">—</div></div>
@@ -818,11 +833,16 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="oc-search" placeholder="Buscar por hospital, N° OC, descripción…" oninput="filterOC()">
       </div>
+      <div class="scope-toggle" id="scope-oc" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('oc','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('oc','todo')">Todo</button>
+      </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
       <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
       <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
       <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
     </div>
+    <div class="scope-aviso" id="scope-aviso-oc" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -928,9 +948,14 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="fpp-search" placeholder="Buscar por N° factura, proveedor o RUT…" oninput="fppBuscar(this.value)">
       </div>
+      <div class="scope-toggle" id="scope-fpp" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('fpp','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('fpp','todo')">Todo</button>
+      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
     </div>
+    <div class="scope-aviso" id="scope-aviso-fpp" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
 
     <div id="fpp-bulk-bar" class="fpp-bulk-bar" style="display:none">
       <span id="fpp-bulk-count"></span>
@@ -1033,7 +1058,12 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="doc-search" placeholder="Buscar por N° documento, RUT, hospital, N° OC…" oninput="filtrarDocumentosGdexpress(this.value)">
       </div>
+      <div class="scope-toggle" id="scope-doc" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('doc','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('doc','todo')">Todo</button>
+      </div>
     </div>
+    <div class="scope-aviso" id="scope-aviso-doc" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="doc-contenido"></div>
   </div>
 
@@ -1057,10 +1087,14 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="fedex-search" placeholder="Buscar por hospital, N° orden, factura…" oninput="filterFedex()">
       </div>
+      <div class="scope-toggle" id="scope-fedex" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('fedex','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('fedex','todo')">Todo</button>
+      </div>
       <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
-      <button class="page-btn" id="fedex-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="fedexVerTodasLasFechas()" title="Ver envíos de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
+    <div class="scope-aviso" id="scope-aviso-fedex" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -1095,15 +1129,19 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="oe-search" placeholder="Buscar por paciente, preparado…" oninput="filterOE()">
       </div>
+      <div class="scope-toggle" id="scope-oe" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('oe','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('oe','todo')">Todo</button>
+      </div>
       <select id="oe-estado-entrega" onchange="oeCategoria='todos';renderTabsOE();filterOE()">
         <option value="">Todos los estados</option>
         <option value="En elaboracion">En elaboración</option>
         <option value="Para entrega">Para entrega</option>
         <option value="Entregado">Entregado</option>
       </select>
-      <button class="page-btn" id="oe-todas-fechas" style="padding:7px 14px;white-space:nowrap" onclick="oeVerTodasLasFechas()" title="Ver órdenes de todos los períodos, sin filtrar por mes">📅 Todas las fechas</button>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevaOrdenElaboracion()">+ Nueva orden</button>
     </div>
+    <div class="scope-aviso" id="scope-aviso-oe" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -1173,9 +1211,14 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" oninput="filtrarPagosBusqueda(this.value)">
       </div>
+      <div class="scope-toggle" id="scope-pagos" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('pagos','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('pagos','todo')">Todo</button>
+      </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
     </div>
+    <div class="scope-aviso" id="scope-aviso-pagos" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="pagos-import-log" style="display:none;margin-bottom:14px"></div>
     <div id="pagos-contenido"></div>
   </div>
@@ -1211,7 +1254,12 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="rechazadas-search" placeholder="Buscar por N° factura, RUT, hospital…" oninput="filtrarRechazadas(this.value)">
       </div>
+      <div class="scope-toggle" id="scope-rechazadas" role="group" aria-label="Alcance de la búsqueda">
+        <button data-alcance="mes" class="active" onclick="setAlcance('rechazadas','mes')">Este mes</button>
+        <button data-alcance="todo" onclick="setAlcance('rechazadas','todo')">Todo</button>
+      </div>
     </div>
+    <div class="scope-aviso" id="scope-aviso-rechazadas" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="rechazadas-contenido"></div>
   </div>
 
@@ -1602,6 +1650,62 @@ let farmaciaMovTipo = 'compra';
 let farmaciaMovProductoId = null;
 const PS = 15;
 
+// ─── ALCANCE DE LA BÚSQUEDA: "Este mes" vs "Todo" ─────────────────────────
+// Todos los módulos con período ya tienen TODO el histórico cargado en
+// memoria (fetchAll pagina hasta traer la tabla completa), así que buscar
+// en todo el historial no necesita ninguna consulta nueva al backend: es
+// simplemente no aplicar el filtro de mes.
+//
+// Cada módulo lleva su propio alcance — activar "Todo" en Facturas no
+// afecta a FedEx. Por defecto todos parten en "Este mes", que es lo
+// coherente con el período que se muestra arriba.
+const ALCANCE_RENDER = {
+  oc:          () => filterOC(),
+  doc:         () => renderDocumentosGdexpress(),
+  fpp:         () => fppRender(),
+  pagos:       () => renderPagosVista(),
+  rechazadas:  () => renderRechazadas(),
+  fedex:       () => filterFedex(),
+  oe:          () => filterOE(),
+};
+
+let alcanceBusqueda = { oc: 'mes', doc: 'mes', fpp: 'mes', pagos: 'mes', rechazadas: 'mes', fedex: 'mes', oe: 'mes' };
+
+function alcanceEsTodo(modulo) { return alcanceBusqueda[modulo] === 'todo'; }
+
+// Nombre del período para los textos ("… en Julio 2026" / "… en todo el
+// historial"), para que nunca se muestre un mes arriba y resultados de
+// otros años abajo sin explicación.
+function nombrePeriodoAlcance(modulo, periodo) {
+  if (alcanceEsTodo(modulo)) return 'todo el historial';
+  if (!periodo) return 'todos los períodos';
+  return `${MESES_NOMBRE[periodo.mes]} ${periodo.anio}`;
+}
+
+function setAlcance(modulo, valor) {
+  if (alcanceBusqueda[modulo] === valor) return;
+  alcanceBusqueda[modulo] = valor;
+  pintarAlcanceUI(modulo);
+  const render = ALCANCE_RENDER[modulo];
+  if (render) render();
+}
+
+// Deja el control segmentado y el aviso en sincronía con el estado.
+function pintarAlcanceUI(modulo) {
+  const grupo = document.getElementById(`scope-${modulo}`);
+  if (grupo) {
+    grupo.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.alcance === alcanceBusqueda[modulo]);
+    });
+  }
+  const aviso = document.getElementById(`scope-aviso-${modulo}`);
+  if (aviso) aviso.hidden = !alcanceEsTodo(modulo);
+}
+
+function pintarTodosLosAlcances() {
+  Object.keys(alcanceBusqueda).forEach(pintarAlcanceUI);
+}
+
 // ─── INIT ──────────────────────────────────────────────────────────────────
 async function fetchAll(table, query) {
   // Supabase limita cada respuesta a 1000 filas por defecto.
@@ -1715,7 +1819,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -3660,7 +3764,6 @@ function fedexPoblarSelectoresPeriodo() {
 
 function fedexSeleccionarPeriodo() {
   fedexPeriodo = { anio: document.getElementById('fedex-select-anio').value, mes: Number(document.getElementById('fedex-select-mes').value) };
-  document.getElementById('fedex-todas-fechas').classList.remove('active');
   filterFedex();
 }
 
@@ -3674,14 +3777,14 @@ function fedexCambiarMes(delta) {
   filterFedex();
 }
 
+// Se mantiene por compatibilidad: antes era el botón "📅 Todas las fechas",
+// que ahora quedó unificado en el control de alcance del buscador.
 function fedexVerTodasLasFechas() {
-  fedexPeriodo = null;
-  document.getElementById('fedex-todas-fechas').classList.add('active');
-  filterFedex();
+  setAlcance('fedex', 'todo');
 }
 
 function fedexListaDelPeriodo() {
-  if (!fedexPeriodo) return fedex;
+  if (alcanceEsTodo('fedex') || !fedexPeriodo) return fedex;
   const { anio, mes } = fedexPeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -3692,7 +3795,7 @@ function updateFedexStats() {
   const delPeriodo = fedexListaDelPeriodo();
   const total = delPeriodo.length;
   const retrasos = delPeriodo.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
-  const nombrePeriodo = fedexPeriodo ? `${MESES_NOMBRE[fedexPeriodo.mes]} ${fedexPeriodo.anio}` : 'todos los períodos';
+  const nombrePeriodo = nombrePeriodoAlcance('fedex', fedexPeriodo);
   document.getElementById('fedex-resumen-compacto').innerHTML =
     `<strong style="color:var(--text)">${total.toLocaleString('es-CL')} envíos en ${nombrePeriodo}</strong>` +
     (retrasos ? ` · <strong style="color:var(--red)">⚠ ${retrasos} con retraso</strong>` : ` · <span style="color:var(--green)">sin retrasos</span>`);
@@ -3755,7 +3858,7 @@ function renderFedex() {
   document.getElementById('fedex-info').textContent = `${total.toLocaleString('es-CL')} envíos`;
   renderPages('fedex-pages', total, pages, fedexPage, 'goFedex');
   if (!slice.length) {
-    const nombrePeriodo = fedexPeriodo ? `${MESES_NOMBRE[fedexPeriodo.mes]} ${fedexPeriodo.anio}` : 'todos los períodos';
+    const nombrePeriodo = nombrePeriodoAlcance('fedex', fedexPeriodo);
     const mensajes = {
       todos: `No encontramos envíos en ${nombrePeriodo}.`,
       retraso: `✓ No hay envíos con retraso en ${nombrePeriodo}.`,
@@ -3892,7 +3995,6 @@ function oePoblarSelectoresPeriodo() {
 
 function oeSeleccionarPeriodo() {
   oePeriodo = { anio: document.getElementById('oe-select-anio').value, mes: Number(document.getElementById('oe-select-mes').value) };
-  document.getElementById('oe-todas-fechas').classList.remove('active');
   filterOE();
 }
 
@@ -3906,14 +4008,14 @@ function oeCambiarMes(delta) {
   filterOE();
 }
 
+// Se mantiene por compatibilidad: antes era el botón "📅 Todas las fechas",
+// que ahora quedó unificado en el control de alcance del buscador.
 function oeVerTodasLasFechas() {
-  oePeriodo = null;
-  document.getElementById('oe-todas-fechas').classList.add('active');
-  filterOE();
+  setAlcance('oe', 'todo');
 }
 
 function oeListaDelPeriodo() {
-  if (!oePeriodo) return ordenesElaboracion;
+  if (alcanceEsTodo('oe') || !oePeriodo) return ordenesElaboracion;
   const { anio, mes } = oePeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -3923,7 +4025,7 @@ function oeListaDelPeriodo() {
 function updateOEStats() {
   const delPeriodo = oeListaDelPeriodo();
   const pendientes = delPeriodo.filter(o => o.estado_entrega !== 'Entregado').length;
-  const nombrePeriodo = oePeriodo ? `${MESES_NOMBRE[oePeriodo.mes]} ${oePeriodo.anio}` : 'todos los períodos';
+  const nombrePeriodo = nombrePeriodoAlcance('oe', oePeriodo);
   document.getElementById('oe-resumen-compacto').innerHTML =
     `<strong style="color:var(--text)">${delPeriodo.length.toLocaleString('es-CL')} órdenes en ${nombrePeriodo}</strong>` +
     (pendientes ? ` · <strong style="color:var(--amber)">${pendientes} pendiente${pendientes===1?'':'s'}</strong>` : ` · <span style="color:var(--green)">todo entregado</span>`);
@@ -3996,7 +4098,7 @@ function renderOE() {
   document.getElementById('oe-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oe-pages', total, pages, oePage, 'goOE');
   if (!slice.length) {
-    const nombrePeriodo = oePeriodo ? `${MESES_NOMBRE[oePeriodo.mes]} ${oePeriodo.anio}` : 'todos los períodos';
+    const nombrePeriodo = nombrePeriodoAlcance('oe', oePeriodo);
     const mensajes = {
       todos: `No hay órdenes de elaboración en ${nombrePeriodo}.`,
       elaboracion: `No hay órdenes en elaboración en ${nombrePeriodo}.`,
@@ -4379,6 +4481,7 @@ function aplicarFiltroPagos(lista) {
 }
 
 function pagosListaDelPeriodo() {
+  if (alcanceEsTodo('pagos')) return facturasPago;
   const { anio, mes } = pagosPeriodo;
   return facturasPago.filter(f => {
     const fecha = fechaReferenciaFactura(f);
@@ -4429,7 +4532,7 @@ function renderPagosVista(soloTabla) {
   let lista = pagosEstadoFiltro === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaPago(f) === pagosEstadoFiltro);
   lista = aplicarFiltroPagos(lista).sort(compararPorFolio);
 
-  const nombrePeriodo = `${MESES_NOMBRE[pagosPeriodo.mes]} ${pagosPeriodo.anio}`;
+  const nombrePeriodo = nombrePeriodoAlcance('pagos', pagosPeriodo);
   const cont = document.getElementById('pagos-contenido');
   if (!lista.length) {
     const mensajes = {
@@ -4937,6 +5040,7 @@ function docMostrarTodosLosTipos() {
 }
 
 function docListaDelPeriodo() {
+  if (alcanceEsTodo('doc')) return documentosGdexpress;
   const { anio, mes } = docPeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -5092,7 +5196,7 @@ function renderDocumentosGdexpress(soloTabla) {
   docF = lista;
 
   if (!lista.length) {
-    const nombrePeriodo = `${MESES_NOMBRE[docPeriodo.mes]} ${docPeriodo.anio}`;
+    const nombrePeriodo = nombrePeriodoAlcance('doc', docPeriodo);
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
     return;
   }
@@ -5381,6 +5485,7 @@ function rechazadasCambiarMes(delta) {
 }
 
 function rechazadasListaDelPeriodo() {
+  if (alcanceEsTodo('rechazadas')) return facturasRechazadas();
   const { anio, mes } = rechazadasPeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -5470,6 +5575,7 @@ function fppBuscar(valor) {
 }
 
 function fppListaDelPeriodo() {
+  if (alcanceEsTodo('fpp')) return facturasPorPagar;
   const { anio, mes } = fppPeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -5562,7 +5668,7 @@ function fppBadgeEstado(f) {
 }
 
 function fppMensajeVacio() {
-  const nombrePeriodo = `${MESES_NOMBRE[fppPeriodo.mes]} ${fppPeriodo.anio}`;
+  const nombrePeriodo = nombrePeriodoAlcance('fpp', fppPeriodo);
   if (fppBusqueda) return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
   const nombres = { pending: 'pendientes', overdue: 'atrasadas', paid: 'pagadas' };
   if (fppEstado === 'all') return { icono: '🧾', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
@@ -5977,7 +6083,7 @@ function renderRechazadas(soloTabla) {
 
   // Resumen compacto, en una línea, siempre del período seleccionado. Lo
   // único destacado es lo que requiere gestión; el resto es contexto.
-  const nombrePeriodoResumen = `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}`;
+  const nombrePeriodoResumen = nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
   document.getElementById('rechazadas-resumen').innerHTML = cuenta.todas === 0
     ? `<span class="rz-dato">Sin facturas rechazadas en ${nombrePeriodoResumen}.</span>`
     : `<span class="rz-total">${cuenta.todas} rechazada${cuenta.todas===1?'':'s'}</span>
@@ -6011,7 +6117,7 @@ function renderRechazadas(soloTabla) {
   window.__rechazadasVisibles = lista;
   const cont = document.getElementById('rechazadas-contenido');
   if (!lista.length) {
-    const nombrePeriodo = `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}`;
+    const nombrePeriodo = nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
     const mensajes = {
       todas: `No hay facturas rechazadas/anuladas en ${nombrePeriodo}.`,
       requiere_gestion: `No hay facturas que requieran gestión en ${nombrePeriodo} — todo está en proceso o regularizado.`,
@@ -7507,7 +7613,6 @@ function ocPoblarSelectoresPeriodo() {
 
 function ocSeleccionarPeriodo() {
   ocPeriodo = { anio: document.getElementById('oc-select-anio').value, mes: Number(document.getElementById('oc-select-mes').value) };
-  document.getElementById('oc-todas-fechas').classList.remove('active');
   filterOC();
 }
 
@@ -7521,14 +7626,14 @@ function ocCambiarMes(delta) {
   filterOC();
 }
 
+// Se mantiene por compatibilidad: antes era el botón "📅 Todas las fechas",
+// que ahora quedó unificado en el control de alcance del buscador.
 function ocVerTodasLasFechas() {
-  ocPeriodo = null;
-  document.getElementById('oc-todas-fechas').classList.add('active');
-  filterOC();
+  setAlcance('oc', 'todo');
 }
 
 function ocListaDelPeriodo() {
-  if (!ocPeriodo) return oc;
+  if (alcanceEsTodo('oc') || !ocPeriodo) return oc;
   const { anio, mes } = ocPeriodo;
   const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
   const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
@@ -7544,7 +7649,7 @@ function updateStats() {
   document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
   document.getElementById('s-fecha').textContent = fDate(ultima);
-  const nombrePeriodo = ocPeriodo ? `${MESES_NOMBRE[ocPeriodo.mes]} ${ocPeriodo.anio}` : 'todos los períodos';
+  const nombrePeriodo = nombrePeriodoAlcance('oc', ocPeriodo);
   document.getElementById('oc-subtitle').textContent = `${base.length.toLocaleString('es-CL')} órdenes en ${nombrePeriodo} — última actualización: ${fDate(ultima)}`;
 }
 
