@@ -644,7 +644,8 @@
     <div class="nav-group" data-modulo="facturas">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas">
         <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
-        <span style="flex:1">Facturas</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas</span>
+        <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-facturas">
@@ -659,7 +660,7 @@
             <div class="nav-item nav-subitem" data-page="facturas-productos" onclick="seleccionarSubpagina('facturas','facturas-productos',this)"><span>Productos</span></div>
             <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
             <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de pagos</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span>Facturas rechazadas</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
           </div>
         </div>
         <div class="nav-subbloque" data-subbloque="facturas-proveedor">
@@ -731,8 +732,9 @@
   <div class="tab-item" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')">
     <i class="ti ti-shopping-cart" aria-hidden="true"></i><span>OC</span>
   </div>
-  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')">
+  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')" style="position:relative">
     <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
+    <span id="badge-rechazadas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
   </div>
   <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex')">
     <i class="ti ti-truck" aria-hidden="true"></i><span>FedEx</span>
@@ -5419,6 +5421,70 @@ function filtrarRechazadas(valor) {
   renderRechazadas(true);
 }
 
+// ─── Aviso de facturas rechazadas nuevas ──────────────────────────────────
+// A diferencia del badge de Órdenes de Elaboración (que cuenta trabajo
+// pendiente), acá se avisa solo de lo NUEVO: las facturas rechazadas que
+// aparecieron desde la última vez que se abrió la página. Si contara todas
+// las pendientes quedaría encendido de forma permanente (hoy hay 22
+// históricas sin regularizar) y dejaría de servir como aviso.
+//
+// Se guardan los N° de factura ya vistos, no una fecha: así una factura
+// que se sincroniza tarde (con fecha de emisión antigua) igual se detecta
+// como nueva. Vive en localStorage, o sea es por navegador — en otro
+// computador el conteo parte limpio, que es el comportamiento razonable
+// para un aviso de "lo que todavía no has mirado".
+const RECHAZADAS_VISTAS_KEY = 'bulfor_rechazadas_vistas';
+
+function rechazadasVistas() {
+  try {
+    const raw = localStorage.getItem(RECHAZADAS_VISTAS_KEY);
+    if (!raw) return null; // null = nunca se ha inicializado
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? new Set(arr.map(String)) : null;
+  } catch (e) { return null; }
+}
+
+function guardarRechazadasVistas(set) {
+  try {
+    localStorage.setItem(RECHAZADAS_VISTAS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) { /* si el navegador bloquea el almacenamiento, el aviso simplemente no persiste */ }
+}
+
+// Facturas rechazadas que todavía no se han visto nunca.
+function rechazadasNuevas() {
+  const vistas = rechazadasVistas();
+  if (!vistas) return []; // primera vez: se marca todo como visto, no se avisa del histórico
+  return facturasRechazadas().filter(f => !vistas.has(String(f.factura)));
+}
+
+// Marca todo lo que hay ahora como visto y apaga el aviso.
+function marcarRechazadasComoVistas() {
+  guardarRechazadasVistas(new Set(facturasRechazadas().map(f => String(f.factura))));
+  actualizarBadgeRechazadas();
+}
+
+function actualizarBadgeRechazadas() {
+  const cantidad = rechazadasNuevas().length;
+  const texto = cantidad > 3 ? '3+' : String(cantidad);
+  [document.getElementById('badge-rechazadas'),
+   document.getElementById('badge-rechazadas-subitem'),
+   document.getElementById('badge-rechazadas-mobile')].forEach(badge => {
+    if (!badge) return;
+    if (!cantidad) { badge.style.display = 'none'; return; }
+    badge.textContent = texto;
+    badge.title = `${cantidad} factura${cantidad===1?'':'s'} rechazada${cantidad===1?'':'s'} nueva${cantidad===1?'':'s'}`;
+    badge.style.display = 'flex';
+  });
+}
+
+// En la primera carga sobre un navegador que nunca ha visto la app, se
+// toma el estado actual como línea base: el aviso parte apagado y solo se
+// enciende con lo que llegue después.
+function inicializarAvisoRechazadas() {
+  if (!rechazadasVistas()) guardarRechazadasVistas(new Set(facturasRechazadas().map(f => String(f.factura))));
+  actualizarBadgeRechazadas();
+}
+
 // ─── Período Mes/Año, mismo patrón que Facturas por pagar y el Buscador ────
 // Se agrupa por fecha_emision de la factura ORIGINAL rechazada: es la fecha
 // que ya trae cada fila (viene de facturas_pago o, para las que solo existen
@@ -5437,6 +5503,7 @@ function rechazadasInit() {
   rechazadasPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
   rechazadasPoblarSelectores();
   renderRechazadas();
+  inicializarAvisoRechazadas();
 }
 
 function rechazadasPoblarSelectores() {
@@ -8943,6 +9010,10 @@ showPage = function(id, el) {
   }
   if (id === 'facturas-prov-productos') {
     cargarProductosFacturasProveedor();
+  }
+  // Entrar a Facturas rechazadas es "ya las vi": se apaga el aviso.
+  if (id === 'facturas-rechazadas') {
+    marcarRechazadasComoVistas();
   }
 };
 
