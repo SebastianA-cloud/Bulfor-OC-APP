@@ -219,10 +219,6 @@
   .scope-toggle button + button { border-left: 1px solid var(--border); }
   .scope-toggle button:hover { background: var(--bg); }
   .scope-toggle button.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
-  /* Aviso de que lo que se está viendo YA NO corresponde al mes de arriba. */
-  .scope-aviso { display: flex; align-items: center; gap: 7px; margin: -6px 0 14px;
-    padding: 8px 12px; border-radius: var(--radius); background: var(--amber-light);
-    color: var(--amber); font-size: 12px; line-height: 1.35; }
   .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 15px; pointer-events: none; }
   input[type=text], select {
     width: 100%; padding: 9px 12px 9px 34px;
@@ -842,7 +838,6 @@
       <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
       <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
     </div>
-    <div class="scope-aviso" id="scope-aviso-oc" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -955,7 +950,6 @@
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
     </div>
-    <div class="scope-aviso" id="scope-aviso-fpp" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
 
     <div id="fpp-bulk-bar" class="fpp-bulk-bar" style="display:none">
       <span id="fpp-bulk-count"></span>
@@ -1063,7 +1057,6 @@
         <button data-alcance="todo" onclick="setAlcance('doc','todo')">Todo</button>
       </div>
     </div>
-    <div class="scope-aviso" id="scope-aviso-doc" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="doc-contenido"></div>
   </div>
 
@@ -1094,7 +1087,6 @@
       <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
-    <div class="scope-aviso" id="scope-aviso-fedex" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -1141,7 +1133,6 @@
       </select>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevaOrdenElaboracion()">+ Nueva orden</button>
     </div>
-    <div class="scope-aviso" id="scope-aviso-oe" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div class="table-card">
       <table>
         <thead><tr>
@@ -1218,7 +1209,6 @@
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
     </div>
-    <div class="scope-aviso" id="scope-aviso-pagos" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="pagos-import-log" style="display:none;margin-bottom:14px"></div>
     <div id="pagos-contenido"></div>
   </div>
@@ -1259,7 +1249,6 @@
         <button data-alcance="todo" onclick="setAlcance('rechazadas','todo')">Todo</button>
       </div>
     </div>
-    <div class="scope-aviso" id="scope-aviso-rechazadas" hidden>🔎 Buscando en todo el historial — el período de arriba no limita estos resultados.</div>
     <div id="rechazadas-contenido"></div>
   </div>
 
@@ -1698,8 +1687,6 @@ function pintarAlcanceUI(modulo) {
       b.classList.toggle('active', b.dataset.alcance === alcanceBusqueda[modulo]);
     });
   }
-  const aviso = document.getElementById(`scope-aviso-${modulo}`);
-  if (aviso) aviso.hidden = !alcanceEsTodo(modulo);
 }
 
 function pintarTodosLosAlcances() {
