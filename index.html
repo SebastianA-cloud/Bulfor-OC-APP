@@ -295,6 +295,21 @@
   .fpp-resumen .stat.destacado { background: var(--accent-light); border-color: var(--accent); }
   .fpp-resumen .stat.destacado .stat-val { color: var(--accent); }
 
+  /* Resumen compacto de Facturas rechazadas: una sola línea en vez de
+     cuatro tarjetas grandes. Lo que requiere gestión es lo único que se
+     destaca — el resto es contexto. */
+  .rechazadas-resumen { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px;
+    padding: 10px 14px; margin-bottom: 14px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface); font-size: 13px; }
+  .rechazadas-resumen .rz-total { font-weight: 600; }
+  .rechazadas-resumen .rz-sep { color: var(--border-strong); }
+  .rechazadas-resumen .rz-gestion { display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 20px; background: var(--accent-light);
+    color: var(--accent); font-weight: 600; }
+  .rechazadas-resumen .rz-dato { color: var(--text-2); }
+  .rechazadas-resumen .rz-dato strong { color: var(--text); font-weight: 600; }
+  .rechazadas-resumen .rz-ok { color: var(--green); }
+
   .fpp-bulk-bar { align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius); padding: 9px 16px; margin-bottom: 10px; font-size: 13px; }
   .fpp-bulk-bar #fpp-bulk-count { font-weight: 600; color: var(--accent); }
   .fpp-bulk-sep { width: 1px; height: 18px; background: var(--accent); opacity: .3; }
@@ -1181,8 +1196,16 @@
       <div class="page-title">Facturas rechazadas</div>
       <div class="page-sub">Bandeja de gestión — qué requiere que hagas algo, qué ya está en proceso, y qué quedó regularizado</div>
     </div>
-    <div class="fpp-status-tabs" id="rechazadas-tabs" style="margin-bottom:14px"></div>
-    <div class="fpp-resumen" id="rechazadas-resumen"></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="rechazadas-select-mes" onchange="rechazadasSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="rechazadas-select-anio" onchange="rechazadasSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <div class="fpp-status-tabs" id="rechazadas-tabs"></div>
+    </div>
+    <div id="rechazadas-resumen" class="rechazadas-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -1692,7 +1715,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); renderRechazadas(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -1848,8 +1871,10 @@ const MODAL_OVERLAY_IDS = [
   'oc-facturas-asociadas-overlay',
   'producto-factura-modal-overlay',
   'facturas-producto-hosp-overlay',
+  'facturas-producto-prov-overlay',
   'fpp-detalle-overlay',
   'proveedores-gestion-overlay',
+  'rechazada-detalle-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -5303,6 +5328,65 @@ function filtrarRechazadas(valor) {
   renderRechazadas(true);
 }
 
+// ─── Período Mes/Año, mismo patrón que Facturas por pagar y el Buscador ────
+// Se agrupa por fecha_emision de la factura ORIGINAL rechazada: es la fecha
+// que ya trae cada fila (viene de facturas_pago o, para las que solo existen
+// en GDExpress, del documento de la factura) y es la que muestra la tabla.
+// No se crea ninguna fecha nueva en la base de datos.
+let rechazadasPeriodo = { anio: null, mes: null };
+
+function rechazadasAniosDisponibles() {
+  const anios = new Set();
+  facturasRechazadas().forEach(f => { if (f.fecha_emision) anios.add(f.fecha_emision.slice(0,4)); });
+  return Array.from(anios).sort((a,b) => b.localeCompare(a));
+}
+
+function rechazadasInit() {
+  const hoy = new Date();
+  rechazadasPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  rechazadasPoblarSelectores();
+  renderRechazadas();
+}
+
+function rechazadasPoblarSelectores() {
+  const selMes = document.getElementById('rechazadas-select-mes');
+  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
+  selMes.value = rechazadasPeriodo.mes;
+
+  const anios = new Set(rechazadasAniosDisponibles());
+  anios.add(rechazadasPeriodo.anio); // por si el mes actual todavía no tiene ninguna rechazada
+  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
+  const selAnio = document.getElementById('rechazadas-select-anio');
+  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
+  selAnio.value = rechazadasPeriodo.anio;
+}
+
+function rechazadasSeleccionarPeriodo() {
+  rechazadasPeriodo = {
+    anio: document.getElementById('rechazadas-select-anio').value,
+    mes: Number(document.getElementById('rechazadas-select-mes').value),
+  };
+  renderRechazadas();
+}
+
+// Diciembre → Enero y Enero → Diciembre arrastran el año, igual que en el
+// resto de los módulos con período.
+function rechazadasCambiarMes(delta) {
+  let a = parseInt(rechazadasPeriodo.anio, 10), m = rechazadasPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  rechazadasPeriodo = { anio: String(a), mes: m };
+  rechazadasPoblarSelectores(); // por si el año nuevo no estaba en la lista
+  renderRechazadas();
+}
+
+function rechazadasListaDelPeriodo() {
+  const { anio, mes } = rechazadasPeriodo;
+  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
+  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
+  return facturasRechazadas().filter(f => { const d = f.fecha_emision || ''; return d >= desde && d < hasta; });
+}
+
 // ─── FACTURAS POR PAGAR (lo que los proveedores le facturan a Bulfor) ──────
 function nombreProveedorCuenta(rutProveedor) {
   const p = proveedoresCuentas.find(x => x.rut_proveedor === rutProveedor);
@@ -5871,10 +5955,13 @@ function badgeGestionRechazada(f) {
 }
 
 function renderRechazadas(soloTabla) {
-  let todas = facturasRechazadas();
+  // Todo lo que se ve en pantalla —pestañas, contadores, resumen y tabla—
+  // corresponde SOLO al mes/año seleccionado. Nunca se mezclan totales
+  // históricos con la vista de un mes.
+  let todas = rechazadasListaDelPeriodo();
 
-  // Resumen y pestañas se calculan sobre TODAS (sin buscador), para que los
-  // contadores no salten al escribir en el buscador.
+  // Resumen y pestañas se calculan sobre todas las del período (sin aplicar
+  // el buscador), para que los contadores no salten al escribir.
   const cuenta = { todas: todas.length, requiere_gestion: 0, en_proceso: 0, regularizada: 0 };
   todas.forEach(f => cuenta[estadoGestionRechazada(f)]++);
 
@@ -5888,11 +5975,21 @@ function renderRechazadas(soloTabla) {
     `<button class="fpp-status-tab${rechazadasEstadoActivo===t.id?' active':''}" onclick="filtrarRechazadasPorEstado('${t.id}')">${t.label} (${cuenta[t.id]||0})</button>`
   ).join('');
 
-  document.getElementById('rechazadas-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Requieren gestión</div><div class="stat-val" style="font-size:20px">${cuenta.requiere_gestion}</div></div>
-    <div class="stat"><div class="stat-label">Total rechazadas</div><div class="stat-val" style="font-size:16px">${cuenta.todas}</div></div>
-    <div class="stat"><div class="stat-label">En proceso</div><div class="stat-val" style="font-size:16px">${cuenta.en_proceso}</div></div>
-    <div class="stat"><div class="stat-label">Regularizadas</div><div class="stat-val" style="font-size:16px;color:var(--green)">${cuenta.regularizada}</div></div>`;
+  // Resumen compacto, en una línea, siempre del período seleccionado. Lo
+  // único destacado es lo que requiere gestión; el resto es contexto.
+  const nombrePeriodoResumen = `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}`;
+  document.getElementById('rechazadas-resumen').innerHTML = cuenta.todas === 0
+    ? `<span class="rz-dato">Sin facturas rechazadas en ${nombrePeriodoResumen}.</span>`
+    : `<span class="rz-total">${cuenta.todas} rechazada${cuenta.todas===1?'':'s'}</span>
+       <span class="rz-dato">en ${nombrePeriodoResumen}</span>
+       <span class="rz-sep">·</span>
+       ${cuenta.requiere_gestion > 0
+         ? `<span class="rz-gestion">${cuenta.requiere_gestion} requiere${cuenta.requiere_gestion===1?'':'n'} gestión</span>`
+         : `<span class="rz-dato rz-ok">✓ nada pendiente de gestión</span>`}
+       <span class="rz-sep">·</span>
+       <span class="rz-dato"><strong>${cuenta.en_proceso}</strong> en proceso</span>
+       <span class="rz-sep">·</span>
+       <span class="rz-dato"><strong class="rz-ok">${cuenta.regularizada}</strong> regularizada${cuenta.regularizada===1?'':'s'}</span>`;
 
   let lista = rechazadasEstadoActivo === 'todas' ? todas : todas.filter(f => estadoGestionRechazada(f) === rechazadasEstadoActivo);
   if (rechazadasBusqueda) {
@@ -5914,11 +6011,12 @@ function renderRechazadas(soloTabla) {
   window.__rechazadasVisibles = lista;
   const cont = document.getElementById('rechazadas-contenido');
   if (!lista.length) {
+    const nombrePeriodo = `${MESES_NOMBRE[rechazadasPeriodo.mes]} ${rechazadasPeriodo.anio}`;
     const mensajes = {
-      todas: 'No hay facturas rechazadas/anuladas.',
-      requiere_gestion: 'No hay facturas que requieran gestión — todo está en proceso o regularizado.',
-      en_proceso: 'No hay facturas en proceso de regularización en este momento.',
-      regularizada: 'Todavía no hay facturas regularizadas.',
+      todas: `No hay facturas rechazadas/anuladas en ${nombrePeriodo}.`,
+      requiere_gestion: `No hay facturas que requieran gestión en ${nombrePeriodo} — todo está en proceso o regularizado.`,
+      en_proceso: `No hay facturas en proceso de regularización en ${nombrePeriodo}.`,
+      regularizada: `Todavía no hay facturas regularizadas en ${nombrePeriodo}.`,
     };
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
     return;
