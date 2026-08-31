@@ -4935,22 +4935,27 @@ function docBadgeTipo(tipoDte) {
   return `<span class="badge-estado ${clases[tipoDte]||'neutral'}">${TIPOS_DTE_INFO[tipoDte]?.singular || tipoDte}</span>`;
 }
 
+// Compara dos N° de documento de mayor a menor. Se guardan como texto
+// aunque casi siempre sean números, y comparados como texto quedan mal
+// ("9" saldría después de "100"). Por eso, cuando los dos son enteramente
+// numéricos se comparan como números; si alguno trae letras, guiones o
+// cualquier otro carácter, cae de vuelta a comparación de texto para no
+// romper el listado.
+function compararNumeroDocumentoDesc(numA, numB) {
+  const a = String(numA ?? ''), b = String(numB ?? '');
+  if (/^\d+$/.test(a) && /^\d+$/.test(b)) return Number(b) - Number(a);
+  return b.localeCompare(a);
+}
+
 // Orden del listado del Buscador de documentos, en dos niveles:
 //   1. fecha de emisión, de la más reciente a la más antigua;
 //   2. dentro de un mismo día, N° de documento de mayor a menor.
 // Es UN solo criterio para la lista unificada: facturas, guías de despacho
 // y notas de crédito se ordenan entre sí, no se agrupan por tipo.
-// Ojo con los folios: se guardan como texto aunque casi siempre sean
-// números, y comparados como texto quedan mal ("9" saldría después de
-// "100"). Por eso, cuando los dos folios son enteramente numéricos se
-// comparan como números; si alguno trae letras, guiones o cualquier otro
-// carácter, cae de vuelta a comparación de texto para no romper el listado.
 function compararDocumentosGdexpress(a, b) {
   const porFecha = (b.fecha_emision || '').localeCompare(a.fecha_emision || '');
   if (porFecha !== 0) return porFecha;
-  const folioA = String(a.folio ?? ''), folioB = String(b.folio ?? '');
-  if (/^\d+$/.test(folioA) && /^\d+$/.test(folioB)) return Number(folioB) - Number(folioA);
-  return folioB.localeCompare(folioA);
+  return compararNumeroDocumentoDesc(a.folio, b.folio);
 }
 
 // Para Facturas (tipo 33), cruzamos con facturas_pago por N° de factura —
@@ -5387,11 +5392,26 @@ function fppListaDelPeriodo() {
   return facturasPorPagar.filter(f => (f.fecha_emision||'') >= desde && (f.fecha_emision||'') < hasta);
 }
 
+// Mismo criterio de orden que el Buscador de documentos, en dos niveles:
+//   1. fecha de emisión, de la más reciente a la más antigua;
+//   2. dentro de un mismo día, N° de factura de mayor a menor.
+// Antes esto ordenaba por fecha de VENCIMIENTO ascendente, que es por lo
+// que el listado no se veía en ningún orden reconocible por emisión.
+function compararFacturasPorPagar(a, b) {
+  const porFecha = (b.fecha_emision || '').localeCompare(a.fecha_emision || '');
+  if (porFecha !== 0) return porFecha;
+  return compararNumeroDocumentoDesc(a.factura, b.factura);
+}
+
 function fppListaFiltrada() {
   const delPeriodo = fppListaDelPeriodo();
   let lista = fppEstado === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaFPP(f) === fppEstado);
   if (fppBusqueda) lista = lista.filter(f => coincideBusqueda(`${f.factura} ${f.rut_proveedor||''} ${f.proveedor||''}`, fppBusqueda));
-  return lista.sort((a,b) => (a.fecha_vencimiento||'').localeCompare(b.fecha_vencimiento||''));
+  // Único punto de ordenamiento: se aplica DESPUÉS de los filtros de
+  // período, estado y búsqueda. La lista resultante alimenta la tabla,
+  // el anterior/siguiente del detalle y la descarga a Excel, así que los
+  // tres respetan siempre este mismo orden.
+  return lista.slice().sort(compararFacturasPorPagar);
 }
 
 function fppRender() {
