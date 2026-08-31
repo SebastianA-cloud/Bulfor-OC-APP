@@ -7633,7 +7633,7 @@ function updateStats() {
   const hosps = new Set(base.map(r=>nombreHosp(r.hospital))).size;
   const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc; // "Última OC" es siempre la más reciente de verdad, no depende del período
   document.getElementById('s-oc').textContent = base.length.toLocaleString('es-CL');
-  document.getElementById('s-monto').textContent = '$ '+Math.round(total/1e6)+'M';
+  document.getElementById('s-monto').textContent = clp(total);
   document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
   document.getElementById('s-fecha').textContent = fDate(ultima);
   const nombrePeriodo = nombrePeriodoAlcance('oc', ocPeriodo);
