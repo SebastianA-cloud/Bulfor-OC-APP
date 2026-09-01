@@ -5244,6 +5244,25 @@ function botonNavDocHtml(idActual) {
     <button onclick="abrirDetalleDocumentoGdexpress(${idSiguiente})" ${haySiguiente?'':'disabled'} title="Documento siguiente (respeta el filtro activo)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
+// Pestaña activa del visor de documentos. Es parte del estado del visor,
+// no del documento: al pasar al anterior/siguiente se conserva, para poder
+// recorrer varios documentos comparando sus ítems sin tener que volver a
+// elegir la pestaña en cada uno. Vuelve a "Datos generales" solo cuando se
+// cierra el visor (ojo: NO en cerrarTodosLosModales, que es justamente lo
+// que se llama al abrir el documento siguiente).
+let docTabActiva = 'doc-tab-general';
+
+function cambiarTabDocumento(el) {
+  cambiarTabOC(el); // el cambio visual sigue siendo el genérico de siempre
+  docTabActiva = el.dataset.tab;
+}
+
+function cerrarVisorDocumento() {
+  const m = document.getElementById('doc-gdexpress-detalle-overlay');
+  if (m) m.remove();
+  docTabActiva = 'doc-tab-general';
+}
+
 async function abrirDetalleDocumentoGdexpress(id) {
   const d = documentosGdexpress.find(x => x.id === id);
   if (!d) return;
@@ -5255,7 +5274,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
   const modal = document.createElement('div');
   modal.id = 'doc-gdexpress-detalle-overlay';
   modal.className = 'modal-overlay';
-  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.onclick = (e) => { if (e.target === modal) cerrarVisorDocumento(); };
   modal.innerHTML = `
     <div class="modal-shell modal-md" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -5267,15 +5286,15 @@ async function abrirDetalleDocumentoGdexpress(id) {
         <div class="modal-actions">
           ${botonAtrasHtml()}
           ${botonNavDocHtml(d.id)}
-          <button onclick="document.getElementById('doc-gdexpress-detalle-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+          <button onclick="cerrarVisorDocumento()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
       <div class="modal-tabs">
-        <div class="modal-tab active" data-tab="doc-tab-general" onclick="cambiarTabOC(this)">Datos generales</div>
-        <div class="modal-tab" data-tab="doc-tab-productos" onclick="cambiarTabOC(this)">Productos / Ítems</div>
+        <div class="modal-tab${docTabActiva==='doc-tab-general'?' active':''}" data-tab="doc-tab-general" onclick="cambiarTabDocumento(this)">Datos generales</div>
+        <div class="modal-tab${docTabActiva==='doc-tab-productos'?' active':''}" data-tab="doc-tab-productos" onclick="cambiarTabDocumento(this)">Productos / Ítems</div>
       </div>
       <div class="modal-body">
-        <div id="doc-tab-general" class="modal-tab-panel active">
+        <div id="doc-tab-general" class="modal-tab-panel${docTabActiva==='doc-tab-general'?' active':''}">
         <table class="clinical-grid">
           <tr><td>Fecha emisión</td><td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td></tr>
           <tr><td>Monto neto</td><td>${clp(d.monto)}</td></tr>
@@ -5289,7 +5308,7 @@ async function abrirDetalleDocumentoGdexpress(id) {
           <tr><td>Anula la Factura</td><td><span style="color:#185FA5;cursor:pointer" onclick="const _f=documentosGdexpress.find(x=>x.tipo_dte==='33'&&String(x.folio)==='${String(d.nc_factura_ref).replace(/'/g,"\\'")}');if(_f){navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));abrirDetalleDocumentoGdexpress(_f.id)}else{toast('Esa factura no está sincronizada todavía.', 'err')}">N° ${d.nc_factura_ref} ↗</span></td></tr>` : ''}
         </table>
         </div>
-        <div id="doc-tab-productos" class="modal-tab-panel">
+        <div id="doc-tab-productos" class="modal-tab-panel${docTabActiva==='doc-tab-productos'?' active':''}">
         <div id="doc-items-cuerpo">
           <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
           <div class="skeleton" style="height:38px;width:80%"></div>
