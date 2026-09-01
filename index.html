@@ -96,6 +96,15 @@
   .nav-subbloque.abierto .nav-subgroup-nivel2 { display: block; }
   .nav-subgroup-nivel2 .nav-subitem { padding-left: 44px; }
 
+  /* "Precios" desplegable dentro de Facturas Bulfor. Se mantiene liviano a
+     propósito: es la misma fila de un subitem, solo con chevron y con sus
+     dos hijos un poco más indentados. */
+  .nav-chevron-precios { font-size: 11px !important; color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
+  .nav-precios.abierto .nav-chevron-precios { transform: rotate(180deg); }
+  .nav-subgroup-nivel3 { display: none; }
+  .nav-precios.abierto .nav-subgroup-nivel3 { display: block; }
+  .nav-subgroup-nivel2 .nav-subitem-nivel3 { padding-left: 58px; font-size: 12.5px; }
+
   /* ─── Sidebar colapsable: modo solo-iconos controlado por el usuario
      (distinto del modo ícono-solo forzado por ancho de pantalla, más
      abajo). Preferencia guardada en localStorage. */
@@ -657,7 +666,13 @@
           </div>
           <div class="nav-subgroup-nivel2">
             <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscador de documentos</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-productos" onclick="seleccionarSubpagina('facturas','facturas-productos',this)"><span>Productos</span></div>
+            <div class="nav-precios" data-subbloque="precios">
+              <div class="nav-item nav-subitem nav-item-precios" onclick="togglePrecios(this)"><span style="flex:1">Precios</span><i class="ti ti-chevron-down nav-chevron-precios" aria-hidden="true"></i></div>
+              <div class="nav-subgroup-nivel3">
+                <div class="nav-item nav-subitem nav-subitem-nivel3" data-page="facturas-productos" onclick="seleccionarSubpagina('facturas','facturas-productos',this)"><span>Por producto</span></div>
+                <div class="nav-item nav-subitem nav-subitem-nivel3" data-page="facturas-clientes" onclick="seleccionarSubpagina('facturas','facturas-clientes',this)"><span>Por cliente</span></div>
+              </div>
+            </div>
             <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
             <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de pagos</span></div>
             <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
@@ -889,8 +904,12 @@
   <!-- PRODUCTOS DE FACTURAS PAGE -->
   <div class="page" id="page-facturas-productos">
     <div class="page-header">
-      <div class="page-title">Productos</div>
-      <div class="page-sub">Historial de productos facturados (Facturas, con IVA)</div>
+      <div class="page-title">Precios — Por producto</div>
+      <div class="page-sub">A quién le hemos vendido cada producto y a qué precio</div>
+    </div>
+    <div class="scope-toggle" id="precios-toggle-producto" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
+      <button class="active" onclick="preciosIrA('producto')">Por producto</button>
+      <button onclick="preciosIrA('cliente')">Por cliente</button>
     </div>
     <div class="fpp-resumen" id="fp-items-resumen" style="display:none"></div>
     <div class="toolbar">
@@ -917,6 +936,44 @@
           </table>
         </div>
         <div class="alfabetico-jump" id="fp-items-jump"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRECIOS — POR CLIENTE -->
+  <div class="page" id="page-facturas-clientes">
+    <div class="page-header">
+      <div class="page-title">Precios — Por cliente</div>
+      <div class="page-sub">Qué le hemos vendido a cada cliente y a qué precio</div>
+    </div>
+    <div class="scope-toggle" id="precios-toggle-cliente" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
+      <button onclick="preciosIrA('producto')">Por producto</button>
+      <button class="active" onclick="preciosIrA('cliente')">Por cliente</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fp-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesFacturas()">
+      </div>
+    </div>
+    <div id="fp-clientes-cargando" style="display:none">
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
+      <div class="skeleton" style="height:38px;width:80%"></div>
+    </div>
+    <div class="table-card" id="fp-clientes-tabla" style="display:none">
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="fp-clientes-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Cliente</th><th>RUT</th>
+              <th style="text-align:right">N° productos</th><th style="text-align:right">Total facturado</th>
+            </tr></thead>
+            <tbody id="fp-clientes-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="fp-clientes-jump"></div>
       </div>
     </div>
   </div>
@@ -1965,6 +2022,10 @@ const MODAL_OVERLAY_IDS = [
   'producto-factura-modal-overlay',
   'facturas-producto-hosp-overlay',
   'facturas-producto-prov-overlay',
+  'cliente-factura-modal-overlay',
+  'historial-venta-overlay',
+  'precio-costo-overlay',
+  'historial-costo-overlay',
   'fpp-detalle-overlay',
   'proveedores-gestion-overlay',
   'rechazada-detalle-overlay',
@@ -2823,26 +2884,34 @@ let facturaProductosUnicosF = [];
 let facturaItemsPage = 1;
 let facturaItemsRaw = []; // ítems crudos, para poder armar el detalle por hospital al hacer clic
 
+// Trae una sola vez los ítems de las facturas de venta y arma el índice de
+// productos. Lo usan tanto "Por producto" como "Por cliente", para no pedir
+// los mismos datos dos veces.
+async function cargarItemsFacturasVenta() {
+  if (facturaItemsCargados) return;
+  const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
+  const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
+  facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
+
+  const map = new Map();
+  facturaItemsRaw.forEach(it => {
+    const key = (it.nombre_producto || 'Sin nombre').trim();
+    if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+    const entry = map.get(key);
+    entry.facturas += 1;
+    entry.totalFacturado += Number(it.monto_item || 0);
+  });
+  facturaProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+  facturaProductosUnicosF = [...facturaProductosUnicos];
+  facturaItemsCargados = true;
+}
+
 async function cargarProductosFacturas() {
   if (facturaItemsCargados) { renderFacturaItems(); return; }
   document.getElementById('fp-items-cargando').style.display = 'block';
   document.getElementById('fp-items-tabla').style.display = 'none';
   try {
-    const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
-    const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
-    facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
-
-    const map = new Map();
-    facturaItemsRaw.forEach(it => {
-      const key = (it.nombre_producto || 'Sin nombre').trim();
-      if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
-      const entry = map.get(key);
-      entry.facturas += 1;
-      entry.totalFacturado += Number(it.monto_item || 0);
-    });
-    facturaProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
-    facturaProductosUnicosF = [...facturaProductosUnicos];
-    facturaItemsCargados = true;
+    await cargarItemsFacturasVenta();
     document.getElementById('fp-items-cargando').style.display = 'none';
     document.getElementById('fp-items-tabla').style.display = 'block';
     renderFacturaItems();
@@ -2936,31 +3005,197 @@ function openProductoFacturaDetail(nombreProducto) {
           <div class="stat" style="padding:12px"><div class="stat-label">N° facturas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:16px">${clp(totalFacturado)}</div></div>
         </div>
-        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por hospital — clic para ver las facturas</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <button class="page-btn" style="padding:8px 16px" onclick="navPush(()=>openProductoFacturaDetail(window.__prodFacturaNombreActual));abrirPrecioCosto(window.__prodFacturaNombreActual)">💰 Precio costo</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por cliente — clic para ver precios</div>
         <table class="clinical-grid">
-          ${hospitales.map((h, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail(window.__prodFacturaNombreActual));abrirFacturasDeProductoHospital(window.__prodFacturaNombreActual, window.__prodFacturaHospitalesVisibles[${idx}].hospital)"><td style="color:#185FA5">${escapeHtml(h.hospital)} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
+          ${hospitales.map((h, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoFacturaDetail(window.__prodFacturaNombreActual));abrirHistorialVentaProducto(window.__prodFacturaNombreActual, window.__prodFacturaHospitalesVisibles[${idx}].hospital)"><td style="color:#185FA5">${escapeHtml(h.hospital)} ↗</td><td style="text-align:right">${h.facturas} factura${h.facturas===1?'':'s'} — ${clp(h.total)}</td></tr>`).join('')}
         </table>
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
+// Se mantiene el nombre por compatibilidad con los cruces que ya la llaman
+// desde otras pantallas: ahora delega en el componente único de historial.
 function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
-  cerrarTodosLosModales();
-  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
-  const facturas = ventas
-    .map(v => {
-      const doc = documentosGdexpress.find(d => d.id === v.documento_id);
-      return doc ? { doc, item: v } : null;
-    })
-    .filter(x => x && (nombreHosp(x.doc.hospital) || x.doc.hospital || 'Sin hospital') === hospitalNombre)
-    .sort((a, b) => (b.doc.fecha_emision || '').localeCompare(a.doc.fecha_emision || ''));
+  return abrirHistorialVentaProducto(nombreProducto, hospitalNombre);
+}
 
-  window.__facturaProductoHospActualNombre = nombreProducto;
-  window.__facturaProductoHospActualHospital = hospitalNombre;
+
+// ═══ PRECIOS ═══════════════════════════════════════════════════════════════
+// Dos formas de consultar exactamente los mismos datos (los ítems de las
+// facturas de venta): "Por producto" responde a quién le vendimos algo, y
+// "Por cliente" responde qué le vendimos a alguien. Las dos terminan en el
+// MISMO historial (abrirHistorialVentaProducto), para que no existan dos
+// implementaciones que se puedan desincronizar.
+//
+// Precio del ítem: se usa precio_unitario tal cual viene del documento. Está
+// verificado contra los datos: cantidad × precio_unitario = monto_item, y la
+// suma de los ítems da el monto NETO de la factura, así que precio_unitario
+// es el precio unitario neto. Nunca se deduce un precio desde el total.
+
+function togglePrecios(el) {
+  el.parentElement.classList.toggle('abierto');
+}
+
+function preciosIrA(vista) {
+  const pagina = vista === 'cliente' ? 'facturas-clientes' : 'facturas-productos';
+  const item = document.querySelector(`.nav-subitem[data-page="${pagina}"]`);
+  seleccionarSubpagina('facturas', pagina, item || undefined);
+}
+
+// ─── Precios → Por cliente ────────────────────────────────────────────────
+let clientesFacturados = [];
+let clientesFacturadosF = [];
+
+// Cliente = el hospital/receptor de cada factura de venta, con el nombre ya
+// normalizado por nombreHosp (así no se duplica el mismo cliente por
+// diferencias de escritura). Se arma sobre los ítems ya cargados, sin
+// ninguna consulta nueva.
+function construirClientesFacturados() {
+  const porCliente = new Map();
+  facturaItemsRaw.forEach(it => {
+    const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+    if (!doc) return;
+    const nombre = nombreHosp(doc.hospital) || doc.hospital || 'Sin cliente';
+    if (!porCliente.has(nombre)) {
+      porCliente.set(nombre, { cliente: nombre, rut: doc.rut_hospital || '', productos: new Set(), facturas: new Set(), total: 0 });
+    }
+    const e = porCliente.get(nombre);
+    if (!e.rut && doc.rut_hospital) e.rut = doc.rut_hospital;
+    e.productos.add((it.nombre_producto || 'Sin nombre').trim());
+    e.facturas.add(doc.id);
+    e.total += Number(it.monto_item || 0);
+  });
+  return Array.from(porCliente.values()).map(c => ({
+    cliente: c.cliente, rut: c.rut, nProductos: c.productos.size, nFacturas: c.facturas.size, total: c.total,
+  }));
+}
+
+async function cargarClientesFacturas() {
+  document.getElementById('fp-clientes-cargando').style.display = 'block';
+  document.getElementById('fp-clientes-tabla').style.display = 'none';
+  try {
+    if (!facturaItemsCargados) await cargarItemsFacturasVenta();
+    clientesFacturados = construirClientesFacturados();
+    clientesFacturadosF = [...clientesFacturados];
+    document.getElementById('fp-clientes-cargando').style.display = 'none';
+    document.getElementById('fp-clientes-tabla').style.display = 'block';
+    renderClientesFacturas();
+  } catch (e) {
+    document.getElementById('fp-clientes-cargando').innerHTML = `<div style="color:var(--red);font-size:13px">No se pudo cargar: ${e.message}</div>`;
+  }
+}
+
+function filterClientesFacturas() {
+  const q = document.getElementById('fp-clientes-search').value;
+  clientesFacturadosF = clientesFacturados.filter(c => coincideBusqueda(`${c.cliente} ${c.rut}`, q));
+  renderClientesFacturas();
+}
+
+function renderClientesFacturas() {
+  document.getElementById('fp-clientes-info').textContent = `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes`;
+  const hayFiltro = document.getElementById('fp-clientes-search').value;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos clientes con ese nombre o RUT.' : 'Todavía no hay clientes facturados.'}</p></div></td>`;
+  renderTablaAlfabetica('fp-clientes-body', 'fp-clientes-jump', clientesFacturadosF, c => c.cliente,
+    (c, idx) => `<tr onclick="navReset();openClienteFacturaDetail(window.__alfabeticoOrden['fp-clientes-body'][${idx}].cliente)" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(c.cliente)} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${escapeHtml(c.rut || '—')}</td>
+      <td style="text-align:right">${c.nProductos}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(c.total)}</td>
+    </tr>`, 4, mensajeVacio);
+}
+
+// Productos facturados a un cliente, en orden alfabético.
+function productosDeCliente(clienteNombre) {
+  const map = new Map();
+  facturaItemsRaw.forEach(it => {
+    const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+    if (!doc) return;
+    if ((nombreHosp(doc.hospital) || doc.hospital || 'Sin cliente') !== clienteNombre) return;
+    const key = (it.nombre_producto || 'Sin nombre').trim();
+    if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, total: 0, ultima: null });
+    const e = map.get(key);
+    e.facturas += 1;
+    e.total += Number(it.monto_item || 0);
+    if (doc.fecha_emision && (!e.ultima || doc.fecha_emision > e.ultima)) e.ultima = doc.fecha_emision;
+  });
+  return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+}
+
+function openClienteFacturaDetail(clienteNombre, filtro) {
+  cerrarTodosLosModales();
+  const todos = productosDeCliente(clienteNombre);
+  const q = filtro || '';
+  const lista = q ? todos.filter(p => coincideBusqueda(p.nombre, q)) : todos;
+  window.__clienteFacturaActual = clienteNombre;
+  window.__clienteFacturaProductosVisibles = lista;
 
   const modal = document.createElement('div');
-  modal.id = 'facturas-producto-hosp-overlay';
+  modal.id = 'cliente-factura-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Cliente</div>
+          <div class="modal-title">${escapeHtml(clienteNombre)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('cliente-factura-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Productos facturados — clic para ver precios</div>
+        ${todos.length > 8 ? `
+        <div class="search-wrap" style="margin-bottom:12px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="cliente-prod-search" value="${escapeHtml(q)}" placeholder="Buscar producto vendido a este cliente…"
+            oninput="openClienteFacturaDetailDebounce(this.value)">
+        </div>` : ''}
+        ${lista.length ? `
+        <table class="clinical-grid">
+          ${lista.map((p, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openClienteFacturaDetail(window.__clienteFacturaActual));abrirHistorialVentaProducto(window.__clienteFacturaProductosVisibles[${idx}].nombre, window.__clienteFacturaActual)">
+            <td style="color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
+            <td style="text-align:right;white-space:nowrap">${p.facturas} factura${p.facturas===1?'':'s'} — ${clp(p.total)}${p.ultima ? ` · ${fDate(p.ultima)}` : ''}</td>
+          </tr>`).join('')}
+        </table>`
+        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'No encontramos productos con ese nombre para este cliente.' : 'Este cliente no tiene productos facturados.'}</p></div>`}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const inp = document.getElementById('cliente-prod-search');
+  if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+}
+
+let __clienteProdTimer = null;
+function openClienteFacturaDetailDebounce(valor) {
+  clearTimeout(__clienteProdTimer);
+  __clienteProdTimer = setTimeout(() => openClienteFacturaDetail(window.__clienteFacturaActual, valor), 180);
+}
+
+// ─── Historial de venta: ÚNICO componente, usado por los dos caminos ──────
+// (Por producto → cliente) y (Por cliente → producto) terminan acá.
+function abrirHistorialVentaProducto(nombreProducto, clienteNombre) {
+  cerrarTodosLosModales();
+  const ventas = facturaItemsRaw
+    .filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto)
+    .map(it => {
+      const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+      return doc ? { doc, item: it } : null;
+    })
+    .filter(x => x && (nombreHosp(x.doc.hospital) || x.doc.hospital || 'Sin cliente') === clienteNombre)
+    .sort((a, b) => (b.doc.fecha_emision || '').localeCompare(a.doc.fecha_emision || ''));
+
+  window.__histVentaProducto = nombreProducto;
+  window.__histVentaCliente = clienteNombre;
+
+  const modal = document.createElement('div');
+  modal.id = 'historial-venta-overlay';
   modal.className = 'modal-overlay';
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `
@@ -2968,28 +3203,269 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
       <div class="modal-header">
         <div>
           <div class="modal-eyebrow">${escapeHtml(nombreProducto)}</div>
-          <div class="modal-title">${escapeHtml(hospitalNombre)}</div>
+          <div class="modal-title">${escapeHtml(clienteNombre)}</div>
         </div>
         <div class="modal-actions">
           ${botonAtrasHtml()}
-          <button onclick="document.getElementById('facturas-producto-hosp-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+          <button onclick="document.getElementById('historial-venta-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
       <div class="modal-body">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Historial de venta</div>
+        ${ventas.length ? `
         <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
           <table style="margin:0"><thead><tr>
-            <th style="font-size:10px">Folio</th><th style="font-size:10px">Fecha</th>
-            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
+            <th style="font-size:10px">Fecha</th><th style="font-size:10px">N° Factura</th>
+            <th style="font-size:10px;text-align:right">Precio ítem neto</th>
+            <th style="font-size:10px;text-align:right">Total factura</th>
           </tr></thead><tbody>
-            ${facturas.map(({doc, item}) => `
-              <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasDeProductoHospital(window.__facturaProductoHospActualNombre, window.__facturaProductoHospActualHospital));abrirDetalleDocumentoGdexpress(${doc.id})">
-                <td data-label="Folio" class="mono" style="color:#185FA5">${doc.folio} ↗</td>
-                <td data-label="Fecha">${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
-                <td data-label="Cantidad" style="text-align:right">${item.cantidad||'—'} ${item.unidad||''}</td>
-                <td data-label="Monto ítem" style="text-align:right;font-variant-numeric:tabular-nums">${clp(item.monto_item)}</td>
+            ${ventas.map(({doc, item}) => `
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirHistorialVentaProducto(window.__histVentaProducto, window.__histVentaCliente));abrirDetalleDocumentoGdexpress(${doc.id})">
+                <td data-label="Fecha" style="white-space:nowrap">${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
+                <td data-label="N° Factura" class="mono" style="color:#185FA5">${doc.folio} ↗</td>
+                <td data-label="Precio ítem neto" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${clp(item.precio_unitario)}${item.unidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(item.unidad)}</span>` : ''}</td>
+                <td data-label="Total factura" style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-2)">${clp(montoTotalDoc(doc))}</td>
               </tr>`).join('')}
           </tbody></table>
         </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:8px">El precio del ítem es el unitario neto que trae la factura. El total de la factura es con IVA e incluye los demás productos.</div>`
+        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>No encontramos facturas de este cliente que contengan este producto.</p></div>`}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ─── PRECIO COSTO ─────────────────────────────────────────────────────────
+// Relaciona un producto que vendemos con los ítems de las facturas de
+// proveedor. NO crea ninguna asociación permanente: solo sugiere candidatos
+// ordenados por relevancia y deja la decisión en el usuario, porque los
+// nombres no calzan entre sí (ej. vendemos "PEG 17G" y compramos
+// "POLYGLYKOL 3350 PSH SACO 25K" — ningún algoritmo de texto los une).
+// Por eso el buscador manual dentro del visor es parte central, no un extra.
+
+function normalizarParaComparar(txt) {
+  return String(txt || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quita tildes
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+const PALABRAS_VACIAS_PRODUCTO = new Set(['de','del','la','el','los','las','con','para','por','y','en','al','un','una','x','c','u','und','uni','sin']);
+
+function tokensProducto(txt) {
+  return normalizarParaComparar(txt).split(' ')
+    .filter(t => t.length >= 2 && !PALABRAS_VACIAS_PRODUCTO.has(t));
+}
+
+// Peso de cada palabra según lo común que sea en el catálogo de proveedor:
+// una palabra que aparece en muchísimos productos ("caja", "carbonato")
+// distingue poco; una que aparece en pocos ("lacosamida") distingue mucho.
+// Se calcula una vez sobre los ítems ya cargados.
+let __pesoTokenCosto = null;
+function pesosTokensCosto() {
+  if (__pesoTokenCosto) return __pesoTokenCosto;
+  const nombres = new Set(facturaProvItemsRaw.map(it => (it.nombre_producto || '').trim()));
+  const df = new Map();
+  nombres.forEach(n => new Set(tokensProducto(n)).forEach(t => df.set(t, (df.get(t) || 0) + 1)));
+  const N = Math.max(nombres.size, 1);
+  __pesoTokenCosto = { df, N };
+  return __pesoTokenCosto;
+}
+function pesoToken(t) {
+  const { df, N } = pesosTokensCosto();
+  return Math.log(1 + N / (1 + (df.get(t) || 0)));
+}
+
+// Puntaje explicable: cuánto del "significado" de cada nombre cubre el otro,
+// pesando más las palabras distintivas. Devuelve también en qué coincidieron,
+// para poder mostrárselo al usuario y que juzgue por sí mismo — que dos
+// nombres compartan solo una palabra genérica queda visible como coincidencia
+// débil en vez de esconderse detrás de un número.
+function puntajeCoincidencia(tokensA, tokensB) {
+  if (!tokensA.length || !tokensB.length) return { score: 0, comunes: [] };
+  const setB = new Set(tokensB);
+  const comunes = [...new Set(tokensA.filter(t => setB.has(t)))];
+  if (!comunes.length) return { score: 0, comunes: [] };
+  const suma = ts => [...new Set(ts)].reduce((s, t) => s + pesoToken(t), 0);
+  const pesoComun = suma(comunes);
+  const coberturaA = pesoComun / (suma(tokensA) || 1);
+  const coberturaB = pesoComun / (suma(tokensB) || 1);
+  return { score: (coberturaA + coberturaB) / 2, comunes };
+}
+
+function candidatosCosto(nombreProductoVenta, filtroManual) {
+  const tokensVenta = tokensProducto(nombreProductoVenta);
+  const normVenta = normalizarParaComparar(nombreProductoVenta);
+  const porNombre = new Map();
+  facturaProvItemsRaw.forEach(it => {
+    const nombre = (it.nombre_producto || 'Sin nombre').trim();
+    if (!porNombre.has(nombre)) porNombre.set(nombre, { nombre, compras: 0, ultima: null, ultimoPrecio: null, ultimaUnidad: null, proveedor: null });
+    const e = porNombre.get(nombre);
+    const f = facturasPorPagar.find(x => x.id === it.factura_id);
+    e.compras += 1;
+    const fecha = f ? f.fecha_emision : null;
+    if (fecha && (!e.ultima || fecha > e.ultima)) {
+      e.ultima = fecha;
+      e.ultimoPrecio = it.precio_unitario != null && it.precio_unitario !== '' ? Number(it.precio_unitario) : null;
+      e.ultimaUnidad = it.unidad || null;
+      e.proveedor = f ? f.proveedor : null;
+    }
+  });
+
+  let lista = Array.from(porNombre.values());
+  if (filtroManual) {
+    // Búsqueda manual: manda por sobre las sugerencias automáticas.
+    return lista.filter(c => coincideBusqueda(c.nombre, filtroManual))
+      .sort((a, b) => (b.ultima || '').localeCompare(a.ultima || ''));
+  }
+  return lista
+    .map(c => {
+      const normC = normalizarParaComparar(c.nombre);
+      const r = puntajeCoincidencia(tokensVenta, tokensProducto(c.nombre));
+      let score = r.score;
+      if (normC === normVenta) score = 1;                                  // idéntico normalizado
+      else if (normC.includes(normVenta) || normVenta.includes(normC)) score = Math.max(score, 0.8);
+      return { ...c, score, comunes: r.comunes };
+    })
+    .filter(c => c.score > 0.12)
+    .sort((a, b) => b.score - a.score || (b.ultima || '').localeCompare(a.ultima || ''))
+    .slice(0, 15);
+}
+
+// Muestra qué tan fuerte es la sugerencia y por qué. Una coincidencia débil
+// (por ejemplo compartir solo "carbonato" entre calcio y sodio) queda marcada
+// como tal en vez de parecer un match válido.
+function etiquetaCoincidencia(c) {
+  if (c.score == null || !c.comunes || !c.comunes.length) return '';
+  const nivel = c.score >= 0.55 ? { t: 'coincidencia alta', color: 'var(--green)' }
+              : c.score >= 0.3  ? { t: 'coincidencia media', color: 'var(--amber)' }
+              :                   { t: 'coincidencia baja',  color: 'var(--text-3)' };
+  return ` · <span style="color:${nivel.color}">${nivel.t}</span> <span style="color:var(--text-3)">(${c.comunes.map(escapeHtml).join(', ')})</span>`;
+}
+
+async function abrirPrecioCosto(nombreProductoVenta, filtroManual) {
+  cerrarTodosLosModales();
+  window.__precioCostoProducto = nombreProductoVenta;
+  if (!facturaProvItemsCargados) {
+    await cargarItemsFacturasProveedor();
+  }
+  const q = filtroManual || '';
+  const candidatos = candidatosCosto(nombreProductoVenta, q);
+
+  const modal = document.createElement('div');
+  modal.id = 'precio-costo-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Precio costo</div>
+          <div class="modal-title">${escapeHtml(nombreProductoVenta)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('precio-costo-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:12px">
+          Posibles productos en facturas de proveedor. Son <strong>sugerencias</strong>: no se guarda ninguna equivalencia, tú decides cuál corresponde.
+        </div>
+        <div class="search-wrap" style="margin-bottom:12px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="precio-costo-search" value="${escapeHtml(q)}" placeholder="Buscar producto en facturas de proveedor…"
+            oninput="abrirPrecioCostoDebounce(this.value)">
+        </div>
+        ${candidatos.length ? `
+        <table class="clinical-grid">
+          ${candidatos.map((c, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>abrirPrecioCosto(window.__precioCostoProducto));abrirHistorialCosto(window.__precioCostoCandidatos[${idx}].nombre)">
+            <td>
+              <div style="color:#185FA5;font-weight:500">${escapeHtml(c.nombre)} ↗</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px">${c.proveedor ? escapeHtml(c.proveedor) : 'Proveedor no identificado'} · ${c.compras} compra${c.compras===1?'':'s'}${etiquetaCoincidencia(c)}</div>
+            </td>
+            <td style="text-align:right;white-space:nowrap">
+              <div style="font-weight:600;font-variant-numeric:tabular-nums">${c.ultimoPrecio != null ? clp(c.ultimoPrecio) : '—'}${c.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(c.ultimaUnidad)}</span>` : ''}</div>
+              <div style="font-size:11px;color:var(--text-3)">${c.ultima ? fDate(c.ultima) : 'sin fecha'}</div>
+            </td>
+          </tr>`).join('')}
+        </table>
+        ${!q ? `<div style="font-size:11px;color:var(--text-3);margin-top:10px">¿No aparece el que buscas? Los nombres de venta y de compra suelen no coincidir (por ejemplo "PEG" y "Polyglykol"). Usa el buscador de arriba con el nombre del proveedor.</div>` : ''}`
+        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div>
+             <p>${q ? 'No encontramos productos de proveedor con ese nombre.' : 'No encontramos posibles productos de proveedor relacionados.'}</p>
+             <p style="font-size:12px;color:var(--text-3)">Busca manualmente arriba: los nombres de compra y de venta muchas veces no se parecen.</p>
+           </div>`}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  window.__precioCostoCandidatos = candidatos;
+  const inp = document.getElementById('precio-costo-search');
+  if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+}
+
+let __precioCostoTimer = null;
+function abrirPrecioCostoDebounce(valor) {
+  clearTimeout(__precioCostoTimer);
+  __precioCostoTimer = setTimeout(() => abrirPrecioCosto(window.__precioCostoProducto, valor), 200);
+}
+
+// Historial de compras de un producto de proveedor: precio unitario y unidad
+// tal como vienen en cada factura, sin convertir nada entre unidades.
+function abrirHistorialCosto(nombreProductoProveedor) {
+  cerrarTodosLosModales();
+  window.__histCostoProducto = nombreProductoProveedor;
+  const compras = facturaProvItemsRaw
+    .filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProductoProveedor)
+    .map(it => {
+      const f = facturasPorPagar.find(x => x.id === it.factura_id);
+      return f ? { f, item: it } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.f.fecha_emision || '').localeCompare(a.f.fecha_emision || ''));
+
+  const unidades = new Set(compras.map(c => (c.item.unidad || '').trim()).filter(Boolean));
+  const avisoUnidades = unidades.size > 1
+    ? `<div class="scope-aviso-costo" style="margin-bottom:12px;padding:8px 12px;border-radius:var(--radius);background:var(--amber-light);color:var(--amber);font-size:12px">
+         Este producto aparece con unidades distintas (${Array.from(unidades).map(escapeHtml).join(', ')}). Los precios no son directamente comparables entre sí.
+       </div>` : '';
+
+  const modal = document.createElement('div');
+  modal.id = 'historial-costo-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Precio costo</div>
+          <div class="modal-title">${escapeHtml(nombreProductoProveedor)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('historial-costo-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        ${avisoUnidades}
+        ${compras.length ? `
+        <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0"><thead><tr>
+            <th style="font-size:10px">Fecha</th><th style="font-size:10px">Proveedor</th>
+            <th style="font-size:10px">N° Factura</th>
+            <th style="font-size:10px;text-align:right">Precio unitario</th>
+          </tr></thead><tbody>
+            ${compras.map(({f, item}) => `
+              <tr style="cursor:pointer" onclick="navPush(()=>abrirHistorialCosto(window.__histCostoProducto));abrirDetalleFacturaPorPagar(${f.id})">
+                <td data-label="Fecha" style="white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+                <td data-label="Proveedor" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(f.proveedor||'')}">${escapeHtml(f.proveedor || '—')}</td>
+                <td data-label="N° Factura" class="mono" style="color:#185FA5">${f.factura} ↗</td>
+                <td data-label="Precio unitario" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${item.precio_unitario != null && item.precio_unitario !== '' ? clp(Number(item.precio_unitario)) : '—'}${item.unidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(item.unidad)}</span>` : ''}</td>
+              </tr>`).join('')}
+          </tbody></table>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:8px">Precio unitario tal como viene en cada factura de proveedor. No se convierten unidades.</div>`
+        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>No encontramos compras de este producto.</p></div>`}
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -3005,26 +3481,33 @@ let facturaProvProductosUnicos = [];
 let facturaProvProductosUnicosF = [];
 let facturaProvItemsRaw = []; // ítems crudos, para armar el detalle por proveedor al hacer clic
 
+// Igual que el de venta: una sola carga, compartida entre la página de
+// Productos de proveedor y el visor de Precio costo.
+async function cargarItemsFacturasProveedor() {
+  if (facturaProvItemsCargados) return;
+  const todos = await fetchAll('facturas_por_pagar_items', 'select=factura_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
+  const idsValidas = new Set(facturasPorPagar.filter(f => f.estado_aceptacion !== 'N').map(f => f.id));
+  facturaProvItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsValidas.has(it.factura_id));
+
+  const map = new Map();
+  facturaProvItemsRaw.forEach(it => {
+    const key = (it.nombre_producto || 'Sin nombre').trim();
+    if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+    const entry = map.get(key);
+    entry.facturas += 1;
+    entry.totalFacturado += Number(it.monto_item || 0);
+  });
+  facturaProvProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+  facturaProvProductosUnicosF = [...facturaProvProductosUnicos];
+  facturaProvItemsCargados = true;
+}
+
 async function cargarProductosFacturasProveedor() {
   if (facturaProvItemsCargados) { renderFacturaProvItems(); return; }
   document.getElementById('fpprov-items-cargando').style.display = 'block';
   document.getElementById('fpprov-items-tabla').style.display = 'none';
   try {
-    const todos = await fetchAll('facturas_por_pagar_items', 'select=factura_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
-    const idsValidas = new Set(facturasPorPagar.filter(f => f.estado_aceptacion !== 'N').map(f => f.id));
-    facturaProvItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsValidas.has(it.factura_id));
-
-    const map = new Map();
-    facturaProvItemsRaw.forEach(it => {
-      const key = (it.nombre_producto || 'Sin nombre').trim();
-      if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
-      const entry = map.get(key);
-      entry.facturas += 1;
-      entry.totalFacturado += Number(it.monto_item || 0);
-    });
-    facturaProvProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
-    facturaProvProductosUnicosF = [...facturaProvProductosUnicos];
-    facturaProvItemsCargados = true;
+    await cargarItemsFacturasProveedor();
     document.getElementById('fpprov-items-cargando').style.display = 'none';
     document.getElementById('fpprov-items-tabla').style.display = 'block';
     renderFacturaProvItems();
@@ -9004,8 +9487,6 @@ function renderResultadoConciliacion(r) {
   cont.innerHTML = html;
 }
 
-
-
 // y mostramos el historial reciente.
 const _showPageOriginal = showPage;
 showPage = function(id, el) {
@@ -9030,6 +9511,9 @@ showPage = function(id, el) {
   if (id === 'facturas-prov-productos') {
     cargarProductosFacturasProveedor();
   }
+  if (id === 'facturas-clientes') {
+    cargarClientesFacturas();
+  }
   // Entrar a Facturas rechazadas es "ya las vi": se apaga el aviso.
   if (id === 'facturas-rechazadas') {
     marcarRechazadasComoVistas();
@@ -9053,7 +9537,8 @@ const SUBMENUS = {
   },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
-    { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'facturas-productos' },
+    { icon: '<i class="ti ti-pill"></i>', label: 'Precios · Por producto', page: 'facturas-productos' },
+    { icon: '<i class="ti ti-building-hospital"></i>', label: 'Precios · Por cliente', page: 'facturas-clientes' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
@@ -9095,6 +9580,12 @@ function marcarModuloActivoEnNav(modulo) {
     const subitemActivo = grupo.querySelector('.nav-subitem.active');
     const subbloqueActivo = subitemActivo ? subitemActivo.closest('.nav-subbloque') : null;
     grupo.querySelectorAll('.nav-subbloque').forEach(b => b.classList.toggle('abierto', b === subbloqueActivo));
+    // Mismo criterio para el desplegable "Precios": si la página activa es
+    // una de sus dos vistas, se abre solo para que quede visible.
+    const preciosGrupo = grupo.querySelector('.nav-precios');
+    if (preciosGrupo && subitemActivo && preciosGrupo.contains(subitemActivo)) {
+      preciosGrupo.classList.add('abierto');
+    }
   }
 }
 
