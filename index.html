@@ -860,12 +860,12 @@
   <div class="page" id="page-items">
     <div class="page-header">
       <div class="page-title">Productos</div>
-      <div class="page-sub">Historial de precios y ventas por producto</div>
+      <div class="page-sub">Productos presentes en Órdenes de Compra</div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="items-search" placeholder="Buscar producto, familia, hospital…" oninput="filterItems()">
+        <input type="text" id="items-search" placeholder="Buscar producto…" oninput="filterItems()">
       </div>
       <select id="items-familia" onchange="filterItems()"><option value="">Todas las familias</option></select>
       <button class="page-btn" id="items-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosItems()">✕ Limpiar filtros</button>
@@ -877,7 +877,7 @@
           <table style="margin:0">
             <thead><tr>
               <th>Producto</th><th>Familia</th>
-              <th style="text-align:right">N° ventas</th><th style="text-align:right">Total vendido</th>
+              <th style="text-align:right">N° OC</th><th style="text-align:right">Último precio OC</th><th style="text-align:right">Total comprado</th>
             </tr></thead>
             <tbody id="items-body"></tbody>
           </table>
@@ -1960,19 +1960,47 @@ function nombreFinalDe(it) {
 }
 
 function getProductosUnicos() {
-  // Agrupa todas las ventas (items) por nombre final (normalización manual si existe,
-  // si no el producto normalizado de tu Excel), calculando totales por producto.
+  // Agrupa todas las líneas de OC (items) por nombre final (normalización manual
+  // si existe, si no el producto normalizado), calculando totales por producto.
+  // Además del total, se guarda lo que sirve para consultar precios: cuántas OC
+  // distintas, cuántos hospitales, el ÚLTIMO precio unitario y el rango
+  // histórico. El precio siempre sale de preciounitario de la línea de OC —
+  // nunca del total de la orden, que incluye los demás productos.
   const map = new Map();
   items.forEach(it => {
     const key = nombreFinalDe(it);
     if (!map.has(key)) {
-      map.set(key, { nombre: key, familia: it.familia || '—', ventas: 0, totalVendido: 0 });
+      map.set(key, {
+        nombre: key, familia: it.familia || '—', ventas: 0, totalVendido: 0,
+        _ocs: new Set(), _hospitales: new Set(), _unidades: new Set(),
+        precioMin: null, precioMax: null, ultimoPrecio: null, ultimaFecha: null, ultimaUnidad: null,
+      });
     }
     const entry = map.get(key);
     entry.ventas += 1;
     entry.totalVendido += (it.totalitem || 0);
+    if (it.codigooc) entry._ocs.add(it.codigooc);
+    if (it.hospital) entry._hospitales.add(nombreHosp(it.hospital) || it.hospital);
+    const u = (it.unidad || '').trim();
+    if (u) entry._unidades.add(u);
+    const precio = Number(it.preciounitario);
+    if (precio > 0) {
+      entry.precioMin = entry.precioMin == null ? precio : Math.min(entry.precioMin, precio);
+      entry.precioMax = entry.precioMax == null ? precio : Math.max(entry.precioMax, precio);
+    }
+    const fecha = it.fechaoc || '';
+    if (fecha && (!entry.ultimaFecha || fecha > entry.ultimaFecha)) {
+      entry.ultimaFecha = fecha;
+      entry.ultimoPrecio = precio > 0 ? precio : null;
+      entry.ultimaUnidad = u || null;
+    }
   });
-  return Array.from(map.values());
+  return Array.from(map.values()).map(e => ({
+    ...e,
+    nOC: e._ocs.size,
+    nHospitales: e._hospitales.size,
+    unidades: Array.from(e._unidades),
+  }));
 }
 
 let productosUnicos = [];
@@ -2684,9 +2712,10 @@ function renderItems() {
     (p, idx) => `<tr onclick="navReset();openProductDetail(window.__alfabeticoOrden['items-body'][${idx}].nombre)" style="cursor:pointer">
       <td style="font-weight:500;color:var(--accent)">${escapeHtml(p.nombre)} ↗</td>
       <td style="font-size:12px;color:var(--text-2)">${escapeHtml(p.familia)}</td>
-      <td style="text-align:right">${p.ventas}</td>
+      <td style="text-align:right">${p.nOC || p.ventas}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3)">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
-    </tr>`, 4, mensajeVacio);
+    </tr>`, 5, mensajeVacio);
 }
 function goItems(p) { const {pages}=paginate(productosUnicosF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
 
@@ -2702,18 +2731,39 @@ function openProductDetail(nombreProducto) {
   const totalVendido = ventas.reduce((s,v) => s + (v.totalitem||0), 0);
   const familia = ventas[0]?.familia || '—';
 
-  // Agrupamos por hospital para el primer nivel de navegación
+  // Agrupamos por hospital para el primer nivel de navegación. Se guarda el
+  // RUT (para poder buscar por él) y la última compra, que es el dato que más
+  // se consulta al cotizar de nuevo.
   const porHospital = new Map();
   ventas.forEach(v => {
     const h = v.hospital || 'Sin hospital';
-    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, ventas: 0, total: 0, codigos: [] });
+    if (!porHospital.has(h)) porHospital.set(h, { hospital: h, nombreMostrado: nombreHosp(h) || h, rut: rutDeHospital(h) || '', ventas: 0, ocs: new Set(), total: 0, ultima: null, codigos: [] });
     const entry = porHospital.get(h);
     entry.ventas += 1;
     entry.total += (v.totalitem || 0);
-    if (v.codigooc) entry.codigos.push(v.codigooc);
+    if (v.codigooc) { entry.codigos.push(v.codigooc); entry.ocs.add(v.codigooc); }
+    const f = v.fechaoc || '';
+    if (f && (!entry.ultima || f > entry.ultima)) entry.ultima = f;
   });
-  window.__productoHospitalesActual = Array.from(porHospital.values()).sort((a,b) => b.total - a.total);
+  // A-Z, como una libreta de direcciones (antes venía por monto).
+  window.__productoHospitalesActual = Array.from(porHospital.values())
+    .map(h => ({ ...h, nOC: h.ocs.size }))
+    .sort((a, b) => a.nombreMostrado.localeCompare(b.nombreMostrado, 'es', { sensitivity: 'base' }));
   window.__productoActual = nombreProducto;
+
+  // Resumen de precios: siempre desde preciounitario de la línea de OC.
+  const ordenadasPorFecha = ventas.slice().sort((a, b) => (b.fechaoc || '').localeCompare(a.fechaoc || ''));
+  const ultimaConPrecio = ordenadasPorFecha.find(v => Number(v.preciounitario) > 0);
+  const ultimoPrecio = ultimaConPrecio ? Number(ultimaConPrecio.preciounitario) : null;
+  const ultimaFecha = ordenadasPorFecha[0]?.fechaoc || null;
+  const nOCDistintas = new Set(ventas.map(v => v.codigooc).filter(Boolean)).size;
+  const unidades = Array.from(new Set(ventas.map(v => (v.unidad || '').trim()).filter(Boolean)));
+  // Si el producto aparece con más de una unidad, el rango puede estar
+  // mezclando presentaciones distintas: se avisa en vez de sacar conclusiones.
+  const avisoUnidades = unidades.length > 1
+    ? `<div style="margin-bottom:14px;padding:8px 12px;border-radius:var(--radius);background:var(--amber-light);color:var(--amber);font-size:12px">
+         Este producto aparece con unidades distintas (${unidades.map(escapeHtml).join(', ')}). Los precios de abajo no son directamente comparables entre sí.
+       </div>` : '';
 
   const modal = document.createElement('div');
   modal.id = 'product-modal-overlay';
@@ -2733,17 +2783,22 @@ function openProductDetail(nombreProducto) {
         </div>
       </div>
       <div class="modal-body">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-          <div class="stat" style="padding:12px"><div class="stat-label">Total vendido</div><div class="stat-val" style="font-size:16px">${clp(totalVendido)}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">N° de ventas</div><div class="stat-val" style="font-size:16px">${ventas.length}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px">${window.__productoHospitalesActual.length}</div></div>
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:14px">
+          <strong style="color:var(--text)">${nOCDistintas || ventas.length} OC</strong> ·
+          <strong style="color:var(--text)">${window.__productoHospitalesActual.length} hospital${window.__productoHospitalesActual.length===1?'':'es'}</strong>
+          ${ultimaFecha ? ` · última compra ${fDate(ultimaFecha)}` : ''}
         </div>
-        <div style="display:flex;gap:20px;margin-bottom:20px;font-size:12px;color:var(--text-2)">
-          <span>Precio mínimo: <strong style="color:var(--text)">${clp(precioMin)}</strong></span>
-          <span>Precio máximo: <strong style="color:var(--text)">${clp(precioMax)}</strong></span>
+        ${avisoUnidades}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+          <div class="stat destacado" style="padding:12px"><div class="stat-label">Último precio OC</div><div class="stat-val" style="font-size:18px">${ultimoPrecio != null ? clp(ultimoPrecio) : '—'}${ultimaConPrecio && ultimaConPrecio.unidad ? ` <span style="font-size:11px;font-weight:400">/ ${escapeHtml(ultimaConPrecio.unidad)}</span>` : ''}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Rango histórico</div><div class="stat-val" style="font-size:14px">${precioMin != null ? `${clp(precioMin)} – ${clp(precioMax)}` : '—'}</div></div>
+          <div class="stat" style="padding:12px"><div class="stat-label">Total comprado</div><div class="stat-val" style="font-size:14px">${clp(totalVendido)}</div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <button class="page-btn" style="padding:8px 16px" onclick="verPreciosFacturadosDe(window.__productoActual)" title="Buscar este producto en Facturas Bulfor → Precios. Son fuentes distintas: no se mezclan los datos.">🧾 Ver precios facturados</button>
         </div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Hospitales que han comprado este producto</div>
-        <input type="text" id="product-hosp-search" placeholder="Buscar por hospital o N° OC…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitales()">
+        <input type="text" id="product-hosp-search" placeholder="Buscar hospital por nombre o RUT…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitales()">
         <div id="product-hosp-table-wrap"></div>
       </div>
     </div>`;
@@ -2754,18 +2809,22 @@ function openProductDetail(nombreProducto) {
 function renderProductoHospitalesTable(lista) {
   window.__productoHospitalesVisibles = lista; // para referenciar por índice, sin incrustar texto crudo (con comillas, etc.) en el onclick
   document.getElementById('product-hosp-table-wrap').innerHTML = !lista.length
-    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
+    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">No encontramos este hospital entre los compradores del producto.</div>`
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
             <th style="font-size:10px">Hospital</th>
+            <th style="font-size:10px">RUT</th>
             <th style="font-size:10px;text-align:right">N° OC</th>
+            <th style="font-size:10px;text-align:right">Última compra</th>
             <th style="font-size:10px;text-align:right">Total comprado</th>
           </tr></thead>
           <tbody>
             ${lista.map((h, idx) => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs(window.__productoActual, window.__productoHospitalesVisibles[${idx}].hospital)">
-              <td data-label="Hospital" style="font-weight:500;color:var(--accent)">${escapeHtml(h.hospital)} ↗</td>
-              <td data-label="N° OC" style="text-align:right">${h.ventas}</td>
+              <td data-label="Hospital" style="font-weight:500;color:var(--accent)">${escapeHtml(h.nombreMostrado || h.hospital)} ↗</td>
+              <td data-label="RUT" style="font-size:12px;color:var(--text-2)">${escapeHtml(h.rut || '—')}</td>
+              <td data-label="N° OC" style="text-align:right">${h.nOC || h.ventas}</td>
+              <td data-label="Última compra" style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${h.ultima ? fDate(h.ultima) : '—'}</td>
               <td data-label="Total comprado" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(h.total)}</td>
             </tr>`).join('')}
           </tbody>
@@ -2777,9 +2836,38 @@ function filterProductoHospitales() {
   const q = document.getElementById('product-hosp-search').value;
   const lista = window.__productoHospitalesActual || [];
   const filtrada = lista.filter(h =>
-    coincideBusqueda(h.hospital, q) || h.codigos.some(c => coincideBusqueda(c, q))
+    coincideBusqueda(`${h.nombreMostrado||''} ${h.hospital||''} ${h.rut||''}`, q) || h.codigos.some(c => coincideBusqueda(c, q))
   );
   renderProductoHospitalesTable(filtrada);
+}
+
+// Al llegar desde un producto, la OC se abre directamente en su pestaña de
+// Productos: es lo que se viene a mirar. Se hace después de renderizar el
+// modal, activando la pestaña que ya existe — sin tocar el visor de OC.
+function abrirOCEnProductos(codigoOC) {
+  openOCDetail(codigoOC);
+  const tab = document.querySelector('#oc-modal-overlay .modal-tab[data-tab="oc-tab-productos"]');
+  if (tab) cambiarTabOC(tab);
+}
+
+// Puente hacia Facturas Bulfor → Precios → Por producto, con el nombre
+// precargado en el buscador. NO asocia nada: son dos fuentes distintas (lo
+// pedido en una OC de Mercado Público vs lo efectivamente facturado), y los
+// nombres no tienen por qué coincidir, así que el usuario elige el resultado.
+async function verPreciosFacturadosDe(nombreProducto) {
+  cerrarTodosLosModales();
+  navReset();
+  preciosVista = 'producto';
+  seleccionarSubpagina('facturas', 'facturas-productos',
+    document.querySelector('.nav-subitem[data-page="facturas-productos"]') || undefined);
+  await cargarProductosFacturas();
+  const inp = document.getElementById('fp-items-search');
+  if (inp) {
+    inp.value = nombreProducto;
+    filterFacturaItems();
+    inp.focus();
+  }
+  toast('Buscando "' + nombreProducto + '" en los precios facturados. Son fuentes distintas: elige el producto que corresponda.');
 }
 
 function openProductoHospitalOCs(nombreProducto, hospital) {
@@ -2805,7 +2893,7 @@ function openProductoHospitalOCs(nombreProducto, hospital) {
           <div style="font-size:16px;font-weight:600">${escapeHtml(hospital)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          ${botonAtrasHtml('Volver al producto')}
+          ${botonAtrasHtml(`Volver a ${nombreProducto}`)}
           <button onclick="closeProductoHospitalOCs_()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
@@ -2830,7 +2918,7 @@ function renderProductoHospitalOCsTabla(ventas) {
             <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
           </tr></thead>
           <tbody>
-            ${ventas.map((v, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoHospitalOCs(window.__prodHospNombreActual, window.__prodHospHospitalActual));cerrarTodosLosModales();openOCDetail(window.__prodHospVentasVisibles[${idx}].codigooc)">
+            ${ventas.map((v, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoHospitalOCs(window.__prodHospNombreActual, window.__prodHospHospitalActual));cerrarTodosLosModales();abrirOCEnProductos(window.__prodHospVentasVisibles[${idx}].codigooc)">
               <td data-label="N° OC"><span class="mono" style="color:var(--accent)">${escapeHtml(v.codigooc||'')} ↗</span></td>
               <td data-label="Fecha" style="font-size:12px;color:var(--text-2)">${fDate(v.fechaoc)}</td>
               <td data-label="Cantidad" style="text-align:right">${v.cantidad||'—'} ${v.unidad||''}</td>
