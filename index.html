@@ -635,7 +635,7 @@
       </div>
       <div class="nav-subgroup" id="subgroup-oc-modulo">
         <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Órdenes de compra</span></div>
-        <div class="nav-item nav-subitem" data-page="items" onclick="seleccionarSubpagina('oc-modulo','items',this)"><span>Productos</span></div>
+        <div class="nav-item nav-subitem" data-page="items" data-page-alt="oc-clientes" onclick="abrirPreciosOC(this)"><span>Precios</span></div>
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
         <div class="nav-item nav-subitem" data-page="importar" onclick="seleccionarSubpagina('oc-modulo','importar',this)"><span>Importar Excel</span></div>
@@ -859,8 +859,12 @@
   <!-- ITEMS PAGE -->
   <div class="page" id="page-items">
     <div class="page-header">
-      <div class="page-title">Productos</div>
-      <div class="page-sub">Productos presentes en Órdenes de Compra</div>
+      <div class="page-title">Precios — Por producto</div>
+      <div class="page-sub">Precios de Órdenes de Compra: a quién le hemos vendido cada producto</div>
+    </div>
+    <div class="scope-toggle" id="precios-oc-toggle-producto" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
+      <button class="active" onclick="preciosOCIrA('producto')">Por producto</button>
+      <button onclick="preciosOCIrA('cliente')">Por cliente</button>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -883,6 +887,39 @@
           </table>
         </div>
         <div class="alfabetico-jump" id="items-jump"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OC: PRECIOS — POR CLIENTE -->
+  <div class="page" id="page-oc-clientes">
+    <div class="page-header">
+      <div class="page-title">Precios — Por cliente</div>
+      <div class="page-sub">Precios de Órdenes de Compra: qué le hemos vendido a cada cliente</div>
+    </div>
+    <div class="scope-toggle" id="precios-oc-toggle-cliente" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
+      <button onclick="preciosOCIrA('producto')">Por producto</button>
+      <button class="active" onclick="preciosOCIrA('cliente')">Por cliente</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="oc-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesOC()">
+      </div>
+    </div>
+    <div class="table-card">
+      <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="oc-clientes-info"></div>
+      <div class="alfabetico-wrap">
+        <div class="alfabetico-tabla">
+          <table style="margin:0">
+            <thead><tr>
+              <th>Cliente</th><th>RUT</th>
+              <th style="text-align:right">N° productos</th><th style="text-align:right">N° OC</th><th style="text-align:right">Total comprado</th>
+            </tr></thead>
+            <tbody id="oc-clientes-body"></tbody>
+          </table>
+        </div>
+        <div class="alfabetico-jump" id="oc-clientes-jump"></div>
       </div>
     </div>
   </div>
@@ -2037,6 +2074,7 @@ const MODAL_OVERLAY_IDS = [
   'facturas-producto-hosp-overlay',
   'facturas-producto-prov-overlay',
   'cliente-factura-modal-overlay',
+  'cliente-oc-modal-overlay',
   'historial-venta-overlay',
   'precio-costo-overlay',
   'historial-costo-overlay',
@@ -2718,6 +2756,154 @@ function renderItems() {
     </tr>`, 5, mensajeVacio);
 }
 function goItems(p) { const {pages}=paginate(productosUnicosF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
+
+// ─── OC → PRECIOS: navegación entre las dos vistas ────────────────────────
+// Misma estructura que Facturas Bulfor → Precios: una sola entrada en el
+// menú y el cambio de vista dentro de la página. Los datos salen de los
+// mismos items de OC (Mercado Público); no se mezcla nada de facturación.
+let preciosOCVista = 'producto';
+
+function abrirPreciosOC(el) {
+  const pagina = preciosOCVista === 'cliente' ? 'oc-clientes' : 'items';
+  seleccionarSubpagina('oc-modulo', pagina, el || undefined);
+}
+
+function preciosOCIrA(vista) {
+  preciosOCVista = vista === 'cliente' ? 'cliente' : 'producto';
+  const pagina = preciosOCVista === 'cliente' ? 'oc-clientes' : 'items';
+  const item = document.querySelector('.nav-subitem[data-page="items"]');
+  seleccionarSubpagina('oc-modulo', pagina, item || undefined);
+}
+
+// ─── OC → Precios → Por cliente ───────────────────────────────────────────
+let clientesOC = [];
+let clientesOCF = [];
+
+function construirClientesOC() {
+  const porCliente = new Map();
+  items.forEach(it => {
+    const crudo = it.hospital || 'Sin cliente';
+    if (!porCliente.has(crudo)) {
+      porCliente.set(crudo, { hospital: crudo, cliente: nombreHosp(crudo) || crudo, rut: rutDeHospital(crudo) || '',
+        productos: new Set(), ocs: new Set(), total: 0, ultima: null });
+    }
+    const e = porCliente.get(crudo);
+    e.productos.add(nombreFinalDe(it));
+    if (it.codigooc) e.ocs.add(it.codigooc);
+    e.total += (it.totalitem || 0);
+    const f = it.fechaoc || '';
+    if (f && (!e.ultima || f > e.ultima)) e.ultima = f;
+  });
+  return Array.from(porCliente.values()).map(c => ({
+    ...c, nProductos: c.productos.size, nOC: c.ocs.size,
+  }));
+}
+
+function renderClientesOC() {
+  if (!clientesOC.length) { clientesOC = construirClientesOC(); clientesOCF = [...clientesOC]; }
+  document.getElementById('oc-clientes-info').textContent = `${clientesOCF.length.toLocaleString('es-CL')} clientes`;
+  const hayFiltro = document.getElementById('oc-clientes-search').value;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos clientes con ese nombre o RUT.' : 'No hay clientes con órdenes de compra.'}</p></div></td>`;
+  renderTablaAlfabetica('oc-clientes-body', 'oc-clientes-jump', clientesOCF, c => c.cliente,
+    (c, idx) => `<tr onclick="navReset();openClienteOCDetail(window.__alfabeticoOrden['oc-clientes-body'][${idx}].hospital)" style="cursor:pointer">
+      <td style="font-weight:500;color:var(--accent)">${escapeHtml(c.cliente)} ↗</td>
+      <td style="font-size:12px;color:var(--text-2)">${escapeHtml(c.rut || '—')}</td>
+      <td style="text-align:right">${c.nProductos}</td>
+      <td style="text-align:right">${c.nOC}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(c.total)}</td>
+    </tr>`, 5, mensajeVacio);
+}
+
+function filterClientesOC() {
+  if (!clientesOC.length) clientesOC = construirClientesOC();
+  const q = document.getElementById('oc-clientes-search').value;
+  clientesOCF = clientesOC.filter(c => coincideBusqueda(`${c.cliente} ${c.hospital} ${c.rut}`, q));
+  renderClientesOC();
+}
+
+// Productos comprados por un cliente, A-Z, con su último precio de OC.
+function productosDeClienteOC(hospitalCrudo) {
+  const map = new Map();
+  items.forEach(it => {
+    if ((it.hospital || 'Sin cliente') !== hospitalCrudo) return;
+    const key = nombreFinalDe(it);
+    if (!map.has(key)) map.set(key, { nombre: key, ocs: new Set(), total: 0, ultima: null, ultimoPrecio: null, ultimaUnidad: null });
+    const e = map.get(key);
+    if (it.codigooc) e.ocs.add(it.codigooc);
+    e.total += (it.totalitem || 0);
+    const f = it.fechaoc || '';
+    if (f && (!e.ultima || f > e.ultima)) {
+      e.ultima = f;
+      const pr = Number(it.preciounitario);
+      e.ultimoPrecio = pr > 0 ? pr : null;
+      e.ultimaUnidad = (it.unidad || '').trim() || null;
+    }
+  });
+  return Array.from(map.values()).map(e => ({ ...e, nOC: e.ocs.size }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+}
+
+function openClienteOCDetail(hospitalCrudo, filtro) {
+  cerrarTodosLosModales();
+  const nombre = nombreHosp(hospitalCrudo) || hospitalCrudo;
+  const todos = productosDeClienteOC(hospitalCrudo);
+  const q = filtro || '';
+  const lista = q ? todos.filter(pr => coincideBusqueda(pr.nombre, q)) : todos;
+  window.__clienteOCActual = hospitalCrudo;
+  window.__clienteOCProductosVisibles = lista;
+
+  const modal = document.createElement('div');
+  modal.id = 'cliente-oc-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Cliente</div>
+          <div class="modal-title">${escapeHtml(nombre)}</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('cliente-oc-modal-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Productos comprados — clic para ver el historial de OC</div>
+        ${todos.length > 8 ? `
+        <div class="search-wrap" style="margin-bottom:12px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="cliente-oc-search" value="${escapeHtml(q)}" placeholder="Buscar producto comprado por este cliente…" oninput="openClienteOCDetailDebounce(this.value)">
+        </div>` : ''}
+        ${lista.length ? `
+        <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <table style="margin:0"><thead><tr>
+            <th style="font-size:10px">Producto</th>
+            <th style="font-size:10px;text-align:right">N° OC</th>
+            <th style="font-size:10px;text-align:right">Último precio OC</th>
+            <th style="font-size:10px;text-align:right">Última compra</th>
+          </tr></thead><tbody>
+            ${lista.map((pr, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openClienteOCDetail(window.__clienteOCActual));openProductoHospitalOCs(window.__clienteOCProductosVisibles[${idx}].nombre, window.__clienteOCActual)">
+              <td data-label="Producto" style="color:var(--accent);font-weight:500">${escapeHtml(pr.nombre)} ↗</td>
+              <td data-label="N° OC" style="text-align:right">${pr.nOC}</td>
+              <td data-label="Último precio OC" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${pr.ultimoPrecio != null ? clp(pr.ultimoPrecio) : '—'}${pr.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(pr.ultimaUnidad)}</span>` : ''}</td>
+              <td data-label="Última compra" style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${pr.ultima ? fDate(pr.ultima) : '—'}</td>
+            </tr>`).join('')}
+          </tbody></table>
+        </div>`
+        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'No encontramos productos con ese nombre para este cliente.' : 'Este cliente no tiene productos en órdenes de compra.'}</p></div>`}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const inp = document.getElementById('cliente-oc-search');
+  if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+}
+
+let __clienteOCTimer = null;
+function openClienteOCDetailDebounce(valor) {
+  clearTimeout(__clienteOCTimer);
+  __clienteOCTimer = setTimeout(() => openClienteOCDetail(window.__clienteOCActual, valor), 180);
+}
 
 // ─── PRODUCT DETAIL MODAL ──────────────────────────────────────────────────
 function openProductDetail(nombreProducto) {
@@ -9648,6 +9834,9 @@ showPage = function(id, el) {
   if (id === 'facturas-clientes') {
     cargarClientesFacturas();
   }
+  if (id === 'oc-clientes') {
+    renderClientesOC();
+  }
   // Entrar a Facturas rechazadas es "ya las vi": se apaga el aviso.
   if (id === 'facturas-rechazadas') {
     marcarRechazadasComoVistas();
@@ -9663,7 +9852,7 @@ const SUBMENUS = {
   'oc-modulo': {
     items: [
       { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Órdenes de compra', page: 'oc' },
-      { icon: '<i class="ti ti-pill"></i>', label: 'Productos', page: 'items' },
+      { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'items' },
       { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
       { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
       { icon: '<i class="ti ti-upload"></i>', label: 'Importar Excel', page: 'importar' },
