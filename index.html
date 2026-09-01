@@ -906,6 +906,11 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="oc-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesOC()">
       </div>
+      <div class="search-wrap">
+        <span class="search-icon">📦</span>
+        <input type="text" id="oc-clientes-producto" placeholder="…que hayan comprado este producto" oninput="filterClientesOC()">
+      </div>
+      <button class="page-btn" id="oc-clientes-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosClientesOC()">✕ Limpiar filtros</button>
     </div>
     <div class="table-card">
       <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="oc-clientes-info"></div>
@@ -914,7 +919,7 @@
           <table style="margin:0">
             <thead><tr>
               <th>Cliente</th><th>RUT</th>
-              <th style="text-align:right">N° productos</th><th style="text-align:right">N° OC</th><th style="text-align:right">Total comprado</th>
+              <th style="text-align:right">N° productos</th><th style="text-align:right">Total comprado</th>
             </tr></thead>
             <tbody id="oc-clientes-body"></tbody>
           </table>
@@ -953,7 +958,7 @@
           <table style="margin:0">
             <thead><tr>
               <th>Producto</th>
-              <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
+              <th style="text-align:right">N° facturas</th><th style="text-align:right">Última factura</th><th style="text-align:right">Precio (sin IVA)</th>
             </tr></thead>
             <tbody id="fp-items-body"></tbody>
           </table>
@@ -978,6 +983,11 @@
         <span class="search-icon">🔍</span>
         <input type="text" id="fp-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesFacturas()">
       </div>
+      <div class="search-wrap">
+        <span class="search-icon">📦</span>
+        <input type="text" id="fp-clientes-producto" placeholder="…a los que les vendimos este producto" oninput="filterClientesFacturas()">
+      </div>
+      <button class="page-btn" id="fp-clientes-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosClientesFacturas()">✕ Limpiar filtros</button>
     </div>
     <div id="fp-clientes-cargando" style="display:none">
       <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
@@ -2818,24 +2828,48 @@ function construirClientesOC() {
 
 function renderClientesOC() {
   if (!clientesOC.length) { clientesOC = construirClientesOC(); clientesOCF = [...clientesOC]; }
-  document.getElementById('oc-clientes-info').textContent = `${clientesOCF.length.toLocaleString('es-CL')} clientes`;
-  const hayFiltro = document.getElementById('oc-clientes-search').value;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos clientes con ese nombre o RUT.' : 'No hay clientes con órdenes de compra.'}</p></div></td>`;
+  const qp = document.getElementById('oc-clientes-producto').value.trim();
+  document.getElementById('oc-clientes-info').textContent = qp
+    ? `${clientesOCF.length.toLocaleString('es-CL')} clientes con productos que calzan con “${qp}”`
+    : `${clientesOCF.length.toLocaleString('es-CL')} clientes`;
+  const hayFiltro = document.getElementById('oc-clientes-search').value || qp;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'No hay clientes con órdenes de compra.'}</p></div></td>`;
   renderTablaAlfabetica('oc-clientes-body', 'oc-clientes-jump', clientesOCF, c => c.cliente,
-    (c, idx) => `<tr onclick="navReset();openClienteOCDetail(window.__alfabeticoOrden['oc-clientes-body'][${idx}].hospital)" style="cursor:pointer">
-      <td style="font-weight:500;color:var(--accent)">${escapeHtml(c.cliente)} ↗</td>
+    (c, idx) => `<tr onclick="navReset();abrirClienteOCConFiltro(${idx})" style="cursor:pointer">
+      <td style="font-weight:500;color:var(--accent)">${escapeHtml(c.cliente)} ↗${lineaProductosCalzados(c.__calzan)}</td>
       <td style="font-size:12px;color:var(--text-2)">${escapeHtml(c.rut || '—')}</td>
-      <td style="text-align:right">${c.nProductos}</td>
-      <td style="text-align:right">${c.nOC}</td>
+      <td style="text-align:right">${c.__calzan ? `${c.__calzan.length} <span style="font-size:11px;color:var(--text-3)">de ${c.nProductos}</span>` : c.nProductos}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(c.total)}</td>
-    </tr>`, 5, mensajeVacio);
+    </tr>`, 4, mensajeVacio);
 }
 
+// Mismos dos filtros que en Facturas Bulfor: nombre/RUT del cliente y, por
+// separado, un producto para dejar solo los clientes que lo compraron.
 function filterClientesOC() {
   if (!clientesOC.length) clientesOC = construirClientesOC();
   const q = document.getElementById('oc-clientes-search').value;
-  clientesOCF = clientesOC.filter(c => coincideBusqueda(`${c.cliente} ${c.hospital} ${c.rut}`, q));
+  const qp = document.getElementById('oc-clientes-producto').value;
+  clientesOCF = clientesOC
+    .filter(c => coincideBusqueda(`${c.cliente} ${c.hospital} ${c.rut}`, q))
+    .map(c => {
+      const calzan = productosQueCalzan(c.productos, qp);
+      return calzan === null ? c : { ...c, __calzan: calzan };
+    })
+    .filter(c => !c.__calzan || c.__calzan.length > 0);
+  document.getElementById('oc-clientes-limpiar').style.display = (q || qp) ? 'block' : 'none';
   renderClientesOC();
+}
+
+function limpiarFiltrosClientesOC() {
+  document.getElementById('oc-clientes-search').value = '';
+  document.getElementById('oc-clientes-producto').value = '';
+  filterClientesOC();
+}
+
+function abrirClienteOCConFiltro(idx) {
+  const c = (window.__alfabeticoOrden['oc-clientes-body'] || [])[idx];
+  if (!c) return;
+  openClienteOCDetail(c.hospital, document.getElementById('oc-clientes-producto').value.trim());
 }
 
 // Productos comprados por un cliente, A-Z, con su último precio de OC.
@@ -3187,15 +3221,35 @@ async function cargarItemsFacturasVenta() {
   const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
   facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
 
+  // Además del total se guarda el precio unitario: el mínimo, el máximo y el
+  // de la última factura. En documentos_gdexpress_items precio_unitario ya
+  // viene NETO (cantidad × precio_unitario = monto_item, y la suma de los
+  // monto_item es el neto del documento), así que se muestra tal cual, sin
+  // descontarle IVA.
   const map = new Map();
   facturaItemsRaw.forEach(it => {
     const key = (it.nombre_producto || 'Sin nombre').trim();
-    if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+    if (!map.has(key)) map.set(key, { nombre: key, docs: new Set(), totalFacturado: 0,
+      precioMin: null, precioMax: null, ultimoPrecio: null, ultimaFecha: null, ultimaUnidad: null });
     const entry = map.get(key);
-    entry.facturas += 1;
+    entry.docs.add(it.documento_id);
     entry.totalFacturado += Number(it.monto_item || 0);
+    const pr = Number(it.precio_unitario);
+    if (pr > 0) {
+      if (entry.precioMin === null || pr < entry.precioMin) entry.precioMin = pr;
+      if (entry.precioMax === null || pr > entry.precioMax) entry.precioMax = pr;
+    }
+    const doc = docPorId(it.documento_id);
+    const f = (doc && doc.fecha_emision) || '';
+    if (f && (!entry.ultimaFecha || f > entry.ultimaFecha)) {
+      entry.ultimaFecha = f;
+      entry.ultimoPrecio = pr > 0 ? pr : null;
+      entry.ultimaUnidad = (it.unidad || '').trim() || null;
+    }
   });
-  facturaProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+  facturaProductosUnicos = Array.from(map.values())
+    .map(e => ({ ...e, facturas: e.docs.size }))
+    .sort((a, b) => b.totalFacturado - a.totalFacturado);
   facturaProductosUnicosF = [...facturaProductosUnicos];
   facturaItemsCargados = true;
 }
@@ -3230,7 +3284,11 @@ function renderFacturaItems() {
   document.getElementById('fp-items-info').textContent = `${facturaProductosUnicosF.length.toLocaleString('es-CL')} productos`;
 
   const totalFacturado = facturaProductosUnicosF.reduce((s,p) => s + (p.totalFacturado||0), 0);
-  const totalFacturas = facturaProductosUnicosF.reduce((s,p) => s + (p.facturas||0), 0);
+  // Facturas distintas, no la suma por producto: una misma factura trae
+  // varios productos y antes se contaba una vez por cada uno.
+  const docsUnicos = new Set();
+  facturaProductosUnicosF.forEach(p => { if (p.docs) p.docs.forEach(id => docsUnicos.add(id)); });
+  const totalFacturas = docsUnicos.size;
   const resumen = document.getElementById('fp-items-resumen');
   resumen.style.display = 'grid';
   resumen.innerHTML = `
@@ -3244,8 +3302,12 @@ function renderFacturaItems() {
     (p, idx) => `<tr onclick="navReset();openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx}].nombre)" style="cursor:pointer">
       <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
       <td style="text-align:right">${p.facturas}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
-    </tr>`, 3, mensajeVacio);
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+      </td>
+    </tr>`, 4, mensajeVacio);
 }
 
 function botonNavProductoFacturaHtml(nombreActual) {
@@ -3272,7 +3334,7 @@ function openProductoFacturaDetail(nombreProducto) {
   // Agrupamos por hospital (vía el documento al que pertenece cada ítem).
   const porHospital = new Map();
   ventas.forEach(v => {
-    const doc = documentosGdexpress.find(d => d.id === v.documento_id);
+    const doc = docPorId(v.documento_id);
     const h = doc ? (nombreHosp(doc.hospital) || doc.hospital || 'Sin hospital') : 'Sin hospital';
     if (!porHospital.has(h)) porHospital.set(h, { hospital: h, facturas: 0, total: 0 });
     const entry = porHospital.get(h);
@@ -3323,6 +3385,31 @@ function abrirFacturasDeProductoHospital(nombreProducto, hospitalNombre) {
 }
 
 
+// ─── Índices en memoria (rendimiento) ─────────────────────────────────────
+// Buscar con .find() dentro de un bucle recorre el arreglo entero en cada
+// vuelta: cruzar los 18.500 ítems de factura contra los 5.700 documentos
+// llegaba a ~106 millones de comparaciones y dejaba la pantalla pegada
+// varios segundos. Con un Map por id cada búsqueda es directa.
+// El índice se reconstruye solo si cambió la cantidad de filas; como guarda
+// referencias a los mismos objetos, cualquier edición se ve al tiro.
+let __idxDocs = null, __idxDocsN = -1;
+function docPorId(id) {
+  if (!__idxDocs || __idxDocsN !== documentosGdexpress.length) {
+    __idxDocs = new Map(documentosGdexpress.map(d => [d.id, d]));
+    __idxDocsN = documentosGdexpress.length;
+  }
+  return __idxDocs.get(id);
+}
+
+let __idxFPP = null, __idxFPPN = -1;
+function fppPorId(id) {
+  if (!__idxFPP || __idxFPPN !== facturasPorPagar.length) {
+    __idxFPP = new Map(facturasPorPagar.map(f => [f.id, f]));
+    __idxFPPN = facturasPorPagar.length;
+  }
+  return __idxFPP.get(id);
+}
+
 // ═══ PRECIOS ═══════════════════════════════════════════════════════════════
 // Dos formas de consultar exactamente los mismos datos (los ítems de las
 // facturas de venta): "Por producto" responde a quién le vendimos algo, y
@@ -3364,7 +3451,7 @@ let clientesFacturadosF = [];
 function construirClientesFacturados() {
   const porCliente = new Map();
   facturaItemsRaw.forEach(it => {
-    const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+    const doc = docPorId(it.documento_id);
     if (!doc) return;
     const nombre = nombreHosp(doc.hospital) || doc.hospital || 'Sin cliente';
     if (!porCliente.has(nombre)) {
@@ -3376,9 +3463,30 @@ function construirClientesFacturados() {
     e.facturas.add(doc.id);
     e.total += Number(it.monto_item || 0);
   });
+  // Se conserva el Set de productos: es lo que permite después filtrar los
+  // clientes por producto sin volver a recorrer los 18.500 ítems.
   return Array.from(porCliente.values()).map(c => ({
-    cliente: c.cliente, rut: c.rut, nProductos: c.productos.size, nFacturas: c.facturas.size, total: c.total,
+    cliente: c.cliente, rut: c.rut, productos: c.productos,
+    nProductos: c.productos.size, nFacturas: c.facturas.size, total: c.total,
   }));
+}
+
+// Productos de un cliente que calzan con la búsqueda por producto. Devuelve
+// el arreglo (vacío si no calza ninguno) para poder mostrarlos bajo el
+// nombre del cliente y saber por qué quedó en la lista.
+function productosQueCalzan(setProductos, q) {
+  if (!q || !q.trim()) return null;
+  const out = [];
+  setProductos.forEach(nombre => { if (coincideBusqueda(nombre, q)) out.push(nombre); });
+  return out.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+}
+
+// Línea de detalle bajo el nombre del cliente cuando se filtró por producto.
+function lineaProductosCalzados(lista) {
+  if (!lista || !lista.length) return '';
+  const muestra = lista.slice(0, 3).map(escapeHtml).join(' · ');
+  const resto = lista.length > 3 ? ` +${lista.length - 3} más` : '';
+  return `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">${muestra}${resto}</div>`;
 }
 
 async function cargarClientesFacturas() {
@@ -3396,23 +3504,51 @@ async function cargarClientesFacturas() {
   }
 }
 
+// Dos filtros que se combinan: el de siempre (nombre o RUT del cliente) y
+// uno por producto, que deja solo los clientes a los que efectivamente les
+// vendimos ese producto (o uno parecido).
 function filterClientesFacturas() {
   const q = document.getElementById('fp-clientes-search').value;
-  clientesFacturadosF = clientesFacturados.filter(c => coincideBusqueda(`${c.cliente} ${c.rut}`, q));
+  const qp = document.getElementById('fp-clientes-producto').value;
+  clientesFacturadosF = clientesFacturados
+    .filter(c => coincideBusqueda(`${c.cliente} ${c.rut}`, q))
+    .map(c => {
+      const calzan = productosQueCalzan(c.productos, qp);
+      return calzan === null ? c : { ...c, __calzan: calzan };
+    })
+    .filter(c => !c.__calzan || c.__calzan.length > 0);
+  document.getElementById('fp-clientes-limpiar').style.display = (q || qp) ? 'block' : 'none';
   renderClientesFacturas();
+}
+
+function limpiarFiltrosClientesFacturas() {
+  document.getElementById('fp-clientes-search').value = '';
+  document.getElementById('fp-clientes-producto').value = '';
+  filterClientesFacturas();
+}
+
+// Al abrir el cliente se arrastra la búsqueda por producto, así el detalle
+// se abre ya mostrando los productos que uno estaba buscando.
+function abrirClienteFacturaConFiltro(idx) {
+  const c = (window.__alfabeticoOrden['fp-clientes-body'] || [])[idx];
+  if (!c) return;
+  openClienteFacturaDetail(c.cliente, document.getElementById('fp-clientes-producto').value.trim());
 }
 
 function renderClientesFacturas() {
   document.getElementById('fp-clientes-cargando').style.display = 'none';
   document.getElementById('fp-clientes-tabla').style.display = 'block';
-  document.getElementById('fp-clientes-info').textContent = `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes`;
-  const hayFiltro = document.getElementById('fp-clientes-search').value;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos clientes con ese nombre o RUT.' : 'Todavía no hay clientes facturados.'}</p></div></td>`;
+  const qp = document.getElementById('fp-clientes-producto').value.trim();
+  document.getElementById('fp-clientes-info').textContent = qp
+    ? `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes con productos que calzan con “${qp}”`
+    : `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes`;
+  const hayFiltro = document.getElementById('fp-clientes-search').value || qp;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'Todavía no hay clientes facturados.'}</p></div></td>`;
   renderTablaAlfabetica('fp-clientes-body', 'fp-clientes-jump', clientesFacturadosF, c => c.cliente,
-    (c, idx) => `<tr onclick="navReset();openClienteFacturaDetail(window.__alfabeticoOrden['fp-clientes-body'][${idx}].cliente)" style="cursor:pointer">
-      <td style="font-weight:500;color:#185FA5">${escapeHtml(c.cliente)} ↗</td>
+    (c, idx) => `<tr onclick="navReset();abrirClienteFacturaConFiltro(${idx})" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(c.cliente)} ↗${lineaProductosCalzados(c.__calzan)}</td>
       <td style="font-size:12px;color:var(--text-2)">${escapeHtml(c.rut || '—')}</td>
-      <td style="text-align:right">${c.nProductos}</td>
+      <td style="text-align:right">${c.__calzan ? `${c.__calzan.length} <span style="font-size:11px;color:var(--text-3)">de ${c.nProductos}</span>` : c.nProductos}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(c.total)}</td>
     </tr>`, 4, mensajeVacio);
 }
@@ -3421,7 +3557,7 @@ function renderClientesFacturas() {
 function productosDeCliente(clienteNombre) {
   const map = new Map();
   facturaItemsRaw.forEach(it => {
-    const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+    const doc = docPorId(it.documento_id);
     if (!doc) return;
     if ((nombreHosp(doc.hospital) || doc.hospital || 'Sin cliente') !== clienteNombre) return;
     const key = (it.nombre_producto || 'Sin nombre').trim();
@@ -3494,7 +3630,7 @@ function abrirHistorialVentaProducto(nombreProducto, clienteNombre) {
   const ventas = facturaItemsRaw
     .filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto)
     .map(it => {
-      const doc = documentosGdexpress.find(d => d.id === it.documento_id);
+      const doc = docPorId(it.documento_id);
       return doc ? { doc, item: it } : null;
     })
     .filter(x => x && (nombreHosp(x.doc.hospital) || x.doc.hospital || 'Sin cliente') === clienteNombre)
@@ -3612,7 +3748,7 @@ function candidatosCosto(nombreProductoVenta, filtroManual) {
     const nombre = (it.nombre_producto || 'Sin nombre').trim();
     if (!porNombre.has(nombre)) porNombre.set(nombre, { nombre, compras: 0, ultima: null, ultimoPrecio: null, ultimaUnidad: null, proveedor: null });
     const e = porNombre.get(nombre);
-    const f = facturasPorPagar.find(x => x.id === it.factura_id);
+    const f = fppPorId(it.factura_id);
     e.compras += 1;
     const fecha = f ? f.fecha_emision : null;
     if (fecha && (!e.ultima || fecha > e.ultima)) {
@@ -3728,7 +3864,7 @@ function abrirHistorialCosto(nombreProductoProveedor) {
   const compras = facturaProvItemsRaw
     .filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProductoProveedor)
     .map(it => {
-      const f = facturasPorPagar.find(x => x.id === it.factura_id);
+      const f = fppPorId(it.factura_id);
       return f ? { f, item: it } : null;
     })
     .filter(Boolean)
@@ -3879,7 +4015,7 @@ function openProductoFacturaProvDetail(nombreProducto) {
   // Agrupamos por proveedor (vía la factura por pagar a la que pertenece cada ítem).
   const porProveedor = new Map();
   compras.forEach(v => {
-    const f = facturasPorPagar.find(x => x.id === v.factura_id);
+    const f = fppPorId(v.factura_id);
     const p = f ? (f.proveedor || 'Sin proveedor') : 'Sin proveedor';
     if (!porProveedor.has(p)) porProveedor.set(p, { proveedor: p, facturas: 0, total: 0 });
     const entry = porProveedor.get(p);
@@ -3925,7 +4061,7 @@ function abrirFacturasProvDeProductoProveedor(nombreProducto, proveedorNombre) {
   const compras = facturaProvItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
   const facturas = compras
     .map(v => {
-      const f = facturasPorPagar.find(x => x.id === v.factura_id);
+      const f = fppPorId(v.factura_id);
       return f ? { f, item: v } : null;
     })
     .filter(x => x && (x.f.proveedor || 'Sin proveedor') === proveedorNombre)
@@ -6039,7 +6175,7 @@ let docNavLista = null; // null = usar el listado del Buscador (docF)
 
 function listaNavDocumentos() {
   if (!docNavLista) return docF;
-  return docNavLista.map(id => documentosGdexpress.find(d => d.id === id)).filter(Boolean);
+  return docNavLista.map(id => docPorId(id)).filter(Boolean);
 }
 
 // Las flechas conservan el contexto; cualquier otra forma de abrir un
@@ -6677,7 +6813,7 @@ async function marcarSeleccionadasComoPagadas() {
       body: JSON.stringify({ estado_pago: 'Pagado', fecha_pago: fecha }),
     });
     ids.forEach(id => {
-      const f = facturasPorPagar.find(x => x.id === id);
+      const f = fppPorId(id);
       if (f) { f.estado_pago = 'Pagado'; f.fecha_pago = fecha; }
     });
     toast(`✓ ${ids.length} factura${ids.length===1?'':'s'} marcada${ids.length===1?'':'s'} como pagada${ids.length===1?'':'s'}`);
@@ -6715,7 +6851,7 @@ let fppNavLista = null; // null = usar el último listado de Facturas por pagar
 
 function listaNavFPP() {
   if (!fppNavLista) return window.__ultimaListaFPP || [];
-  return fppNavLista.map(id => facturasPorPagar.find(f => f.id === id)).filter(Boolean);
+  return fppNavLista.map(id => fppPorId(id)).filter(Boolean);
 }
 
 function navegarFacturaProvDesdeVisor(id) {
@@ -6736,7 +6872,7 @@ function botonNavFPPHtml(idActual) {
 
 function abrirDetalleFacturaPorPagar(id, contextoNav = null) {
   fppNavLista = contextoNav;
-  const f = facturasPorPagar.find(x => x.id === id);
+  const f = fppPorId(id);
   if (!f) return;
   cerrarTodosLosModales();
   const cuenta = nombreProveedorCuenta(f.rut_proveedor);
@@ -6847,7 +6983,7 @@ async function guardarPagoFacturaPorPagar(id, btnEl) {
   try {
     const cambios = { estado_pago: estado, fecha_pago: estado === 'Pagado' ? (fechaPago || new Date().toISOString().slice(0,10)) : fechaPago, cuenta_pago_id: cuentaId ? Number(cuentaId) : null };
     await sb(`facturas_por_pagar?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
-    const f = facturasPorPagar.find(x => x.id === id);
+    const f = fppPorId(id);
     if (f) Object.assign(f, cambios);
     document.getElementById('fpp-detalle-overlay').remove();
     fppRender();
