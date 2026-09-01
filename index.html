@@ -880,8 +880,8 @@
         <div class="alfabetico-tabla">
           <table style="margin:0">
             <thead><tr>
-              <th>Producto</th><th>Familia</th>
-              <th style="text-align:right">N° OC</th><th style="text-align:right">Último precio OC</th><th style="text-align:right">Total comprado</th>
+              <th>Producto</th>
+              <th style="text-align:right">N° OC</th><th style="text-align:right">Última OC</th><th style="text-align:right">Precio OC</th>
             </tr></thead>
             <tbody id="items-body"></tbody>
           </table>
@@ -2442,12 +2442,12 @@ function openOCDetail(codigoOC) {
         </div>
       </div>
       <div class="modal-tabs">
-        <div class="modal-tab active" data-tab="oc-tab-general" onclick="cambiarTabOC(this)">Datos generales</div>
-        <div class="modal-tab" data-tab="oc-tab-productos" onclick="cambiarTabOC(this)">Productos${relacionados.length ? ` (${relacionados.length})` : ''}</div>
-        <div class="modal-tab" data-tab="oc-tab-facturas" onclick="cambiarTabOC(this)">Facturas asociadas${facturasDeEstaOC.length ? ` (${facturasDeEstaOC.length})` : ''}</div>
+        <div class="modal-tab${ocTabActiva==='oc-tab-general'?' active':''}" data-tab="oc-tab-general" onclick="cambiarTabOCConEstado(this)">Datos generales</div>
+        <div class="modal-tab${ocTabActiva==='oc-tab-productos'?' active':''}" data-tab="oc-tab-productos" onclick="cambiarTabOCConEstado(this)">Productos${relacionados.length ? ` (${relacionados.length})` : ''}</div>
+        <div class="modal-tab${ocTabActiva==='oc-tab-facturas'?' active':''}" data-tab="oc-tab-facturas" onclick="cambiarTabOCConEstado(this)">Facturas asociadas${facturasDeEstaOC.length ? ` (${facturasDeEstaOC.length})` : ''}</div>
       </div>
       <div class="modal-body">
-        <div id="oc-tab-general" class="modal-tab-panel active">
+        <div id="oc-tab-general" class="modal-tab-panel${ocTabActiva==='oc-tab-general'?' active':''}">
           ${(() => {
             const totalOC = Number(r.totaloc || 0);
             if (!totalOC) return '';
@@ -2478,10 +2478,10 @@ function openOCDetail(codigoOC) {
             <tr><td>Fecha creación (Mercado Público)</td><td>${fDate(r.fechaoc)}</td></tr>
           </table>
         </div>
-        <div id="oc-tab-productos" class="modal-tab-panel">
+        <div id="oc-tab-productos" class="modal-tab-panel${ocTabActiva==='oc-tab-productos'?' active':''}">
           ${itemsHtml}
         </div>
-        <div id="oc-tab-facturas" class="modal-tab-panel">
+        <div id="oc-tab-facturas" class="modal-tab-panel${ocTabActiva==='oc-tab-facturas'?' active':''}">
           ${facturasHtml}
         </div>
       </div>
@@ -2498,9 +2498,22 @@ function cambiarTabOC(el) {
   document.getElementById(el.dataset.tab).classList.add('active');
 }
 
+// Pestaña activa del visor de OC. Es estado del visor, no de la orden: al
+// entrar a una factura asociada y volver con "atrás", el modal se reconstruye
+// entero, y con la pestaña fija en "Datos generales" se perdía el lugar donde
+// estabas. Se reinicia solo al cerrar el visor de verdad — NO en
+// cerrarTodosLosModales, que es lo que se llama al saltar a la factura.
+let ocTabActiva = 'oc-tab-general';
+
+function cambiarTabOCConEstado(el) {
+  cambiarTabOC(el);
+  ocTabActiva = el.dataset.tab;
+}
+
 function closeOCDetail() {
   const m = document.getElementById('oc-modal-overlay');
   if (m) m.remove();
+  ocTabActiva = 'oc-tab-general';
 }
 
 // ─── NORMALIZACIÓN MANUAL DE PRODUCTOS ─────────────────────────────────────
@@ -2746,14 +2759,18 @@ function renderItems() {
   document.getElementById('items-info').textContent = `${productosUnicosF.length.toLocaleString('es-CL')} productos`;
   const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
   const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
+  // Precio: el de la última OC. Si el producto tuvo más de un precio, se
+  // muestra el rango debajo, que es lo que interesa al cotizar de nuevo.
   renderTablaAlfabetica('items-body', 'items-jump', productosUnicosF, p => p.nombre,
     (p, idx) => `<tr onclick="navReset();openProductDetail(window.__alfabeticoOrden['items-body'][${idx}].nombre)" style="cursor:pointer">
       <td style="font-weight:500;color:var(--accent)">${escapeHtml(p.nombre)} ↗</td>
-      <td style="font-size:12px;color:var(--text-2)">${escapeHtml(p.familia)}</td>
       <td style="text-align:right">${p.nOC || p.ventas}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3)">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalVendido)}</td>
-    </tr>`, 5, mensajeVacio);
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+      </td>
+    </tr>`, 4, mensajeVacio);
 }
 function goItems(p) { const {pages}=paginate(productosUnicosF,itemsPage); if(p<1||p>pages) return; itemsPage=p; renderItems(); }
 
@@ -2906,6 +2923,24 @@ function openClienteOCDetailDebounce(valor) {
 }
 
 // ─── PRODUCT DETAIL MODAL ──────────────────────────────────────────────────
+// Flechas ‹ › para recorrer productos sin volver al listado. Usan el mismo
+// orden alfabético que se está viendo (guardado por renderTablaAlfabetica),
+// así que respetan la búsqueda y el filtro de familia activos: "siguiente"
+// es el siguiente en pantalla, no el siguiente del catálogo completo.
+function listaNavProductosOC() {
+  return (window.__alfabeticoOrden && window.__alfabeticoOrden['items-body']) || productosUnicosF || [];
+}
+
+function botonNavProductoOCHtml(nombreActual) {
+  const lista = listaNavProductosOC();
+  const idx = lista.findIndex(p => p.nombre === nombreActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0, haySiguiente = idx < lista.length - 1;
+  const pos = `${idx+1} de ${lista.length}`;
+  const btn = (dir, activo, i) => `<button onclick="${activo ? `openProductDetail(listaNavProductosOC()[${i}].nombre)` : ''}" ${activo?'':'disabled'} title="Producto ${dir} (orden alfabético, respeta la búsqueda y el filtro) — ${pos}" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${activo?'':'opacity:.35;cursor:not-allowed'}">${dir === 'anterior' ? '‹' : '›'}</button>`;
+  return btn('anterior', hayAnterior, idx-1) + btn('siguiente', haySiguiente, idx+1);
+}
+
 function openProductDetail(nombreProducto) {
   cerrarTodosLosModales();
   const ventas = items.filter(it => nombreFinalDe(it) === nombreProducto);
@@ -2965,6 +3000,7 @@ function openProductDetail(nombreProducto) {
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
+          ${botonNavProductoOCHtml(nombreProducto)}
           <button onclick="closeProductDetail()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
@@ -2975,10 +3011,9 @@ function openProductDetail(nombreProducto) {
           ${ultimaFecha ? ` · última compra ${fDate(ultimaFecha)}` : ''}
         </div>
         ${avisoUnidades}
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px">
           <div class="stat destacado" style="padding:12px"><div class="stat-label">Último precio OC</div><div class="stat-val" style="font-size:18px">${ultimoPrecio != null ? clp(ultimoPrecio) : '—'}${ultimaConPrecio && ultimaConPrecio.unidad ? ` <span style="font-size:11px;font-weight:400">/ ${escapeHtml(ultimaConPrecio.unidad)}</span>` : ''}</div></div>
           <div class="stat" style="padding:12px"><div class="stat-label">Rango histórico</div><div class="stat-val" style="font-size:14px">${precioMin != null ? `${clp(precioMin)} – ${clp(precioMax)}` : '—'}</div></div>
-          <div class="stat" style="padding:12px"><div class="stat-label">Total comprado</div><div class="stat-val" style="font-size:14px">${clp(totalVendido)}</div></div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
           <button class="page-btn" style="padding:8px 16px" onclick="verPreciosFacturadosDe(window.__productoActual)" title="Buscar este producto en Facturas Bulfor → Precios. Son fuentes distintas: no se mezclan los datos.">🧾 Ver precios facturados</button>
@@ -3031,9 +3066,8 @@ function filterProductoHospitales() {
 // Productos: es lo que se viene a mirar. Se hace después de renderizar el
 // modal, activando la pestaña que ya existe — sin tocar el visor de OC.
 function abrirOCEnProductos(codigoOC) {
+  ocTabActiva = 'oc-tab-productos';
   openOCDetail(codigoOC);
-  const tab = document.querySelector('#oc-modal-overlay .modal-tab[data-tab="oc-tab-productos"]');
-  if (tab) cambiarTabOC(tab);
 }
 
 // Puente hacia Facturas Bulfor → Precios → Por producto, con el nombre
