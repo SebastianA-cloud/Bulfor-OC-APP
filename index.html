@@ -834,6 +834,7 @@
       </div>
       <div class="scope-toggle" id="scope-oc" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('oc','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('oc','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('oc','todo')">Todo</button>
       </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
@@ -1037,6 +1038,7 @@
       </div>
       <div class="scope-toggle" id="scope-fpp" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('fpp','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('fpp','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('fpp','todo')">Todo</button>
       </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
@@ -1146,6 +1148,7 @@
       </div>
       <div class="scope-toggle" id="scope-doc" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('doc','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('doc','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('doc','todo')">Todo</button>
       </div>
     </div>
@@ -1174,6 +1177,7 @@
       </div>
       <div class="scope-toggle" id="scope-fedex" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('fedex','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('fedex','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('fedex','todo')">Todo</button>
       </div>
       <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
@@ -1215,6 +1219,7 @@
       </div>
       <div class="scope-toggle" id="scope-oe" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('oe','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('oe','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('oe','todo')">Todo</button>
       </div>
       <select id="oe-estado-entrega" onchange="oeCategoria='todos';renderTabsOE();filterOE()">
@@ -1296,6 +1301,7 @@
       </div>
       <div class="scope-toggle" id="scope-pagos" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('pagos','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('pagos','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('pagos','todo')">Todo</button>
       </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
@@ -1338,6 +1344,7 @@
       </div>
       <div class="scope-toggle" id="scope-rechazadas" role="group" aria-label="Alcance de la búsqueda">
         <button data-alcance="mes" class="active" onclick="setAlcance('rechazadas','mes')">Este mes</button>
+        <button data-alcance="anio" onclick="setAlcance('rechazadas','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('rechazadas','todo')">Todo</button>
       </div>
     </div>
@@ -1753,6 +1760,23 @@ const ALCANCE_RENDER = {
 let alcanceBusqueda = { oc: 'mes', doc: 'mes', fpp: 'mes', pagos: 'mes', rechazadas: 'mes', fedex: 'mes', oe: 'mes' };
 
 function alcanceEsTodo(modulo) { return alcanceBusqueda[modulo] === 'todo'; }
+function alcanceEsAnio(modulo) { return alcanceBusqueda[modulo] === 'anio'; }
+
+// Rango de fechas [desde, hasta) que corresponde al alcance elegido:
+// el mes seleccionado, el año completo, o null cuando es "Todo" (sin filtro).
+// Todas las fechas de la app son texto 'YYYY-MM-DD', así que comparar como
+// texto ordena igual que comparar como fecha y evita problemas de zona horaria.
+function rangoDelAlcance(modulo, periodo) {
+  if (alcanceEsTodo(modulo) || !periodo) return null;
+  const { anio, mes } = periodo;
+  if (alcanceEsAnio(modulo)) {
+    return { desde: `${anio}-01-01`, hasta: `${Number(anio) + 1}-01-01` };
+  }
+  return {
+    desde: `${anio}-${String(mes + 1).padStart(2, '0')}-01`,
+    hasta: mes === 11 ? `${Number(anio) + 1}-01-01` : `${anio}-${String(mes + 2).padStart(2, '0')}-01`
+  };
+}
 
 // Nombre del período para los textos ("… en Julio 2026" / "… en todo el
 // historial"), para que nunca se muestre un mes arriba y resultados de
@@ -1760,6 +1784,7 @@ function alcanceEsTodo(modulo) { return alcanceBusqueda[modulo] === 'todo'; }
 function nombrePeriodoAlcance(modulo, periodo) {
   if (alcanceEsTodo(modulo)) return 'todo el historial';
   if (!periodo) return 'todos los períodos';
+  if (alcanceEsAnio(modulo)) return `el año ${periodo.anio}`;
   return `${MESES_NOMBRE[periodo.mes]} ${periodo.anio}`;
 }
 
@@ -1772,6 +1797,9 @@ function setAlcance(modulo, valor) {
 }
 
 // Deja el control segmentado y el aviso en sincronía con el estado.
+// Además atenúa los selectores que dejan de aplicar: con "Año" el mes ya no
+// filtra nada, y con "Todo" tampoco el año. Antes quedaban activos mostrando
+// un mes que no tenía nada que ver con los resultados de abajo.
 function pintarAlcanceUI(modulo) {
   const grupo = document.getElementById(`scope-${modulo}`);
   if (grupo) {
@@ -1779,6 +1807,15 @@ function pintarAlcanceUI(modulo) {
       b.classList.toggle('active', b.dataset.alcance === alcanceBusqueda[modulo]);
     });
   }
+  const alc = alcanceBusqueda[modulo];
+  const selMes = document.getElementById(`${modulo}-select-mes`);
+  const selAnio = document.getElementById(`${modulo}-select-anio`);
+  [[selMes, alc !== 'mes'], [selAnio, alc === 'todo']].forEach(([el, apagado]) => {
+    if (!el) return;
+    el.disabled = apagado;
+    el.style.opacity = apagado ? '.4' : '';
+    el.title = apagado ? 'No aplica con el alcance seleccionado' : '';
+  });
 }
 
 function pintarTodosLosAlcances() {
@@ -4802,11 +4839,9 @@ function fedexVerTodasLasFechas() {
 }
 
 function fedexListaDelPeriodo() {
-  if (alcanceEsTodo('fedex') || !fedexPeriodo) return fedex;
-  const { anio, mes } = fedexPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return fedex.filter(f => { const fe = String(f.fecha_ingreso||'').slice(0,10); return fe >= desde && fe < hasta; });
+  const r = rangoDelAlcance('fedex', fedexPeriodo);
+  if (!r) return fedex;
+  return fedex.filter(f => { const fe = String(f.fecha_ingreso||'').slice(0,10); return fe >= r.desde && fe < r.hasta; });
 }
 
 function updateFedexStats() {
@@ -5033,11 +5068,9 @@ function oeVerTodasLasFechas() {
 }
 
 function oeListaDelPeriodo() {
-  if (alcanceEsTodo('oe') || !oePeriodo) return ordenesElaboracion;
-  const { anio, mes } = oePeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return ordenesElaboracion.filter(o => { const f = String(o.fecha_orden||'').slice(0,10); return f >= desde && f < hasta; });
+  const r = rangoDelAlcance('oe', oePeriodo);
+  if (!r) return ordenesElaboracion;
+  return ordenesElaboracion.filter(o => { const f = String(o.fecha_orden||'').slice(0,10); return f >= r.desde && f < r.hasta; });
 }
 
 function updateOEStats() {
@@ -5499,26 +5532,30 @@ function aplicarFiltroPagos(lista) {
 }
 
 function pagosListaDelPeriodo() {
-  if (alcanceEsTodo('pagos')) return facturasPago;
-  const { anio, mes } = pagosPeriodo;
+  const r = rangoDelAlcance('pagos', pagosPeriodo);
+  if (!r) return facturasPago;
   return facturasPago.filter(f => {
-    const fecha = fechaReferenciaFactura(f);
-    if (!fecha || !fecha.startsWith(anio)) return false;
-    return (parseInt(fecha.slice(5,7),10) - 1) === mes;
+    const fecha = fechaReferenciaFactura(f) || '';
+    return fecha >= r.desde && fecha < r.hasta;
   });
 }
 
 // Notas de crédito emitidas dentro del período que se está mirando en
 // Seguimiento de pago. Viven en documentos_gdexpress (tipo 61), no en
 // facturas_pago, por eso hay que buscarlas aparte. Solo cuentan las aceptadas.
+// Una factura queda fuera del total de venta solo si el receptor la RECHAZÓ.
+// Si está anulada por nota de crédito, el descuento lo hace la NC (ver
+// documentoRechazado).
+function facturaPagoRechazada(f) {
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  return doc ? documentoRechazado(doc) : (f.estado_aceptacion || '') === 'N';
+}
+
 function totalNotasCreditoPeriodoPagos() {
-  const ncs = documentosGdexpress.filter(d => d.tipo_dte === '61' && d.estado_aceptacion !== 'N');
-  if (alcanceEsTodo('pagos')) return ncs.reduce((s,d) => s + montoTotalDoc(d), 0);
-  const { anio, mes } = pagosPeriodo;
-  return ncs.filter(d => {
-    const f = d.fecha_emision || '';
-    return f.startsWith(anio) && (parseInt(f.slice(5,7),10) - 1) === mes;
-  }).reduce((s,d) => s + montoTotalDoc(d), 0);
+  const ncs = documentosGdexpress.filter(d => d.tipo_dte === '61' && !documentoRechazado(d));
+  const r = rangoDelAlcance('pagos', pagosPeriodo);
+  const enRango = r ? ncs.filter(d => { const f = d.fecha_emision || ''; return f >= r.desde && f < r.hasta; }) : ncs;
+  return enRango.reduce((s,d) => s + montoTotalDoc(d), 0);
 }
 
 // Total facturado, total pagado, % pagado y N° de pendientes de un conjunto
@@ -5534,7 +5571,8 @@ function totalNotasCreditoPeriodoPagos() {
 // anulada no se va a pagar nunca, así que no entra en esos dos números.
 function calcularResumenPagos(lista) {
   const validas = lista.filter(f => estadoFusionadoPago(f) !== 'N');
-  const totalFacturado = lista.reduce((s,f) => s + montoConIVAPago(f), 0)
+  const totalFacturado = lista.filter(f => !facturaPagoRechazada(f))
+                              .reduce((s,f) => s + montoConIVAPago(f), 0)
                        - totalNotasCreditoPeriodoPagos();
   const pagadas = validas.filter(f => f.fecha_pago);
   const totalPagado = pagadas.reduce((s,f) => s + montoConIVAPago(f), 0);
@@ -6080,11 +6118,9 @@ function docMostrarTodosLosTipos() {
 }
 
 function docListaDelPeriodo() {
-  if (alcanceEsTodo('doc')) return documentosGdexpress;
-  const { anio, mes } = docPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return documentosGdexpress.filter(d => { const f = d.fecha_emision || ''; return f >= desde && f < hasta; });
+  const r = rangoDelAlcance('doc', docPeriodo);
+  if (!r) return documentosGdexpress;
+  return documentosGdexpress.filter(d => { const f = d.fecha_emision || ''; return f >= r.desde && f < r.hasta; });
 }
 
 function cambiarTipoDocumento(tipo) {
@@ -6167,6 +6203,18 @@ async function completarMontoTotalSiFalta(d) {
   } catch (e) { /* si falla, se queda mostrando el neto como respaldo */ }
 }
 
+// Para los totales de venta hay que separar dos cosas que la insignia muestra
+// igual ("Anulada/Rechazada"):
+//   · RECHAZADA  — el receptor reclamó el documento (estado_aceptacion 'N').
+//     No es venta: el SII no la considera y hay que sacarla del total.
+//   · ANULADA POR NC — la factura sigue siendo venta del mes en que se emitió;
+//     lo que descuenta es la nota de crédito, en el mes de la NC.
+// Si se sacara del total la factura anulada Y además se restara su NC, se
+// estaría descontando dos veces.
+function documentoRechazado(d) {
+  return (d.estado_aceptacion || '') === 'N';
+}
+
 function estadoAceptacionFusionado(d) {
   if (d.tipo_dte === '33') {
     if (notaCreditoQueAnula(d.folio)) return 'N';
@@ -6210,15 +6258,18 @@ function renderDocumentosGdexpress(soloTabla) {
   // mercadería despachada que no se ha facturado.
   const facturasDelPeriodo = delPeriodo.filter(d => d.tipo_dte === '33');
   const facturasAnuladasPorNC = facturasDelPeriodo.filter(d => estadoAceptacionFusionado(d) === 'N');
+  const facturasRechazadasPeriodo = facturasDelPeriodo.filter(documentoRechazado);
   const totalNotasCredito = delPeriodo
-    .filter(d => d.tipo_dte === '61' && d.estado_aceptacion !== 'N')
+    .filter(d => d.tipo_dte === '61' && !documentoRechazado(d))
     .reduce((s,d) => s + montoTotalDoc(d), 0);
-  const totalFacturado = facturasDelPeriodo.reduce((s,d) => s + montoTotalDoc(d), 0) - totalNotasCredito;
+  const totalFacturado = facturasDelPeriodo
+    .filter(d => !documentoRechazado(d))
+    .reduce((s,d) => s + montoTotalDoc(d), 0) - totalNotasCredito;
   const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
   document.getElementById('doc-resumen').innerHTML = `
     <div class="stat destacado" title="Facturas del período menos notas de crédito del período, igual que el Registro de Ventas del SII"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
     <div class="stat"><div class="stat-label">Facturas</div><div class="stat-val" style="font-size:16px">${cuenta['33']}</div></div>
-    <div class="stat" title="Notas de crédito emitidas en el período, ya descontadas del total facturado. ${facturasAnuladasPorNC.length} factura(s) de este mismo período quedaron anuladas por una NC."><div class="stat-label">Notas de crédito (−)</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '−' + clp(totalNotasCredito) : '—'}</div></div>
+    <div class="stat" title="Notas de crédito emitidas en el período, ya descontadas del total facturado. ${facturasAnuladasPorNC.length} factura(s) de este período quedaron anuladas por una NC.${facturasRechazadasPeriodo.length ? ' Además hay ' + facturasRechazadasPeriodo.length + ' factura(s) rechazada(s) por el receptor, que no se cuentan como venta.' : ''}"><div class="stat-label">Notas de crédito (−)</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '−' + clp(totalNotasCredito) : '—'}</div></div>
     <div class="stat"><div class="stat-label">Guías de despacho (por facturar)</div><div class="stat-val" style="font-size:16px;color:var(--amber)">${clp(totalGuiasPorFacturar)}</div></div>`;
 
   const ningunTipoActivo = !docTiposActivos['33'] && !docTiposActivos['61'] && !docTiposActivos['52'];
@@ -6639,11 +6690,9 @@ function rechazadasCambiarMes(delta) {
 }
 
 function rechazadasListaDelPeriodo() {
-  if (alcanceEsTodo('rechazadas')) return facturasRechazadas();
-  const { anio, mes } = rechazadasPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return facturasRechazadas().filter(f => { const d = f.fecha_emision || ''; return d >= desde && d < hasta; });
+  const r = rangoDelAlcance('rechazadas', rechazadasPeriodo);
+  if (!r) return facturasRechazadas();
+  return facturasRechazadas().filter(f => { const d = f.fecha_emision || ''; return d >= r.desde && d < r.hasta; });
 }
 
 // ─── FACTURAS POR PAGAR (lo que los proveedores le facturan a Bulfor) ──────
@@ -6729,11 +6778,9 @@ function fppBuscar(valor) {
 }
 
 function fppListaDelPeriodo() {
-  if (alcanceEsTodo('fpp')) return facturasPorPagar;
-  const { anio, mes } = fppPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return facturasPorPagar.filter(f => (f.fecha_emision||'') >= desde && (f.fecha_emision||'') < hasta);
+  const r = rangoDelAlcance('fpp', fppPeriodo);
+  if (!r) return facturasPorPagar;
+  return facturasPorPagar.filter(f => (f.fecha_emision||'') >= r.desde && (f.fecha_emision||'') < r.hasta);
 }
 
 // Mismo criterio de orden que el Buscador de documentos, en dos niveles:
@@ -8805,11 +8852,9 @@ function ocVerTodasLasFechas() {
 }
 
 function ocListaDelPeriodo() {
-  if (alcanceEsTodo('oc') || !ocPeriodo) return oc;
-  const { anio, mes } = ocPeriodo;
-  const desde = `${anio}-${String(mes+1).padStart(2,'0')}-01`;
-  const hasta = mes === 11 ? `${Number(anio)+1}-01-01` : `${anio}-${String(mes+2).padStart(2,'0')}-01`;
-  return oc.filter(r => { const f = r.fechaenvio || r.fechaoc || ''; return f >= desde && f < hasta; });
+  const r = rangoDelAlcance('oc', ocPeriodo);
+  if (!r) return oc;
+  return oc.filter(x => { const f = x.fechaenvio || x.fechaoc || ''; return f >= r.desde && f < r.hasta; });
 }
 
 function updateStats() {
