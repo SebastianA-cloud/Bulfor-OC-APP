@@ -1904,7 +1904,7 @@ async function init() {
       fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc'),
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
       fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
-      fetchAll('documentos_gdexpress', 'select=id,tipo_dte,folio,rut_hospital,hospital,fecha_emision,monto,estado_aceptacion,doc_url,orden_compra_ref,created_at,updated_at,detalle_sincronizado,estado_fiscal_status,estado_fiscal_actualizado,nc_factura_ref,monto_total&order=fecha_emision.desc'),
+      fetchAll('documentos_gdexpress', 'select=id,tipo_dte,folio,rut_hospital,hospital,fecha_emision,fecha_emision_real,monto,estado_aceptacion,doc_url,orden_compra_ref,created_at,updated_at,detalle_sincronizado,estado_fiscal_status,estado_fiscal_actualizado,nc_factura_ref,monto_total&order=fecha_emision.desc'),
       fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_lotes', 'select=*'),
@@ -5429,9 +5429,12 @@ async function sincronizarFacturasPagoDesdeGdexpress() {
 }
 
 function fechaReferenciaFactura(f) {
-  // Para agrupar por año/mes usamos la fecha de emisión; si no la tiene
-  // (puede pasar con facturas creadas solo desde el listado de pagos),
-  // usamos la fecha de pago como respaldo.
+  // Para agrupar por año/mes se usa la fecha con la que el documento cuenta
+  // para el SII (ver fechaPeriodoDoc). Si la factura no está en GDExpress
+  // todavía, cae a su propia fecha de emisión y, si tampoco la tiene, a la
+  // fecha de pago.
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  if (doc) return fechaPeriodoDoc(doc) || f.fecha_emision || f.fecha_pago || null;
   return f.fecha_emision || f.fecha_pago || null;
 }
 
@@ -5570,7 +5573,7 @@ function facturaPagoRechazada(f) {
 function totalNotasCreditoPeriodoPagos() {
   const ncs = documentosGdexpress.filter(d => d.tipo_dte === '61' && !documentoRechazado(d));
   const r = rangoDelAlcance('pagos', pagosPeriodo);
-  const enRango = r ? ncs.filter(d => { const f = d.fecha_emision || ''; return f >= r.desde && f < r.hasta; }) : ncs;
+  const enRango = r ? ncs.filter(d => { const f = fechaPeriodoDoc(d); return f >= r.desde && f < r.hasta; }) : ncs;
   return enRango.reduce((s,d) => s + montoTotalDoc(d), 0);
 }
 
@@ -5841,6 +5844,8 @@ async function abrirDetalleFacturaPago(id, contextoNav = null) {
       <div class="modal-zona-fija">
         <table class="clinical-grid">
           <tr><td>Fecha emisión</td><td>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td></tr>
+${doc && fechaDocumentoDesalineada(doc) ? `
+          <tr><td>Emitida realmente el</td><td><span style="color:var(--amber);font-weight:600" title="La fecha escrita en el documento cae en otro mes. Para el SII este documento cuenta en el mes en que se emitio de verdad, que es esta fecha; el programa usa la misma para que los totales por mes calcen con el Registro de Ventas.">${fDate(doc.fecha_emision_real)} ⚠</span></td></tr>` : ''}
           <tr><td>Vencimiento</td><td>${vencHtmlDetalle}</td></tr>
           ${doc ? `
           <tr><td>Monto neto</td><td>${clp(doc.monto)}</td></tr>
@@ -6172,7 +6177,7 @@ function docMostrarTodosLosTipos() {
 function docListaDelPeriodo() {
   const r = rangoDelAlcance('doc', docPeriodo);
   if (!r) return documentosGdexpress;
-  return documentosGdexpress.filter(d => { const f = d.fecha_emision || ''; return f >= r.desde && f < r.hasta; });
+  return documentosGdexpress.filter(d => { const f = fechaPeriodoDoc(d); return f >= r.desde && f < r.hasta; });
 }
 
 function cambiarTipoDocumento(tipo) {
@@ -6263,6 +6268,25 @@ async function completarMontoTotalSiFalta(d) {
 //     lo que descuenta es la nota de crédito, en el mes de la NC.
 // Si se sacara del total la factura anulada Y además se restara su NC, se
 // estaría descontando dos veces.
+// Fecha con la que el documento CUENTA para un periodo. El SII asigna cada
+// documento al mes en que efectivamente se emitio (la firma electronica del
+// DTE), no a la fecha escrita adentro. Casi siempre son la misma; se separan
+// cuando alguien tipea mal la fecha, o cuando se factura el ultimo dia del mes
+// por la tarde con fecha del dia siguiente. Ejemplo real: 17 facturas firmadas
+// el 30-06-2026 salieron con fecha 01-07-2026 ($2.811.256) — el SII las cuenta
+// en junio y sin esto el mes no calzaba con el Registro de Ventas.
+function fechaPeriodoDoc(d) {
+  return (d && d.fecha_emision_real) || (d && d.fecha_emision) || '';
+}
+
+// true cuando la fecha escrita en el documento cae en un mes distinto al que
+// realmente le corresponde. Se marca en pantalla para que el numero se pueda
+// explicar sin tener que abrir el XML.
+function fechaDocumentoDesalineada(d) {
+  const real = d && d.fecha_emision_real, propia = d && d.fecha_emision;
+  return !!(real && propia && real.slice(0, 7) !== propia.slice(0, 7));
+}
+
 function documentoRechazado(d) {
   return (d.estado_aceptacion || '') === 'N';
 }
@@ -6481,6 +6505,8 @@ async function abrirDetalleDocumentoGdexpress(id, contextoNav = null) {
         <div id="doc-tab-general" class="modal-tab-panel${docTabActiva==='doc-tab-general'?' active':''}">
         <table class="clinical-grid">
           <tr><td>Fecha emisión</td><td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td></tr>
+${fechaDocumentoDesalineada(d) ? `
+          <tr><td>Emitida realmente el</td><td><span style="color:var(--amber);font-weight:600" title="La fecha escrita en el documento cae en otro mes. Para el SII este documento cuenta en el mes en que se emitio de verdad, que es esta fecha; el programa usa la misma para que los totales por mes calcen con el Registro de Ventas.">${fDate(d.fecha_emision_real)} ⚠</span></td></tr>` : ''}
           <tr><td>Monto neto</td><td>${clp(d.monto)}</td></tr>
           <tr><td>Monto total (con IVA)</td><td style="font-weight:600">${clp(montoTotalDoc(d))}</td></tr>
           <tr><td>RUT Hospital</td><td>${d.rut_hospital||'—'}</td></tr>
