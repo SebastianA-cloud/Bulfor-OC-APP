@@ -146,12 +146,16 @@
      tablas adentro (ítems, historial). Header y footer con el mismo padding
      siempre, para que ninguna ventana "se sienta" distinta a otra. */
   .modal-overlay { position: fixed; inset: 0; background: rgba(26,25,23,.5); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: var(--sp-5); overflow-y: auto; }
-  .modal-shell { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; overflow-x: hidden; box-shadow: 0 12px 32px rgba(26,25,23,.18); }
+  /* El scroll va DENTRO del cuerpo, no en toda la ventana: el encabezado
+     (folio, hospital, flechas y cerrar) y el pie quedan siempre fijos, y la
+     barra de scroll aparece solo al costado del contenido. Antes scrolleaba
+     el shell completo y la barra recorría toda la ficha de arriba abajo. */
+  .modal-shell { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; overflow-x: hidden; box-shadow: 0 12px 32px rgba(26,25,23,.18); display: flex; flex-direction: column; }
   .modal-sm { max-width: 420px; }
   .modal-md { max-width: 520px; }
   .modal-lg { max-width: 640px; }
   .modal-xl { max-width: 760px; } /* excepción: solo para fichas con tabla ancha adentro (ítems con 4+ columnas) */
-  .modal-header { padding: var(--sp-5); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-4); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .modal-header { padding: var(--sp-5); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-4); background: var(--surface); z-index: 1; flex-shrink: 0; position: sticky; top: 0; }
   .modal-header > *:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
   .modal-eyebrow { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
   .modal-title { font-size: 16px; font-weight: 600; letter-spacing: -.2px; overflow-wrap: anywhere; }
@@ -159,8 +163,8 @@
   .modal-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-2); padding: 4px 8px; border-radius: var(--radius); }
   .modal-close:hover { background: var(--bg); color: var(--text); }
-  .modal-body { padding: var(--sp-5); }
-  .modal-footer { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-2); }
+  .modal-body { padding: var(--sp-5); overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 0; }
+  .modal-footer { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-2); flex-shrink: 0; }
 
   /* Pestañas dentro de una ficha (estilo sistema hospitalario: la info se
      separa por pestaña en vez de un solo bloque largo con scroll). */
@@ -5531,6 +5535,9 @@ function aplicarFiltroPagos(lista) {
   ));
 }
 
+let pagosF = [];          // la lista tal como quedó pintada en la tabla
+let pagoNavLista = null;  // null = usar pagosF; si no, ids de otra pantalla
+
 function pagosListaDelPeriodo() {
   const r = rangoDelAlcance('pagos', pagosPeriodo);
   if (!r) return facturasPago;
@@ -5620,9 +5627,14 @@ function renderPagosVista(soloTabla) {
       paid: `No hay facturas pagadas en ${nombrePeriodo}.`,
     };
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
+    pagosF = [];
     return;
   }
 
+  // pagosF guarda EXACTAMENTE la lista que se pintó (período + pestaña de
+  // estado + búsqueda, ya ordenada), que es la que recorren las flechas ‹ ›
+  // del detalle. Así la navegación respeta siempre lo que se ve en pantalla.
+  pagosF = lista;
   cont.innerHTML = construirTablaFacturasHtml(lista, '');
   if (soloTabla) { const inp = document.getElementById('pagos-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
 }
@@ -5757,11 +5769,38 @@ function badgeEstadoPagoHtml(f) {
 function cerrarDetalleFacturaPago() {
   const m = document.getElementById('factura-pago-detalle-overlay');
   if (m) m.remove();
+  pagoNavLista = null;
 }
 
-async function abrirDetalleFacturaPago(id) {
+// Lista sobre la que se mueven las flechas ‹ › del detalle de pago.
+// Por defecto es el listado que se está viendo en Seguimiento de pago; cuando
+// se llega desde otra pantalla, esa pantalla pasa su propia lista de ids y las
+// flechas recorren esa, no la de Seguimiento de pago.
+function listaNavPago() {
+  if (!pagoNavLista) return pagosF;
+  return pagoNavLista.map(id => facturasPago.find(f => f.id === id)).filter(Boolean);
+}
+
+function navegarPagoDesdeVisor(id) {
+  abrirDetalleFacturaPago(id, pagoNavLista);
+}
+
+function botonNavPagoHtml(idActual) {
+  const lista = listaNavPago();
+  const idx = lista.findIndex(f => f.id === idActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0, haySiguiente = idx < lista.length - 1;
+  const donde = pagoNavLista ? 'de esta lista' : 'respeta el período, la pestaña y la búsqueda activa';
+  const posicion = `${idx+1} de ${lista.length}`;
+  return `
+    <button onclick="navegarPagoDesdeVisor(${hayAnterior?lista[idx-1].id:''})" ${hayAnterior?'':'disabled'} title="Factura anterior (${donde}) — ${posicion}" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${hayAnterior?'':'opacity:.35;cursor:not-allowed'}">‹</button>
+    <button onclick="navegarPagoDesdeVisor(${haySiguiente?lista[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Factura siguiente (${donde}) — ${posicion}" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
+}
+
+async function abrirDetalleFacturaPago(id, contextoNav = null) {
   const f = facturasPago.find(x => x.id === id);
   if (!f) return;
+  pagoNavLista = contextoNav;
   const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
   if (doc) await completarMontoTotalSiFalta(doc);
   cerrarTodosLosModales();
@@ -5785,6 +5824,7 @@ async function abrirDetalleFacturaPago(id) {
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${botonAtrasHtml()}
+          ${botonNavPagoHtml(f.id)}
           <button onclick="cerrarDetalleFacturaPago()" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
       </div>
