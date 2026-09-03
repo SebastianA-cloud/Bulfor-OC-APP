@@ -5559,24 +5559,6 @@ function pagosListaDelPeriodo() {
   });
 }
 
-// Notas de crédito emitidas dentro del período que se está mirando en
-// Seguimiento de pago. Viven en documentos_gdexpress (tipo 61), no en
-// facturas_pago, por eso hay que buscarlas aparte. Solo cuentan las aceptadas.
-// Una factura queda fuera del total de venta solo si el receptor la RECHAZÓ.
-// Si está anulada por nota de crédito, el descuento lo hace la NC (ver
-// documentoRechazado).
-function facturaPagoRechazada(f) {
-  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
-  return doc ? documentoRechazado(doc) : (f.estado_aceptacion || '') === 'N';
-}
-
-function totalNotasCreditoPeriodoPagos() {
-  const ncs = documentosGdexpress.filter(d => d.tipo_dte === '61' && !documentoRechazado(d));
-  const r = rangoDelAlcance('pagos', pagosPeriodo);
-  const enRango = r ? ncs.filter(d => { const f = fechaPeriodoDoc(d); return f >= r.desde && f < r.hasta; }) : ncs;
-  return enRango.reduce((s,d) => s + montoTotalDoc(d), 0);
-}
-
 // Total facturado, total pagado, % pagado y N° de pendientes de un conjunto
 // de facturas.
 //
@@ -5590,14 +5572,18 @@ function totalNotasCreditoPeriodoPagos() {
 // anulada no se va a pagar nunca, así que no entra en esos dos números.
 function calcularResumenPagos(lista) {
   const validas = lista.filter(f => estadoFusionadoPago(f) !== 'N');
-  const totalFacturado = lista.filter(f => !facturaPagoRechazada(f))
-                              .reduce((s,f) => s + montoConIVAPago(f), 0)
-                       - totalNotasCreditoPeriodoPagos();
+  // Mismo cálculo que el Buscador de documentos, sobre la misma fuente.
+  const totalFacturado = totalFacturadoDelPeriodo(rangoDelAlcance('pagos', pagosPeriodo)).total;
   const pagadas = validas.filter(f => f.fecha_pago);
   const totalPagado = pagadas.reduce((s,f) => s + montoConIVAPago(f), 0);
   const pendientesCount = validas.filter(esPendienteReal).length;
   const pct = totalFacturado ? (totalPagado / totalFacturado * 100) : 0;
-  return { totalFacturado, totalPagado, pct, pendientesCount };
+  // Facturas del listado que no tienen documento en GDExpress: se cobran igual,
+  // pero no entran al total facturado. Se avisa para que el número se entienda.
+  const sinRespaldo = lista.filter(f => !documentosGdexpress.some(
+    d => d.tipo_dte === '33' && String(d.folio) === String(f.factura)));
+  return { totalFacturado, totalPagado, pct, pendientesCount,
+           sinRespaldo: sinRespaldo.length };
 }
 
 function renderPagosVista(soloTabla) {
@@ -5621,7 +5607,7 @@ function renderPagosVista(soloTabla) {
 
   const r = calcularResumenPagos(delPeriodo);
   document.getElementById('pagos-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Total facturado</div><div class="stat-val" style="font-size:20px">${clp(r.totalFacturado)}</div></div>
+    <div class="stat destacado" title="Facturas del período menos notas de crédito, igual que el Buscador de documentos y que el Registro de Ventas del SII.${r.sinRespaldo ? ' ' + r.sinRespaldo + ' factura(s) del listado no están en GDExpress (folios anteriores al 17236, cargados desde el Excel de pagos) y no entran en este total.' : ''}"><div class="stat-label">Total facturado${r.sinRespaldo ? ' <span style="color:var(--amber)" title="Hay facturas del listado sin documento en GDExpress">⚠</span>' : ''}</div><div class="stat-val" style="font-size:20px">${clp(r.totalFacturado)}</div></div>
     <div class="stat"><div class="stat-label">Total pagado</div><div class="stat-val" style="font-size:16px;color:var(--green)">${clp(r.totalPagado)}</div></div>
     <div class="stat"><div class="stat-label">% pagado</div><div class="stat-val" style="font-size:16px">${r.pct.toFixed(0)}%</div></div>
     <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val" style="font-size:16px;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
@@ -6291,6 +6277,33 @@ function documentoRechazado(d) {
   return (d.estado_aceptacion || '') === 'N';
 }
 
+// ÚNICO lugar donde se calcula el "Total facturado" de un período. Lo usan el
+// Buscador de documentos y Seguimiento de pago, así que no pueden dar distinto.
+//
+// Siempre se calcula sobre documentos_gdexpress, que es lo que el SII tiene:
+// facturas del período menos notas de crédito del período, cada documento en el
+// mes en que se emitió de verdad, sin las rechazadas por el receptor.
+//
+// Seguimiento de pago trabaja sobre facturas_pago, que NO es el mismo universo:
+// tiene facturas antiguas (folios anteriores al 17236) que nunca pasaron por
+// GDExpress y que entraron a mano desde el Excel de pagos. Esas se siguen
+// listando y cobrando, pero no entran al total facturado — no tienen respaldo
+// en el SII y varias traen el monto mal leído del Excel.
+function totalFacturadoDelPeriodo(rango) {
+  const enRango = d => {
+    if (!rango) return true;
+    const f = fechaPeriodoDoc(d);
+    return f >= rango.desde && f < rango.hasta;
+  };
+  let facturas = 0, notas = 0, nFacturas = 0, nNotas = 0;
+  documentosGdexpress.forEach(d => {
+    if (documentoRechazado(d) || !enRango(d)) return;
+    if (d.tipo_dte === '33') { facturas += montoTotalDoc(d); nFacturas++; }
+    else if (d.tipo_dte === '61') { notas += montoTotalDoc(d); nNotas++; }
+  });
+  return { facturas, notas, total: facturas - notas, nFacturas, nNotas };
+}
+
 function estadoAceptacionFusionado(d) {
   if (d.tipo_dte === '33') {
     if (notaCreditoQueAnula(d.folio)) return 'N';
@@ -6335,12 +6348,9 @@ function renderDocumentosGdexpress(soloTabla) {
   const facturasDelPeriodo = delPeriodo.filter(d => d.tipo_dte === '33');
   const facturasAnuladasPorNC = facturasDelPeriodo.filter(d => estadoAceptacionFusionado(d) === 'N');
   const facturasRechazadasPeriodo = facturasDelPeriodo.filter(documentoRechazado);
-  const totalNotasCredito = delPeriodo
-    .filter(d => d.tipo_dte === '61' && !documentoRechazado(d))
-    .reduce((s,d) => s + montoTotalDoc(d), 0);
-  const totalFacturado = facturasDelPeriodo
-    .filter(d => !documentoRechazado(d))
-    .reduce((s,d) => s + montoTotalDoc(d), 0) - totalNotasCredito;
+  const resumenVenta = totalFacturadoDelPeriodo(rangoDelAlcance('doc', docPeriodo));
+  const totalNotasCredito = resumenVenta.notas;
+  const totalFacturado = resumenVenta.total;
   const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
   document.getElementById('doc-resumen').innerHTML = `
     <div class="stat destacado" title="Facturas del período menos notas de crédito del período, igual que el Registro de Ventas del SII"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
