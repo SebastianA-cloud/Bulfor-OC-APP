@@ -5508,12 +5508,34 @@ function pagosListaDelPeriodo() {
   });
 }
 
+// Notas de crédito emitidas dentro del período que se está mirando en
+// Seguimiento de pago. Viven en documentos_gdexpress (tipo 61), no en
+// facturas_pago, por eso hay que buscarlas aparte. Solo cuentan las aceptadas.
+function totalNotasCreditoPeriodoPagos() {
+  const ncs = documentosGdexpress.filter(d => d.tipo_dte === '61' && d.estado_aceptacion !== 'N');
+  if (alcanceEsTodo('pagos')) return ncs.reduce((s,d) => s + montoTotalDoc(d), 0);
+  const { anio, mes } = pagosPeriodo;
+  return ncs.filter(d => {
+    const f = d.fecha_emision || '';
+    return f.startsWith(anio) && (parseInt(f.slice(5,7),10) - 1) === mes;
+  }).reduce((s,d) => s + montoTotalDoc(d), 0);
+}
+
 // Total facturado, total pagado, % pagado y N° de pendientes de un conjunto
-// de facturas. Las anuladas ('N') no cuentan para ningún monto ni porcentaje
-// — nunca se van a pagar, así que no deben inflar ni el total ni el % pendiente.
+// de facturas.
+//
+// "Total facturado" usa el criterio del Registro de Ventas del SII: todas las
+// facturas del período menos las notas de crédito del período, contando cada
+// documento en el mes en que fue emitido. Antes se sacaba del total la factura
+// anulada completa, lo que descuadraba el mes cuando la NC se emitía en un mes
+// distinto al de su factura.
+//
+// "Total pagado" y "% pagado" siguen mirando solo lo cobrable: una factura
+// anulada no se va a pagar nunca, así que no entra en esos dos números.
 function calcularResumenPagos(lista) {
   const validas = lista.filter(f => estadoFusionadoPago(f) !== 'N');
-  const totalFacturado = validas.reduce((s,f) => s + montoConIVAPago(f), 0);
+  const totalFacturado = lista.reduce((s,f) => s + montoConIVAPago(f), 0)
+                       - totalNotasCreditoPeriodoPagos();
   const pagadas = validas.filter(f => f.fecha_pago);
   const totalPagado = pagadas.reduce((s,f) => s + montoConIVAPago(f), 0);
   const pendientesCount = validas.filter(esPendienteReal).length;
@@ -6172,24 +6194,31 @@ function renderDocumentosGdexpress(soloTabla) {
     `<button class="fpp-status-tab${docTiposActivos[t] ? ' active' : ''}" onclick="docToggleTipo('${t}')">${docTiposActivos[t] ? '✓' : '○'} ${TIPOS_DTE_INFO[t].nombre} (${cuenta[t]})</button>`
   ).join('');
 
-  // Resumen compacto del período. "Total facturado" ahora usa EXACTAMENTE el
-  // mismo criterio que Seguimiento de pago: cada factura que tiene una NC
-  // que la anula (nc_factura_ref) se excluye por completo del total — no se
-  // le resta solo el monto de la NC. Antes estos dos números no calzaban
-  // porque cada pantalla los calculaba distinto; ahora es el mismo criterio
-  // en los dos lados. Las guías se muestran aparte — no son una venta
-  // facturada todavía, son mercadería despachada que no se ha facturado.
+  // Resumen compacto del período. "Total facturado" usa el mismo criterio que
+  // el Registro de Ventas del SII: cada documento cuenta en el mes en que fue
+  // emitido. O sea, facturas del mes MENOS notas de crédito del mes.
+  //
+  // Antes se hacía distinto: se sacaba del total la factura anulada completa,
+  // en vez de restar la NC. Da el mismo resultado mientras la NC y su factura
+  // caen en el mismo mes, pero cuando la NC cruza de mes el descuento aterriza
+  // en el mes equivocado. Ejemplo real: la NC 1272 (10-08-2026, $624.750)
+  // anula la factura 21696, que es del 28-07-2026 — agosto quedaba $624.750
+  // más alto y julio $624.750 más bajo que el portal del SII.
+  //
+  // Solo se restan las NC aceptadas: una NC rechazada no descuenta nada.
+  // Las guías se muestran aparte — no son una venta facturada todavía, son
+  // mercadería despachada que no se ha facturado.
   const facturasDelPeriodo = delPeriodo.filter(d => d.tipo_dte === '33');
   const facturasAnuladasPorNC = facturasDelPeriodo.filter(d => estadoAceptacionFusionado(d) === 'N');
-  const totalFacturado = facturasDelPeriodo
-    .filter(d => estadoAceptacionFusionado(d) !== 'N')
+  const totalNotasCredito = delPeriodo
+    .filter(d => d.tipo_dte === '61' && d.estado_aceptacion !== 'N')
     .reduce((s,d) => s + montoTotalDoc(d), 0);
-  const totalNotasCredito = delPeriodo.filter(d => d.tipo_dte === '61').reduce((s,d) => s + montoTotalDoc(d), 0);
+  const totalFacturado = facturasDelPeriodo.reduce((s,d) => s + montoTotalDoc(d), 0) - totalNotasCredito;
   const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
   document.getElementById('doc-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
+    <div class="stat destacado" title="Facturas del período menos notas de crédito del período, igual que el Registro de Ventas del SII"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
     <div class="stat"><div class="stat-label">Facturas</div><div class="stat-val" style="font-size:16px">${cuenta['33']}</div></div>
-    <div class="stat" title="Facturas del período excluidas del total por tener una NC que las anula"><div class="stat-label">Anuladas por NC</div><div class="stat-val" style="font-size:16px;color:var(--red)">${facturasAnuladasPorNC.length || '—'}</div></div>
+    <div class="stat" title="Notas de crédito emitidas en el período, ya descontadas del total facturado. ${facturasAnuladasPorNC.length} factura(s) de este mismo período quedaron anuladas por una NC."><div class="stat-label">Notas de crédito (−)</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '−' + clp(totalNotasCredito) : '—'}</div></div>
     <div class="stat"><div class="stat-label">Guías de despacho (por facturar)</div><div class="stat-val" style="font-size:16px;color:var(--amber)">${clp(totalGuiasPorFacturar)}</div></div>`;
 
   const ningunTipoActivo = !docTiposActivos['33'] && !docTiposActivos['61'] && !docTiposActivos['52'];
