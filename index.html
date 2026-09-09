@@ -336,6 +336,55 @@
   .rechazadas-resumen .rz-dato strong { color: var(--text); font-weight: 600; }
   .rechazadas-resumen .rz-ok { color: var(--green); }
 
+
+  /* ─── RRHH · Vacaciones ─────────────────────────────────────────────────
+     Reutiliza .stat, .table-card, .badge-estado y .fpp-status-tabs del
+     resto de la app. Acá solo va lo que no existía: la fila de alerta y
+     la grilla del calendario. */
+  .vac-dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .vac-alerta { display: flex; align-items: center; gap: 10px; padding: 11px 18px;
+    border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; transition: background .1s; }
+  .vac-alerta:last-child { border-bottom: none; }
+  .vac-alerta:hover { background: #FAFAF8; }
+  .vac-alerta .badge-estado { padding: 0; width: 8px; height: 8px; min-width: 0; flex-shrink: 0; }
+  .vac-alerta .badge-estado::before { margin: 0; }
+
+  .vac-cal-wrap { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
+  .vac-cal-head { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--bg); border-bottom: 1px solid var(--border); }
+  .vac-cal-head > div { padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: .5px; text-align: center; }
+  .vac-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); }
+  .vac-cal-dia { background: var(--surface); min-height: 96px; padding: 6px 7px; }
+  .vac-cal-dia.fuera   { background: var(--bg); opacity: .5; }
+  .vac-cal-dia.finde   { background: #FBFAF8; }
+  .vac-cal-dia.feriado { background: var(--amber-light); }
+  .vac-cal-dia.hoy     { box-shadow: inset 0 0 0 2px var(--accent); }
+  .vac-cal-num { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+  .vac-cal-dia.hoy .vac-cal-num { color: var(--accent); }
+  .vac-cal-feriado { font-size: 9.5px; color: var(--amber); margin-top: 2px; line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vac-cal-chip { display: block; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; margin-top: 3px;
+    background: var(--green-light); color: var(--green); cursor: pointer; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vac-cal-chip:hover { filter: brightness(.95); }
+  .vac-cal-chip.pend { background: var(--amber-light); color: var(--amber); }
+  .vac-leyenda { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .vac-leyenda.ok   { background: var(--green-light); border: 1px solid var(--green); }
+  .vac-leyenda.pend { background: var(--amber-light); border: 1px solid var(--amber); }
+  .vac-leyenda.fer  { background: var(--amber-light); }
+
+  @media (max-width: 900px) {
+    .vac-dos-columnas { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    /* El calendario no se comprime: se desplaza. Siete columnas de 40px en
+       un celular son ilegibles. */
+    .vac-cal-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .vac-cal-head, .vac-cal-grid { min-width: 620px; }
+    .vac-cal-dia { min-height: 78px; }
+    .fpp-resumen { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+
   .fpp-bulk-bar { align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius); padding: 9px 16px; margin-bottom: 10px; font-size: 13px; }
   .fpp-bulk-bar #fpp-bulk-count { font-weight: 600; color: var(--accent); }
   .fpp-bulk-sep { width: 1px; height: 18px; background: var(--accent); opacity: .3; }
@@ -733,6 +782,11 @@
     <div class="nav-group" data-modulo="rrhh">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh', true)" title="Recursos Humanos">
         <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span style="flex:1">Recursos Humanos</span>
+        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
+      </div>
+      <div class="nav-subgroup" id="subgroup-rrhh">
+        <div class="nav-item nav-subitem" data-page="rrhh-personal" onclick="seleccionarSubpagina('rrhh','rrhh-personal',this)"><span>Personal</span></div>
+        <div class="nav-item nav-subitem" data-page="rrhh-vacaciones" onclick="seleccionarSubpagina('rrhh','rrhh-vacaciones',this)"><span>Vacaciones Personal</span></div>
       </div>
     </div>
   </div>
@@ -1285,12 +1339,36 @@
     </div>
   </div>
 
-  <div class="page" id="page-rrhh">
-    <div class="modulo-placeholder">
-      <div class="icono">👥</div>
-      <h2>Recursos Humanos</h2>
-      <p>Este módulo está en construcción. Próximamente vas a tener varias opciones de RRHH disponibles aquí.</p>
+  <div class="page" id="page-rrhh-personal">
+    <div class="page-header">
+      <div class="page-title">Personal</div>
+      <div class="page-sub">La ficha de cada trabajador — es de acá que cuelgan sus vacaciones</div>
     </div>
+    <div id="personal-resumen" class="fpp-resumen"></div>
+    <div class="toolbar" style="flex-wrap:wrap">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="personal-search" placeholder="Buscar por nombre, RUT o cargo…" oninput="filtrarPersonal(this.value)">
+      </div>
+      <div class="fpp-status-tabs" id="personal-estado-tabs"></div>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="abrirFormPersonal()"><i class="ti ti-user-plus" aria-hidden="true"></i> Nuevo trabajador</button>
+    </div>
+    <div id="personal-contenido"></div>
+  </div>
+
+  <div class="page" id="page-rrhh-vacaciones">
+    <div class="page-header">
+      <div class="page-title">Vacaciones Personal</div>
+      <div class="page-sub">Saldos por período, historial y programación. El saldo se calcula solo: días asignados menos días usados, nunca se escribe a mano</div>
+    </div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-status-tabs" id="vac-tabs"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="exportarVacaciones()"><i class="ti ti-file-export" aria-hidden="true"></i> Exportar</button>
+        <button class="page-btn" style="padding:8px 14px;white-space:nowrap;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="abrirFormVacaciones()"><i class="ti ti-plus" aria-hidden="true"></i> Registrar vacaciones</button>
+      </div>
+    </div>
+    <div id="vac-contenido"></div>
   </div>
 
   <div class="page" id="page-pagos">
@@ -1912,6 +1990,9 @@ async function init() {
       fetchAll('facturas_por_pagar', 'select=*&order=fecha_vencimiento.asc'),
       fetchAll('proveedores_cuentas', 'select=*&order=nombre_proveedor.asc'),
     ]);
+    // RRHH va aparte y sin bloquear: si estas tablas fallaran, el resto de
+    // la app tiene que seguir funcionando igual.
+    const rrhhListo = cargarRRHH().catch(() => {});
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
     fedex = Array.isArray(fedexR) ? fedexR : [];
@@ -1949,6 +2030,7 @@ async function init() {
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
     populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
+    await rrhhListo; rrhhInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
     document.getElementById('syncText').textContent = 'Sin conexión';
@@ -2141,6 +2223,12 @@ const MODAL_OVERLAY_IDS = [
   'fpp-detalle-overlay',
   'proveedores-gestion-overlay',
   'rechazada-detalle-overlay',
+  'personal-form-overlay',
+  'vac-perfil-overlay',
+  'vac-periodo-overlay',
+  'vac-form-overlay',
+  'vac-detalle-overlay',
+  'vac-bitacora-overlay',
 ];
 
 function cerrarTodosLosModales() {
@@ -6631,6 +6719,1543 @@ function facturasRechazadas() {
   return Array.from(map.values());
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RECURSOS HUMANOS — PERSONAL Y VACACIONES
+//
+// Regla que ordena todo el módulo: EL SALDO NO SE GUARDA EN NINGUNA PARTE.
+// Se reconstruye siempre desde los días asignados de cada período menos los
+// días que las solicitudes repartieron sobre ese período. Por eso cancelar
+// unas vacaciones devuelve los días solos, sin tener que sumárselos de
+// vuelta a nadie: los días vuelven porque la solicitud dejó de contar.
+//
+// Y hay UNA sola función que calcula ese saldo — saldoDeTrabajador(). Las
+// tarjetas, el listado, el perfil, el calendario, la validación al aprobar
+// y las exportaciones la llaman a ella. Ninguna suma sus propios días por
+// su cuenta.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let personal          = [];   // trabajadores
+let vacPeriodos       = [];   // días asignados por trabajador y período
+let vacSolicitudes    = [];   // vacaciones registradas
+let vacDistribucion   = [];   // de qué período sale cada tramo de días
+let feriados          = {};   // 'YYYY-MM-DD' -> nombre del feriado
+
+let vacTab       = 'resumen';
+let vacCalendario = null;     // {anio, mes} del calendario, se fija al iniciar
+let personalQ    = '';
+let personalEstadoFiltro = 'activo';
+let vacFiltros   = { q: '', trabajador: '', estado: '', periodo: '', anio: '' };
+let vacMostrarInactivos = false;   // pestaña Personal; separado del filtro de estado del Historial
+
+const ESTADOS_VAC = {
+  pendiente:     { label: 'Pendiente',     clase: 'warn'    },
+  aprobado:      { label: 'Aprobado',      clase: 'ok'      },
+  rechazado:     { label: 'Rechazado',     clase: 'err'     },
+  cancelado:     { label: 'Cancelado',     clase: 'neutral' },
+  // Estos dos NO se guardan: son el mismo "aprobado" leído contra la fecha
+  // de hoy. Guardarlos obligaría a un proceso que los fuera cambiando solo.
+  en_vacaciones: { label: 'En vacaciones', clase: 'ok'      },
+  finalizado:    { label: 'Finalizado',    clase: 'neutral' },
+};
+
+// ─── Fechas ────────────────────────────────────────────────────────────────
+// Deliberadamente NO se usa hoyISO(), que resuelve por UTC: pasadas las
+// 21:00 en Chile devuelve la fecha de mañana, y acá eso significaría marcar
+// a alguien "de vacaciones" un día antes.
+function vacHoy() { return vacISO(new Date()); }
+function vacISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function vacFecha(iso) { return iso ? new Date(iso + 'T12:00:00') : null; }  // mediodía: inmune al cambio de hora
+function vacSumarDias(iso, n) { const d = vacFecha(iso); d.setDate(d.getDate() + n); return vacISO(d); }
+function vacDiasCorridos(desde, hasta) {
+  if (!desde || !hasta) return 0;
+  return Math.round((vacFecha(hasta) - vacFecha(desde)) / 86400000) + 1;
+}
+
+// ─── Días hábiles ──────────────────────────────────────────────────────────
+// Sábados, domingos y feriados no se descuentan. Los feriados salen de la
+// tabla `feriados`, no de una lista escrita acá: agregar un año nuevo es
+// insertar filas en la base, no volver a tocar este archivo.
+function esFeriado(iso)  { return Object.prototype.hasOwnProperty.call(feriados, iso); }
+function esFinDeSemana(iso) { const dow = vacFecha(iso).getDay(); return dow === 0 || dow === 6; }
+function esDiaHabil(iso) { return !esFinDeSemana(iso) && !esFeriado(iso); }
+
+function diasHabilesEntre(desde, hasta) {
+  if (!desde || !hasta || hasta < desde) return 0;
+  let n = 0, cur = desde, tope = 0;
+  while (cur <= hasta && tope++ < 4000) { if (esDiaHabil(cur)) n++; cur = vacSumarDias(cur, 1); }
+  return n;
+}
+
+// Qué días del tramo NO se descuentan, para poder explicarlo en pantalla en
+// vez de que el número aparezca por arte de magia.
+function detalleNoHabiles(desde, hasta) {
+  const findes = [], fer = [];
+  let cur = desde, tope = 0;
+  while (cur <= hasta && tope++ < 4000) {
+    if (esFeriado(cur)) fer.push({ fecha: cur, nombre: feriados[cur] });
+    else if (esFinDeSemana(cur)) findes.push(cur);
+    cur = vacSumarDias(cur, 1);
+  }
+  return { findes, feriados: fer };
+}
+
+// ─── Períodos ──────────────────────────────────────────────────────────────
+// Un período de vacaciones va de aniversario a aniversario del contrato,
+// pero en la práctica se nombra por los dos años que cruza: 2024 -> "24/25".
+function periodoDeAnio(anio) {
+  const a = Number(anio);
+  return String(a % 100).padStart(2,'0') + '/' + String((a+1) % 100).padStart(2,'0');
+}
+// El período "en curso" hoy. Se corta en marzo por defecto — es una
+// convención, y por eso cada período se puede crear y editar a mano.
+function anioPeriodoActual() {
+  const h = new Date();
+  return h.getMonth() >= 2 ? h.getFullYear() : h.getFullYear() - 1;
+}
+
+// ─── El cálculo del saldo ──────────────────────────────────────────────────
+// vacVersion se incrementa en cada escritura. El índice de días repartidos
+// se rearma solo cuando cambió algo, así el listado completo del personal no
+// recorre la distribución una vez por trabajador.
+let vacVersion = 0;
+let vacIdxVersion = -1, vacIdxDias = new Map();
+
+function indiceDiasRepartidos() {
+  if (vacIdxVersion === vacVersion) return vacIdxDias;
+  const estadoDe = new Map(vacSolicitudes.map(s => [s.id, s.estado]));
+  vacIdxDias = new Map();
+  vacDistribucion.forEach(d => {
+    const e = estadoDe.get(d.solicitud_id);
+    if (e !== 'aprobado' && e !== 'pendiente') return;   // rechazadas y canceladas no consumen
+    const acc = vacIdxDias.get(d.periodo_id) || { aprobados: 0, pendientes: 0 };
+    if (e === 'aprobado') acc.aprobados += Number(d.dias); else acc.pendientes += Number(d.dias);
+    vacIdxDias.set(d.periodo_id, acc);
+  });
+  vacIdxVersion = vacVersion;
+  return vacIdxDias;
+}
+
+const redondear = n => Math.round(n * 100) / 100;
+
+// ÚNICO lugar donde se calcula un saldo de vacaciones.
+//
+//   disponibles = días asignados − aprobados − pendientes
+//
+// `excluirSolicitud` sirve al editar: sin eso, una solicitud de 10 días
+// competiría contra sus propios 10 días y siempre parecería no caber.
+function saldoDeTrabajador(personalId, excluirSolicitud) {
+  const idx = indiceDiasRepartidos();
+
+  // Días que hay que devolver al saldo porque son de la solicitud que se
+  // está editando en este momento.
+  const propios = new Map();
+  if (excluirSolicitud) {
+    const s = vacSolicitudes.find(x => x.id === excluirSolicitud);
+    if (s && (s.estado === 'aprobado' || s.estado === 'pendiente')) {
+      vacDistribucion.filter(d => d.solicitud_id === excluirSolicitud).forEach(d => {
+        const a = propios.get(d.periodo_id) || { aprobados: 0, pendientes: 0 };
+        if (s.estado === 'aprobado') a.aprobados += Number(d.dias); else a.pendientes += Number(d.dias);
+        propios.set(d.periodo_id, a);
+      });
+    }
+  }
+
+  const detalle = vacPeriodos
+    .filter(p => p.personal_id === personalId)
+    .sort((a,b) => a.anio_inicio - b.anio_inicio)
+    .map(p => {
+      const usado  = idx.get(p.id)     || { aprobados: 0, pendientes: 0 };
+      const propio = propios.get(p.id) || { aprobados: 0, pendientes: 0 };
+      const utilizados = redondear(usado.aprobados  - propio.aprobados);
+      const pendientes = redondear(usado.pendientes - propio.pendientes);
+      const totales    = Number(p.dias_totales);
+      return {
+        id: p.id, periodo: p.periodo, anio_inicio: p.anio_inicio, observacion: p.observacion,
+        base: Number(p.dias_base), progresivos: Number(p.dias_progresivos), ajuste: Number(p.dias_ajuste),
+        totales, utilizados, pendientes,
+        disponibles: redondear(totales - utilizados - pendientes),
+      };
+    });
+
+  const suma = k => redondear(detalle.reduce((s,p) => s + p[k], 0));
+  return {
+    periodos: detalle,
+    totales:     suma('totales'),
+    utilizados:  suma('utilizados'),
+    pendientes:  suma('pendientes'),
+    disponibles: suma('disponibles'),
+    progresivos: suma('progresivos'),
+  };
+}
+
+// ─── Estados derivados ─────────────────────────────────────────────────────
+function estadoVisualSolicitud(s) {
+  if (s.estado !== 'aprobado') return s.estado;
+  const hoy = vacHoy();
+  if (s.fecha_inicio <= hoy && hoy <= s.fecha_fin) return 'en_vacaciones';
+  if (s.fecha_fin < hoy) return 'finalizado';
+  return 'aprobado';
+}
+function badgeVac(clave) {
+  const e = ESTADOS_VAC[clave] || { label: clave, clase: 'neutral' };
+  return `<span class="badge-estado ${e.clase}">${e.label}</span>`;
+}
+
+function solicitudesDe(personalId) {
+  return vacSolicitudes.filter(s => s.personal_id === personalId)
+    .sort((a,b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''));
+}
+function vacacionesVigentes(personalId) {
+  const hoy = vacHoy();
+  return vacSolicitudes.find(s => s.personal_id === personalId && s.estado === 'aprobado'
+    && s.fecha_inicio <= hoy && hoy <= s.fecha_fin) || null;
+}
+function proximasVacacionesDe(personalId) {
+  const hoy = vacHoy();
+  return vacSolicitudes.filter(s => s.personal_id === personalId
+      && (s.estado === 'aprobado' || s.estado === 'pendiente') && s.fecha_inicio > hoy)
+    .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0] || null;
+}
+function estadoTrabajador(personalId) {
+  if (vacacionesVigentes(personalId))  return { label: 'En vacaciones', clase: 'ok' };
+  if (proximasVacacionesDe(personalId)) return { label: 'Programadas',   clase: 'warn' };
+  return { label: 'Disponible', clase: 'neutral' };
+}
+
+// Tramo de fechas en una línea: "3 al 18 de febrero" o "29 de octubre".
+function rangoLegible(desde, hasta) {
+  const M = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const a = vacFecha(desde), b = vacFecha(hasta);
+  if (desde === hasta) return `${a.getDate()} de ${M[a.getMonth()]}`;
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear())
+    return `${a.getDate()} al ${b.getDate()} de ${M[a.getMonth()]}`;
+  return `${a.getDate()} de ${M[a.getMonth()]} al ${b.getDate()} de ${M[b.getMonth()]}`;
+}
+function diasHasta(iso) { return Math.round((vacFecha(iso) - vacFecha(vacHoy())) / 86400000); }
+const nombreDe = id => (personal.find(p => p.id === id) || {}).nombre || '—';
+
+// ─── Sugerencia de distribución ────────────────────────────────────────────
+// Gasta primero los períodos más antiguos: son los que se pueden perder.
+// Devuelve además cuánto quedó sin cubrir, que es justo lo que hay que
+// mostrarle a quien aprueba antes de que apruebe.
+function sugerirDistribucion(personalId, dias, excluirSolicitud) {
+  const saldo = saldoDeTrabajador(personalId, excluirSolicitud);
+  const tramos = [];
+  let resto = dias;
+  saldo.periodos.forEach(p => {
+    if (resto <= 0 || p.disponibles <= 0) return;
+    const usa = Math.min(resto, p.disponibles);
+    tramos.push({ periodo_id: p.id, periodo: p.periodo, dias: redondear(usa) });
+    resto = redondear(resto - usa);
+  });
+  return { tramos, faltante: redondear(Math.max(0, resto)), saldo };
+}
+
+// Quién más estará de vacaciones en esas fechas. No bloquea: avisa, para
+// que la decisión operativa la tome una persona.
+function solapamientos(personalId, desde, hasta, excluirSolicitud) {
+  return vacSolicitudes.filter(s =>
+      s.id !== excluirSolicitud &&
+      (s.estado === 'aprobado' || s.estado === 'pendiente') &&
+      s.fecha_inicio <= hasta && s.fecha_fin >= desde)
+    .map(s => ({ ...s, mismo: s.personal_id === personalId }))
+    .sort((a,b) => (b.mismo - a.mismo) || a.fecha_inicio.localeCompare(b.fecha_inicio));
+}
+
+// ─── Carga ─────────────────────────────────────────────────────────────────
+async function cargarRRHH() {
+  const [perR, perioR, solR, distR, ferR] = await Promise.all([
+    fetchAll('personal', 'select=*&order=nombre.asc'),
+    fetchAll('vacaciones_periodos', 'select=*&order=anio_inicio.asc'),
+    fetchAll('vacaciones_solicitudes', 'select=*&order=fecha_inicio.desc'),
+    fetchAll('vacaciones_distribucion', 'select=*'),
+    fetchAll('feriados', 'select=*&order=fecha.asc'),
+  ]);
+  personal        = Array.isArray(perR)   ? perR   : [];
+  vacPeriodos     = Array.isArray(perioR) ? perioR : [];
+  vacSolicitudes  = Array.isArray(solR)   ? solR   : [];
+  vacDistribucion = Array.isArray(distR)  ? distR  : [];
+  feriados = {};
+  (Array.isArray(ferR) ? ferR : []).forEach(f => { feriados[f.fecha] = f.nombre; });
+  vacVersion++;
+}
+
+// Vuelve a leer de la base lo que cambió y repinta. Se llama después de
+// cada escritura: es más barato que mantener sincronizados a mano cuatro
+// arreglos, y elimina la clase de bug donde la pantalla y la base difieren.
+async function recargarVacaciones() {
+  const [perioR, solR, distR] = await Promise.all([
+    fetchAll('vacaciones_periodos', 'select=*&order=anio_inicio.asc'),
+    fetchAll('vacaciones_solicitudes', 'select=*&order=fecha_inicio.desc'),
+    fetchAll('vacaciones_distribucion', 'select=*'),
+  ]);
+  if (Array.isArray(perioR)) vacPeriodos = perioR;
+  if (Array.isArray(solR))   vacSolicitudes = solR;
+  if (Array.isArray(distR))  vacDistribucion = distR;
+  vacVersion++;
+}
+
+function rrhhInit() {
+  const h = new Date();
+  vacCalendario = { anio: h.getFullYear(), mes: h.getMonth() };
+  renderPersonal();
+  renderVacaciones();
+}
+
+// Llama a la función RPC y devuelve el mensaje de error tal cual lo mandó
+// la base, que está escrito para que lo lea una persona.
+async function rpcVac(nombre, cuerpo) {
+  const res = await sb('rpc/' + nombre, { method: 'POST', body: JSON.stringify(cuerpo) });
+  if (res.ok) { const t = await res.text(); return t ? JSON.parse(t) : null; }
+  let msg = 'No se pudo guardar.';
+  try { const j = await res.json(); msg = j.message || j.hint || msg; } catch(e) {}
+  throw new Error(msg);
+}
+const usuarioActualVac = () => (sesionActual && sesionActual.email) || 'desconocido';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PÁGINA: PERSONAL
+// ═══════════════════════════════════════════════════════════════════════════
+function filtrarPersonal(q) { personalQ = (q || '').toLowerCase(); renderPersonal(); }
+function filtrarPersonalEstado(e) { personalEstadoFiltro = e; renderPersonal(); }
+
+function personalFiltrado() {
+  return personal.filter(p => {
+    if (personalEstadoFiltro && p.estado !== personalEstadoFiltro) return false;
+    if (!personalQ) return true;
+    return [p.nombre, p.rut, p.cargo].some(v => (v || '').toLowerCase().includes(personalQ));
+  });
+}
+
+function renderPersonal() {
+  const tabs = document.getElementById('personal-estado-tabs');
+  if (!tabs) return;
+  const cuenta = { activo: 0, inactivo: 0 };
+  personal.forEach(p => { cuenta[p.estado] = (cuenta[p.estado] || 0) + 1; });
+  tabs.innerHTML = [
+    { id: 'activo',   label: 'Activos',   n: cuenta.activo   || 0 },
+    { id: 'inactivo', label: 'Inactivos', n: cuenta.inactivo || 0 },
+    { id: '',         label: 'Todos',     n: personal.length },
+  ].map(t => `<button class="fpp-status-tab${personalEstadoFiltro === t.id ? ' active' : ''}" onclick="filtrarPersonalEstado('${t.id}')">${t.label} (${t.n})</button>`).join('');
+
+  const lista = personalFiltrado();
+  const cont = document.getElementById('personal-contenido');
+  if (!personal.length) {
+    cont.innerHTML = mensajeVacioRRHH('Todavía no hay trabajadores cargados',
+      'Agrega el primero con “Nuevo trabajador”, o importa tu Excel de control de vacaciones.');
+    return;
+  }
+  if (!lista.length) { cont.innerHTML = mensajeVacioRRHH('Sin resultados', 'Ningún trabajador coincide con la búsqueda.'); return; }
+
+  cont.innerHTML = `<div class="table-card"><table>
+    <thead><tr>
+      <th>Trabajador</th><th>RUT</th><th>Cargo</th><th>Ingreso</th>
+      <th style="text-align:center">Antigüedad</th><th>Estado</th><th></th>
+    </tr></thead>
+    <tbody>${lista.map(p => `
+      <tr onclick="navReset();abrirPerfilVacaciones(${p.id})">
+        <td style="font-weight:500">${escapeHtml(p.nombre)}</td>
+        <td style="font-size:12px;color:var(--text-2)">${escapeHtml(p.rut || '—')}</td>
+        <td style="font-size:12px;color:var(--text-2)">${escapeHtml(p.cargo || '—')}</td>
+        <td style="font-size:12px;white-space:nowrap">${p.fecha_ingreso ? fDate(p.fecha_ingreso) : '—'}</td>
+        <td style="text-align:center;font-size:12px;color:var(--text-2)">${antiguedadTexto(p.fecha_ingreso)}</td>
+        <td><span class="badge-estado ${p.estado === 'activo' ? 'ok' : 'neutral'}">${p.estado === 'activo' ? 'Activo' : 'Inactivo'}</span></td>
+        <td style="text-align:right"><button class="page-btn" onclick="event.stopPropagation();abrirFormPersonal(${p.id})">Editar</button></td>
+      </tr>`).join('')}</tbody></table></div>`;
+
+  const resumen = document.getElementById('personal-resumen');
+  const activos = personal.filter(p => p.estado === 'activo');
+  const sinPeriodos = activos.filter(p => !vacPeriodos.some(v => v.personal_id === p.id));
+  resumen.innerHTML = `
+    <div class="stat"><div class="stat-label">Trabajadores activos</div><div class="stat-val">${activos.length}</div></div>
+    <div class="stat"><div class="stat-label">Inactivos</div><div class="stat-val">${personal.length - activos.length}</div></div>
+    <div class="stat"><div class="stat-label">Antigüedad promedio</div><div class="stat-val" style="font-size:18px">${antiguedadPromedio(activos)}</div></div>
+    <div class="stat${sinPeriodos.length ? ' destacado' : ''}"><div class="stat-label">Sin vacaciones configuradas</div><div class="stat-val">${sinPeriodos.length}</div><div class="stat-sub">${sinPeriodos.length ? 'No tienen ningún período con días asignados' : 'Todos tienen sus días asignados'}</div></div>`;
+}
+
+function mensajeVacioRRHH(titulo, sub) {
+  return `<div class="table-card" style="padding:40px 24px;text-align:center">
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">${escapeHtml(titulo)}</div>
+    <div style="font-size:13px;color:var(--text-2)">${escapeHtml(sub)}</div></div>`;
+}
+
+function antiguedadEnAnios(ingreso) {
+  if (!ingreso) return null;
+  return (vacFecha(vacHoy()) - vacFecha(ingreso)) / (365.25 * 86400000);
+}
+function antiguedadTexto(ingreso) {
+  const a = antiguedadEnAnios(ingreso);
+  if (a === null || a < 0) return '—';
+  if (a < 1) return `${Math.max(0, Math.round(a * 12))} meses`;
+  return `${Math.floor(a)} año${Math.floor(a) === 1 ? '' : 's'}`;
+}
+function antiguedadPromedio(lista) {
+  const vals = lista.map(p => antiguedadEnAnios(p.fecha_ingreso)).filter(v => v !== null && v >= 0);
+  if (!vals.length) return '—';
+  const prom = vals.reduce((s,v) => s + v, 0) / vals.length;
+  return prom < 1 ? `${Math.round(prom * 12)} meses` : `${prom.toFixed(1)} años`;
+}
+
+// ─── Alta y edición de un trabajador ───────────────────────────────────────
+function abrirFormPersonal(id) {
+  cerrarTodosLosModales();
+  const p = id ? personal.find(x => x.id === id) : null;
+  const v = (campo) => escapeHtml((p && p[campo]) || '');
+  const modal = document.createElement('div');
+  modal.id = 'personal-form-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) cerrarTodosLosModales(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="font-size:16px;font-weight:600">${p ? 'Editar trabajador' : 'Nuevo trabajador'}</div>
+        <button onclick="cerrarTodosLosModales()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        ${campoRRHH('pf-nombre', 'Nombre completo', `<input type="text" id="pf-nombre" value="${v('nombre')}" placeholder="Nombre y apellidos" style="padding-left:12px">`)}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          ${campoRRHH('pf-rut', 'RUT', `<input type="text" id="pf-rut" value="${v('rut')}" placeholder="12.345.678-9" style="padding-left:12px">`)}
+          ${campoRRHH('pf-ingreso', 'Fecha de ingreso', `<input type="date" id="pf-ingreso" value="${(p && p.fecha_ingreso) || ''}">`)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          ${campoRRHH('pf-cargo', 'Cargo', `<input type="text" id="pf-cargo" value="${v('cargo')}" placeholder="Ej. Auxiliar de farmacia" style="padding-left:12px">`)}
+          ${campoRRHH('pf-estado', 'Estado', `<select id="pf-estado" style="width:100%">
+            <option value="activo"${(!p || p.estado === 'activo') ? ' selected' : ''}>Activo</option>
+            <option value="inactivo"${(p && p.estado === 'inactivo') ? ' selected' : ''}>Inactivo</option></select>`)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          ${campoRRHH('pf-email', 'Correo', `<input type="text" id="pf-email" value="${v('email')}" style="padding-left:12px">`)}
+          ${campoRRHH('pf-telefono', 'Teléfono', `<input type="text" id="pf-telefono" value="${v('telefono')}" style="padding-left:12px">`)}
+        </div>
+        <div id="pf-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px"></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <div>${p ? `<button class="page-btn" style="padding:8px 14px;color:var(--red)" onclick="eliminarTrabajador(${p.id}, this)">Eliminar</button>` : ''}</div>
+          <div style="display:flex;gap:8px">
+            <button class="page-btn" style="padding:8px 14px" onclick="cerrarTodosLosModales()">Cancelar</button>
+            <button class="page-btn" style="padding:8px 16px;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="guardarTrabajador(${p ? p.id : 'null'}, this)">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => { const el = document.getElementById('pf-nombre'); if (el) el.focus(); }, 40);
+}
+
+function campoRRHH(id, label, control) {
+  return `<div style="margin-bottom:14px">
+    <label for="${id}" style="display:block;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">${label}</label>
+    ${control}</div>`;
+}
+
+async function guardarTrabajador(id, btn) {
+  const err = document.getElementById('pf-error');
+  const nombre = document.getElementById('pf-nombre').value.trim();
+  if (!nombre) { err.textContent = 'El nombre es obligatorio.'; err.style.display = 'block'; return; }
+  const payload = {
+    nombre,
+    rut:           document.getElementById('pf-rut').value.trim()      || null,
+    cargo:         document.getElementById('pf-cargo').value.trim()    || null,
+    fecha_ingreso: document.getElementById('pf-ingreso').value         || null,
+    estado:        document.getElementById('pf-estado').value,
+    email:         document.getElementById('pf-email').value.trim()    || null,
+    telefono:      document.getElementById('pf-telefono').value.trim() || null,
+  };
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = id
+      ? await sb(`personal?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+      : await sb('personal', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error((await res.text()) || 'Error al guardar');
+    if (id) {
+      Object.assign(personal.find(p => p.id === id), payload);
+    } else {
+      const [fila] = await res.json();
+      personal.push(fila);
+      personal.sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    }
+    vacVersion++;
+    cerrarTodosLosModales();
+    renderPersonal(); renderVacaciones();
+    toast(id ? 'Trabajador actualizado' : 'Trabajador agregado');
+  } catch(e) {
+    err.textContent = /duplicate|unique/i.test(e.message) ? 'Ya hay un trabajador con ese RUT.' : e.message;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+async function eliminarTrabajador(id, btn) {
+  const p = personal.find(x => x.id === id);
+  const sols = solicitudesDe(id).length;
+  let msg = `¿Eliminar a ${p.nombre}?`;
+  msg += sols
+    ? `\n\nTiene ${sols} registro${sols === 1 ? '' : 's'} de vacaciones y sus períodos asignados. Todo eso se borra con él y no se puede deshacer.\n\nSi la persona ya no trabaja acá pero quieres conservar su historial, márcala como Inactivo en vez de eliminarla.`
+    : '\n\nEsta acción no se puede deshacer.';
+  if (!(await confirmModal(msg))) return;
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Eliminando…';
+  try {
+    const res = await sb(`personal?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    personal = personal.filter(x => x.id !== id);
+    vacPeriodos = vacPeriodos.filter(x => x.personal_id !== id);
+    const idsSol = new Set(vacSolicitudes.filter(s => s.personal_id === id).map(s => s.id));
+    vacSolicitudes = vacSolicitudes.filter(s => s.personal_id !== id);
+    vacDistribucion = vacDistribucion.filter(d => !idsSol.has(d.solicitud_id));
+    vacVersion++;
+    cerrarTodosLosModales();
+    renderPersonal(); renderVacaciones();
+    toast('Trabajador eliminado');
+  } catch(e) {
+    toast('No se pudo eliminar: ' + e.message, 'err');
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PÁGINA: VACACIONES PERSONAL
+// ═══════════════════════════════════════════════════════════════════════════
+function cambiarTabVac(tab) { vacTab = tab; renderVacaciones(); }
+
+function renderVacaciones() {
+  const tabs = document.getElementById('vac-tabs');
+  if (!tabs) return;
+  tabs.innerHTML = [
+    ['resumen', 'Resumen'], ['personal', 'Personal'], ['calendario', 'Calendario'], ['historial', 'Historial'],
+  ].map(([id, label]) => `<button class="fpp-status-tab${vacTab === id ? ' active' : ''}" onclick="cambiarTabVac('${id}')">${label}</button>`).join('');
+
+  const cont = document.getElementById('vac-contenido');
+  if (!personal.length) {
+    cont.innerHTML = mensajeVacioRRHH('Todavía no hay trabajadores',
+      'Las vacaciones cuelgan de la ficha de cada trabajador. Crea el primero en Recursos Humanos → Personal.');
+    return;
+  }
+  if (vacTab === 'resumen')    return renderVacResumen(cont);
+  if (vacTab === 'personal')   return renderVacPersonal(cont);
+  if (vacTab === 'calendario') return renderVacCalendario(cont);
+  if (vacTab === 'historial')  return renderVacHistorial(cont);
+}
+
+// ─── Pestaña Resumen ───────────────────────────────────────────────────────
+function renderVacResumen(cont) {
+  const hoy = vacHoy();
+  const activos = personal.filter(p => p.estado === 'activo');
+  const deVacacionesHoy = activos.filter(p => vacacionesVigentes(p.id));
+  const proximas = vacSolicitudes
+    .filter(s => (s.estado === 'aprobado' || s.estado === 'pendiente') && s.fecha_inicio > hoy)
+    .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+  const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
+  const diasDisponibles = redondear(activos.reduce((s,p) => s + saldoDeTrabajador(p.id).disponibles, 0));
+
+  const tarjetas = `
+    <div class="fpp-resumen" style="grid-template-columns:repeat(5,1fr)">
+      <div class="stat"><div class="stat-label">Personal</div><div class="stat-val">${activos.length}</div><div class="stat-sub">trabajadores activos</div></div>
+      <div class="stat${deVacacionesHoy.length ? ' destacado' : ''}"><div class="stat-label">De vacaciones hoy</div><div class="stat-val">${deVacacionesHoy.length}</div><div class="stat-sub">${deVacacionesHoy.length ? escapeHtml(deVacacionesHoy.map(p => p.nombre.split(' ')[0]).join(', ')) : 'nadie'}</div></div>
+      <div class="stat"><div class="stat-label">Próximas vacaciones</div><div class="stat-val">${proximas.length}</div><div class="stat-sub">${proximas.length ? 'la más cercana, ' + rangoLegible(proximas[0].fecha_inicio, proximas[0].fecha_fin) : 'nada programado'}</div></div>
+      <div class="stat"><div class="stat-label">Solicitudes pendientes</div><div class="stat-val" style="color:${pendientes.length ? 'var(--amber)' : 'var(--text)'}">${pendientes.length}</div><div class="stat-sub">${pendientes.length ? 'esperan aprobación' : 'nada por aprobar'}</div></div>
+      <div class="stat"><div class="stat-label">Días disponibles</div><div class="stat-val">${diasDisponibles}</div><div class="stat-sub">suma de todo el personal activo</div></div>
+    </div>`;
+
+  const alertas = alertasVacaciones();
+  const htmlAlertas = `
+    <div class="table-card" style="padding:0">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">Alertas</div>
+      ${alertas.length ? alertas.map(a => `
+        <div class="vac-alerta" ${a.onclick ? `onclick="${a.onclick}"` : ''}>
+          <span class="badge-estado ${a.tipo}"></span>
+          <span style="flex:1">${a.texto}</span>
+          ${a.onclick ? '<i class="ti ti-chevron-right" style="color:var(--text-3)" aria-hidden="true"></i>' : ''}
+        </div>`).join('')
+      : '<div style="padding:18px;font-size:13px;color:var(--text-3)">Nada que revisar por ahora.</div>'}
+    </div>`;
+
+  const htmlProximas = `
+    <div class="table-card" style="padding:0">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">Próximas vacaciones</div>
+      ${proximas.length ? proximas.slice(0, 10).map(s => `
+        <div class="vac-alerta" onclick="navReset();abrirDetalleSolicitud(${s.id})">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${escapeHtml(nombreDe(s.personal_id))}</div>
+            <div style="font-size:11.5px;color:var(--text-2);margin-top:2px">${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} día${Number(s.dias_habiles) === 1 ? '' : 's'}</div>
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            ${badgeVac(s.estado)}
+            <div style="font-size:11px;color:var(--text-3);margin-top:3px">en ${diasHasta(s.fecha_inicio)} días</div>
+          </div>
+        </div>`).join('')
+      : '<div style="padding:18px;font-size:13px;color:var(--text-3)">No hay vacaciones programadas.</div>'}
+    </div>`;
+
+  cont.innerHTML = tarjetas + `<div class="vac-dos-columnas">${htmlAlertas}${htmlProximas}</div>`;
+}
+
+// Solo lo que sirve para gestionar. Nada de avisar por avisar.
+function alertasVacaciones() {
+  const out = [];
+  const activos = personal.filter(p => p.estado === 'activo');
+  const anioActual = anioPeriodoActual();
+
+  const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
+  if (pendientes.length) out.push({ tipo: 'warn',
+    texto: `Hay <strong>${pendientes.length}</strong> solicitud${pendientes.length === 1 ? '' : 'es'} pendiente${pendientes.length === 1 ? '' : 's'} de aprobación.`,
+    onclick: `cambiarTabVac('historial');setTimeout(()=>{const s=document.getElementById('vac-f-estado');if(s){s.value='pendiente';filtrarHistorialVac()}},50)` });
+
+  // Períodos viejos con saldo: son los que se pueden perder. El umbral es
+  // DOS períodos atrás, no uno — el período inmediatamente anterior sigue
+  // siendo normal tenerlo con saldo, y avisar de ese llenaría la lista de
+  // ruido justo cuando queremos que se note lo que sí importa.
+  activos.forEach(p => {
+    saldoDeTrabajador(p.id).periodos.forEach(per => {
+      if (per.anio_inicio <= anioActual - 2 && per.disponibles > 0) out.push({ tipo: 'warn',
+        texto: `<strong>${escapeHtml(p.nombre)}</strong> todavía tiene ${per.disponibles} día${per.disponibles === 1 ? '' : 's'} disponible${per.disponibles === 1 ? '' : 's'} del período ${per.periodo}.`,
+        onclick: `navReset();abrirPerfilVacaciones(${p.id})` });
+    });
+  });
+
+  // Vacaciones que empiezan esta semana. Más allá de eso ya están en el
+  // panel "Próximas vacaciones" de al lado; repetirlas acá sería duplicar.
+  vacSolicitudes.filter(s => s.estado === 'aprobado' && s.fecha_inicio > vacHoy() && diasHasta(s.fecha_inicio) <= 7)
+    .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio))
+    .forEach(s => out.push({ tipo: 'ok',
+      texto: `<strong>${escapeHtml(nombreDe(s.personal_id))}</strong> comienza sus vacaciones en ${diasHasta(s.fecha_inicio)} día${diasHasta(s.fecha_inicio) === 1 ? '' : 's'}.`,
+      onclick: `navReset();abrirDetalleSolicitud(${s.id})` }));
+
+  // Saldo bajo, pero solo si ya tiene períodos configurados.
+  activos.forEach(p => {
+    const s = saldoDeTrabajador(p.id);
+    if (!s.periodos.length) return;
+    if (s.disponibles > 0 && s.disponibles <= 3) out.push({ tipo: 'err',
+      texto: `<strong>${escapeHtml(p.nombre)}</strong> tiene solamente ${s.disponibles} día${s.disponibles === 1 ? '' : 's'} disponible${s.disponibles === 1 ? '' : 's'}.`,
+      onclick: `navReset();abrirPerfilVacaciones(${p.id})` });
+  });
+
+  // Sin días asignados: el módulo no puede calcular nada para esa persona.
+  const sinPeriodos = activos.filter(p => !vacPeriodos.some(v => v.personal_id === p.id));
+  sinPeriodos.forEach(p => out.push({ tipo: 'err',
+    texto: `<strong>${escapeHtml(p.nombre)}</strong> no tiene ningún período con días asignados.`,
+    onclick: `navReset();abrirPerfilVacaciones(${p.id})` }));
+
+  return out;
+}
+
+// ─── Pestaña Personal (saldos) ─────────────────────────────────────────────
+function renderVacPersonal(cont) {
+  const q = (vacFiltros.q || '').toLowerCase();
+  const lista = personal
+    .filter(p => vacMostrarInactivos || p.estado === 'activo')
+    .filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || (p.rut || '').toLowerCase().includes(q));
+
+  cont.innerHTML = `
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="vac-buscar-personal" value="${escapeHtml(vacFiltros.q)}" placeholder="Buscar trabajador por nombre o RUT…" oninput="vacFiltros.q=this.value;renderVacPersonal(document.getElementById('vac-contenido'))">
+      </div>
+      <div class="scope-toggle" role="group" aria-label="Qué trabajadores mostrar">
+        <button class="${vacMostrarInactivos ? '' : 'active'}" onclick="vacMostrarInactivos=false;renderVacPersonal(document.getElementById('vac-contenido'))">Solo activos</button>
+        <button class="${vacMostrarInactivos ? 'active' : ''}" onclick="vacMostrarInactivos=true;renderVacPersonal(document.getElementById('vac-contenido'))">Todos</button>
+      </div>
+    </div>
+    ${!lista.length ? mensajeVacioRRHH('Sin resultados', 'Ningún trabajador coincide con la búsqueda.') : `
+    <div class="table-card"><table>
+      <thead><tr>
+        <th>Trabajador</th>
+        <th style="text-align:center">Días disponibles</th>
+        <th style="text-align:center">Días utilizados</th>
+        <th style="text-align:center">Pendientes</th>
+        <th>Próximas vacaciones</th>
+        <th>Estado</th>
+      </tr></thead>
+      <tbody>${lista.map(p => {
+        const s = saldoDeTrabajador(p.id);
+        const prox = proximasVacacionesDe(p.id);
+        const est = estadoTrabajador(p.id);
+        const vigente = vacacionesVigentes(p.id);
+        const detallePeriodos = s.periodos.filter(x => x.disponibles > 0)
+          .map(x => `${x.periodo}: ${x.disponibles}`).join(' · ');
+        return `<tr onclick="navReset();abrirPerfilVacaciones(${p.id})">
+          <td>
+            <div style="font-weight:500">${escapeHtml(p.nombre)}</div>
+            ${p.cargo ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${escapeHtml(p.cargo)}</div>` : ''}
+          </td>
+          <td style="text-align:center">
+            <div style="font-size:15px;font-weight:600;color:${s.disponibles > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? s.disponibles : '—'}</div>
+            ${detallePeriodos ? `<div style="font-size:10.5px;color:var(--text-3);margin-top:2px">${detallePeriodos}</div>` : ''}
+          </td>
+          <td style="text-align:center;color:var(--text-2)">${s.periodos.length ? s.utilizados : '—'}</td>
+          <td style="text-align:center;color:${s.pendientes ? 'var(--amber)' : 'var(--text-3)'}">${s.pendientes || '—'}</td>
+          <td style="font-size:12px">${vigente
+            ? `<span style="color:var(--green)">De vacaciones hasta el ${fDate(vigente.fecha_fin)}</span>`
+            : prox ? `${rangoLegible(prox.fecha_inicio, prox.fecha_fin)} <span style="color:var(--text-3)">· ${prox.dias_habiles} día${Number(prox.dias_habiles) === 1 ? '' : 's'}</span>`
+            : '<span style="color:var(--text-3)">Sin vacaciones programadas</span>'}</td>
+          <td><span class="badge-estado ${est.clase}">${est.label}</span></td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`}`;
+}
+
+// ─── Pestaña Calendario ────────────────────────────────────────────────────
+function vacCambiarMes(delta) {
+  let { anio, mes } = vacCalendario;
+  mes += delta;
+  if (mes < 0)  { mes = 11; anio--; }
+  if (mes > 11) { mes = 0;  anio++; }
+  vacCalendario = { anio, mes };
+  renderVacCalendario(document.getElementById('vac-contenido'));
+}
+function vacIrAHoy() {
+  const h = new Date();
+  vacCalendario = { anio: h.getFullYear(), mes: h.getMonth() };
+  renderVacCalendario(document.getElementById('vac-contenido'));
+}
+
+function renderVacCalendario(cont) {
+  const { anio, mes } = vacCalendario;
+  const primero = new Date(anio, mes, 1);
+  const ultimo  = new Date(anio, mes + 1, 0);
+  // La semana empieza el lunes: getDay() da 0 para domingo, así que se corre.
+  const offset = (primero.getDay() + 6) % 7;
+  const inicioGrilla = vacSumarDias(vacISO(primero), -offset);
+  const celdas = Math.ceil((offset + ultimo.getDate()) / 7) * 7;
+
+  const desdeVista = inicioGrilla, hastaVista = vacSumarDias(inicioGrilla, celdas - 1);
+  const enVista = vacSolicitudes.filter(s => (s.estado === 'aprobado' || s.estado === 'pendiente')
+    && s.fecha_inicio <= hastaVista && s.fecha_fin >= desdeVista);
+
+  const hoy = vacHoy();
+  let grilla = '';
+  for (let i = 0; i < celdas; i++) {
+    const iso = vacSumarDias(inicioGrilla, i);
+    const d = vacFecha(iso);
+    const fuera = d.getMonth() !== mes;
+    const clases = ['vac-cal-dia'];
+    if (fuera) clases.push('fuera');
+    else if (esFeriado(iso)) clases.push('feriado');
+    else if (esFinDeSemana(iso)) clases.push('finde');
+    if (iso === hoy) clases.push('hoy');
+    const delDia = enVista.filter(s => s.fecha_inicio <= iso && s.fecha_fin >= iso);
+    grilla += `<div class="${clases.join(' ')}">
+      <div class="vac-cal-num">${d.getDate()}</div>
+      ${!fuera && esFeriado(iso) ? `<div class="vac-cal-feriado" title="${escapeHtml(feriados[iso])}">${escapeHtml(feriados[iso])}</div>` : ''}
+      ${delDia.map(s => `<span class="vac-cal-chip${s.estado === 'pendiente' ? ' pend' : ''}" title="${escapeHtml(nombreDe(s.personal_id))} — ${rangoLegible(s.fecha_inicio, s.fecha_fin)}" onclick="navReset();abrirDetalleSolicitud(${s.id})">${escapeHtml(nombreDe(s.personal_id).split(' ')[0])}</span>`).join('')}
+    </div>`;
+  }
+
+  const delMes = enVista.filter(s => s.fecha_inicio <= vacISO(ultimo) && s.fecha_fin >= vacISO(primero));
+  cont.innerHTML = `
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period">
+        <button class="fpp-period-btn" onclick="vacCambiarMes(-1)" title="Mes anterior">‹</button>
+        <div style="font-size:15px;font-weight:600;min-width:170px;text-align:center">${MESES_NOMBRE[mes]} ${anio}</div>
+        <button class="fpp-period-btn" onclick="vacCambiarMes(1)" title="Mes siguiente">›</button>
+        <button class="page-btn" style="padding:7px 12px;margin-left:6px" onclick="vacIrAHoy()">Hoy</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:5px"><span class="vac-leyenda ok"></span>Aprobadas</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><span class="vac-leyenda pend"></span>Pendientes</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><span class="vac-leyenda fer"></span>Feriado</span>
+      </div>
+    </div>
+    ${delMes.length ? '' : '<div style="font-size:13px;color:var(--text-3);margin-bottom:12px">Nadie tiene vacaciones este mes.</div>'}
+    <div class="vac-cal-wrap">
+      <div class="vac-cal-head">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => `<div>${d}</div>`).join('')}</div>
+      <div class="vac-cal-grid">${grilla}</div>
+    </div>`;
+}
+
+// ─── Pestaña Historial ─────────────────────────────────────────────────────
+function filtrarHistorialVac() {
+  vacFiltros.trabajador = document.getElementById('vac-f-trabajador').value;
+  vacFiltros.estado     = document.getElementById('vac-f-estado').value;
+  vacFiltros.periodo    = document.getElementById('vac-f-periodo').value;
+  vacFiltros.anio       = document.getElementById('vac-f-anio').value;
+  vacFiltros.q          = document.getElementById('vac-f-busca').value;
+  renderTablaHistorialVac();
+}
+
+function historialFiltrado() {
+  const q = (vacFiltros.q || '').toLowerCase();
+  // Qué períodos usó cada solicitud, para poder filtrar por período.
+  const periodosDeSolicitud = new Map();
+  const periodoPorId = new Map(vacPeriodos.map(p => [p.id, p.periodo]));
+  vacDistribucion.forEach(d => {
+    const arr = periodosDeSolicitud.get(d.solicitud_id) || [];
+    arr.push(periodoPorId.get(d.periodo_id));
+    periodosDeSolicitud.set(d.solicitud_id, arr);
+  });
+
+  return vacSolicitudes.filter(s => {
+    if (vacFiltros.trabajador && String(s.personal_id) !== vacFiltros.trabajador) return false;
+    if (vacFiltros.estado && s.estado !== vacFiltros.estado) return false;
+    if (vacFiltros.anio && s.fecha_inicio.slice(0,4) !== vacFiltros.anio) return false;
+    if (vacFiltros.periodo && !(periodosDeSolicitud.get(s.id) || []).includes(vacFiltros.periodo)) return false;
+    if (q && !(nombreDe(s.personal_id).toLowerCase().includes(q) || (s.observaciones || '').toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a,b) => b.fecha_inicio.localeCompare(a.fecha_inicio));
+}
+
+function renderVacHistorial(cont) {
+  const anios = [...new Set(vacSolicitudes.map(s => s.fecha_inicio.slice(0,4)))].sort().reverse();
+  const periodos = [...new Set(vacPeriodos.map(p => p.periodo))].sort();
+  const opt = (v, label, sel) => `<option value="${v}"${sel === v ? ' selected' : ''}>${label}</option>`;
+  cont.innerHTML = `
+    <div class="toolbar" style="flex-wrap:wrap">
+      <div class="search-wrap" style="min-width:200px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="vac-f-busca" value="${escapeHtml(vacFiltros.q)}" placeholder="Buscar por nombre u observación…" oninput="filtrarHistorialVac()">
+      </div>
+      <select id="vac-f-trabajador" onchange="filtrarHistorialVac()" aria-label="Trabajador">
+        ${opt('', 'Todos los trabajadores', vacFiltros.trabajador)}
+        ${personal.map(p => opt(String(p.id), escapeHtml(p.nombre), vacFiltros.trabajador)).join('')}
+      </select>
+      <select id="vac-f-estado" onchange="filtrarHistorialVac()" aria-label="Estado">
+        ${opt('', 'Todos los estados', vacFiltros.estado)}
+        ${['pendiente','aprobado','rechazado','cancelado'].map(e => opt(e, ESTADOS_VAC[e].label, vacFiltros.estado)).join('')}
+      </select>
+      <select id="vac-f-periodo" onchange="filtrarHistorialVac()" aria-label="Período">
+        ${opt('', 'Todos los períodos', vacFiltros.periodo)}
+        ${periodos.map(p => opt(p, 'Período ' + p, vacFiltros.periodo)).join('')}
+      </select>
+      <select id="vac-f-anio" onchange="filtrarHistorialVac()" aria-label="Año">
+        ${opt('', 'Todos los años', vacFiltros.anio)}
+        ${anios.map(a => opt(a, a, vacFiltros.anio)).join('')}
+      </select>
+    </div>
+    <div id="vac-historial-tabla"></div>`;
+  renderTablaHistorialVac();
+}
+
+function renderTablaHistorialVac() {
+  const cont = document.getElementById('vac-historial-tabla');
+  if (!cont) return;
+  const lista = historialFiltrado();
+  const totalDias = redondear(lista.filter(s => s.estado === 'aprobado').reduce((n,s) => n + Number(s.dias_habiles), 0));
+  if (!lista.length) { cont.innerHTML = mensajeVacioRRHH('Sin registros', 'No hay vacaciones que coincidan con estos filtros.'); return; }
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--text-2);margin-bottom:10px">
+      ${lista.length} registro${lista.length === 1 ? '' : 's'} · ${totalDias} día${totalDias === 1 ? '' : 's'} aprobados
+    </div>
+    <div class="table-card"><table>
+      <thead><tr>
+        <th>Trabajador</th><th>Desde</th><th>Hasta</th>
+        <th style="text-align:center">Días</th><th>Período utilizado</th><th>Estado</th><th>Observación</th>
+      </tr></thead>
+      <tbody>${lista.map(s => `
+        <tr onclick="navReset();abrirDetalleSolicitud(${s.id})">
+          <td style="font-weight:500">${escapeHtml(nombreDe(s.personal_id))}</td>
+          <td style="white-space:nowrap;font-size:12.5px">${fDate(s.fecha_inicio)}</td>
+          <td style="white-space:nowrap;font-size:12.5px">${fDate(s.fecha_fin)}</td>
+          <td style="text-align:center;font-weight:500">${s.dias_habiles}</td>
+          <td style="font-size:12px;color:var(--text-2)">${escapeHtml(textoDistribucion(s.id)) || '—'}</td>
+          <td>${badgeVac(estadoVisualSolicitud(s))}</td>
+          <td style="font-size:12px;color:var(--text-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(s.observaciones || '')}">${escapeHtml(s.observaciones || '—')}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+}
+
+function tramosDe(solicitudId) {
+  const periodoPorId = new Map(vacPeriodos.map(p => [p.id, p]));
+  return vacDistribucion.filter(d => d.solicitud_id === solicitudId)
+    .map(d => ({ ...d, periodo: (periodoPorId.get(d.periodo_id) || {}).periodo || '?',
+                 anio_inicio: (periodoPorId.get(d.periodo_id) || {}).anio_inicio || 0 }))
+    .sort((a,b) => a.anio_inicio - b.anio_inicio);
+}
+function textoDistribucion(solicitudId) {
+  return tramosDe(solicitudId).map(t => `${t.periodo}: ${Number(t.dias)}`).join(' · ');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERFIL DE VACACIONES DEL TRABAJADOR
+// ═══════════════════════════════════════════════════════════════════════════
+function abrirPerfilVacaciones(id) {
+  cerrarTodosLosModales();
+  const p = personal.find(x => x.id === id);
+  if (!p) return;
+  const s = saldoDeTrabajador(id);
+  const prox = proximasVacacionesDe(id);
+  const vigente = vacacionesVigentes(id);
+  const historial = solicitudesDe(id);
+  const ultimas = historial.filter(x => x.estado === 'aprobado' && x.fecha_fin < vacHoy())[0];
+  const programados = redondear(historial
+    .filter(x => x.estado === 'aprobado' && x.fecha_inicio > vacHoy())
+    .reduce((n,x) => n + Number(x.dias_habiles), 0));
+
+  const modal = document.createElement('div');
+  modal.id = 'vac-perfil-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) cerrarTodosLosModales(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-xl" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Vacaciones</div>
+          <div style="font-size:17px;font-weight:600;margin-top:2px">${escapeHtml(p.nombre)}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:5px;display:flex;gap:12px;flex-wrap:wrap">
+            ${p.rut ? `<span>RUT ${escapeHtml(p.rut)}</span>` : ''}
+            ${p.cargo ? `<span>${escapeHtml(p.cargo)}</span>` : ''}
+            ${p.fecha_ingreso ? `<span>Ingreso ${fDate(p.fecha_ingreso)} · ${antiguedadTexto(p.fecha_ingreso)}</span>` : ''}
+            <span class="badge-estado ${p.estado === 'activo' ? 'ok' : 'neutral'}" style="font-size:11px;padding:1px 8px">${p.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+          </div>
+        </div>
+        <button onclick="cerrarTodosLosModales()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="fpp-resumen" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+          <div class="stat destacado"><div class="stat-label">Disponibles</div><div class="stat-val">${s.periodos.length ? s.disponibles : '—'}</div><div class="stat-sub">${s.periodos.length ? 'días' : 'sin períodos asignados'}</div></div>
+          <div class="stat"><div class="stat-label">Utilizados</div><div class="stat-val">${s.utilizados}</div><div class="stat-sub">días aprobados</div></div>
+          <div class="stat"><div class="stat-label">Programados</div><div class="stat-val">${programados}</div><div class="stat-sub">aún no los toma</div></div>
+          <div class="stat"><div class="stat-label">Progresivos</div><div class="stat-val">${s.progresivos}</div><div class="stat-sub">sobre los días base</div></div>
+        </div>
+
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:18px;padding:11px 14px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">
+          ${vigente
+            ? `<strong style="color:var(--green)">Está de vacaciones ahora</strong> — vuelve el ${fDate(vacSumarDias(vigente.fecha_fin, 1))}.`
+            : prox ? `Sus próximas vacaciones son el <strong>${rangoLegible(prox.fecha_inicio, prox.fecha_fin)}</strong> (${prox.dias_habiles} día${Number(prox.dias_habiles) === 1 ? '' : 's'}, en ${diasHasta(prox.fecha_inicio)} días).`
+            : 'No tiene vacaciones programadas.'}
+          ${ultimas ? ` Las últimas que tomó fueron del ${fDate(ultimas.fecha_inicio)} al ${fDate(ultimas.fecha_fin)}.` : ''}
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">Saldo de vacaciones</div>
+          <button class="page-btn" onclick="abrirFormPeriodo(${id})"><i class="ti ti-plus" aria-hidden="true"></i> Agregar período</button>
+        </div>
+        ${s.periodos.length ? `
+        <div class="table-card" style="margin-bottom:22px"><table>
+          <thead><tr>
+            <th>Período</th>
+            <th style="text-align:center">Base</th>
+            <th style="text-align:center">Progresivos</th>
+            <th style="text-align:center">Ajustes</th>
+            <th style="text-align:center">Asignados</th>
+            <th style="text-align:center">Utilizados</th>
+            <th style="text-align:center">Disponibles</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${s.periodos.map(per => `
+            <tr onclick="abrirFormPeriodo(${id}, ${per.id})">
+              <td style="font-weight:600">${per.periodo}${per.anio_inicio < anioPeriodoActual() && per.disponibles > 0 ? ' <span title="Período antiguo con saldo" style="color:var(--amber)">⚠</span>' : ''}</td>
+              <td style="text-align:center;color:var(--text-2)">${per.base}</td>
+              <td style="text-align:center;color:var(--text-2)">${per.progresivos || '—'}</td>
+              <td style="text-align:center;color:var(--text-2)">${per.ajuste || '—'}</td>
+              <td style="text-align:center;font-weight:600">${per.totales}</td>
+              <td style="text-align:center">${per.utilizados}${per.pendientes ? ` <span style="color:var(--amber);font-size:11px" title="${per.pendientes} día(s) en solicitudes pendientes">+${per.pendientes}</span>` : ''}</td>
+              <td style="text-align:center;font-weight:600;color:${per.disponibles > 0 ? 'var(--green)' : 'var(--text-3)'}">${per.disponibles}</td>
+              <td style="text-align:right"><button class="page-btn" onclick="event.stopPropagation();abrirFormPeriodo(${id}, ${per.id})">Editar</button></td>
+            </tr>`).join('')}
+            <tr style="background:var(--bg);cursor:default">
+              <td style="font-weight:600">Total</td><td></td><td></td><td></td>
+              <td style="text-align:center;font-weight:600">${s.totales}</td>
+              <td style="text-align:center;font-weight:600">${s.utilizados}</td>
+              <td style="text-align:center;font-weight:600;color:var(--green)">${s.disponibles}</td><td></td>
+            </tr>
+          </tbody></table></div>`
+        : `<div class="table-card" style="padding:22px;text-align:center;margin-bottom:22px">
+             <div style="font-size:13px;color:var(--text-2);margin-bottom:10px">Todavía no tiene días asignados en ningún período, así que no se puede calcular su saldo.</div>
+             <button class="page-btn" style="padding:8px 16px" onclick="abrirFormPeriodo(${id})">Asignar el primer período</button>
+           </div>`}
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">Historial de vacaciones</div>
+          <div style="display:flex;gap:8px">
+            <button class="page-btn" onclick="exportarHistorialTrabajador(${id})"><i class="ti ti-file-export" aria-hidden="true"></i> Exportar</button>
+            <button class="page-btn" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="abrirFormVacaciones(${id})"><i class="ti ti-plus" aria-hidden="true"></i> Registrar vacaciones</button>
+          </div>
+        </div>
+        ${historial.length ? `
+        <div class="table-card"><table>
+          <thead><tr><th>Desde</th><th>Hasta</th><th style="text-align:center">Días</th><th>Período utilizado</th><th>Estado</th><th>Observación</th></tr></thead>
+          <tbody>${historial.map(x => `
+            <tr onclick="navPush(()=>abrirPerfilVacaciones(${id}));abrirDetalleSolicitud(${x.id})">
+              <td style="white-space:nowrap;font-size:12.5px">${fDate(x.fecha_inicio)}</td>
+              <td style="white-space:nowrap;font-size:12.5px">${fDate(x.fecha_fin)}</td>
+              <td style="text-align:center;font-weight:500">${x.dias_habiles}</td>
+              <td style="font-size:12px;color:var(--text-2)">${escapeHtml(textoDistribucion(x.id)) || '—'}</td>
+              <td>${badgeVac(estadoVisualSolicitud(x))}</td>
+              <td style="font-size:12px;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(x.observaciones || '')}">${escapeHtml(x.observaciones || '—')}</td>
+            </tr>`).join('')}</tbody></table></div>`
+        : '<div class="table-card" style="padding:22px;text-align:center;font-size:13px;color:var(--text-2)">Sin vacaciones registradas todavía.</div>'}
+
+        <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <button class="page-btn" style="padding:8px 14px" onclick="abrirBitacoraTrabajador(${id})"><i class="ti ti-history" aria-hidden="true"></i> Ver cambios registrados</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="abrirFormPersonal(${id})">Editar ficha</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ─── Días de un período ────────────────────────────────────────────────────
+function abrirFormPeriodo(personalId, periodoId) {
+  const volver = () => abrirPerfilVacaciones(personalId);
+  cerrarTodosLosModales();
+  const per = periodoId ? vacPeriodos.find(p => p.id === periodoId) : null;
+  const anioSugerido = per ? per.anio_inicio : anioPeriodoActual();
+  const anios = [];
+  for (let a = anioPeriodoActual() + 1; a >= anioPeriodoActual() - 6; a--) anios.push(a);
+  const yaTiene = new Set(vacPeriodos.filter(p => p.personal_id === personalId).map(p => p.periodo));
+
+  const modal = document.createElement('div');
+  modal.id = 'vac-periodo-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) { cerrarTodosLosModales(); volver(); } };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-size:16px;font-weight:600">${per ? 'Días del período ' + per.periodo : 'Agregar período'}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:3px">${escapeHtml(nombreDe(personalId))}</div>
+        </div>
+        <button onclick="cerrarTodosLosModales();abrirPerfilVacaciones(${personalId})" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        ${per ? '' : campoRRHH('vp-anio', 'Período', `<select id="vp-anio" style="width:100%" onchange="recalcularTotalPeriodo()">
+          ${anios.map(a => `<option value="${a}"${a === anioSugerido ? ' selected' : ''}${yaTiene.has(periodoDeAnio(a)) ? ' disabled' : ''}>${periodoDeAnio(a)}${yaTiene.has(periodoDeAnio(a)) ? ' — ya existe' : ''}</option>`).join('')}
+        </select>`)}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          ${campoRRHH('vp-base', 'Días base', `<input type="number" step="0.5" min="0" id="vp-base" value="${per ? Number(per.dias_base) : 15}" style="padding-left:12px" oninput="recalcularTotalPeriodo()">`)}
+          ${campoRRHH('vp-prog', 'Días progresivos', `<input type="number" step="0.5" min="0" id="vp-prog" value="${per ? Number(per.dias_progresivos) : 0}" style="padding-left:12px" oninput="recalcularTotalPeriodo()">`)}
+          ${campoRRHH('vp-ajuste', 'Ajuste', `<input type="number" step="0.5" id="vp-ajuste" value="${per ? Number(per.dias_ajuste) : 0}" style="padding-left:12px" oninput="recalcularTotalPeriodo()">`)}
+        </div>
+        <div style="background:var(--accent-light);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--accent);font-weight:500">Total del período</span>
+          <span style="font-size:19px;font-weight:700;color:var(--accent)" id="vp-total">—</span>
+        </div>
+        ${campoRRHH('vp-obs', 'Motivo del ajuste u observación', `<input type="text" id="vp-obs" value="${escapeHtml((per && per.observacion) || '')}" placeholder="Queda registrado en la bitácora" style="padding-left:12px">`)}
+        <div style="font-size:11.5px;color:var(--text-3);margin-bottom:14px">
+          El ajuste sirve para correcciones puntuales: días arrastrados, un acuerdo particular, un error del control anterior. Todo cambio queda con fecha, valor anterior, valor nuevo y usuario.
+        </div>
+        <div id="vp-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <button class="page-btn" style="padding:8px 14px" onclick="cerrarTodosLosModales();abrirPerfilVacaciones(${personalId})">Cancelar</button>
+          <button class="page-btn" style="padding:8px 16px;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="guardarPeriodoVac(${personalId}, ${per ? per.id : 'null'}, '${per ? per.periodo : ''}', this)">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  recalcularTotalPeriodo();
+}
+
+function recalcularTotalPeriodo() {
+  const n = id => Number(document.getElementById(id).value || 0);
+  const el = document.getElementById('vp-total');
+  if (el) el.textContent = redondear(n('vp-base') + n('vp-prog') + n('vp-ajuste')) + ' días';
+}
+
+async function guardarPeriodoVac(personalId, periodoId, periodoTexto, btn) {
+  const err = document.getElementById('vp-error');
+  const n = id => Number(document.getElementById(id).value || 0);
+  const anio = periodoId ? vacPeriodos.find(p => p.id === periodoId).anio_inicio : Number(document.getElementById('vp-anio').value);
+  const periodo = periodoTexto || periodoDeAnio(anio);
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await rpcVac('vac_guardar_periodo', {
+      p_personal_id: personalId, p_periodo: periodo, p_anio_inicio: anio,
+      p_base: n('vp-base'), p_progresivos: n('vp-prog'), p_ajuste: n('vp-ajuste'),
+      p_usuario: usuarioActualVac(), p_obs: document.getElementById('vp-obs').value.trim() || null,
+    });
+    await recargarVacaciones();
+    cerrarTodosLosModales();
+    abrirPerfilVacaciones(personalId);
+    renderVacaciones(); renderPersonal();
+    toast('Período guardado');
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGISTRAR / EDITAR VACACIONES
+// ═══════════════════════════════════════════════════════════════════════════
+let vacFormEstado = null;   // {personalId, solicitudId, tramos:[{periodo_id,dias}], manual:bool}
+
+function abrirFormVacaciones(personalId, solicitudId) {
+  const volverAlPerfil = personalId && !solicitudId ? personalId : null;
+  cerrarTodosLosModales();
+  const s = solicitudId ? vacSolicitudes.find(x => x.id === solicitudId) : null;
+  const pid = s ? s.personal_id : (personalId || null);
+  vacFormEstado = { personalId: pid, solicitudId: solicitudId || null, tramos: [], manual: false, volverAlPerfil };
+
+  const activos = personal.filter(p => p.estado === 'activo' || p.id === pid);
+  const modal = document.createElement('div');
+  modal.id = 'vac-form-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) cerrarFormVacaciones(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-xl" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="font-size:16px;font-weight:600">${s ? 'Editar vacaciones' : 'Registrar vacaciones'}</div>
+        <button onclick="cerrarFormVacaciones()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        ${campoRRHH('vf-trabajador', 'Trabajador', `<select id="vf-trabajador" style="width:100%" onchange="vacFormCambioTrabajador()">
+          <option value="">Selecciona un trabajador…</option>
+          ${activos.map(p => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>${escapeHtml(p.nombre)}</option>`).join('')}
+        </select>`)}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          ${campoRRHH('vf-inicio', 'Fecha de inicio', `<input type="date" id="vf-inicio" value="${s ? s.fecha_inicio : ''}" onchange="vacFormRecalcular()">`)}
+          ${campoRRHH('vf-fin', 'Fecha de término', `<input type="date" id="vf-fin" value="${s ? s.fecha_fin : ''}" onchange="vacFormRecalcular()">`)}
+        </div>
+        <div id="vf-dias-box" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px"></div>
+        <div id="vf-distribucion" style="margin-bottom:16px"></div>
+        <div id="vf-solape" style="margin-bottom:16px"></div>
+        ${campoRRHH('vf-estado', 'Estado', `<select id="vf-estado" style="width:100%" onchange="vacFormRecalcular()">
+          ${['pendiente','aprobado','rechazado','cancelado'].map(e => `<option value="${e}"${(s ? s.estado : 'aprobado') === e ? ' selected' : ''}>${ESTADOS_VAC[e].label}</option>`).join('')}
+        </select>`)}
+        ${campoRRHH('vf-obs', 'Observaciones', `<input type="text" id="vf-obs" value="${escapeHtml((s && s.observaciones) || '')}" placeholder="Opcional" style="padding-left:12px">`)}
+        <div id="vf-error" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px"></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <div>${s ? `<button class="page-btn" style="padding:8px 14px;color:var(--red)" onclick="anularSolicitud(${s.id}, this)">Anular</button>` : ''}</div>
+          <div style="display:flex;gap:8px">
+            <button class="page-btn" style="padding:8px 14px" onclick="cerrarFormVacaciones()">Cancelar</button>
+            <button class="page-btn" style="padding:8px 16px;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="guardarSolicitudVac(this)">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  if (s) {
+    vacFormEstado.tramos = tramosDe(s.id).map(t => ({ periodo_id: t.periodo_id, dias: Number(t.dias) }));
+    vacFormEstado.manual = true;
+  }
+  vacFormRecalcular();
+}
+
+function cerrarFormVacaciones() {
+  const volver = vacFormEstado && vacFormEstado.volverAlPerfil;
+  cerrarTodosLosModales();
+  vacFormEstado = null;
+  if (volver) abrirPerfilVacaciones(volver);
+}
+
+function vacFormCambioTrabajador() {
+  vacFormEstado.personalId = Number(document.getElementById('vf-trabajador').value) || null;
+  vacFormEstado.tramos = [];
+  vacFormEstado.manual = false;
+  vacFormRecalcular();
+}
+
+// Recalcula días hábiles, sugiere la distribución y avisa de solapes.
+// Se llama en cada cambio de fecha, trabajador o estado.
+function vacFormRecalcular() {
+  const e = vacFormEstado;
+  if (!e) return;
+  const desde = document.getElementById('vf-inicio').value;
+  const hasta = document.getElementById('vf-fin').value;
+  const boxDias = document.getElementById('vf-dias-box');
+  const boxDist = document.getElementById('vf-distribucion');
+  const boxSol  = document.getElementById('vf-solape');
+
+  if (!desde || !hasta || hasta < desde) {
+    boxDias.style.display = 'none';
+    boxDist.innerHTML = ''; boxSol.innerHTML = '';
+    if (desde && hasta && hasta < desde) {
+      boxDias.style.display = 'block';
+      boxDias.innerHTML = '<span style="font-size:13px;color:var(--red)">La fecha de término no puede ser anterior a la de inicio.</span>';
+    }
+    return;
+  }
+
+  const dias = diasHabilesEntre(desde, hasta);
+  const noHab = detalleNoHabiles(desde, hasta);
+  const corridos = vacDiasCorridos(desde, hasta);
+  const explicacion = [];
+  if (noHab.findes.length)   explicacion.push(`${noHab.findes.length} de fin de semana`);
+  if (noHab.feriados.length) explicacion.push(`${noHab.feriados.length} feriado${noHab.feriados.length === 1 ? '' : 's'} (${noHab.feriados.map(f => f.nombre).join(', ')})`);
+
+  boxDias.style.display = 'block';
+  boxDias.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Días hábiles</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:3px">${corridos} día${corridos === 1 ? '' : 's'} corridos${explicacion.length ? ', menos ' + explicacion.join(' y ') : ''}</div>
+      </div>
+      <div style="font-size:24px;font-weight:700">${dias}</div>
+    </div>`;
+
+  if (!e.personalId) {
+    boxDist.innerHTML = '<div style="font-size:12.5px;color:var(--text-3)">Elige un trabajador para repartir los días entre sus períodos.</div>';
+    boxSol.innerHTML = '';
+    return;
+  }
+
+  if (!e.manual) {
+    e.tramos = sugerirDistribucion(e.personalId, dias, e.solicitudId).tramos;
+  }
+  renderDistribucionForm(dias);
+  renderSolapeForm(desde, hasta);
+}
+
+function renderDistribucionForm(dias) {
+  const e = vacFormEstado;
+  const saldo = saldoDeTrabajador(e.personalId, e.solicitudId);
+  const box = document.getElementById('vf-distribucion');
+  if (!saldo.periodos.length) {
+    box.innerHTML = `<div style="background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius);padding:12px 14px;font-size:12.5px;color:var(--red)">
+      <strong>${escapeHtml(nombreDe(e.personalId))} no tiene ningún período con días asignados.</strong><br>
+      Sin eso no hay de dónde descontar. Abre su perfil y asigna al menos un período.</div>`;
+    return;
+  }
+  const asignado = redondear(e.tramos.reduce((s,t) => s + Number(t.dias || 0), 0));
+  const faltante = redondear(dias - asignado);
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:600">Distribución de vacaciones</div>
+      ${e.manual ? `<button class="page-btn" onclick="vacFormEstado.manual=false;vacFormRecalcular()">Volver a la sugerencia</button>` : '<span style="font-size:11.5px;color:var(--text-3)">Sugerido: primero los períodos más antiguos</span>'}
+    </div>
+    <div class="table-card"><table>
+      <thead><tr><th>Período</th><th style="text-align:center">Disponibles</th><th style="text-align:center">Días a usar</th></tr></thead>
+      <tbody>${saldo.periodos.map(p => {
+        const t = e.tramos.find(x => x.periodo_id === p.id);
+        const usa = t ? Number(t.dias) : 0;
+        const excede = usa > p.disponibles;
+        return `<tr style="cursor:default">
+          <td style="font-weight:600">${p.periodo}${p.anio_inicio < anioPeriodoActual() && p.disponibles > 0 ? ' <span style="color:var(--amber)" title="Período antiguo: conviene gastarlo primero">⚠</span>' : ''}</td>
+          <td style="text-align:center;color:${p.disponibles > 0 ? 'var(--text-2)' : 'var(--text-3)'}">${p.disponibles}</td>
+          <td style="text-align:center">
+            <input type="number" step="0.5" min="0" value="${usa || ''}" placeholder="0"
+              style="width:78px;padding:6px 8px;text-align:center;${excede ? 'border-color:var(--red);color:var(--red)' : ''}"
+              onchange="setTramoDistribucion(${p.id}, this.value)">
+          </td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px;padding:0 2px">
+      <span style="color:var(--text-2)">Total repartido</span>
+      <span style="font-weight:600;color:${faltante === 0 ? 'var(--green)' : 'var(--red)'}">${asignado} de ${dias} días</span>
+    </div>
+    ${faltante > 0 ? `
+      <div style="background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius);padding:12px 14px;margin-top:10px;font-size:12.5px;color:var(--red)">
+        <strong>Saldo insuficiente</strong><br>
+        Esta solicitud usa ${dias} días, pero ${escapeHtml(nombreDe(e.personalId))} solo tiene ${saldo.disponibles} día${saldo.disponibles === 1 ? '' : 's'} disponible${saldo.disponibles === 1 ? '' : 's'}. Faltan ${faltante}.
+        <div style="margin-top:10px;display:flex;align-items:flex-start;gap:8px">
+          <input type="checkbox" id="vf-excepcion" style="width:auto;margin-top:2px" onchange="document.getElementById('vf-motivo-wrap').style.display=this.checked?'block':'none'">
+          <label for="vf-excepcion" style="font-size:12.5px;cursor:pointer">Autorizar de todas formas como excepción</label>
+        </div>
+        <div id="vf-motivo-wrap" style="display:none;margin-top:8px">
+          <input type="text" id="vf-motivo" placeholder="Motivo de la excepción (obligatorio)" style="padding-left:12px;background:var(--surface)">
+        </div>
+      </div>` : faltante < 0 ? `
+      <div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-top:10px;font-size:12.5px;color:var(--amber)">
+        Estás repartiendo ${asignado} días y la solicitud es de ${dias}. Ajusta los tramos para que sumen exactamente ${dias}.
+      </div>` : ''}`;
+}
+
+function setTramoDistribucion(periodoId, valor) {
+  const e = vacFormEstado;
+  e.manual = true;
+  const dias = Number(valor || 0);
+  e.tramos = e.tramos.filter(t => t.periodo_id !== periodoId);
+  if (dias > 0) e.tramos.push({ periodo_id: periodoId, dias: redondear(dias) });
+  const desde = document.getElementById('vf-inicio').value, hasta = document.getElementById('vf-fin').value;
+  renderDistribucionForm(diasHabilesEntre(desde, hasta));
+}
+
+function renderSolapeForm(desde, hasta) {
+  const e = vacFormEstado;
+  const box = document.getElementById('vf-solape');
+  const otros = solapamientos(e.personalId, desde, hasta, e.solicitudId);
+  if (!otros.length) { box.innerHTML = ''; return; }
+  const propio = otros.filter(o => o.mismo);
+  const ajenos = otros.filter(o => !o.mismo);
+  box.innerHTML = `
+    ${propio.length ? `<div style="background:var(--red-light);border:1px solid var(--red);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;font-size:12.5px;color:var(--red)">
+      <strong>Estas fechas se cruzan con otras vacaciones de la misma persona</strong>
+      ${propio.map(o => `<div style="margin-top:4px">${rangoLegible(o.fecha_inicio, o.fecha_fin)} · ${ESTADOS_VAC[o.estado].label}</div>`).join('')}
+    </div>` : ''}
+    ${ajenos.length ? `<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:12px 14px;font-size:12.5px;color:var(--amber)">
+      <strong>Atención</strong> — durante este período también estarán de vacaciones:
+      ${ajenos.map(o => `<div style="margin-top:4px">${escapeHtml(nombreDe(o.personal_id))}: ${rangoLegible(o.fecha_inicio, o.fecha_fin)}${o.estado === 'pendiente' ? ' (pendiente)' : ''}</div>`).join('')}
+      <div style="margin-top:8px;opacity:.85">No impide guardar: decides tú si operativamente corresponde.</div>
+    </div>` : ''}`;
+}
+
+async function guardarSolicitudVac(btn) {
+  const e = vacFormEstado;
+  const err = document.getElementById('vf-error');
+  const mostrar = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+
+  const desde = document.getElementById('vf-inicio').value;
+  const hasta = document.getElementById('vf-fin').value;
+  if (!e.personalId) return mostrar('Elige un trabajador.');
+  if (!desde || !hasta) return mostrar('Faltan las fechas.');
+  if (hasta < desde)    return mostrar('La fecha de término no puede ser anterior a la de inicio.');
+
+  const dias = diasHabilesEntre(desde, hasta);
+  if (!dias) return mostrar('Ese tramo no tiene ningún día hábil: son todos fines de semana o feriados.');
+
+  const asignado = redondear(e.tramos.reduce((s,t) => s + Number(t.dias || 0), 0));
+  if (asignado !== dias) return mostrar(`La distribución suma ${asignado} días y la solicitud es de ${dias}. Ajusta los tramos.`);
+
+  const chk = document.getElementById('vf-excepcion');
+  const excepcion = !!(chk && chk.checked);
+  const motivo = excepcion ? (document.getElementById('vf-motivo').value || '').trim() : null;
+  if (excepcion && !motivo) return mostrar('Para autorizar por sobre el saldo hay que escribir el motivo.');
+
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await rpcVac('vac_guardar_solicitud', {
+      p_personal_id: e.personalId, p_inicio: desde, p_fin: hasta, p_dias: dias,
+      p_estado: document.getElementById('vf-estado').value,
+      p_distribucion: e.tramos.map(t => ({ periodo_id: t.periodo_id, dias: t.dias })),
+      p_usuario: usuarioActualVac(), p_id: e.solicitudId,
+      p_obs: document.getElementById('vf-obs').value.trim() || null,
+      p_excepcion: excepcion, p_motivo: motivo,
+    });
+    const volver = e.volverAlPerfil || e.personalId;
+    await recargarVacaciones();
+    cerrarTodosLosModales();
+    vacFormEstado = null;
+    renderVacaciones(); renderPersonal();
+    if (volver) abrirPerfilVacaciones(volver);
+    toast('Vacaciones guardadas');
+  } catch(ex) {
+    mostrar(ex.message);
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DETALLE DE UNA SOLICITUD
+// ═══════════════════════════════════════════════════════════════════════════
+function abrirDetalleSolicitud(id) {
+  cerrarTodosLosModales();
+  const s = vacSolicitudes.find(x => x.id === id);
+  if (!s) return;
+  const tramos = tramosDe(id);
+  const otros = solapamientos(s.personal_id, s.fecha_inicio, s.fecha_fin, id).filter(o => !o.mismo);
+  const noHab = detalleNoHabiles(s.fecha_inicio, s.fecha_fin);
+
+  const modal = document.createElement('div');
+  modal.id = 'vac-detalle-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) cerrarTodosLosModales(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="flex:1;min-width:0">
+          ${botonAtrasHtml()}
+          <div style="font-size:16px;font-weight:600">${escapeHtml(nombreDe(s.personal_id))}</div>
+          <div style="font-size:12.5px;color:var(--text-2);margin-top:3px">${rangoLegible(s.fecha_inicio, s.fecha_fin)} de ${vacFecha(s.fecha_inicio).getFullYear()}</div>
+        </div>
+        <button onclick="cerrarTodosLosModales()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="fpp-resumen" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+          <div class="stat"><div class="stat-label">Días hábiles</div><div class="stat-val">${s.dias_habiles}</div></div>
+          <div class="stat"><div class="stat-label">Días corridos</div><div class="stat-val">${vacDiasCorridos(s.fecha_inicio, s.fecha_fin)}</div></div>
+          <div class="stat"><div class="stat-label">Estado</div><div style="margin-top:6px">${badgeVac(estadoVisualSolicitud(s))}</div></div>
+        </div>
+
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">De qué períodos salen</div>
+        <div class="table-card" style="margin-bottom:16px"><table>
+          <thead><tr><th>Período</th><th style="text-align:right">Días</th></tr></thead>
+          <tbody>${tramos.length ? tramos.map(t => `<tr style="cursor:default"><td style="font-weight:600">${t.periodo}</td><td style="text-align:right;font-weight:500">${Number(t.dias)}</td></tr>`).join('')
+            : '<tr style="cursor:default"><td colspan="2" style="color:var(--text-3)">Sin distribución registrada.</td></tr>'}
+          <tr style="background:var(--bg);cursor:default"><td style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">${s.dias_habiles}</td></tr>
+          </tbody></table></div>
+
+        <div style="font-size:12.5px;color:var(--text-2);margin-bottom:16px;line-height:1.7">
+          <div>Desde el ${fDate(s.fecha_inicio)} hasta el ${fDate(s.fecha_fin)}, y vuelve el ${fDate(vacSumarDias(s.fecha_fin, 1))}.</div>
+          ${noHab.findes.length || noHab.feriados.length ? `<div>No se descuentan ${noHab.findes.length} día${noHab.findes.length === 1 ? '' : 's'} de fin de semana${noHab.feriados.length ? ` ni ${noHab.feriados.length} feriado${noHab.feriados.length === 1 ? '' : 's'} (${noHab.feriados.map(f => escapeHtml(f.nombre)).join(', ')})` : ''}.</div>` : ''}
+          ${s.observaciones ? `<div style="margin-top:6px"><strong>Observación:</strong> ${escapeHtml(s.observaciones)}</div>` : ''}
+          ${s.excepcion_saldo ? `<div style="margin-top:6px;color:var(--amber)"><strong>Autorizada como excepción por sobre el saldo.</strong> ${escapeHtml(s.motivo_excepcion || '')}</div>` : ''}
+          ${s.origen === 'excel' ? '<div style="margin-top:6px;color:var(--text-3)">Registro migrado desde el control en Excel.</div>' : ''}
+        </div>
+
+        ${otros.length ? `<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--amber)">
+          También de vacaciones en estas fechas: ${otros.map(o => escapeHtml(nombreDe(o.personal_id))).join(', ')}.
+        </div>` : ''}
+
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${s.estado === 'pendiente' ? `
+              <button class="page-btn" style="padding:8px 14px;color:var(--green)" onclick="cambiarEstadoSolicitud(${id},'aprobado',this)">Aprobar</button>
+              <button class="page-btn" style="padding:8px 14px;color:var(--red)" onclick="cambiarEstadoSolicitud(${id},'rechazado',this)">Rechazar</button>` : ''}
+            ${(s.estado === 'aprobado' || s.estado === 'pendiente') ? `
+              <button class="page-btn" style="padding:8px 14px" onclick="anularSolicitud(${id}, this)">Anular</button>` : ''}
+            ${(s.estado === 'cancelado' || s.estado === 'rechazado') ? `
+              <button class="page-btn" style="padding:8px 14px" onclick="cambiarEstadoSolicitud(${id},'aprobado',this)">Reactivar como aprobada</button>` : ''}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="page-btn" style="padding:8px 14px" onclick="navPush(()=>abrirDetalleSolicitud(${id}));abrirPerfilVacaciones(${s.personal_id})">Ver trabajador</button>
+            <button class="page-btn" style="padding:8px 16px;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="abrirFormVacaciones(null, ${id})">Editar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function cambiarEstadoSolicitud(id, estado, btn) {
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: estado, p_usuario: usuarioActualVac() });
+    await recargarVacaciones();
+    cerrarTodosLosModales();
+    abrirDetalleSolicitud(id);
+    renderVacaciones(); renderPersonal();
+    toast('Estado actualizado');
+  } catch(e) {
+    toast(e.message, 'err');
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+// Anular en vez de borrar: el registro queda, los días vuelven al saldo
+// solos (una solicitud cancelada deja de consumir) y el historial no
+// pierde lo que efectivamente pasó.
+async function anularSolicitud(id, btn) {
+  const s = vacSolicitudes.find(x => x.id === id);
+  const ok = await confirmModal(
+    `¿Anular estas vacaciones de ${nombreDe(s.personal_id)}?\n\n${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} días\n\nLos ${s.dias_habiles} días vuelven a estar disponibles y el registro queda en el historial marcado como Cancelado.`);
+  if (!ok) return;
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Anulando…';
+  try {
+    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: 'cancelado', p_usuario: usuarioActualVac() });
+    const pid = s.personal_id;
+    await recargarVacaciones();
+    cerrarTodosLosModales();
+    vacFormEstado = null;
+    renderVacaciones(); renderPersonal();
+    abrirPerfilVacaciones(pid);
+    toast('Vacaciones anuladas — los días volvieron al saldo');
+  } catch(e) {
+    toast(e.message, 'err');
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BITÁCORA
+// ═══════════════════════════════════════════════════════════════════════════
+async function abrirBitacoraTrabajador(personalId) {
+  const volver = () => abrirPerfilVacaciones(personalId);
+  cerrarTodosLosModales();
+  const modal = document.createElement('div');
+  modal.id = 'vac-bitacora-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) { cerrarTodosLosModales(); volver(); } };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-size:16px;font-weight:600">Cambios registrados</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:3px">${escapeHtml(nombreDe(personalId))}</div>
+        </div>
+        <button onclick="cerrarTodosLosModales();abrirPerfilVacaciones(${personalId})" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body" id="vac-bitacora-cuerpo">
+        <div style="font-size:13px;color:var(--text-3)">Cargando…</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const filas = await fetchAll('vacaciones_bitacora',
+    `select=*&personal_id=eq.${personalId}&order=created_at.desc&limit=200`);
+  const cuerpo = document.getElementById('vac-bitacora-cuerpo');
+  if (!cuerpo) return;
+  if (!filas || !filas.length) {
+    cuerpo.innerHTML = '<div style="font-size:13px;color:var(--text-3)">Todavía no hay cambios registrados.</div>';
+    return;
+  }
+  const ACCION = { crear: 'Creación', editar: 'Edición', estado: 'Cambio de estado', ajuste: 'Ajuste de días', excepcion: 'Excepción autorizada', importar: 'Importación' };
+  cuerpo.innerHTML = filas.map(f => {
+    const cuando = new Date(f.created_at);
+    return `<div style="border-left:2px solid var(--border);padding:0 0 14px 14px;position:relative">
+      <div style="font-size:11px;color:var(--text-3)">${cuando.toLocaleDateString('es-CL')} ${cuando.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})} · ${escapeHtml(f.usuario || '—')}</div>
+      <div style="font-size:13px;font-weight:500;margin-top:2px">${ACCION[f.accion] || escapeHtml(f.accion)}${f.campo ? ` · ${escapeHtml(f.campo)}` : ''}</div>
+      ${f.valor_anterior !== null || f.valor_nuevo !== null
+        ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px"><span style="text-decoration:line-through;opacity:.7">${escapeHtml(f.valor_anterior ?? '—')}</span> → <strong>${escapeHtml(f.valor_nuevo ?? '—')}</strong></div>` : ''}
+      ${f.detalle ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${escapeHtml(f.detalle)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORTAR
+// ═══════════════════════════════════════════════════════════════════════════
+function exportarVacaciones() {
+  const libro = XLSX.utils.book_new();
+  const hoy = vacHoy();
+  const activos = personal.filter(p => p.estado === 'activo');
+
+  // Resumen del personal
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(activos.map(p => {
+    const s = saldoDeTrabajador(p.id);
+    const prox = proximasVacacionesDe(p.id);
+    return {
+      'Trabajador': p.nombre, 'RUT': p.rut || '', 'Cargo': p.cargo || '',
+      'Fecha de ingreso': p.fecha_ingreso || '', 'Antigüedad': antiguedadTexto(p.fecha_ingreso),
+      'Días asignados': s.totales, 'Días utilizados': s.utilizados,
+      'Días pendientes de aprobación': s.pendientes, 'Días disponibles': s.disponibles,
+      'Días progresivos': s.progresivos,
+      'Próximas vacaciones': prox ? `${prox.fecha_inicio} a ${prox.fecha_fin}` : 'Sin programar',
+      'Estado': estadoTrabajador(p.id).label,
+    };
+  })), 'Resumen personal');
+
+  // Saldos por período
+  const filasPeriodo = [];
+  personal.forEach(p => saldoDeTrabajador(p.id).periodos.forEach(per => filasPeriodo.push({
+    'Trabajador': p.nombre, 'Período': per.periodo,
+    'Días base': per.base, 'Días progresivos': per.progresivos, 'Ajustes': per.ajuste,
+    'Días asignados': per.totales, 'Días utilizados': per.utilizados,
+    'Días pendientes': per.pendientes, 'Días disponibles': per.disponibles,
+    'Observación': per.observacion || '',
+  })));
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filasPeriodo), 'Saldos por período');
+
+  // Historial completo
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(
+    [...vacSolicitudes].sort((a,b) => b.fecha_inicio.localeCompare(a.fecha_inicio)).map(s => ({
+      'Trabajador': nombreDe(s.personal_id), 'Desde': s.fecha_inicio, 'Hasta': s.fecha_fin,
+      'Días hábiles': Number(s.dias_habiles), 'Período utilizado': textoDistribucion(s.id),
+      'Estado': ESTADOS_VAC[s.estado].label, 'Observación': s.observaciones || '',
+      'Excepción de saldo': s.excepcion_saldo ? 'Sí' : '', 'Motivo de la excepción': s.motivo_excepcion || '',
+      'Origen': s.origen === 'excel' ? 'Migrado del Excel' : 'Registrado en la app',
+    }))), 'Historial');
+
+  // Vacaciones programadas
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(
+    vacSolicitudes.filter(s => (s.estado === 'aprobado' || s.estado === 'pendiente') && s.fecha_inicio > hoy)
+      .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio)).map(s => ({
+        'Trabajador': nombreDe(s.personal_id), 'Desde': s.fecha_inicio, 'Hasta': s.fecha_fin,
+        'Días hábiles': Number(s.dias_habiles), 'Días para que empiecen': diasHasta(s.fecha_inicio),
+        'Período utilizado': textoDistribucion(s.id), 'Estado': ESTADOS_VAC[s.estado].label,
+      }))), 'Programadas');
+
+  XLSX.writeFile(libro, `vacaciones_${hoy}.xlsx`);
+  toast('Exportado');
+}
+
+function exportarHistorialTrabajador(personalId) {
+  const p = personal.find(x => x.id === personalId);
+  const s = saldoDeTrabajador(personalId);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(s.periodos.map(per => ({
+    'Período': per.periodo, 'Días base': per.base, 'Días progresivos': per.progresivos,
+    'Ajustes': per.ajuste, 'Días asignados': per.totales,
+    'Días utilizados': per.utilizados, 'Días disponibles': per.disponibles,
+  }))), 'Saldo');
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(solicitudesDe(personalId).map(x => ({
+    'Desde': x.fecha_inicio, 'Hasta': x.fecha_fin, 'Días hábiles': Number(x.dias_habiles),
+    'Período utilizado': textoDistribucion(x.id), 'Estado': ESTADOS_VAC[x.estado].label,
+    'Observación': x.observaciones || '',
+  }))), 'Historial');
+  XLSX.writeFile(libro, `vacaciones_${(p.nombre || '').replace(/[^\wáéíóúñ ]/gi,'').replace(/\s+/g,'_')}.xlsx`);
+  toast('Exportado');
+}
+
 function hoyISO() {
   const d = new Date();
   return d.toISOString().slice(0,10);
@@ -10302,7 +11927,10 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes de Elaboración', page: 'elaboracion' },
     { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
   ] },
-  'rrhh': { items: [{ icon: '<i class="ti ti-users"></i>', label: 'Recursos Humanos', page: 'rrhh' }] },
+  'rrhh': { items: [
+    { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
+    { icon: '<i class="ti ti-beach"></i>', label: 'Vacaciones Personal', page: 'rrhh-vacaciones' },
+  ] },
   'farmacia-modulo': { items: [
     { icon: '<i class="ti ti-clipboard-list"></i>', label: 'Catastro de stock', page: 'farmacia-catastro' },
     { icon: '<i class="ti ti-package"></i>', label: 'Stock actual', page: 'farmacia-stock' },
