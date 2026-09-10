@@ -78,7 +78,44 @@
   .nav-group.abierto .nav-chevron { transform: rotate(180deg); }
   .nav-subgroup { display: none; margin: 2px 0 4px; }
   .nav-group.abierto .nav-subgroup { display: block; }
-  .nav-subitem { padding-left: 34px; font-size: 12.5px; }
+
+  /* ─── Dónde estoy parado ────────────────────────────────────────────────
+     El acordeón desplegaba las subsecciones pero no las "entonaba": los
+     ítems quedaban flotando y no se notaba ni qué módulo estaba abierto ni
+     en qué subsección estabas. Peor todavía, el encabezado del módulo y la
+     subsección activa usaban EXACTAMENTE la misma píldora azul, así que
+     competían entre sí en vez de ordenar.
+
+     Se arregla en dos niveles, con dos volúmenes distintos a propósito:
+       el módulo     dice "estás trabajando acá adentro", en voz baja
+       la subsección dice "estás en ESTA página", en voz alta            */
+
+  /* Un módulo desplegado se lee como un solo bloque, no como ítems sueltos
+     apilados. */
+  .nav-group.abierto { background: var(--bg); border-radius: var(--radius-lg); padding: 2px 0 5px; margin-bottom: 6px; }
+  .nav-group.abierto > .nav-item-modulo { color: var(--text); font-weight: 600; }
+  .nav-group.abierto > .nav-item-modulo .nav-icon,
+  .nav-group.abierto > .nav-item-modulo .nav-chevron { color: var(--accent); }
+  /* Dentro del bloque el hover tiene que ACLARAR: el gris del hover normal
+     es justo el fondo que ahora tiene el bloque, así que ahí no se veía.
+     El :not(.active) importa — sin él, pasar el mouse por encima de la
+     subsección en la que estás parado le borraba la píldora azul y por un
+     momento parecía que te habías salido de ella. */
+  .nav-group.abierto .nav-item:not(.active):hover { background: var(--surface); }
+
+  /* El encabezado de un módulo desplegado le cede la píldora azul a su
+     subsección activa y se queda con la negrita y la barra roja. Un módulo
+     de un solo ítem (FedEx) no cede nada: ahí el encabezado ES la página,
+     y por eso esta regla solo aplica cuando el acordeón está abierto. */
+  .nav-group.abierto > .nav-item-modulo.active { background: none; }
+
+  /* La subsección activa: la píldora azul con una barra al costado — el
+     mismo recurso que ya usaban los sub-bloques de Facturas, así que el
+     sidebar habla un solo idioma. */
+  .nav-subitem { padding-left: 31px; font-size: 12.5px;
+    border-left: 3px solid transparent; border-radius: 0 var(--radius) var(--radius) 0; }
+  .nav-subitem:hover { border-left-color: var(--border-strong); }
+  .nav-subitem.active { border-left-color: #185FA5; font-weight: 600; }
 
   /* ─── Sub-bloques anidados dentro de un módulo (ej. Facturas: "Facturas
      Bulfor" / "Facturas Proveedor"), cada uno con su propio acordeón,
@@ -94,7 +131,7 @@
   .nav-subbloque.abierto .nav-chevron-sub { transform: rotate(180deg); }
   .nav-subgroup-nivel2 { display: none; margin: 2px 0 6px; }
   .nav-subbloque.abierto .nav-subgroup-nivel2 { display: block; }
-  .nav-subgroup-nivel2 .nav-subitem { padding-left: 44px; }
+  .nav-subgroup-nivel2 .nav-subitem { padding-left: 41px; }   /* 41 + 3 de borde = los 44 de siempre */
 
 
   /* ─── Sidebar colapsable: modo solo-iconos controlado por el usuario
@@ -111,6 +148,9 @@
   body.sidebar-colapsado .logo-text, body.sidebar-colapsado .nav-section-label,
   body.sidebar-colapsado .nav-item span:not(.nav-icon), body.sidebar-colapsado .nav-chevron,
   body.sidebar-colapsado .nav-subgroup { display: none !important; }
+  /* Igual que en el modo ícono por ancho de pantalla: sin subsecciones a la
+     vista, el bloque gris del módulo abierto no encierra nada. */
+  body.sidebar-colapsado .nav-group.abierto { background: none; padding: 0; margin-bottom: 2px; }
   @media (max-width: 900px) { #sidebar-toggle { display: none; } }
 
   /* ─── Pantalla Inicio ────────────────────────────────────────────────── */
@@ -465,6 +505,10 @@
     .stats { grid-template-columns: repeat(2, 1fr); }
     .logo { justify-content: center; }
     .nav-subgroup, .nav-chevron { display: none !important; }
+    /* En modo solo-iconos el bloque del módulo abierto no tiene nada que
+       encerrar — las subsecciones están ocultas — y quedaría como un
+       recuadro gris suelto detrás de un ícono. */
+    .nav-group.abierto { background: none; padding: 0; margin-bottom: 2px; }
   }
 
   /* ─── Celular: barra inferior fija + submenú como pestañas horizontales,
