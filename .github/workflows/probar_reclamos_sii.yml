@@ -1,0 +1,27 @@
+name: Diagnóstico reclamos SII
+
+# Solo a mano (Actions -> Run workflow). No tiene horario: es un diagnóstico,
+# no una tarea que deba correr sola. Tampoco escribe nada en Supabase — por eso
+# no recibe la clave de administrador, solo las credenciales de GDExpress.
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Ejecutar diagnóstico
+        env:
+          DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
+          GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+        run: python probar_reclamos_sii.py
