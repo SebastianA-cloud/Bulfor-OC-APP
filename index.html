@@ -798,11 +798,13 @@
         <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de Elaboración</span>
         <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
+        <span id="badge-sw-nuevas" title="Solicitudes web nuevas" style="display:none;flex-shrink:0;margin-left:4px;background:#1E40AF;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-elaboracion">
         <div class="nav-item nav-subitem" data-page="elaboracion" onclick="seleccionarSubpagina('elaboracion','elaboracion',this)"><span>Órdenes de Elaboración</span></div>
         <div class="nav-item nav-subitem" data-page="pacientes" onclick="seleccionarSubpagina('elaboracion','pacientes',this)"><span>Pacientes</span></div>
+        <div class="nav-item nav-subitem" data-page="solicitudes-web" onclick="seleccionarSubpagina('elaboracion','solicitudes-web',this)"><span>Solicitudes Web</span></div>
       </div>
     </div>
 
@@ -1352,6 +1354,35 @@
       <div class="pagination">
         <span id="oe-info"></span>
         <div class="page-btns" id="oe-pages"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-solicitudes-web">
+    <div class="page-header">
+      <div class="page-title">Solicitudes Web</div>
+      <div class="page-sub">Cotizaciones y consultas enviadas desde farmaciabulfor.cl</div>
+    </div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-status-tabs" id="sw-tabs"></div>
+      <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="cargarSolicitudesWeb(true)"><i class="ti ti-refresh" aria-hidden="true"></i> Actualizar</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="sw-search" placeholder="Buscar por nombre, teléfono o fórmula…" oninput="filtrarSolicitudesWeb()">
+      </div>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Recibida</th><th>Nombre</th><th>Teléfono</th><th>Detalle</th><th style="text-align:center">Fotos</th><th>Estado</th>
+        </tr></thead>
+        <tbody id="sw-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="sw-info"></span>
+        <div class="page-btns" id="sw-pages"></div>
       </div>
     </div>
   </div>
@@ -2037,6 +2068,8 @@ async function init() {
     // RRHH va aparte y sin bloquear: si estas tablas fallaran, el resto de
     // la app tiene que seguir funcionando igual.
     const rrhhListo = cargarRRHH().catch(() => {});
+    cargarSolicitudesWeb().catch(() => {});
+    if (!window.__swTimer) window.__swTimer = setInterval(() => { if (sesionActual) cargarSolicitudesWeb().catch(() => {}); }, 5 * 60 * 1000);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
     fedex = Array.isArray(fedexR) ? fedexR : [];
@@ -2251,6 +2284,8 @@ const MODAL_OVERLAY_IDS = [
   'oe-detalle-modal-overlay',
   'oe-editar-modal-overlay',
   'oe-receta-visor-overlay',
+  'sw-detalle-overlay',
+  'sw-visor-overlay',
   'pac-modal-overlay',
   'factura-quickview-overlay',
   'factura-pago-detalle-overlay',
@@ -5320,6 +5355,292 @@ function renderOE() {
 }
 
 function goOE(p) { const {pages}=paginate(ordenesElaboracionF,oePage); if(p<1||p>pages) return; oePage=p; renderOE(); }
+
+// ─── SOLICITUDES WEB (formulario de farmaciabulfor.cl) ─────────────────────
+// La página pública solo puede CREAR filas en `solicitudes_web` y subir
+// fotos al bucket privado `recetas-web` (carpeta web/). Acá se leen con la
+// sesión del usuario; las fotos se bajan con el token (nunca son públicas).
+let solicitudesWeb = [], solicitudesWebF = [], swPage = 1, swCategoria = 'Nueva';
+const ESTADOS_SW = {
+  'Nueva':      { bg: '#DBEAFE', color: '#1E40AF' },
+  'Cotizada':   { bg: '#FEF3C7', color: '#92400E' },
+  'Convertida': { bg: '#D8F3DC', color: '#2D6A4F' },
+  'Cerrada':    { bg: '#E5E7EB', color: '#374151' },
+};
+const SW_CATEGORIAS = [
+  { id: 'Nueva', label: 'Nuevas' },
+  { id: 'Cotizada', label: 'Cotizadas' },
+  { id: 'Convertida', label: 'Convertidas en orden' },
+  { id: 'Cerrada', label: 'Cerradas' },
+  { id: 'todas', label: 'Todas' },
+];
+
+async function cargarSolicitudesWeb(conAviso) {
+  const r = await fetchAll('solicitudes_web', 'select=*&order=created_at.desc');
+  if (!Array.isArray(r)) { if (conAviso) toast('No se pudieron cargar las solicitudes web.', 'err'); return; }
+  solicitudesWeb = r;
+  actualizarBadgeSW();
+  if (document.getElementById('page-solicitudes-web')?.classList.contains('active')) filtrarSolicitudesWeb(true);
+  if (document.getElementById('page-inicio')?.classList.contains('active')) renderInicio();
+  if (conAviso) toast('Solicitudes actualizadas.');
+}
+
+function actualizarBadgeSW() {
+  const n = solicitudesWeb.filter(x => x.estado === 'Nueva').length;
+  const el = document.getElementById('badge-sw-nuevas');
+  if (el) { el.style.display = n ? 'flex' : 'none'; el.textContent = n > 9 ? '9+' : String(n); }
+  const sub = document.querySelector('.nav-subitem[data-page="solicitudes-web"] span');
+  if (sub) sub.textContent = n ? `Solicitudes Web (${n})` : 'Solicitudes Web';
+}
+
+function fechaHoraCL(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d)) return '—';
+  return d.toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function telefonoWhatsAppSW(tel) {
+  let d = String(tel || '').replace(/\D/g, '');
+  if (d.length === 9 && d.startsWith('9')) d = '56' + d;   // 9XXXXXXXX → 569XXXXXXXX
+  if (d.length === 8) d = '569' + d;                         // XXXXXXXX → 569XXXXXXXX
+  return d;
+}
+
+function renderTabsSW() {
+  const cuenta = { todas: solicitudesWeb.length };
+  SW_CATEGORIAS.forEach(c => { if (c.id !== 'todas') cuenta[c.id] = solicitudesWeb.filter(x => x.estado === c.id).length; });
+  document.getElementById('sw-tabs').innerHTML = SW_CATEGORIAS.map(c =>
+    `<button class="fpp-status-tab${swCategoria===c.id?' active':''}" onclick="swCategoria='${c.id}';filtrarSolicitudesWeb()">${c.label} (${cuenta[c.id]})</button>`
+  ).join('');
+}
+
+function filtrarSolicitudesWeb(mantenerPagina) {
+  const q = document.getElementById('sw-search')?.value || '';
+  solicitudesWebF = solicitudesWeb.filter(x =>
+    (swCategoria === 'todas' || x.estado === swCategoria) &&
+    coincideBusqueda(`${x.nombre||''} ${x.telefono||''} ${x.correo||''} ${x.mensaje||''} ${x.notas||''}`, q));
+  if (!mantenerPagina) swPage = 1;
+  renderSW();
+}
+
+function renderSW() {
+  renderTabsSW();
+  const { slice, pages, total } = paginate(solicitudesWebF, swPage);
+  if (swPage > pages) swPage = pages;
+  document.getElementById('sw-info').textContent = `${total.toLocaleString('es-CL')} solicitud${total===1?'':'es'}`;
+  renderPages('sw-pages', total, pages, swPage, 'goSW');
+  if (!slice.length) {
+    document.getElementById('sw-body').innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">📭</div><p>${swCategoria==='Nueva' ? 'No hay solicitudes nuevas.' : 'No hay solicitudes en esta categoría.'}</p>${swCategoria!=='todas' ? `<a onclick="swCategoria='todas';filtrarSolicitudesWeb()">Ver todas</a>` : ''}</div></td></tr>`;
+    return;
+  }
+  document.getElementById('sw-body').innerHTML = slice.map(x => `
+    <tr style="cursor:pointer" onclick="abrirDetalleSW(${x.id})">
+      <td data-label="Recibida" style="font-size:12px;color:var(--text-2);white-space:nowrap">${fechaHoraCL(x.created_at)}</td>
+      <td data-label="Nombre" style="font-weight:500">${escapeHtml(x.nombre)}${x.tipo==='consulta' ? ' <span class="badge badge-gray">Consulta</span>' : ''}</td>
+      <td data-label="Teléfono" style="white-space:nowrap">${escapeHtml(x.telefono)}</td>
+      <td data-label="Detalle" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(x.mensaje)}">${escapeHtml(x.mensaje)}</td>
+      <td data-label="Fotos" style="text-align:center">${(x.archivos||[]).length ? `<i class="ti ti-photo" aria-hidden="true"></i> ${(x.archivos||[]).length}` : '—'}</td>
+      <td data-label="Estado">${badgeOE(x.estado, ESTADOS_SW)}</td>
+    </tr>`).join('');
+}
+function goSW(p) { const {pages}=paginate(solicitudesWebF,swPage); if(p<1||p>pages) return; swPage=p; renderSW(); }
+
+// Descarga un archivo del bucket privado con el token de la sesión.
+const swBlobCache = {};
+async function blobSolicitudWeb(ruta) {
+  if (swBlobCache[ruta]) return swBlobCache[ruta];
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/recetas-web/${ruta.split('/').map(encodeURIComponent).join('/')}`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${sesionActual?.access_token || SUPABASE_KEY}` }
+  });
+  if (!res.ok) throw new Error('No se pudo abrir el archivo (' + res.status + ')');
+  const blob = await res.blob();
+  swBlobCache[ruta] = { blob, url: URL.createObjectURL(blob) };
+  return swBlobCache[ruta];
+}
+
+function abrirDetalleSW(id) {
+  const x = solicitudesWeb.find(s => s.id === id);
+  if (!x) return;
+  cerrarTodosLosModales();
+  const esEditor = sesionActual?.rol === 'editor';
+  const wa = telefonoWhatsAppSW(x.telefono);
+  const textoWA = encodeURIComponent(`Hola ${x.nombre.split(' ')[0]}, te escribimos de Farmacia Bulfor por la ${x.tipo==='consulta' ? 'consulta' : 'cotización de receta magistral'} que enviaste en nuestra página web.`);
+  const archivos = x.archivos || [];
+  const modal = document.createElement('div');
+  modal.id = 'sw-detalle-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
+  modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('sw-detalle-overlay'); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-size:13px;color:var(--text-2)">Solicitud web #${x.id} · ${fechaHoraCL(x.created_at)}</div>
+          <div style="font-size:17px;font-weight:600">${escapeHtml(x.nombre)} ${badgeOE(x.estado, ESTADOS_SW)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <button onclick="cerrarModalOE('sw-detalle-overlay')" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          ${wa ? `<a class="page-btn" style="padding:8px 14px;text-decoration:none;background:#1FAE5B;color:#fff;border-color:#1FAE5B" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${textoWA}"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Responder por WhatsApp</a>` : ''}
+          <a class="page-btn" style="padding:8px 14px;text-decoration:none" href="tel:${escapeHtml(String(x.telefono).replace(/[^\d+]/g,''))}"><i class="ti ti-phone" aria-hidden="true"></i> Llamar</a>
+          ${x.correo ? `<a class="page-btn" style="padding:8px 14px;text-decoration:none" href="mailto:${escapeHtml(x.correo)}"><i class="ti ti-mail" aria-hidden="true"></i> Correo</a>` : ''}
+        </div>
+        <table class="clinical-grid">
+          <tr><td>Tipo</td><td>${x.tipo==='consulta' ? 'Consulta' : 'Cotización de receta'}</td></tr>
+          <tr><td>Teléfono</td><td>${escapeHtml(x.telefono)}</td></tr>
+          ${x.correo ? `<tr><td>Correo</td><td>${escapeHtml(x.correo)}</td></tr>` : ''}
+          ${x.fecha_requerida ? `<tr><td>Lo necesita para</td><td>${fDate(x.fecha_requerida)}</td></tr>` : ''}
+          <tr><td>Detalle</td><td style="white-space:pre-wrap;word-break:break-word">${escapeHtml(x.mensaje)}</td></tr>
+          ${x.orden_elaboracion_id ? `<tr><td>Orden creada</td><td><a style="cursor:pointer;color:var(--accent)" onclick="abrirDetalleOE(${x.orden_elaboracion_id})">Ver orden de elaboración ↗</a></td></tr>` : ''}
+          ${x.actualizado_por ? `<tr><td>Última gestión</td><td>${escapeHtml(x.actualizado_por)} · ${fechaHoraCL(x.updated_at)}</td></tr>` : ''}
+        </table>
+
+        ${archivos.length ? `
+        <div style="font-size:13px;font-weight:500;margin:16px 0 8px">📋 Receta enviada (${archivos.length})</div>
+        <div id="sw-fotos" style="display:flex;gap:10px;flex-wrap:wrap">
+          ${archivos.map((ruta, i) => `<button type="button" onclick="verArchivoSW('${ruta}')" data-ruta="${ruta}" style="width:110px;height:110px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);cursor:pointer;overflow:hidden;padding:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-2)">Cargando…</button>`).join('')}
+        </div>` : '<div style="font-size:13px;color:var(--text-3);margin-top:14px">Sin fotos adjuntas.</div>'}
+
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:18px">
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Valor cotizado ($)</div>
+            <input type="number" id="sw-valor" value="${x.valor_cotizado ?? ''}" style="width:100%" ${esEditor?'':'disabled'}>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Notas internas</div>
+            <textarea id="sw-notas" style="width:100%;min-height:40px;resize:vertical;font-family:inherit" ${esEditor?'':'disabled'}>${escapeHtml(x.notas || '')}</textarea>
+          </div>
+        </div>
+
+        ${esEditor ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:space-between">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="page-btn" style="padding:8px 14px" onclick="guardarGestionSW(${x.id})">Guardar notas</button>
+            ${x.estado !== 'Cotizada' ? `<button class="page-btn" style="padding:8px 14px;background:#FEF3C7" onclick="guardarGestionSW(${x.id},'Cotizada')">Marcar cotizada</button>` : ''}
+            ${x.estado !== 'Cerrada' ? `<button class="page-btn" style="padding:8px 14px" onclick="guardarGestionSW(${x.id},'Cerrada')">Cerrar</button>` : `<button class="page-btn" style="padding:8px 14px" onclick="guardarGestionSW(${x.id},'Nueva')">Reabrir</button>`}
+            <button class="page-btn" style="padding:8px 14px;color:var(--red)" onclick="eliminarSolicitudWeb(${x.id})">Eliminar</button>
+          </div>
+          ${x.tipo === 'cotizacion' && !x.orden_elaboracion_id ? `<button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="convertirSolicitudEnOrden(${x.id})">+ Crear orden de elaboración</button>` : ''}
+        </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:14px">Tu cuenta es de solo lectura.</div>'}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  // Miniaturas: se bajan con el token, sin exponer las fotos públicamente
+  archivos.forEach(async ruta => {
+    const btn = modal.querySelector(`button[data-ruta="${ruta}"]`);
+    try {
+      const { blob, url } = await blobSolicitudWeb(ruta);
+      if (!btn) return;
+      if (blob.type.startsWith('image/') && !/heic|heif/i.test(blob.type)) btn.innerHTML = `<img src="${url}" alt="Receta" style="width:100%;height:100%;object-fit:cover">`;
+      else btn.innerHTML = `<span><i class="ti ti-file-text" style="font-size:26px" aria-hidden="true"></i><br>${/pdf/.test(blob.type) ? 'PDF' : 'Archivo'}</span>`;
+    } catch (e) { if (btn) btn.textContent = 'No disponible'; }
+  });
+}
+
+async function verArchivoSW(ruta) {
+  try {
+    const { blob, url } = await blobSolicitudWeb(ruta);
+    const esImagen = blob.type.startsWith('image/') && !/heic|heif/i.test(blob.type);
+    const nombre = ruta.split('/').pop();
+    const visor = document.createElement('div');
+    visor.id = 'sw-visor-overlay';
+    visor.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1200;display:flex;align-items:center;justify-content:center;padding:24px';
+    visor.onclick = (e) => { if (e.target === visor) visor.remove(); };
+    visor.innerHTML = `
+      <div style="background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:500">Receta enviada por la web</span>
+          <div style="display:flex;gap:8px">
+            <a href="${url}" download="${nombre}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;font-size:13px;text-decoration:none;color:inherit">⬇ Descargar</a>
+            <button onclick="document.getElementById('sw-visor-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;background:#111">
+          ${esImagen ? `<img src="${url}" style="max-width:100%;max-height:72vh;object-fit:contain;border-radius:4px">`
+                     : (/pdf/.test(blob.type) ? `<iframe src="${url}" style="width:100%;height:72vh;border:none;border-radius:4px"></iframe>`
+                     : `<div style="color:#fff;font-size:14px;text-align:center;padding:40px">Este formato (${blob.type || 'desconocido'}) no se puede previsualizar.<br>Usa “Descargar”.</div>`)}
+        </div>
+      </div>`;
+    document.body.appendChild(visor);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function marcarSolicitudWeb(id, cambios, silencioso) {
+  const datos = { ...cambios, actualizado_por: sesionActual?.email || null, updated_at: new Date().toISOString() };
+  const res = await sb(`solicitudes_web?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(datos) });
+  if (!res.ok) { if (!silencioso) toast('No se pudo guardar.', 'err'); return false; }
+  const i = solicitudesWeb.findIndex(s => s.id === id);
+  if (i !== -1) solicitudesWeb[i] = { ...solicitudesWeb[i], ...datos };
+  actualizarBadgeSW();
+  return true;
+}
+
+async function guardarGestionSW(id, nuevoEstado) {
+  const valor = document.getElementById('sw-valor')?.value;
+  const notas = document.getElementById('sw-notas')?.value.trim();
+  const cambios = { valor_cotizado: valor ? parseInt(valor) : null, notas: notas || null };
+  if (nuevoEstado) cambios.estado = nuevoEstado;
+  if (await marcarSolicitudWeb(id, cambios)) {
+    toast(nuevoEstado ? `Solicitud marcada como ${nuevoEstado.toLowerCase()}.` : 'Guardado.');
+    filtrarSolicitudesWeb(true);
+    abrirDetalleSW(id);
+  }
+}
+
+async function eliminarSolicitudWeb(id) {
+  if (!(await confirmModal('¿Eliminar esta solicitud web y sus fotos?\n\nEsta acción no se puede deshacer.', { textoOk: 'Eliminar' }))) return;
+  const x = solicitudesWeb.find(s => s.id === id);
+  const res = await sb(`solicitudes_web?id=eq.${id}`, { method: 'DELETE' });
+  if (!res.ok) { toast('No se pudo eliminar.', 'err'); return; }
+  if (x?.archivos?.length) {
+    try {
+      await fetch(`${SUPABASE_URL}/storage/v1/object/recetas-web`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${sesionActual?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: x.archivos }),
+      });
+    } catch (_) {}
+  }
+  solicitudesWeb = solicitudesWeb.filter(s => s.id !== id);
+  actualizarBadgeSW();
+  cerrarModalOE('sw-detalle-overlay');
+  filtrarSolicitudesWeb(true);
+  toast('Solicitud eliminada.');
+}
+
+// Abre "Nueva Orden de Elaboración" con los datos de la solicitud y la
+// primera foto ya adjunta. Al guardar la orden, la solicitud queda
+// "Convertida" y enlazada a esa orden (ver guardarNuevaOrdenOE).
+async function convertirSolicitudEnOrden(id) {
+  const x = solicitudesWeb.find(s => s.id === id);
+  if (!x) return;
+  abrirNuevaOrdenElaboracion();
+  window.__solicitudWebConvertir = id;
+  const set = (elId, v) => { const el = document.getElementById(elId); if (el && v != null) el.value = v; };
+  set('oe-paciente-input', x.nombre);
+  set('oe-telefono', x.telefono);
+  set('oe-indicacion', x.mensaje && x.mensaje !== '(Ver foto de la receta)' ? x.mensaje.slice(0, 300) : '');
+  if (x.valor_cotizado) set('oe-valor', x.valor_cotizado);
+  if (x.fecha_requerida) set('oe-retiro-fecha', x.fecha_requerida);
+  set('oe-observaciones', `Solicitud web #${x.id}${x.notas ? ' — ' + x.notas : ''}`);
+  setTimeout(() => { try { buscarPacienteOE(); } catch (_) {} }, 80);
+  const ruta = (x.archivos || [])[0];
+  if (ruta) {
+    try {
+      const { blob } = await blobSolicitudWeb(ruta);
+      const ext = ruta.split('.').pop();
+      const archivo = new File([blob], `receta_web_${x.id}.${ext}`, { type: blob.type });
+      const dt = new DataTransfer(); dt.items.add(archivo);
+      const input = document.getElementById('oe-receta-archivo');
+      if (input) input.files = dt.files;
+      if ((x.archivos || []).length > 1) toast(`Se adjuntó la primera foto. La solicitud tiene ${x.archivos.length}; las demás quedan en Solicitudes Web.`);
+    } catch (_) { toast('No se pudo adjuntar la foto automáticamente; descárgala desde la solicitud.', 'err'); }
+  }
+}
 
 // ─── PACIENTES (buscador y gestor) ─────────────────────────────────────────
 let pacientesF = [];
@@ -9356,6 +9677,7 @@ function seleccionarTipoPagoOE(tipo) {
 
 function abrirNuevaOrdenElaboracion() {
   cerrarTodosLosModales();
+  window.__solicitudWebConvertir = null;
   const modal = document.createElement('div');
   modal.id = 'oe-form-modal-overlay';
   modal.className = 'modal-overlay';
@@ -9742,6 +10064,15 @@ async function guardarNuevaOrdenOE() {
       }])
     });
     if (!rOE.ok) throw new Error(await rOE.text());
+
+    // Si la orden nació de una Solicitud Web, la dejamos marcada como "Convertida"
+    if (window.__solicitudWebConvertir) {
+      try {
+        const nuevaOE = (await rOE.clone().json())[0];
+        await marcarSolicitudWeb(window.__solicitudWebConvertir, { estado: 'Convertida', orden_elaboracion_id: nuevaOE?.id || null }, true);
+      } catch (_) {}
+      window.__solicitudWebConvertir = null;
+    }
 
     // Recargamos órdenes para mostrar el JOIN con el nombre del paciente
     const nuevasOE = await fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc');
@@ -11970,6 +12301,7 @@ const SUBMENUS = {
   'elaboracion': { items: [
     { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes de Elaboración', page: 'elaboracion' },
     { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
+    { icon: '<i class="ti ti-world"></i>', label: 'Solicitudes Web', page: 'solicitudes-web' },
   ] },
   'rrhh': { items: [
     { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
@@ -12097,6 +12429,7 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pageEl = document.getElementById('page-'+id);
   if (pageEl) pageEl.classList.add('active');
+  if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
   // agrupa Por producto y Por cliente): así queda marcado en las dos.
@@ -12134,6 +12467,10 @@ function renderInicio() {
   if (Array.isArray(ordenesElaboracion) && ordenesElaboracion.length) {
     const n = ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length;
     if (n > 0) items.push({ texto: `${n} orden${n===1?'':'es'} de elaboración por digitar`, tipo: 'err', modulo: 'elaboracion', pagina: 'elaboracion' });
+  }
+  if (Array.isArray(solicitudesWeb) && solicitudesWeb.length) {
+    const n = solicitudesWeb.filter(x => x.estado === 'Nueva').length;
+    if (n > 0) items.push({ texto: `${n} solicitud${n===1?'':'es'} web nueva${n===1?'':'s'} por responder`, tipo: 'warn', modulo: 'elaboracion', pagina: 'solicitudes-web' });
   }
   if (Array.isArray(facturasPorPagar) && facturasPorPagar.length) {
     const n = facturasPorPagar.filter(f => f.estado_aceptacion !== 'N' && categoriaFPP(f) === 'overdue').length;
