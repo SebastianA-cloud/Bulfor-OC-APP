@@ -10222,6 +10222,9 @@ function datosComprobanteOE(id) {
     // mejor queda "por confirmar" que un ticket que afirma algo que no es.
     valorTexto: valor ? montoComprobante(valor) : 'Por confirmar',
     estado: !valor ? 'POR CONFIRMAR' : (abonado ? 'ABONADO' : 'CANCELADO'),
+    fechaRetiroTexto: o.fecha_retiro ? fDate(o.fecha_retiro) : '',
+    pagadoTexto: montoComprobante(pagado),
+    saldoTexto: montoComprobante(Math.max(0, valor - pagado)),
   };
 }
 
@@ -10291,6 +10294,192 @@ function documentoComprobanteOE(d) {
 </style></head><body>${ticketComprobanteOE(d)}</body></html>`;
 }
 
+// ── El PDF del comprobante ────────────────────────────────────────────────
+// Se escribe byte a byte, sin librería externa: usa las fuentes Courier que
+// todo lector de PDF ya trae incorporadas. Hecho así el comprobante se genera
+// igual aunque la farmacia esté sin internet, y no dependemos de otro script
+// que se pueda caer. El diseño es el mismo ticket de 80 mm que se ve en
+// pantalla.
+const PDF_PT_MM = 2.834645669;   // un milímetro en puntos PDF
+
+function pdfTextoLatin1(s) {
+  // Las fuentes base del PDF usan WinAnsi, así que pasamos el texto a Latin-1
+  // (las tildes y la ñ entran sin problema) y escapamos los caracteres que
+  // tienen significado dentro de un PDF.
+  return String(s == null ? '' : s)
+    .normalize('NFC')
+    .replace(/[‐-―−]/g, '-')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, '...')
+    .replace(/ /g, ' ')
+    .split('').map(c => c.charCodeAt(0) <= 0xFF ? c : '?').join('')
+    .replace(/([\\()])/g, '\\$1');
+}
+
+// Courier es monoespaciada: cada carácter mide exactamente 0.6 del tamaño de
+// fuente, así que podemos centrar y alinear a la derecha con cuentas exactas.
+const pdfAnchoTexto = (texto, size, tc) =>
+  texto.length ? texto.length * (size * 0.6 + (tc || 0)) - (tc || 0) : 0;
+
+function pdfEnvolver(texto, size, anchoMax) {
+  const max = Math.max(1, Math.floor(anchoMax / (size * 0.6)));
+  const palabras = String(texto == null ? '' : texto).split(/\s+/).filter(Boolean);
+  const lineas = [];
+  let act = '';
+  const cortar = () => { while (act.length > max) { lineas.push(act.slice(0, max)); act = act.slice(max); } };
+  for (const p of palabras) {
+    if (!act) act = p;
+    else if ((act + ' ' + p).length <= max) act += ' ' + p;
+    else { cortar(); if (act) lineas.push(act); act = p; }
+    cortar();
+  }
+  if (act) lineas.push(act);
+  return lineas.length ? lineas : [''];
+}
+
+function construirComprobantePdf(d) {
+  const W = 80 * PDF_PT_MM;
+  const MG = 15;
+  const CW = W - MG * 2;
+  const ops = [];
+  let y = 24;   // va midiendo desde arriba; al final se invierte
+
+  const txt = (s, o) => {
+    const t = pdfTextoLatin1(s);
+    const size = o.size || 8;
+    const tc = o.tc || 0;
+    const ancho = pdfAnchoTexto(t, size, tc);
+    let x = MG;
+    if (o.align === 'center') x = (W - ancho) / 2;
+    else if (o.align === 'right') x = W - MG - ancho;
+    ops.push({ t: 'txt', s: t, x, y, size, bold: !!o.bold, gris: o.gris || 0, tc });
+  };
+  const linea = () => { y += 6; ops.push({ t: 'dash', y }); y += 11; };
+
+  txt('FARMACIA BULFOR', { size: 13, bold: true, align: 'center', tc: 0.8 });
+  y += 10;
+  txt('RECETARIO MAGISTRAL', { size: 7.5, align: 'center', tc: 0.5 });
+  y += 13;
+  txt('COMPROBANTE DE RETIRO', { size: 9.5, bold: true, align: 'center' });
+  y += 4;
+  linea();
+
+  // Una fila etiqueta/valor. Si el valor no cabe al lado de la etiqueta
+  // (un nombre largo, por ejemplo), baja a su propia línea en vez de pisarse.
+  const fila = (etq, valor) => {
+    const sizeE = 8, sizeV = 8.5;
+    const anchoE = pdfAnchoTexto(pdfTextoLatin1(etq), sizeE, 0);
+    const anchoV = pdfAnchoTexto(pdfTextoLatin1(valor), sizeV, 0);
+    txt(etq, { size: sizeE, gris: 0.33 });
+    if (anchoE + 8 + anchoV <= CW) {
+      txt(valor, { size: sizeV, bold: true, align: 'right' });
+      y += 13;
+    } else {
+      y += 11;
+      pdfEnvolver(valor, sizeV, CW).forEach(l => { txt(l, { size: sizeV, bold: true, align: 'right' }); y += 11; });
+      y += 2;
+    }
+  };
+
+  fila('N°', d.numero);
+  fila('Emitido', d.emitido);
+  fila('Paciente', d.nombre);
+
+  y += 1;
+  txt('PREPARADO', { size: 7, gris: 0.33, tc: 0.4 });
+  y += 10;
+  pdfEnvolver(d.preparado, 8.5, CW).forEach(l => { txt(l, { size: 8.5, bold: true }); y += 11; });
+  linea();
+
+  txt('RETIRO', { size: 7.5, bold: true, align: 'center', tc: 1.6 });
+  y += 12;
+  fila('Fecha', d.fechaRetiro ? d.fechaRetiroTexto : 'Por confirmar');
+  fila('Hora', d.horaRetiro ? d.horaRetiro + ' hrs' : 'Por confirmar');
+  linea();
+
+  fila('Valor', d.valorTexto);
+  fila('Forma de pago', d.formaPago);
+  if (d.abonado) {
+    fila('Abonado', d.pagadoTexto);
+    fila('Saldo al retirar', d.saldoTexto);
+  }
+  fila('Estado', d.estado);
+  linea();
+
+  const pie = ['Presente este comprobante al retirar.'];
+  if (d.abonado && d.saldo) pie.push('El saldo se paga al momento del retiro.');
+  pie.push('Gracias por preferirnos.');
+  pie.forEach(l => pdfEnvolver(l, 7, CW).forEach(s => { txt(s, { size: 7, align: 'center', gris: 0.2 }); y += 9.5; }));
+
+  const H = y + 16;
+
+  // El origen del PDF está abajo a la izquierda, por eso invertimos la y.
+  const flujo = ['0.80 0.80 0.80 RG 0.6 w [] 0 d',
+                 `5 5 ${(W - 10).toFixed(2)} ${(H - 10).toFixed(2)} re S`];
+  for (const op of ops) {
+    const yy = (H - op.y).toFixed(2);
+    if (op.t === 'dash') {
+      flujo.push('0.60 0.60 0.60 RG 0.5 w [1.6 1.8] 0 d');
+      flujo.push(`${MG} ${yy} m ${(W - MG).toFixed(2)} ${yy} l S`);
+    } else {
+      const g = op.gris ? op.gris.toFixed(2) : '0';
+      flujo.push(`BT ${g} ${g} ${g} rg /${op.bold ? 'F2' : 'F1'} ${op.size} Tf ${op.tc ? op.tc.toFixed(2) : 0} Tc 1 0 0 1 ${op.x.toFixed(2)} ${yy} Tm (${op.s}) Tj ET`);
+    }
+  }
+  const contenido = flujo.join('\n');
+
+  const objetos = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W.toFixed(2)} ${H.toFixed(2)}] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>`,
+    `<< /Length ${contenido.length} >>\nstream\n${contenido}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>',
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [];
+  objetos.forEach((cuerpo, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${cuerpo}\nendobj\n`; });
+  const inicioXref = pdf.length;
+  pdf += `xref\n0 ${objetos.length + 1}\n0000000000 65535 f \n`;
+  offsets.forEach(o => { pdf += String(o).padStart(10, '0') + ' 00000 n \n'; });
+  pdf += `trailer\n<< /Size ${objetos.length + 1} /Root 1 0 R >>\nstartxref\n${inicioXref}\n%%EOF\n`;
+
+  const bytes = new Uint8Array(pdf.length);
+  for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xFF;
+  return bytes;
+}
+
+function pdfComprobanteOE(d) {
+  return new Blob([construirComprobantePdf(d)], { type: 'application/pdf' });
+}
+
+function nombrePdfComprobanteOE(d) {
+  return `Comprobante ${d.numero} - ${d.nombre}.pdf`.replace(/[\\/:*?"<>|]/g, ' ');
+}
+
+function guardarBlobComprobante(blob, nombre) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = nombre;
+  // El <a> tiene que estar en el documento para que el navegador respete el
+  // nombre del atributo download.
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+}
+
+// ¿Este navegador sabe compartir archivos? En celular (Android y iPhone) sí,
+// y ahí el PDF se manda directo por WhatsApp desde el menú de compartir. En
+// la mayoría de los navegadores de escritorio no, y ahí hay que adjuntarlo.
+function puedeCompartirPdfComprobante() {
+  try {
+    if (!navigator.canShare || typeof File !== 'function') return false;
+    return navigator.canShare({ files: [new File([new Uint8Array([37, 80, 68, 70])], 'p.pdf', { type: 'application/pdf' })] });
+  } catch (_) { return false; }
+}
+
 function imprimirComprobanteOE(id) {
   const d = datosComprobanteOE(id);
   if (!d) return;
@@ -10314,44 +10503,50 @@ function imprimirComprobanteOE(id) {
 function descargarComprobanteOE(id) {
   const d = datosComprobanteOE(id);
   if (!d) return;
-  const blob = new Blob([documentoComprobanteOE(d)], { type: 'text/html;charset=utf-8' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `Comprobante ${d.numero} - ${d.nombre}.html`.replace(/[\\/:*?"<>|]/g, ' ');
-  // El <a> tiene que estar en el documento para que el navegador respete el
-  // nombre del atributo download; si no, el archivo baja como "download".
-  document.body.appendChild(link);
-  link.click();
-  setTimeout(() => { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+  guardarBlobComprobante(pdfComprobanteOE(d), nombrePdfComprobanteOE(d));
 }
 
+// El mensaje va corto a propósito: el detalle (valor, forma de pago, estado)
+// está en el PDF, así que el texto solo avisa y da la fecha y hora de retiro.
 function mensajeComprobanteOE(d) {
-  const L = [];
-  L.push('*Farmacia Bulfor* — Comprobante de retiro');
-  L.push('N° ' + d.numero);
-  L.push('');
-  L.push('Paciente: ' + d.nombre);
-  L.push('Preparado: ' + d.preparado);
-  L.push('Valor: ' + d.valorTexto);
-  if (d.abonado) {
-    L.push('Abonado: ' + montoComprobante(d.pagado) + ' (' + d.formaPago + ')');
-    L.push('Saldo a pagar al retirar: ' + montoComprobante(d.saldo));
-  } else if (d.valor) {
-    L.push('Pago: ' + d.formaPago + ' — cancelado');
+  const L = [`Hola! Tu pedido está en proceso, este es tu comprobante de retiro N° ${d.numero}.`];
+  if (d.fechaRetiro) {
+    L.push(`Puedes retirar el ${d.fechaRetiroTexto}${d.horaRetiro ? ` a las ${d.horaRetiro} hrs` : ''}.`);
   } else {
-    L.push('Pago: ' + d.formaPago);
+    L.push('Te confirmamos la fecha y hora de retiro a la brevedad.');
   }
-  L.push('');
-  L.push('Retiro: ' + retiroTextoComprobante(d));
-  L.push('');
-  L.push('Presente este comprobante al retirar. Gracias por preferirnos.');
-  return L.join('\n');
+  if (d.abonado && d.saldo) L.push(`Queda un saldo de ${d.saldoTexto} por pagar al momento del retiro.`);
+  return L.join('\n\n');
 }
 
-function enviarWhatsAppComprobanteOE(wa) {
+async function enviarWhatsAppComprobanteOE(id, wa) {
+  const d = datosComprobanteOE(id);
+  if (!d) return;
   const caja = document.getElementById('oe-comp-msg');
-  const texto = caja ? caja.value : '';
-  window.open(`https://wa.me/${wa}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+  const texto = caja ? caja.value : mensajeComprobanteOE(d);
+  const blob = pdfComprobanteOE(d);
+  const nombre = nombrePdfComprobanteOE(d);
+
+  if (puedeCompartirPdfComprobante()) {
+    try {
+      await navigator.share({ files: [new File([blob], nombre, { type: 'application/pdf' })], text: texto });
+      return;
+    } catch (e) {
+      // Si cerró el menú de compartir no hacemos nada más; si falló de verdad,
+      // caemos al plan B de abajo.
+      if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
+    }
+  }
+
+  // Plan B (escritorio): WhatsApp Web no permite adjuntar desde un enlace, así
+  // que descargamos el PDF y abrimos el chat con el texto ya escrito.
+  guardarBlobComprobante(blob, nombre);
+  if (wa) {
+    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+    toast('Te descargué el PDF: adjúntalo en el chat que acabo de abrir.');
+  } else {
+    toast('Te descargué el PDF para que lo adjuntes tú.');
+  }
 }
 
 function copiarMensajeComprobanteOE() {
@@ -10372,12 +10567,17 @@ function abrirComprobanteOE(id) {
   cerrarTodosLosModales();
 
   const waOk = waValidoComprobante(d.wa);
+  const compartir = puedeCompartirPdfComprobante();
   const avisos = [];
-  if (!d.fechaRetiro) avisos.push('La orden no tiene <strong>fecha de retiro</strong> registrada.');
+  if (!d.fechaRetiro) avisos.push('La orden no tiene <strong>fecha de retiro</strong> registrada, así que el mensaje no la puede nombrar.');
   if (!d.horaRetiro) avisos.push('La orden no tiene <strong>hora de retiro</strong> registrada.');
   if (!d.valor) avisos.push('La orden no tiene <strong>valor</strong> registrado.');
-  if (!d.telefono) avisos.push('El paciente no tiene <strong>teléfono</strong> guardado, así que el envío por WhatsApp está desactivado. Puedes agregarlo en la ficha del paciente.');
-  else if (!waOk) avisos.push(`El teléfono guardado (<strong>${escapeHtml(d.telefono)}</strong>) no quedó en formato de celular chileno, así que el envío por WhatsApp está desactivado.`);
+  // El teléfono solo hace falta en escritorio, donde hay que abrir el chat por
+  // enlace. Si el equipo sabe compartir archivos, el contacto se elige ahí.
+  if (!compartir) {
+    if (!d.telefono) avisos.push('El paciente no tiene <strong>teléfono</strong> guardado, así que no puedo abrirle el chat. Puedes agregarlo en la ficha del paciente, o descargar el PDF y mandarlo tú.');
+    else if (!waOk) avisos.push(`El teléfono guardado (<strong>${escapeHtml(d.telefono)}</strong>) no quedó en formato de celular chileno, así que no puedo abrirle el chat.`);
+  }
 
   const modal = document.createElement('div');
   modal.id = 'oe-comprobante-overlay';
@@ -10412,17 +10612,21 @@ function abrirComprobanteOE(id) {
           </div>
           <div style="flex:1 1 240px;min-width:220px">
             <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Mensaje para el paciente</div>
-            <textarea id="oe-comp-msg" rows="14" style="width:100%;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical">${escapeHtml(mensajeComprobanteOE(d))}</textarea>
-            <div style="font-size:11px;color:var(--text-3);margin-top:6px">Puedes editarlo acá antes de enviarlo. El botón de WhatsApp abre el chat con este texto ya escrito; el envío lo haces tú.</div>
+            <textarea id="oe-comp-msg" rows="7" style="width:100%;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical">${escapeHtml(mensajeComprobanteOE(d))}</textarea>
+            <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.55">
+              ${compartir
+                ? 'Puedes editarlo antes de enviarlo. Al tocar <strong>Enviar</strong> se abre el menú de compartir con el PDF y este texto: eliges WhatsApp y el contacto, y mandas.'
+                : 'Puedes editarlo antes de enviarlo. WhatsApp no deja adjuntar archivos desde un enlace, así que al enviar te <strong>descargo el PDF</strong> y te abro el chat del paciente con este texto escrito; solo adjuntas el archivo. Desde el celular el PDF sí se manda directo.'}
+            </div>
           </div>
         </div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
           <button class="page-btn" style="padding:8px 14px" onclick="imprimirComprobanteOE(${d.id})">🖨 Imprimir</button>
-          <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})">⬇ Descargar</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})">📄 Descargar PDF</button>
           <button class="page-btn" style="padding:8px 14px" onclick="copiarMensajeComprobanteOE()">Copiar mensaje</button>
-          ${waOk
-            ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="enviarWhatsAppComprobanteOE('${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Enviar por WhatsApp</button>`
+          ${(compartir || waOk)
+            ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="enviarWhatsAppComprobanteOE(${d.id},'${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Enviar ${compartir ? 'PDF' : 'por WhatsApp'}</button>`
             : `<button class="page-btn" style="padding:8px 14px;opacity:.45;cursor:not-allowed" disabled>WhatsApp sin teléfono válido</button>`}
           <button class="import-btn" style="margin-top:0;padding:8px 14px" onclick="cerrarModalOE('oe-comprobante-overlay')">Cerrar</button>
         </div>
