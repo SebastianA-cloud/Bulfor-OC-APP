@@ -10519,33 +10519,41 @@ function mensajeComprobanteOE(d) {
   return L.join('\n\n');
 }
 
-async function enviarWhatsAppComprobanteOE(id, wa) {
+function textoComprobanteEnPantalla(d) {
+  const caja = document.getElementById('oe-comp-msg');
+  return caja ? caja.value : mensajeComprobanteOE(d);
+}
+
+// Camino 1 — WhatsApp Web, todo dentro del navegador.
+// Ningún enlace de WhatsApp permite adjuntar un archivo (eso no lo decide la
+// app, lo decide WhatsApp), así que bajamos el PDF y abrimos el chat del
+// paciente con el texto ya escrito: queda solo arrastrar el archivo.
+function abrirWhatsAppWebComprobanteOE(id, wa) {
+  const d = datosComprobanteOE(id);
+  if (!d || !wa) return;
+  const texto = textoComprobanteEnPantalla(d);
+  guardarBlobComprobante(pdfComprobanteOE(d), nombrePdfComprobanteOE(d));
+  // /send va directo a la conversación en el navegador, sin pasar por la
+  // página intermedia de wa.me que pregunta si abrir la aplicación.
+  window.open(`https://web.whatsapp.com/send?phone=${wa}&text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+  toast('Te descargué el PDF: arrástralo al chat que acabo de abrir.');
+}
+
+// Camino 2 — menú de compartir del sistema (celular, o Windows con la
+// aplicación de WhatsApp instalada). Acá el PDF va adjunto de una, pero el
+// contacto se elige en ese menú.
+async function compartirComprobanteOE(id) {
   const d = datosComprobanteOE(id);
   if (!d) return;
-  const caja = document.getElementById('oe-comp-msg');
-  const texto = caja ? caja.value : mensajeComprobanteOE(d);
+  const texto = textoComprobanteEnPantalla(d);
   const blob = pdfComprobanteOE(d);
   const nombre = nombrePdfComprobanteOE(d);
-
-  if (puedeCompartirPdfComprobante()) {
-    try {
-      await navigator.share({ files: [new File([blob], nombre, { type: 'application/pdf' })], text: texto });
-      return;
-    } catch (e) {
-      // Si cerró el menú de compartir no hacemos nada más; si falló de verdad,
-      // caemos al plan B de abajo.
-      if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
-    }
-  }
-
-  // Plan B (escritorio): WhatsApp Web no permite adjuntar desde un enlace, así
-  // que descargamos el PDF y abrimos el chat con el texto ya escrito.
-  guardarBlobComprobante(blob, nombre);
-  if (wa) {
-    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
-    toast('Te descargué el PDF: adjúntalo en el chat que acabo de abrir.');
-  } else {
-    toast('Te descargué el PDF para que lo adjuntes tú.');
+  try {
+    await navigator.share({ files: [new File([blob], nombre, { type: 'application/pdf' })], text: texto });
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // cerró el menú, no pasa nada
+    guardarBlobComprobante(blob, nombre);
+    toast('No se pudo abrir el menú de compartir: te descargué el PDF.', 'err');
   }
 }
 
@@ -10572,12 +10580,11 @@ function abrirComprobanteOE(id) {
   if (!d.fechaRetiro) avisos.push('La orden no tiene <strong>fecha de retiro</strong> registrada, así que el mensaje no la puede nombrar.');
   if (!d.horaRetiro) avisos.push('La orden no tiene <strong>hora de retiro</strong> registrada.');
   if (!d.valor) avisos.push('La orden no tiene <strong>valor</strong> registrado.');
-  // El teléfono solo hace falta en escritorio, donde hay que abrir el chat por
-  // enlace. Si el equipo sabe compartir archivos, el contacto se elige ahí.
-  if (!compartir) {
-    if (!d.telefono) avisos.push('El paciente no tiene <strong>teléfono</strong> guardado, así que no puedo abrirle el chat. Puedes agregarlo en la ficha del paciente, o descargar el PDF y mandarlo tú.');
-    else if (!waOk) avisos.push(`El teléfono guardado (<strong>${escapeHtml(d.telefono)}</strong>) no quedó en formato de celular chileno, así que no puedo abrirle el chat.`);
-  }
+  // Para abrir el chat del paciente hace falta su número. Con el menú de
+  // compartir igual se puede mandar, eligiendo el contacto a mano.
+  const sinChat = compartir ? ' Igual puedes usar <strong>Compartir…</strong> y elegir el contacto ahí.' : ' Puedes descargar el PDF y mandarlo tú.';
+  if (!d.telefono) avisos.push('El paciente no tiene <strong>teléfono</strong> guardado, así que no puedo abrirle el chat. Puedes agregarlo en la ficha del paciente.' + sinChat);
+  else if (!waOk) avisos.push(`El teléfono guardado (<strong>${escapeHtml(d.telefono)}</strong>) no quedó en formato de celular chileno, así que no puedo abrirle el chat.` + sinChat);
 
   const modal = document.createElement('div');
   modal.id = 'oe-comprobante-overlay';
@@ -10611,12 +10618,15 @@ function abrirComprobanteOE(id) {
             ${ticketComprobanteOE(d)}
           </div>
           <div style="flex:1 1 240px;min-width:220px">
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Mensaje para el paciente</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+              <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Mensaje para el paciente</div>
+              <button class="page-btn" style="padding:3px 9px;font-size:11px" onclick="copiarMensajeComprobanteOE()">Copiar texto</button>
+            </div>
             <textarea id="oe-comp-msg" rows="7" style="width:100%;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical">${escapeHtml(mensajeComprobanteOE(d))}</textarea>
-            <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.55">
-              ${compartir
-                ? 'Puedes editarlo antes de enviarlo. Al tocar <strong>Enviar</strong> se abre el menú de compartir con el PDF y este texto: eliges WhatsApp y el contacto, y mandas.'
-                : 'Puedes editarlo antes de enviarlo. WhatsApp no deja adjuntar archivos desde un enlace, así que al enviar te <strong>descargo el PDF</strong> y te abro el chat del paciente con este texto escrito; solo adjuntas el archivo. Desde el celular el PDF sí se manda directo.'}
+            <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.6">
+              Puedes editarlo antes de enviarlo.
+              <br><strong>WhatsApp Web</strong>: te descargo el PDF y abro el chat de ${escapeHtml(d.nombre)} con este texto escrito — solo arrastras el archivo al chat. Todo en el navegador.
+              ${compartir ? '<br><strong>Compartir</strong>: abre el menú del sistema con el PDF ya adjunto (ideal desde el celular), pero ahí eliges el contacto a mano.' : ''}
             </div>
           </div>
         </div>
@@ -10624,9 +10634,9 @@ function abrirComprobanteOE(id) {
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
           <button class="page-btn" style="padding:8px 14px" onclick="imprimirComprobanteOE(${d.id})">🖨 Imprimir</button>
           <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})">📄 Descargar PDF</button>
-          <button class="page-btn" style="padding:8px 14px" onclick="copiarMensajeComprobanteOE()">Copiar mensaje</button>
-          ${(compartir || waOk)
-            ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="enviarWhatsAppComprobanteOE(${d.id},'${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Enviar ${compartir ? 'PDF' : 'por WhatsApp'}</button>`
+          ${compartir ? `<button class="page-btn" style="padding:8px 14px" onclick="compartirComprobanteOE(${d.id})">Compartir…</button>` : ''}
+          ${waOk
+            ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="abrirWhatsAppWebComprobanteOE(${d.id},'${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> WhatsApp Web</button>`
             : `<button class="page-btn" style="padding:8px 14px;opacity:.45;cursor:not-allowed" disabled>WhatsApp sin teléfono válido</button>`}
           <button class="import-btn" style="margin-top:0;padding:8px 14px" onclick="cerrarModalOE('oe-comprobante-overlay')">Cerrar</button>
         </div>
