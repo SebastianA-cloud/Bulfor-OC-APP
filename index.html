@@ -1584,7 +1584,7 @@
   <div class="page" id="page-farmacia-stock">
     <div class="page-header">
       <div class="page-title">Stock actual</div>
-      <div class="page-sub">Existencias por producto, sumando todos los lotes contados</div>
+      <div class="page-sub">Existencias por producto (suma de lotes, actualizada con FEFO desde el sistema de ventas). "En PC" en ámbar = no cuadra con el sistema de ventas.</div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -1604,12 +1604,13 @@
   <div class="page" id="page-farmacia-movimientos">
     <div class="page-header">
       <div class="page-title">Movimientos de stock</div>
-      <div class="page-sub">Registra compras (entradas), ventas/consumo (salidas) y ajustes</div>
+      <div class="page-sub">Las compras, ventas y traspasos llegan solos desde el sistema de ventas cada 30 minutos (descontando con FEFO). Aquí solo registras ajustes por recuento.</div>
     </div>
     <div class="toolbar" style="gap:8px">
-      <button class="page-btn" id="farmacia-tab-compra" onclick="cambiarTipoMovFarmacia('compra')">⬆️ Compra</button>
-      <button class="page-btn" id="farmacia-tab-venta" onclick="cambiarTipoMovFarmacia('venta')">⬇️ Venta/Consumo</button>
-      <button class="page-btn" id="farmacia-tab-ajuste" onclick="cambiarTipoMovFarmacia('ajuste')">⚖️ Ajuste</button>
+      <button class="page-btn" id="farmacia-tab-compra" onclick="cambiarTipoMovFarmacia('compra')" style="display:none">⬆️ Compra</button>
+      <button class="page-btn" id="farmacia-tab-venta" onclick="cambiarTipoMovFarmacia('venta')" style="display:none">⬇️ Venta/Consumo</button>
+      <button class="page-btn" id="farmacia-tab-ajuste" onclick="cambiarTipoMovFarmacia('ajuste')">⚖️ Ajuste por recuento</button>
+      <span style="font-size:12px;color:var(--text-3)">Compras y ventas manuales desactivadas para no descontar dos veces lo que ya registra el sistema de ventas.</span>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -1629,44 +1630,55 @@
   <div class="page" id="page-farmacia-vencimientos">
     <div class="page-header">
       <div class="page-title">Vencimientos</div>
-      <div class="page-sub">Lotes vencidos y por vencer, con opción de darlos de baja</div>
+      <div class="page-sub">Lotes con saldo según FEFO, actualizados automáticamente desde el sistema de ventas <span id="farmacia-venc-sync" style="margin-left:6px"></span></div>
+    </div>
+    <div class="fpp-resumen" id="farmacia-venc-resumen"></div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="farmacia-venc-tabs"></div>
     </div>
     <div class="toolbar">
-      <label style="color:var(--text-2);font-size:13px">Considerar "por vencer" dentro de</label>
-      <select id="farmacia-venc-dias" onchange="renderVencimientos()" style="margin-left:8px">
-        <option value="30">30 días</option>
-        <option value="60" selected>60 días</option>
-        <option value="90">90 días</option>
-        <option value="180">180 días</option>
-      </select>
-      <div class="search-wrap" style="margin-left:10px">
+      <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="farmacia-venc-search" placeholder="Código o nombre del producto…" oninput="renderVencimientos()" autocomplete="off">
+        <input type="text" id="farmacia-venc-search" placeholder="Código, nombre o lote…" oninput="renderVencimientos()" autocomplete="off">
       </div>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
+        <input type="checkbox" id="farmacia-venc-solo-riesgo" onchange="renderVencimientos()"> Solo con unidades en riesgo
+      </label>
+      <button class="page-btn" style="white-space:nowrap" onclick="cargarVencimientosERP(true)">↻ Actualizar</button>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarVencimientosExcel()">⬇️ Excel</button>
     </div>
-
-    <div class="page-header" style="margin-top:10px">
-      <div class="page-title" style="font-size:16px;color:#d64545">🔴 Vencidos</div>
-    </div>
-    <div id="farmacia-venc-vencidos"></div>
-
-    <div class="page-header" style="margin-top:22px">
-      <div class="page-title" style="font-size:16px;color:#b8860b">🟡 Por vencer</div>
-    </div>
-    <div id="farmacia-venc-porvencer"></div>
+    <div id="farmacia-venc-tabla"></div>
   </div>
 
   <div class="page" id="page-farmacia-conciliacion">
     <div class="page-header">
-      <div class="page-title">Conciliación con maestro del PC</div>
-      <div class="page-sub">Sube el listado actual del PC (Código + Stock) y ajusta automáticamente lo que se vendió durante el catastro, quitando primero los lotes que vencen antes (FEFO)</div>
+      <div class="page-title">Conciliación con el PC</div>
+      <div class="page-sub">Compara automáticamente tus lotes con el stock del sistema de ventas <span id="farmacia-conc-sync" style="margin-left:6px"></span></div>
+    </div>
+    <div class="fpp-resumen" id="farmacia-conc-resumen"></div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="farmacia-conc-tabs"></div>
     </div>
     <div class="toolbar">
-      <button class="page-btn" style="white-space:nowrap" onclick="document.getElementById('farmacia-conciliacion-file').click()">📤 Subir maestro del PC</button>
-      <input type="file" id="farmacia-conciliacion-file" accept=".xlsx,.xlsm" style="display:none" onchange="conciliarConMaestroPC(this.files[0])">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-conc-search" placeholder="Código o nombre del producto…" oninput="renderConciliacionERP()" autocomplete="off">
+      </div>
+      <select id="farmacia-conc-origen" onchange="renderConciliacionERP()">
+        <option value="">Todos los orígenes</option>
+        <option value="catastro">Catastro</option>
+        <option value="estimado_compras">Estimados</option>
+        <option value="recontado">Recontados</option>
+        <option value="inicio_sync">Nuevos / sin stock inicial</option>
+      </select>
+      <button class="page-btn" style="white-space:nowrap" onclick="cargarConciliacionERP(true)">↻ Actualizar</button>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarConciliacionExcel()">⬇️ Excel</button>
     </div>
-    <div id="farmacia-conciliacion-log" style="display:none;margin-bottom:14px"></div>
-    <div id="farmacia-conciliacion-resultado"></div>
+    <div id="farmacia-conc-tabla"></div>
+    <!-- Conciliación antigua por Excel (ya no se usa: ahora es automática) -->
+    <div id="farmacia-conciliacion-log" style="display:none"></div>
+    <div id="farmacia-conciliacion-resultado" style="display:none"></div>
+    <input type="file" id="farmacia-conciliacion-file" style="display:none">
   </div>
 
 </main>
@@ -1900,7 +1912,7 @@ let ocF = [], itemsF = [], hospF = [], fedexF = [];
 let ocPage = 1, itemsPage = 1, hospPage = 1, fedexPage = 1;
 let farmaciaProductos = [], farmaciaFamilias = [], farmaciaLotes = [], farmaciaMovimientos = [];
 let farmaciaProductoSeleccionado = null;
-let farmaciaMovTipo = 'compra';
+let farmaciaMovTipo = 'ajuste';
 let farmaciaMovProductoId = null;
 const PS = 15;
 
@@ -12254,6 +12266,8 @@ function renderStockActual() {
   const familiaId = document.getElementById('farmacia-stock-familia').value;
   const soloBajo = document.getElementById('farmacia-stock-solo-bajo').checked;
 
+  const pcPorCodigo = {};
+  (farmaciaConcData || []).forEach(r => { pcPorCodigo[r.codigo] = r.stock_erp; });
   let filas = farmaciaProductos.map(p => ({ p, total: stockTotalProducto(p.id) }));
   filas = filas.filter(({total}) => total !== 0);
   if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
@@ -12270,7 +12284,7 @@ function renderStockActual() {
   }
   const nota = `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Los productos con stock en 0 no se muestran aquí (siguen guardados en la base de datos).</div>`;
   cont.innerHTML = `${nota}<div class="table-card"><table><thead><tr>
-    <th>Código</th><th>Producto</th><th>Familia</th><th style="text-align:right">Stock actual</th><th style="text-align:right">Mínimo</th>
+    <th>Código</th><th>Producto</th><th>Familia</th><th style="text-align:right">Stock actual</th><th style="text-align:right" title="Stock en el sistema de ventas">En PC</th><th style="text-align:right">Mínimo</th>
   </tr></thead><tbody>
     ${filas.map(({p, total}) => {
       const bajo = p.stock_minimo != null && total < Number(p.stock_minimo);
@@ -12279,6 +12293,7 @@ function renderStockActual() {
         <td data-label="Producto">${p.nombre}</td>
         <td data-label="Familia" style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
         <td data-label="Stock actual" style="text-align:right;font-weight:700;${bajo ? 'color:#d64545' : ''}">${total}</td>
+        <td data-label="En PC" style="text-align:right;${pcPorCodigo[p.codigo] !== undefined && Number(pcPorCodigo[p.codigo]) !== total ? 'color:var(--amber);font-weight:600' : 'color:var(--text-2)'}">${pcPorCodigo[p.codigo] ?? '—'}</td>
         <td data-label="Mínimo" style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
       </tr>`;
     }).join('')}
@@ -12481,24 +12496,40 @@ async function registrarMovimientoFarmacia(productoId) {
 
 function renderHistorialMovFarmacia() {
   const cont = document.getElementById('farmacia-mov-historial');
-  const ultimos = farmaciaMovimientos.slice(0, 50);
+  const ultimos = farmaciaMovimientos.slice(0, 100);
   if (ultimos.length === 0) {
     cont.innerHTML = `<div class="table-card"><div class="empty"><p>Todavía no hay movimientos registrados.</p></div></div>`;
     return;
   }
-  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋', baja: '🗑️' };
-  const nombreTipo = { compra: 'Compra', venta: 'Venta/Consumo', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial', baja: 'Baja por vencimiento' };
+  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋' };
+  const nombreTipo = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial' };
+  const etiqueta = m => {
+    const o = m.archivo_origen || '';
+    if (o === 'baja_vencimiento') return '🗑️ Baja por vencimiento';
+    if (/traspaso local salida/i.test(o)) return '↗️ Traspaso salida';
+    if (/traspaso local entrada/i.test(o)) return '↙️ Traspaso entrada';
+    if (/^ERP anulaci/i.test(o)) return '↩️ Anulación';
+    if (/^Carga inicial ESTIMADA/i.test(o)) return '🧮 Carga inicial estimada';
+    return `${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}`;
+  };
+  const lotePorId = {};
+  farmaciaLotes.forEach(l => { lotePorId[l.id] = l; });
   cont.innerHTML = `<div class="table-card"><table><thead><tr>
-    <th>Fecha</th><th>Tipo</th><th>Producto</th><th style="text-align:right">Cantidad</th>
+    <th>Fecha</th><th>Tipo</th><th>Producto</th><th>Lote</th><th style="text-align:right">Cantidad</th><th>Origen</th>
   </tr></thead><tbody>
     ${ultimos.map(m => {
       const p = farmaciaProductos.find(x => x.id === m.producto_id);
+      const l = lotePorId[m.lote_id];
       const cant = Number(m.cantidad);
+      const desdePC = m.usuario === 'sync-erp';
+      const doc = (m.archivo_origen || '').replace(/^ERP /, '').replace(/^conciliacion_maestro_pc$/, 'Conciliación Excel').replace(/^baja_vencimiento$/, '');
       return `<tr>
         <td data-label="Fecha" style="white-space:nowrap">${fDate(m.fecha)}</td>
-        <td data-label="Tipo" style="white-space:nowrap">${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}</td>
+        <td data-label="Tipo" style="white-space:nowrap">${etiqueta(m)}</td>
         <td data-label="Producto">${p ? `${p.codigo} — ${p.nombre}` : '—'}</td>
-        <td data-label="Cantidad" style="text-align:right;font-weight:600;${cant < 0 ? 'color:#d64545' : ''}">${cant > 0 && m.tipo !== 'ajuste' ? '' : ''}${cant}</td>
+        <td data-label="Lote" class="mono" style="white-space:nowrap">${l ? `${l.lote || 's/n'}${l.vencimiento ? ` · ${fDate(l.vencimiento)}` : ''}` : '—'}</td>
+        <td data-label="Cantidad" style="text-align:right;font-weight:600;${cant < 0 ? 'color:#d64545' : ''}">${cant}</td>
+        <td data-label="Origen" style="font-size:12px;color:var(--text-2)">${desdePC ? '<span class="badge badge-blue">Sistema de ventas</span>' : '<span class="badge badge-gray">App</span>'} ${doc}</td>
       </tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -12511,46 +12542,298 @@ function diasEntre(fechaISO) {
   return Math.round((venc - hoy) / 86400000);
 }
 
+// ─── FARMACIA: VENCIMIENTOS (sincronizado con el sistema de ventas, FEFO) ──
+// Los lotes se mantienen solos: cada 30 min el servidor de la farmacia envía
+// ventas, traspasos y compras del sistema de ventas (SenegPOS) a Supabase, y la
+// función erp_procesar() descuenta con FEFO. Acá solo leemos las vistas
+// v_farmacia_vencimientos, v_farmacia_conciliacion y v_erp_sync_estado.
+let farmaciaVencData = null, farmaciaVencCargadoEn = 0, farmaciaVencTab = 'Vencido';
+let farmaciaConcData = null, farmaciaConcCargadoEn = 0, farmaciaConcTab = 'dif';
+let farmaciaSyncEstado = null;
+let farmaciaDatosCargadosEn = Date.now();
+
+const FARM_VENC_TABS = [
+  { id: 'Vencido',             label: 'Vencidos',            color: 'var(--red)' },
+  { id: 'Pronto vencimiento',  label: 'Pronto vencimiento',  color: 'var(--amber)' },
+  { id: 'Por vencer',          label: 'Por vencer',          color: '' },
+  { id: 'Vigente',             label: 'Vigentes',            color: '' },
+  { id: 'Sin vencimiento',     label: 'Sin vencimiento',     color: '' },
+  { id: 'Sin lote registrado', label: 'Sin lote',            color: '' },
+];
+
+const farmNum = n => (n === null || n === undefined || n === '') ? '—' : Number(n).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+const farmClp = n => (n === null || n === undefined || n === '' || Number(n) === 0) ? '—' : '$ ' + Math.round(Number(n)).toLocaleString('es-CL');
+const farmEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function farmOrigenBadge(origen) {
+  if (origen === 'estimado_compras') return `<span class="badge badge-amber" title="Lote estimado desde las compras del sistema de ventas: falta verificar contando">Estimado</span>`;
+  if (origen === 'recontado') return `<span class="badge badge-green" title="Producto estimado que ya fue contado en la app">Recontado</span>`;
+  if (origen === 'catastro') return `<span class="badge badge-blue" title="Partió del catastro físico">Catastro</span>`;
+  if (origen === 'inicio_sync' || origen === 'producto_nuevo') return `<span class="badge badge-gray" title="Sin stock al activar la sincronización">Nuevo</span>`;
+  return '';
+}
+
+// Recarga lotes/movimientos/productos si los datos en memoria tienen más de 5 min
+// (el servidor los va cambiando mientras la app está abierta).
+async function refrescarDatosFarmacia(forzar = false) {
+  if (!forzar && Date.now() - farmaciaDatosCargadosEn < 5 * 60 * 1000) return;
+  const [lotes, movs, prods] = await Promise.all([
+    fetchAll('farmacia_lotes', 'select=*'),
+    fetchAll('farmacia_movimientos', 'select=*&order=creado_en.desc'),
+    fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
+  ]);
+  if (Array.isArray(lotes) && lotes.length) farmaciaLotes = lotes;
+  if (Array.isArray(movs) && movs.length) farmaciaMovimientos = movs;
+  if (Array.isArray(prods) && prods.length) farmaciaProductos = prods;
+  farmaciaDatosCargadosEn = Date.now();
+}
+
+async function cargarEstadoSyncFarmacia() {
+  try {
+    const res = await sb('v_erp_sync_estado?select=*');
+    if (res.ok) { const r = await res.json(); farmaciaSyncEstado = r[0] || null; }
+  } catch (e) { /* sin estado: no bloquea */ }
+}
+
+function htmlEstadoSyncFarmacia() {
+  if (!farmaciaSyncEstado || !farmaciaSyncEstado.ultima_sync) return `<span class="badge-estado neutral">Sin sincronizaciones aún</span>`;
+  const min = Math.round((Date.now() - new Date(farmaciaSyncEstado.ultima_sync).getTime()) / 60000);
+  const txt = min < 1 ? 'hace menos de 1 min' : min < 60 ? `hace ${min} min` : `hace ${Math.floor(min / 60)} h ${min % 60} min`;
+  const cls = min <= 45 ? 'ok' : min <= 120 ? 'warn' : 'err';
+  const extra = min > 120 ? ' — revisar el servidor de la farmacia' : '';
+  return `<span class="badge-estado ${cls}" title="El servidor de la farmacia envía datos cada 30 minutos">Sincronizado ${txt}${extra}</span>`;
+}
+
+async function cargarVencimientosERP(forzar = false) {
+  const cont = document.getElementById('farmacia-venc-tabla');
+  if (!forzar && farmaciaVencData && Date.now() - farmaciaVencCargadoEn < 5 * 60 * 1000) { renderVencimientos(); return; }
+  if (!farmaciaVencData && cont) cont.innerHTML = `<div class="table-card"><div class="empty"><p>Cargando vencimientos…</p></div></div>`;
+  const [rows] = await Promise.all([
+    fetchAll('v_farmacia_vencimientos', 'select=*'),
+    cargarEstadoSyncFarmacia(),
+    refrescarDatosFarmacia(forzar),
+  ]);
+  farmaciaVencData = Array.isArray(rows) ? rows : [];
+  farmaciaVencCargadoEn = Date.now();
+  renderVencimientos();
+}
+
+function farmVencSetTab(id) { farmaciaVencTab = id; renderVencimientos(); }
+
+function farmVencFiltradas() {
+  const q = (document.getElementById('farmacia-venc-search')?.value || '').trim().toLowerCase();
+  const soloRiesgo = document.getElementById('farmacia-venc-solo-riesgo')?.checked;
+  let filas = farmaciaVencData || [];
+  if (q) filas = filas.filter(r => (r.codigo || '').toLowerCase().includes(q) || (r.nombre || '').toLowerCase().includes(q) || (r.lote || '').toLowerCase().includes(q));
+  if (soloRiesgo) filas = filas.filter(r => Number(r.unid_en_riesgo) > 0);
+  return filas;
+}
+
 function renderVencimientos() {
-  const q = (document.getElementById('farmacia-venc-search').value || '').trim().toLowerCase();
-  const diasLimite = Number(document.getElementById('farmacia-venc-dias').value);
+  const syncEl = document.getElementById('farmacia-venc-sync');
+  if (syncEl) syncEl.innerHTML = htmlEstadoSyncFarmacia();
+  if (!farmaciaVencData) return;
 
-  let filas = farmaciaLotes
-    .filter(l => l.vencimiento && Number(l.cantidad) > 0)
-    .map(l => ({ l, p: farmaciaProductos.find(x => x.id === l.producto_id), dias: diasEntre(l.vencimiento) }))
-    .filter(({p}) => p);
+  const todas = farmaciaVencData;
+  const sum = (arr, k) => arr.reduce((s, r) => s + Number(r[k] || 0), 0);
+  const de = cat => todas.filter(r => r.categoria === cat);
+  const vencidos = de('Vencido'), pronto = de('Pronto vencimiento'), porVencer = de('Por vencer');
+  const valorRiesgo = sum(vencidos, 'valor_riesgo') + sum(pronto, 'valor_riesgo') + sum(porVencer, 'valor_riesgo');
+  document.getElementById('farmacia-venc-resumen').innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Vencidos con stock</div><div class="stat-val" style="font-size:20px">${vencidos.length} lote${vencidos.length === 1 ? '' : 's'}</div><div class="stat-sub">${farmNum(sum(vencidos, 'cantidad'))} unid. · ${farmClp(sum(vencidos, 'valor_riesgo'))} a costo</div></div>
+    <div class="stat"><div class="stat-label">Vencen en ≤ 90 días</div><div class="stat-val" style="font-size:16px">${pronto.length} lote${pronto.length === 1 ? '' : 's'}</div><div class="stat-sub">${farmNum(sum(pronto, 'unid_en_riesgo'))} unid. no alcanzan a venderse</div></div>
+    <div class="stat"><div class="stat-label">Plata en riesgo (≤ 1 año)</div><div class="stat-val" style="font-size:16px">${farmClp(valorRiesgo)}</div><div class="stat-sub">Unidades que al ritmo de venta actual vencerían</div></div>
+    <div class="stat"><div class="stat-label">Sin vencimiento / sin lote</div><div class="stat-val" style="font-size:16px">${farmNum(sum(de('Sin vencimiento'), 'cantidad') + sum(de('Sin lote registrado'), 'cantidad'))} unid.</div><div class="stat-sub">Stock sin fecha conocida: verificar al contar</div></div>`;
 
-  if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
+  const filtradas = farmVencFiltradas();
+  const cuenta = {};
+  FARM_VENC_TABS.forEach(t => cuenta[t.id] = filtradas.filter(r => r.categoria === t.id).length);
+  document.getElementById('farmacia-venc-tabs').innerHTML = FARM_VENC_TABS.map(t =>
+    `<button class="fpp-status-tab${farmaciaVencTab === t.id ? ' active' : ''}" style="${farmaciaVencTab === t.id && t.color ? `color:${t.color}` : ''}" onclick="farmVencSetTab('${t.id}')">${t.label} (${cuenta[t.id]})</button>`
+  ).join('');
 
-  const vencidos = filas.filter(f => f.dias < 0).sort((a, b) => a.dias - b.dias);
-  const porVencer = filas.filter(f => f.dias >= 0 && f.dias <= diasLimite).sort((a, b) => a.dias - b.dias);
+  let filas = filtradas.filter(r => r.categoria === farmaciaVencTab);
+  const conFecha = ['Vencido', 'Pronto vencimiento', 'Por vencer', 'Vigente'].includes(farmaciaVencTab);
+  filas.sort((a, b) => conFecha
+    ? (a.dias_para_vencer - b.dias_para_vencer) || (Number(b.valor_riesgo || 0) - Number(a.valor_riesgo || 0))
+    : Number(b.cantidad || 0) - Number(a.cantidad || 0));
+  const total = filas.length;
+  filas = filas.slice(0, 400);
 
-  const filaHtml = (f, esVencido) => `
-    <tr>
-      <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${f.p.codigo}</td>
-      <td data-label="Producto">${f.p.nombre}</td>
-      <td data-label="Lote" class="mono">${f.l.lote || '—'}</td>
-      <td data-label="Vencimiento" style="white-space:nowrap">${fDate(f.l.vencimiento)}</td>
-      <td data-label="Estado" style="white-space:nowrap;font-weight:600;${esVencido ? 'color:#d64545' : 'color:#b8860b'}">
-        ${esVencido ? `Venció hace ${Math.abs(f.dias)} día${Math.abs(f.dias) === 1 ? '' : 's'}` : (f.dias === 0 ? 'Vence hoy' : `Vence en ${f.dias} día${f.dias === 1 ? '' : 's'}`)}
-      </td>
-      <td data-label="Cantidad" style="text-align:right">${f.l.cantidad}</td>
-      <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="darDeBajaLote(${f.l.id})">Dar de baja</button></td>
-    </tr>`;
+  const cont = document.getElementById('farmacia-venc-tabla');
+  if (total === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaVencTab === 'Vencido' ? 'No hay lotes vencidos con stock. 🎉' : 'No hay lotes en esta categoría.'}</p></div></div>`;
+    return;
+  }
 
-  const tabla = (arr, esVencido, vacioMsg) => arr.length === 0
-    ? `<div class="table-card"><div class="empty"><p>${vacioMsg}</p></div></div>`
-    : `<div class="table-card"><table><thead><tr>
-        <th>Código</th><th>Producto</th><th>Lote</th><th>Vencimiento</th><th></th><th style="text-align:right">Cantidad</th><th></th>
-      </tr></thead><tbody>${arr.map(f => filaHtml(f, esVencido)).join('')}</tbody></table></div>`;
+  const estadoTxt = r => {
+    if (r.dias_para_vencer === null || r.dias_para_vencer === undefined) return '—';
+    const d = Number(r.dias_para_vencer);
+    if (d < 0) return `<span style="color:var(--red);font-weight:600">Venció hace ${Math.abs(d)} día${Math.abs(d) === 1 ? '' : 's'}</span>`;
+    if (d === 0) return `<span style="color:var(--red);font-weight:600">Vence hoy</span>`;
+    return `<span style="${d <= 90 ? 'color:var(--amber);font-weight:600' : 'color:var(--text-2)'}">en ${d} día${d === 1 ? '' : 's'}</span>`;
+  };
 
-  document.getElementById('farmacia-venc-vencidos').innerHTML = tabla(vencidos, true, 'No hay lotes vencidos. 🎉');
-  document.getElementById('farmacia-venc-porvencer').innerHTML = tabla(porVencer, false, 'No hay lotes por vencer en ese rango.');
+  const nota = farmaciaVencTab === 'Sin lote registrado'
+    ? 'Productos con stock en el sistema de ventas pero sin ningún lote con saldo en Control Farmacia. Al contarlos en Catastro quedan con lote y vencimiento.'
+    : farmaciaVencTab === 'Sin vencimiento'
+    ? 'Stock que entró sin vencimiento (compras antiguas o traspasos). FEFO lo descuenta al final; conviene contarlo para asignarle fecha.'
+    : '"En riesgo" = unidades que, al ritmo de salida de los últimos 90 días, no alcanzan a venderse antes de vencer (descontando primero los lotes que vencen antes). Lotes "Estimado" vienen de las compras y falta verificarlos contando.';
+
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);padding:6px 2px">${nota}${total > 400 ? ` Mostrando 400 de ${total}; usa el buscador para acotar.` : ''}</div>
+    <div class="table-card"><table><thead><tr>
+      <th>Código</th><th>Producto</th><th>Lote</th><th>Vence</th>
+      <th style="text-align:right">Cantidad</th><th style="text-align:right" title="Unidades que salen por día (ventas + traspasos, últimos 90 días)">Salida/día</th>
+      <th style="text-align:right">En riesgo</th><th style="text-align:right">$ riesgo</th><th>Origen</th><th style="width:1%"></th>
+    </tr></thead><tbody>
+      ${filas.map(r => `
+        <tr>
+          <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${farmEsc(r.codigo)}</td>
+          <td data-label="Producto">${farmEsc(r.nombre)}</td>
+          <td data-label="Lote" class="mono">${farmEsc(r.lote || '—')}</td>
+          <td data-label="Vence" style="white-space:nowrap">${r.venc_efectiva ? fDate(r.venc_efectiva) : '—'}${r.venc_efectiva ? `<div style="font-size:12px">${estadoTxt(r)}</div>` : ''}</td>
+          <td data-label="Cantidad" style="text-align:right;font-weight:600">${farmNum(r.cantidad)}</td>
+          <td data-label="Salida/día" style="text-align:right;color:var(--text-2)">${Number(r.venta_diaria_90d) > 0 ? farmNum(r.venta_diaria_90d) : (conFecha ? '<span title="Sin salidas en 90 días">0</span>' : '—')}</td>
+          <td data-label="En riesgo" style="text-align:right;${Number(r.unid_en_riesgo) > 0 ? 'color:var(--red);font-weight:600' : 'color:var(--text-3)'}">${r.unid_en_riesgo === null ? '—' : farmNum(Math.round(Number(r.unid_en_riesgo)))}</td>
+          <td data-label="$ riesgo" style="text-align:right;white-space:nowrap">${farmClp(r.valor_riesgo)}</td>
+          <td data-label="Origen">${farmOrigenBadge(r.origen_base)}</td>
+          <td style="text-align:right"><div style="display:flex;gap:4px;justify-content:flex-end">
+            ${r.lote_id ? `<button class="page-btn" style="padding:3px 8px;font-size:11px" onclick="darDeBajaLote(${r.lote_id})" title="Dar de baja unidades de este lote">Baja</button>` : ''}
+            <button class="page-btn" style="padding:3px 8px;font-size:11px" onclick="irARecontarFarmacia('${farmEsc(r.codigo)}')" title="Abrir en Catastro para contar">Contar</button>
+          </div></td>
+        </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function descargarVencimientosExcel() {
+  if (!farmaciaVencData || typeof XLSX === 'undefined') { toast('Todavía no hay datos para descargar.', 'err'); return; }
+  const filas = farmVencFiltradas().map(r => ({
+    'Categoría': r.categoria, 'Código': r.codigo, 'Producto': r.nombre, 'Lote': r.lote || '',
+    'Vence': r.venc_efectiva || '', 'Días para vencer': r.dias_para_vencer ?? '', 'Cantidad': Number(r.cantidad),
+    'Salida diaria (90d)': Number(r.venta_diaria_90d || 0), 'Unid. en riesgo': r.unid_en_riesgo === null ? '' : Math.round(Number(r.unid_en_riesgo)),
+    'Costo unit.': r.costo_neto === null ? '' : Number(r.costo_neto), '$ en riesgo': r.valor_riesgo === null ? '' : Number(r.valor_riesgo),
+    'Origen': r.origen_base || '',
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Vencimientos');
+  XLSX.writeFile(wb, `vencimientos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// Abre Catastro con el producto ya buscado, para contarlo.
+function irARecontarFarmacia(codigo) {
+  irAModuloPagina('farmacia-modulo', 'farmacia-catastro');
+  setTimeout(() => {
+    const input = document.getElementById('farmacia-search');
+    if (input) { input.value = codigo; buscarProductoFarmacia(codigo); }
+    const p = farmaciaProductos.find(x => x.codigo === codigo);
+    if (p) seleccionarProductoFarmacia(p.id);
+  }, 50);
+}
+
+// ─── FARMACIA: CONCILIACIÓN AUTOMÁTICA CON EL PC (sistema de ventas) ───────
+async function cargarConciliacionERP(forzar = false, silencioso = false) {
+  if (!forzar && farmaciaConcData && Date.now() - farmaciaConcCargadoEn < 5 * 60 * 1000) { if (!silencioso) renderConciliacionERP(); return; }
+  const cont = document.getElementById('farmacia-conc-tabla');
+  if (!silencioso && !farmaciaConcData && cont) cont.innerHTML = `<div class="table-card"><div class="empty"><p>Cargando conciliación…</p></div></div>`;
+  const [rows] = await Promise.all([fetchAll('v_farmacia_conciliacion', 'select=*'), cargarEstadoSyncFarmacia()]);
+  farmaciaConcData = Array.isArray(rows) ? rows : [];
+  farmaciaConcCargadoEn = Date.now();
+  if (!silencioso) renderConciliacionERP();
+}
+
+function farmConcSetTab(id) { farmaciaConcTab = id; renderConciliacionERP(); }
+
+function farmConcFiltradas() {
+  const q = (document.getElementById('farmacia-conc-search')?.value || '').trim().toLowerCase();
+  const origen = document.getElementById('farmacia-conc-origen')?.value || '';
+  let filas = farmaciaConcData || [];
+  if (q) filas = filas.filter(r => (r.codigo || '').toLowerCase().includes(q) || (r.nombre || '').toLowerCase().includes(q));
+  if (origen) filas = filas.filter(r => (r.origen_base || '') === origen);
+  return filas;
+}
+
+function renderConciliacionERP() {
+  const syncEl = document.getElementById('farmacia-conc-sync');
+  if (syncEl) syncEl.innerHTML = htmlEstadoSyncFarmacia();
+  if (!farmaciaConcData) return;
+
+  const todas = farmaciaConcData.filter(r => r.stock_erp !== null);
+  const cuadran = todas.filter(r => Number(r.diferencia) === 0);
+  const conDif = todas.filter(r => Number(r.diferencia) !== 0 && Number(r.stock_erp) >= 0);  // los negativos del PC van aparte
+  const valorDif = conDif.reduce((s, r) => s + Math.abs(Number(r.diferencia)) * Number(r.costo_neto || 0), 0);
+  const pct = todas.length ? Math.round(cuadran.length * 100 / todas.length) : 0;
+  document.getElementById('farmacia-conc-resumen').innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Cuadran con el PC</div><div class="stat-val" style="font-size:20px">${pct}%</div><div class="stat-sub">${cuadran.length} de ${todas.length} productos</div></div>
+    <div class="stat"><div class="stat-label">Con diferencia</div><div class="stat-val" style="font-size:16px">${conDif.length}</div><div class="stat-sub">${conDif.filter(r => Math.abs(Number(r.diferencia)) > 1).length} con más de 1 unidad</div></div>
+    <div class="stat"><div class="stat-label">Diferencia valorizada</div><div class="stat-val" style="font-size:16px">${farmClp(valorDif)}</div><div class="stat-sub">Suma de |diferencia| × costo</div></div>
+    <div class="stat"><div class="stat-label">Stock negativo en el PC</div><div class="stat-val" style="font-size:16px">${todas.filter(r => Number(r.stock_erp) < 0).length}</div><div class="stat-sub">Corregir con ajuste en el sistema de ventas</div></div>`;
+
+  const filtradas = farmConcFiltradas();
+  const grupos = {
+    dif: filtradas.filter(r => r.stock_erp !== null && Number(r.diferencia) !== 0 && Number(r.stock_erp) >= 0),
+    neg: filtradas.filter(r => Number(r.stock_erp) < 0 || r.tiene_negativos),
+    cuadra: filtradas.filter(r => r.stock_erp !== null && Number(r.diferencia) === 0),
+    todos: filtradas,
+  };
+  const tabs = [
+    { id: 'dif', label: 'Para recontar' }, { id: 'neg', label: 'Negativos' },
+    { id: 'cuadra', label: 'Cuadran' }, { id: 'todos', label: 'Todos' },
+  ];
+  document.getElementById('farmacia-conc-tabs').innerHTML = tabs.map(t =>
+    `<button class="fpp-status-tab${farmaciaConcTab === t.id ? ' active' : ''}" onclick="farmConcSetTab('${t.id}')">${t.label} (${grupos[t.id].length})</button>`
+  ).join('');
+
+  let filas = grupos[farmaciaConcTab].slice()
+    .sort((a, b) => (Math.abs(Number(b.diferencia)) * Number(b.costo_neto || 1)) - (Math.abs(Number(a.diferencia)) * Number(a.costo_neto || 1)));
+  const total = filas.length;
+  filas = filas.slice(0, 400);
+  const cont = document.getElementById('farmacia-conc-tabla');
+  if (total === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaConcTab === 'dif' ? 'Todo cuadra con el PC. 🎉' : 'No hay productos en esta categoría.'}</p></div></div>`;
+    return;
+  }
+  const nota = farmaciaConcTab === 'neg'
+    ? 'Stock negativo en el sistema de ventas (error de datos del PC) o lotes negativos en Control Farmacia (se vendió más de lo registrado). Ambos se corrigen contando.'
+    : '"En lotes" es lo que Control Farmacia tiene después de aplicar ventas, traspasos y compras con FEFO; "En PC" es el stock del sistema de ventas. Si al contar confirmas el número del PC, ajústalo en Catastro.';
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);padding:6px 2px">${nota}${total > 400 ? ` Mostrando 400 de ${total}.` : ''}</div>
+    <div class="table-card"><table><thead><tr>
+      <th>Código</th><th>Producto</th><th style="text-align:right">En lotes</th><th style="text-align:right">En PC</th>
+      <th style="text-align:right">Diferencia</th><th>Estado</th><th>Origen</th><th></th>
+    </tr></thead><tbody>
+      ${filas.map(r => {
+        const d = Number(r.diferencia);
+        const est = r.estado === 'Cuadra' ? 'ok' : Math.abs(d) > 1 ? 'err' : 'warn';
+        return `<tr>
+          <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${farmEsc(r.codigo)}</td>
+          <td data-label="Producto">${farmEsc(r.nombre)}</td>
+          <td data-label="En lotes" style="text-align:right;font-weight:600;${r.tiene_negativos ? 'color:var(--red)' : ''}">${farmNum(r.stock_lotes)}</td>
+          <td data-label="En PC" style="text-align:right;${Number(r.stock_erp) < 0 ? 'color:var(--red)' : ''}">${farmNum(r.stock_erp)}</td>
+          <td data-label="Diferencia" style="text-align:right;font-weight:600;${d === 0 ? 'color:var(--text-3)' : d > 0 ? 'color:var(--amber)' : 'color:var(--red)'}">${d > 0 ? '+' : ''}${farmNum(d)}</td>
+          <td data-label="Estado"><span class="badge-estado ${est}">${farmEsc(r.estado)}</span></td>
+          <td data-label="Origen">${farmOrigenBadge(r.origen_base)}</td>
+          <td style="text-align:right"><button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="irARecontarFarmacia('${farmEsc(r.codigo)}')">Contar</button></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`;
+}
+
+function descargarConciliacionExcel() {
+  if (!farmaciaConcData || typeof XLSX === 'undefined') { toast('Todavía no hay datos para descargar.', 'err'); return; }
+  const filas = farmConcFiltradas().map(r => ({
+    'Código': r.codigo, 'Producto': r.nombre, 'En lotes': Number(r.stock_lotes), 'En PC': r.stock_erp === null ? '' : Number(r.stock_erp),
+    'Diferencia': Number(r.diferencia), 'Estado': r.estado, 'Origen': r.origen_base || '', 'Costo unit.': r.costo_neto === null ? '' : Number(r.costo_neto),
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Conciliación');
+  XLSX.writeFile(wb, `conciliacion_pc_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 async function darDeBajaLote(loteId) {
+  await refrescarDatosFarmacia(true); // saldo real del lote (el servidor lo va actualizando)
   const lote = farmaciaLotes.find(l => l.id === loteId);
-  if (!lote) return;
+  if (!lote) { toast('No encontré ese lote.', 'err'); return; }
   const p = farmaciaProductos.find(x => x.id === lote.producto_id);
   const entrada = await promptModal(`Dar de baja "${p ? p.nombre : ''}" (lote ${lote.lote || 'sin número'}).\nCantidad disponible: ${lote.cantidad}.\n¿Cuánto quieres dar de baja?`, lote.cantidad);
   if (entrada === null) return;
@@ -12558,15 +12841,17 @@ async function darDeBajaLote(loteId) {
   if (!cantidad || cantidad <= 0 || cantidad > Number(lote.cantidad)) { toast('Cantidad inválida.', 'err'); return; }
 
   const nuevaCantidad = Number(lote.cantidad) - cantidad;
-  await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+  const resLote = await sb(`farmacia_lotes?id=eq.${lote.id}`, { method: 'PATCH', body: JSON.stringify({ cantidad: nuevaCantidad, actualizado_en: new Date().toISOString() }) });
+  if (!resLote.ok) { toast('No se pudo actualizar el lote.', 'err'); return; }
   lote.cantidad = nuevaCantidad;
+  // La tabla solo acepta compra/venta/ajuste/catastro_inicial: la baja es un ajuste marcado como tal.
   const movRes = await sb('farmacia_movimientos', {
     method: 'POST', headers: { 'Prefer': 'return=representation' },
-    body: JSON.stringify([{ tipo: 'baja', producto_id: lote.producto_id, lote_id: lote.id, cantidad: -cantidad, fecha: new Date().toISOString().slice(0, 10) }]),
+    body: JSON.stringify([{ tipo: 'ajuste', producto_id: lote.producto_id, lote_id: lote.id, cantidad: -cantidad, fecha: new Date().toISOString().slice(0, 10), archivo_origen: 'baja_vencimiento' }]),
   });
-  const movFilas = await movRes.json();
-  farmaciaMovimientos.unshift(movFilas[0]);
-  renderVencimientos();
+  if (movRes.ok) { const movFilas = await movRes.json(); farmaciaMovimientos.unshift(movFilas[0]); }
+  else toast('El lote se descontó, pero no se pudo registrar el movimiento.', 'err');
+  await cargarVencimientosERP(true);
   toast('Baja registrada');
 }
 
@@ -12728,15 +13013,20 @@ showPage = function(id, el) {
     if (!document.getElementById('farmacia-tab-compra').classList.contains('active') &&
         !document.getElementById('farmacia-tab-venta').classList.contains('active') &&
         !document.getElementById('farmacia-tab-ajuste').classList.contains('active')) {
-      cambiarTipoMovFarmacia('compra');
+      cambiarTipoMovFarmacia('ajuste');
     }
     renderHistorialMovFarmacia();
+    refrescarDatosFarmacia().then(() => renderHistorialMovFarmacia());
   }
   if (id === 'farmacia-stock') {
     renderStockActual();
+    Promise.all([refrescarDatosFarmacia(), cargarConciliacionERP(false, true)]).then(() => renderStockActual());
   }
   if (id === 'farmacia-vencimientos') {
-    renderVencimientos();
+    cargarVencimientosERP();
+  }
+  if (id === 'farmacia-conciliacion') {
+    cargarConciliacionERP();
   }
   if (id === 'facturas-productos') {
     cargarProductosFacturas();
