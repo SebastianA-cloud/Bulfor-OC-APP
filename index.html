@@ -819,6 +819,7 @@
         <div class="nav-item nav-subitem" data-page="farmacia-stock" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-stock',this)"><span>Stock actual</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-movimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-movimientos',this)"><span>Movimientos</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-vencimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-vencimientos',this)"><span>Vencimientos</span></div>
+        <div class="nav-item nav-subitem" data-page="farmacia-compras" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-compras',this)"><span>Sugerencia de compra</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-conciliacion" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-conciliacion',this)"><span>Conciliación con PC</span></div>
       </div>
     </div>
@@ -1584,19 +1585,23 @@
   <div class="page" id="page-farmacia-stock">
     <div class="page-header">
       <div class="page-title">Stock actual</div>
-      <div class="page-sub">Existencias por producto (suma de lotes, actualizada con FEFO desde el sistema de ventas). "En PC" en ámbar = no cuadra con el sistema de ventas.</div>
+      <div class="page-sub">Existencias por producto (suma de lotes, actualizada con FEFO desde el sistema de ventas) comparadas con el stock del PC</div>
+    </div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="farmacia-stock-tabs"></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="farmacia-stock-search" placeholder="Código o nombre del producto…" oninput="renderStockActual()" autocomplete="off">
+        <input type="text" id="farmacia-stock-search" placeholder="Código o nombre del producto…" oninput="farmStockFiltro()" autocomplete="off">
       </div>
-      <select id="farmacia-stock-familia" onchange="renderStockActual()" style="margin-left:10px">
+      <select id="farmacia-stock-familia" onchange="farmStockFiltro()" style="margin-left:10px">
         <option value="">Todas las familias</option>
       </select>
       <label style="display:flex;align-items:center;gap:6px;margin-left:10px;color:var(--text-2);font-size:13px">
-        <input type="checkbox" id="farmacia-stock-solo-bajo" onchange="renderStockActual()"> Solo bajo el mínimo
+        <input type="checkbox" id="farmacia-stock-solo-bajo" onchange="farmStockFiltro()"> Solo bajo el mínimo
       </label>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarStockExcel()">⬇️ Excel</button>
     </div>
     <div id="farmacia-stock-resultados"></div>
   </div>
@@ -1648,6 +1653,48 @@
       <button class="page-btn" style="white-space:nowrap" onclick="descargarVencimientosExcel()">⬇️ Excel</button>
     </div>
     <div id="farmacia-venc-tabla"></div>
+  </div>
+
+  <div class="page" id="page-farmacia-compras">
+    <div class="page-header">
+      <div class="page-title">Sugerencia de compra</div>
+      <div class="page-sub">Elige un rango de ventas y para cuántos días quieres comprar: te sugiero cuánto pedir de cada producto, agrupado por proveedor</div>
+    </div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="farmacia-compras-rangos"></div>
+    </div>
+    <div class="toolbar">
+      <label style="font-size:13px;color:var(--text-2)">Desde</label>
+      <input type="date" id="farmacia-compras-desde" onchange="farmComprasFechaManual()">
+      <label style="font-size:13px;color:var(--text-2)">Hasta</label>
+      <input type="date" id="farmacia-compras-hasta" onchange="farmComprasFechaManual()">
+      <label style="font-size:13px;color:var(--text-2);margin-left:8px">Comprar para</label>
+      <select id="farmacia-compras-cobertura" onchange="cargarSugerenciaCompra()">
+        <option value="7">7 días</option>
+        <option value="15">15 días</option>
+        <option value="30" selected>30 días</option>
+        <option value="45">45 días</option>
+        <option value="60">60 días</option>
+        <option value="90">90 días</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
+        <input type="checkbox" id="farmacia-compras-traspasos" checked onchange="cargarSugerenciaCompra()"> Incluir traspasos de salida
+      </label>
+    </div>
+    <div class="fpp-resumen" id="farmacia-compras-resumen"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="farmacia-compras-search" placeholder="Código, producto o proveedor…" oninput="renderSugerenciaCompra()" autocomplete="off">
+      </div>
+      <select id="farmacia-compras-proveedor" onchange="renderSugerenciaCompra()"><option value="">Todos los proveedores</option></select>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
+        <input type="checkbox" id="farmacia-compras-solo" checked onchange="renderSugerenciaCompra()"> Solo lo que hay que comprar
+      </label>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarPedidoExcel()">⬇️ Descargar pedido (Excel)</button>
+    </div>
+    <div id="farmacia-compras-nota" style="font-size:12px;color:var(--text-3);padding:0 2px 8px"></div>
+    <div id="farmacia-compras-tabla"></div>
   </div>
 
   <div class="page" id="page-farmacia-conciliacion">
@@ -12260,44 +12307,116 @@ function poblarSelectFamiliasStock() {
   });
 }
 
-function renderStockActual() {
+let farmaciaStockTab = 'stock';
+let farmaciaStockLimite = 300;
+
+function farmStockFiltro() { farmaciaStockLimite = 300; renderStockActual(); }
+function farmStockSetTab(id) { farmaciaStockTab = id; farmaciaStockLimite = 300; renderStockActual(); }
+function farmStockMas() { farmaciaStockLimite += 300; renderStockActual(); }
+
+// Arma todas las filas (lotes + stock del PC) y las agrupa por pestaña
+function farmStockFilas() {
   poblarSelectFamiliasStock();
   const q = (document.getElementById('farmacia-stock-search').value || '').trim().toLowerCase();
   const familiaId = document.getElementById('farmacia-stock-familia').value;
   const soloBajo = document.getElementById('farmacia-stock-solo-bajo').checked;
 
   const pcPorCodigo = {};
-  (farmaciaConcData || []).forEach(r => { pcPorCodigo[r.codigo] = r.stock_erp; });
-  let filas = farmaciaProductos.map(p => ({ p, total: stockTotalProducto(p.id) }));
-  filas = filas.filter(({total}) => total !== 0);
+  (farmaciaConcData || []).forEach(r => { pcPorCodigo[r.codigo] = r.stock_erp === null ? undefined : Number(r.stock_erp); });
+  const totPorId = {}, negPorId = {};
+  farmaciaLotes.forEach(l => {
+    const c = Number(l.cantidad || 0);
+    totPorId[l.producto_id] = (totPorId[l.producto_id] || 0) + c;
+    if (c < 0) negPorId[l.producto_id] = true;
+  });
+
+  let filas = farmaciaProductos.map(p => {
+    const total = totPorId[p.id] || 0;
+    const pc = pcPorCodigo[p.codigo];
+    return { p, total, pc, dif: pc === undefined ? null : total - pc, loteNeg: !!negPorId[p.id] };
+  }).filter(f => f.total !== 0 || (f.pc !== undefined && f.pc !== 0) || f.loteNeg);
+
   if (q) filas = filas.filter(({p}) => p.codigo.toLowerCase().includes(q) || p.nombre.toLowerCase().includes(q));
   if (familiaId) filas = filas.filter(({p}) => String(p.familia_id) === familiaId);
   if (soloBajo) filas = filas.filter(({p, total}) => p.stock_minimo != null && total < Number(p.stock_minimo));
 
-  filas.sort((a, b) => a.p.nombre.localeCompare(b.p.nombre));
-  filas = filas.slice(0, 300);
+  return {
+    stock: filas.filter(f => f.total > 0 || (f.pc !== undefined && f.pc > 0)),
+    neg: filas.filter(f => (f.pc !== undefined && f.pc < 0) || f.total < 0 || f.loteNeg),
+    dif: filas.filter(f => f.dif !== null && f.dif !== 0),
+    todos: filas,
+  };
+}
+
+function renderStockActual() {
+  const grupos = farmStockFilas();
+  const tabs = [
+    { id: 'stock', label: 'Con stock' }, { id: 'neg', label: 'Negativos' },
+    { id: 'dif', label: 'No cuadra con PC' }, { id: 'todos', label: 'Todos' },
+  ];
+  document.getElementById('farmacia-stock-tabs').innerHTML = tabs.map(t =>
+    `<button class="fpp-status-tab${farmaciaStockTab === t.id ? ' active' : ''}" style="${farmaciaStockTab === t.id && t.id === 'neg' ? 'color:var(--red)' : ''}" onclick="farmStockSetTab('${t.id}')">${t.label} (${grupos[t.id].length.toLocaleString('es-CL')})</button>`
+  ).join('');
+
+  let filas = grupos[farmaciaStockTab].slice();
+  if (farmaciaStockTab === 'neg') filas.sort((a, b) => Math.min(a.pc ?? 0, a.total) - Math.min(b.pc ?? 0, b.total) || a.p.nombre.localeCompare(b.p.nombre));
+  else if (farmaciaStockTab === 'dif') filas.sort((a, b) => Math.abs(b.dif) - Math.abs(a.dif) || a.p.nombre.localeCompare(b.p.nombre));
+  else filas.sort((a, b) => a.p.nombre.localeCompare(b.p.nombre));
+  const total = filas.length;
+  filas = filas.slice(0, farmaciaStockLimite);
 
   const cont = document.getElementById('farmacia-stock-resultados');
-  if (filas.length === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>No hay productos con stock distinto de 0 que coincidan.</p></div></div>`;
+  if (total === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>${farmaciaStockTab === 'neg' ? 'No hay productos con stock negativo. 🎉' : 'No hay productos que coincidan.'}</p></div></div>`;
     return;
   }
-  const nota = `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Los productos con stock en 0 no se muestran aquí (siguen guardados en la base de datos).</div>`;
-  cont.innerHTML = `${nota}<div class="table-card"><table><thead><tr>
-    <th>Código</th><th>Producto</th><th>Familia</th><th style="text-align:right">Stock actual</th><th style="text-align:right" title="Stock en el sistema de ventas">En PC</th><th style="text-align:right">Mínimo</th>
-  </tr></thead><tbody>
-    ${filas.map(({p, total}) => {
-      const bajo = p.stock_minimo != null && total < Number(p.stock_minimo);
-      return `<tr>
-        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
-        <td data-label="Producto">${p.nombre}</td>
-        <td data-label="Familia" style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
-        <td data-label="Stock actual" style="text-align:right;font-weight:700;${bajo ? 'color:#d64545' : ''}">${total}</td>
-        <td data-label="En PC" style="text-align:right;${pcPorCodigo[p.codigo] !== undefined && Number(pcPorCodigo[p.codigo]) !== total ? 'color:var(--amber);font-weight:600' : 'color:var(--text-2)'}">${pcPorCodigo[p.codigo] ?? '—'}</td>
-        <td data-label="Mínimo" style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
-      </tr>`;
-    }).join('')}
-  </tbody></table></div>`;
+  const notas = {
+    stock: 'Productos con stock en Control Farmacia o en el PC. "En PC" en ámbar = no cuadra con el sistema de ventas.',
+    neg: '<b>Negativo en PC</b>: el sistema de ventas vendió más de lo que tenía ingresado → cuenta el producto y haz un ajuste de inventario en el PC con el número real. <b>Negativo en lotes</b>: Control Farmacia descontó más de lo contado → cuéntalo en Catastro.',
+    dif: 'Diferencias entre Control Farmacia y el PC, de mayor a menor. Cuenta físicamente y corrige donde corresponda.',
+    todos: 'Todos los productos con stock distinto de 0 en Control Farmacia o en el PC.',
+  };
+  const fmt = n => n === undefined || n === null ? '—' : Number(n).toLocaleString('es-CL');
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);padding:6px 2px">${notas[farmaciaStockTab]} Mostrando ${filas.length.toLocaleString('es-CL')} de ${total.toLocaleString('es-CL')}.</div>
+    <div class="table-card"><table><thead><tr>
+      <th>Código</th><th>Producto</th><th>Familia</th>
+      <th style="text-align:right" title="Suma de los lotes en Control Farmacia">Stock actual</th>
+      <th style="text-align:right" title="Stock en el sistema de ventas">En PC</th>
+      <th style="text-align:right">Diferencia</th>
+      <th style="text-align:right">Mínimo</th><th></th>
+    </tr></thead><tbody>
+      ${filas.map(({p, total, pc, dif, loteNeg}) => {
+        const bajo = p.stock_minimo != null && total < Number(p.stock_minimo);
+        return `<tr>
+          <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${p.codigo}</td>
+          <td data-label="Producto">${p.nombre}${loteNeg && total >= 0 ? ' <span class="badge badge-red" title="Algún lote quedó negativo">lote negativo</span>' : ''}</td>
+          <td data-label="Familia" style="color:var(--text-2);white-space:nowrap">${familiaNombre(p.familia_id) || '—'}</td>
+          <td data-label="Stock actual" style="text-align:right;font-weight:700;${total < 0 || bajo ? 'color:#d64545' : ''}">${fmt(total)}</td>
+          <td data-label="En PC" style="text-align:right;${pc !== undefined && pc < 0 ? 'color:#d64545;font-weight:700' : dif ? 'color:var(--amber);font-weight:600' : 'color:var(--text-2)'}">${fmt(pc)}</td>
+          <td data-label="Diferencia" style="text-align:right;${!dif ? 'color:var(--text-3)' : 'font-weight:600;color:' + (dif > 0 ? 'var(--amber)' : 'var(--red)')}">${dif ? (dif > 0 ? '+' : '') + fmt(dif) : '—'}</td>
+          <td data-label="Mínimo" style="text-align:right;color:var(--text-2)">${p.stock_minimo ?? '—'}</td>
+          <td style="text-align:right"><button class="page-btn" style="padding:3px 8px;font-size:11px" onclick="irARecontarFarmacia('${p.codigo}')" title="Abrir en Catastro para contar">Contar</button></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>
+    ${total > filas.length ? `<div style="text-align:center;margin:14px 0"><button class="page-btn" onclick="farmStockMas()">Mostrar ${Math.min(300, total - filas.length)} más (quedan ${(total - filas.length).toLocaleString('es-CL')})</button></div>` : ''}`;
+}
+
+function descargarStockExcel() {
+  if (typeof XLSX === 'undefined') { toast('No se pudo cargar el generador de Excel.', 'err'); return; }
+  const grupos = farmStockFilas();
+  const filas = grupos[farmaciaStockTab];
+  if (!filas.length) { toast('No hay filas para descargar.', 'err'); return; }
+  const datos = filas.slice().sort((a, b) => a.p.nombre.localeCompare(b.p.nombre)).map(f => ({
+    'Código': f.p.codigo, 'Producto': f.p.nombre, 'Familia': familiaNombre(f.p.familia_id) || '',
+    'Stock Control Farmacia': f.total, 'Stock PC': f.pc === undefined ? '' : f.pc,
+    'Diferencia': f.dif === null ? '' : f.dif, 'Lote negativo': f.loteNeg ? 'Sí' : '',
+  }));
+  const nombres = { stock: 'Con stock', neg: 'Negativos', dif: 'No cuadra con PC', todos: 'Todos' };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(datos), nombres[farmaciaStockTab]);
+  XLSX.writeFile(wb, `stock_${farmaciaStockTab}_${new Date().toLocaleDateString('sv-SE')}.xlsx`);
 }
 
 // ─── FARMACIA: MOVIMIENTOS (compra / venta / ajuste) ──────────────────────
@@ -12731,6 +12850,206 @@ function irARecontarFarmacia(codigo) {
   }, 50);
 }
 
+// ─── FARMACIA: SUGERENCIA DE COMPRA ───────────────────────────────────────
+// Según lo vendido en el rango elegido (ventas + traspasos de salida del
+// sistema de ventas), calcula cuánto comprar para cubrir N días:
+//   sugerido = venta diaria × días a cubrir − stock útil (lotes no vencidos) − en camino
+// El cálculo lo hace la función farmacia_sugerencia_compra() en Supabase.
+let farmaciaComprasData = null;
+let farmaciaComprasRango = 30;          // días rápidos seleccionados (null = rango personalizado)
+let farmaciaComprasEdit = {};           // codigo -> cantidad editada a mano
+let farmaciaComprasParams = null;
+
+const fechaLocalISO = (d = new Date()) => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD en hora local
+
+function farmComprasInit() {
+  const hasta = document.getElementById('farmacia-compras-hasta');
+  if (hasta && !hasta.value) farmComprasSetRango(30, false);
+  farmComprasRenderRangos();
+  if (!farmaciaComprasData) cargarSugerenciaCompra();
+  else renderSugerenciaCompra();
+}
+
+function farmComprasRenderRangos() {
+  const rangos = [7, 15, 30, 60, 90];
+  document.getElementById('farmacia-compras-rangos').innerHTML = rangos.map(d =>
+    `<button class="fpp-status-tab${farmaciaComprasRango === d ? ' active' : ''}" onclick="farmComprasSetRango(${d}, true)">Últimos ${d} días</button>`
+  ).join('') + `<button class="fpp-status-tab${farmaciaComprasRango === null ? ' active' : ''}" onclick="document.getElementById('farmacia-compras-desde').focus()">Personalizado</button>`;
+}
+
+function farmComprasSetRango(dias, calcular) {
+  farmaciaComprasRango = dias;
+  const hoy = new Date();
+  const desde = new Date(hoy); desde.setDate(hoy.getDate() - (dias - 1));
+  document.getElementById('farmacia-compras-desde').value = fechaLocalISO(desde);
+  document.getElementById('farmacia-compras-hasta').value = fechaLocalISO(hoy);
+  farmComprasRenderRangos();
+  if (calcular) cargarSugerenciaCompra();
+}
+
+function farmComprasFechaManual() {
+  farmaciaComprasRango = null;
+  farmComprasRenderRangos();
+  cargarSugerenciaCompra();
+}
+
+async function cargarSugerenciaCompra() {
+  const desde = document.getElementById('farmacia-compras-desde').value;
+  const hasta = document.getElementById('farmacia-compras-hasta').value;
+  const cobertura = Number(document.getElementById('farmacia-compras-cobertura').value) || 30;
+  const traspasos = document.getElementById('farmacia-compras-traspasos').checked;
+  if (!desde || !hasta || desde > hasta) { toast('Revisa el rango de fechas.', 'err'); return; }
+  const cont = document.getElementById('farmacia-compras-tabla');
+  cont.innerHTML = `<div class="table-card"><div class="empty"><p>Calculando sugerencia…</p></div></div>`;
+  const q = `p_desde=${desde}&p_hasta=${hasta}&p_dias_cobertura=${cobertura}&p_incluir_traspasos=${traspasos}`;
+  const rows = await fetchAll('rpc/farmacia_sugerencia_compra', q);
+  farmaciaComprasData = Array.isArray(rows) ? rows : [];
+  farmaciaComprasParams = { desde, hasta, cobertura, traspasos };
+  farmaciaComprasEdit = {};
+  farmComprasPoblarProveedores();
+  renderSugerenciaCompra();
+}
+
+function farmComprasPoblarProveedores() {
+  const sel = document.getElementById('farmacia-compras-proveedor');
+  const actual = sel.value;
+  const provs = [...new Set((farmaciaComprasData || []).filter(r => Number(r.sugerido) > 0).map(r => r.proveedor))].sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = `<option value="">Todos los proveedores</option>` + provs.map(p => `<option value="${farmEsc(p)}">${farmEsc(p)}</option>`).join('');
+  if (provs.includes(actual)) sel.value = actual;
+}
+
+function farmComprasCantidad(r) {
+  return farmaciaComprasEdit[r.codigo] !== undefined ? farmaciaComprasEdit[r.codigo] : Number(r.sugerido || 0);
+}
+
+function farmComprasEditar(codigo, valor) {
+  const n = Math.max(0, Math.round(Number(valor) || 0));
+  farmaciaComprasEdit[codigo] = n;
+  renderSugerenciaCompra();
+}
+
+function farmComprasFiltradas() {
+  const q = (document.getElementById('farmacia-compras-search')?.value || '').trim().toLowerCase();
+  const prov = document.getElementById('farmacia-compras-proveedor')?.value || '';
+  const soloSug = document.getElementById('farmacia-compras-solo')?.checked;
+  let filas = farmaciaComprasData || [];
+  if (q) filas = filas.filter(r => (r.codigo || '').toLowerCase().includes(q) || (r.producto || '').toLowerCase().includes(q) || (r.proveedor || '').toLowerCase().includes(q));
+  if (prov) filas = filas.filter(r => r.proveedor === prov);
+  if (soloSug) filas = filas.filter(r => farmComprasCantidad(r) > 0);
+  return filas;
+}
+
+function renderSugerenciaCompra() {
+  if (!farmaciaComprasData) return;
+  const p = farmaciaComprasParams;
+  const filas = farmComprasFiltradas();
+  const aComprar = filas.filter(r => farmComprasCantidad(r) > 0);
+  const totalCosto = aComprar.reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
+  const totalUds = aComprar.reduce((s, r) => s + farmComprasCantidad(r), 0);
+  const provs = new Set(aComprar.map(r => r.proveedor));
+  const sinStock = filas.filter(r => Number(r.stock_util) <= 0).length;
+  document.getElementById('farmacia-compras-resumen').innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Costo estimado del pedido</div><div class="stat-val" style="font-size:20px">${farmClp(totalCosto)}</div><div class="stat-sub">Costo neto de la última compra</div></div>
+    <div class="stat"><div class="stat-label">Productos a comprar</div><div class="stat-val" style="font-size:16px">${aComprar.length}</div><div class="stat-sub">${farmNum(totalUds)} unidades</div></div>
+    <div class="stat"><div class="stat-label">Proveedores</div><div class="stat-val" style="font-size:16px">${provs.size}</div><div class="stat-sub">Agrupado abajo por proveedor</div></div>
+    <div class="stat"><div class="stat-label">Vendidos sin stock útil</div><div class="stat-val" style="font-size:16px">${sinStock}</div><div class="stat-sub">Se vendieron en el rango y hoy no hay stock</div></div>`;
+
+  const dias = Math.round((new Date(p.hasta) - new Date(p.desde)) / 86400000) + 1;
+  document.getElementById('farmacia-compras-nota').innerHTML =
+    `Ventas del <b>${fDate(p.desde)}</b> al <b>${fDate(p.hasta)}</b> (${dias} días${p.traspasos ? ', incluye traspasos de salida' : ''}) proyectadas para cubrir <b>${p.cobertura} días</b>. ` +
+    `Sugerido = venta diaria × ${p.cobertura} − stock útil (lotes no vencidos) − compras pendientes en camino. Puedes corregir la cantidad antes de descargar el pedido.`;
+
+  const cont = document.getElementById('farmacia-compras-tabla');
+  if (filas.length === 0) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>No hay productos para sugerir con estos filtros.</p></div></div>`;
+    return;
+  }
+
+  // Agrupa por proveedor; los grupos con más plata primero
+  const grupos = {};
+  filas.forEach(r => { (grupos[r.proveedor] = grupos[r.proveedor] || []).push(r); });
+  const orden = Object.keys(grupos).sort((a, b) => {
+    const ta = grupos[a].reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
+    const tb = grupos[b].reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
+    return tb - ta || a.localeCompare(b);
+  });
+
+  const COLS = 10;
+  let html = `<div class="table-card"><table><thead><tr>
+      <th>Código</th><th>Producto</th>
+      <th style="text-align:right" title="Unidades vendidas en el rango (entre paréntesis: mismo período del año anterior)">Vendidas</th>
+      <th style="text-align:right">Venta/día</th>
+      <th style="text-align:right" title="Unidades en lotes no vencidos">Stock útil</th>
+      <th style="text-align:right" title="Días que alcanza el stock útil al ritmo de venta del rango">Alcanza</th>
+      <th style="text-align:right" title="Compras pendientes de recepción en el sistema de ventas">En camino</th>
+      <th style="text-align:right">Comprar</th>
+      <th style="text-align:right">Total</th>
+      <th>Última compra</th>
+    </tr></thead><tbody>`;
+  let mostradas = 0;
+  for (const prov of orden) {
+    const arr = grupos[prov].slice().sort((a, b) => (farmComprasCantidad(b) * Number(b.costo_unit || 0)) - (farmComprasCantidad(a) * Number(a.costo_unit || 0)) || Number(b.unidades_vendidas) - Number(a.unidades_vendidas));
+    const subtotal = arr.reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
+    const nComprar = arr.filter(r => farmComprasCantidad(r) > 0).length;
+    const esRecetario = /recetario/i.test(prov);
+    html += `<tr style="background:var(--bg)"><td colspan="${COLS}" style="font-weight:600;padding-top:12px">
+        ${farmEsc(prov)} <span style="font-weight:400;color:var(--text-2);font-size:12px">· ${nComprar} producto${nComprar === 1 ? '' : 's'} · ${farmClp(subtotal)}${esRecetario ? ' · se prepara en el recetario' : ''}</span>
+      </td></tr>`;
+    for (const r of arr) {
+      if (mostradas >= 600) break;
+      mostradas++;
+      const cant = farmComprasCantidad(r);
+      const editado = farmaciaComprasEdit[r.codigo] !== undefined && farmaciaComprasEdit[r.codigo] !== Number(r.sugerido);
+      const alcanza = r.dias_stock === null ? '—' : Number(r.dias_stock) >= 999 ? '999+' : `${farmNum(r.dias_stock)} d`;
+      const alcanzaColor = r.dias_stock !== null && Number(r.dias_stock) < Math.min(7, p.cobertura) ? 'color:var(--red);font-weight:600' : r.dias_stock !== null && Number(r.dias_stock) < p.cobertura ? 'color:var(--amber)' : 'color:var(--text-2)';
+      html += `<tr>
+        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${farmEsc(r.codigo)}</td>
+        <td data-label="Producto">${farmEsc(r.producto)}${r.proximo_venc ? `<div style="font-size:11px;color:var(--text-3)">Próx. venc. ${fDate(r.proximo_venc)}</div>` : ''}</td>
+        <td data-label="Vendidas" style="text-align:right;white-space:nowrap"><b>${farmNum(r.unidades_vendidas)}</b>${Number(r.unidades_anio_anterior) > 0 ? ` <span style="font-size:11px;color:var(--text-3)" title="Mismo período del año anterior">(${farmNum(r.unidades_anio_anterior)})</span>` : ''}</td>
+        <td data-label="Venta/día" style="text-align:right;color:var(--text-2)">${Number(r.venta_diaria).toLocaleString('es-CL', { maximumFractionDigits: 2 })}</td>
+        <td data-label="Stock útil" style="text-align:right;${Number(r.stock_util) <= 0 ? 'color:var(--red);font-weight:600' : ''}">${farmNum(r.stock_util)}</td>
+        <td data-label="Alcanza" style="text-align:right;white-space:nowrap;${alcanzaColor}">${alcanza}</td>
+        <td data-label="En camino" style="text-align:right;color:var(--text-2)">${Number(r.en_camino) > 0 ? farmNum(r.en_camino) : '—'}</td>
+        <td data-label="Comprar" style="text-align:right">
+          <input type="number" min="0" step="1" value="${cant}" onchange="farmComprasEditar('${farmEsc(r.codigo)}', this.value)"
+            style="width:64px;text-align:right;font-weight:700;${editado ? 'border-color:var(--amber);background:var(--amber-light)' : ''}" title="${editado ? `Sugerido original: ${r.sugerido}` : 'Puedes cambiar la cantidad'}">
+        </td>
+        <td data-label="Total" style="text-align:right;white-space:nowrap">${cant > 0 ? farmClp(cant * Number(r.costo_unit || 0)) : '—'}</td>
+        <td data-label="Última compra" style="white-space:nowrap;font-size:12px;color:var(--text-2)">${r.ultima_compra ? `${fDate(r.ultima_compra)} · ${farmNum(r.ultima_compra_cant)} u.` : '—'}</td>
+      </tr>`;
+    }
+    if (mostradas >= 600) break;
+  }
+  html += `</tbody></table></div>`;
+  if (mostradas >= 600) html += `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Mostrando 600 productos; usa los filtros para acotar (el Excel trae todo).</div>`;
+  cont.innerHTML = html;
+}
+
+function descargarPedidoExcel() {
+  if (!farmaciaComprasData || typeof XLSX === 'undefined') { toast('Primero calcula la sugerencia.', 'err'); return; }
+  const filas = farmComprasFiltradas().filter(r => farmComprasCantidad(r) > 0)
+    .sort((a, b) => a.proveedor.localeCompare(b.proveedor) || a.producto.localeCompare(b.producto));
+  if (filas.length === 0) { toast('No hay productos con cantidad a comprar.', 'err'); return; }
+  const fila = r => ({
+    'Proveedor': r.proveedor, 'Código': r.codigo, 'Producto': r.producto,
+    'Cantidad a comprar': farmComprasCantidad(r), 'Sugerido sistema': Number(r.sugerido),
+    'Costo unit.': r.costo_unit === null ? '' : Number(r.costo_unit), 'Total': Math.round(farmComprasCantidad(r) * Number(r.costo_unit || 0)),
+    'Vendidas en rango': Number(r.unidades_vendidas), 'Venta diaria': Number(r.venta_diaria), 'Stock útil': Number(r.stock_util),
+    'En camino': Number(r.en_camino), 'Última compra': r.ultima_compra || '',
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas.map(fila)), 'Pedido completo');
+  const usados = new Set(['Pedido completo']);
+  [...new Set(filas.map(r => r.proveedor))].forEach(prov => {
+    let nombre = prov.replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31).trim() || 'Proveedor';
+    let i = 2; while (usados.has(nombre)) nombre = nombre.slice(0, 28) + ' ' + (i++);
+    usados.add(nombre);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas.filter(r => r.proveedor === prov).map(fila)), nombre);
+  });
+  const p = farmaciaComprasParams;
+  XLSX.writeFile(wb, `pedido_sugerido_${p.desde}_a_${p.hasta}_cubre_${p.cobertura}d.xlsx`);
+}
+
 // ─── FARMACIA: CONCILIACIÓN AUTOMÁTICA CON EL PC (sistema de ventas) ───────
 async function cargarConciliacionERP(forzar = false, silencioso = false) {
   if (!forzar && farmaciaConcData && Date.now() - farmaciaConcCargadoEn < 5 * 60 * 1000) { if (!silencioso) renderConciliacionERP(); return; }
@@ -13028,6 +13347,9 @@ showPage = function(id, el) {
   if (id === 'farmacia-conciliacion') {
     cargarConciliacionERP();
   }
+  if (id === 'farmacia-compras') {
+    farmComprasInit();
+  }
   if (id === 'facturas-productos') {
     cargarProductosFacturas();
   }
@@ -13086,6 +13408,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-package"></i>', label: 'Stock actual', page: 'farmacia-stock' },
     { icon: '<i class="ti ti-refresh"></i>', label: 'Movimientos', page: 'farmacia-movimientos' },
     { icon: '<i class="ti ti-clock-exclamation"></i>', label: 'Vencimientos', page: 'farmacia-vencimientos' },
+    { icon: '<i class="ti ti-shopping-cart-plus"></i>', label: 'Sugerencia de compra', page: 'farmacia-compras' },
     { icon: '<i class="ti ti-calculator"></i>', label: 'Conciliación con PC', page: 'farmacia-conciliacion' },
   ] },
 };
