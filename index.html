@@ -2283,6 +2283,7 @@ const MODAL_OVERLAY_IDS = [
   'oe-form-modal-overlay',
   'oe-detalle-modal-overlay',
   'oe-editar-modal-overlay',
+  'oe-comprobante-overlay',
   'oe-receta-visor-overlay',
   'sw-detalle-overlay',
   'sw-visor-overlay',
@@ -5185,17 +5186,30 @@ function badgeOE(texto, mapa) {
   return `<span class="badge" style="background:${e.bg};color:${e.color}">${texto}</span>`;
 }
 
-function calcularVencimientoReceta(fechaEmision) {
+// Vigencia de recetas: hoy se cuentan 12 meses desde la emisión. Antes el
+// plazo era de 6 meses, así que las recetas que se guardaron con el criterio
+// viejo ya traen su propia fecha_vencimiento en la base — cuando viene, se
+// respeta esa y no se recalcula, para que una receta antigua no cambie de
+// vencimiento sola. El plazo nuevo aplica a las recetas que se registren de
+// aquí en adelante.
+const MESES_VIGENCIA_RECETA = 12;
+
+function calcularVencimientoReceta(fechaEmision, fechaVencimientoGuardada) {
+  if (fechaVencimientoGuardada) {
+    const texto = String(fechaVencimientoGuardada).slice(0, 10);
+    const guardada = new Date(texto + 'T00:00:00');
+    if (!isNaN(guardada)) return guardada;
+  }
   if (!fechaEmision) return null;
-  const d = new Date(fechaEmision + 'T00:00:00');
-  d.setMonth(d.getMonth() + 6);
+  const d = new Date(String(fechaEmision).slice(0, 10) + 'T00:00:00');
+  if (isNaN(d)) return null;
+  d.setMonth(d.getMonth() + MESES_VIGENCIA_RECETA);
   return d;
 }
 
-function recetaVigente(fechaEmision) {
-  if (!fechaEmision) return false;
-  const venc = calcularVencimientoReceta(fechaEmision);
-  return venc && venc >= new Date();
+function recetaVigente(fechaEmision, fechaVencimientoGuardada) {
+  const venc = calcularVencimientoReceta(fechaEmision, fechaVencimientoGuardada);
+  return !!venc && venc >= new Date();
 }
 
 // ─── Período (mes/año) para Órdenes de Elaboración — mismo patrón que
@@ -5728,8 +5742,8 @@ async function abrirDetallePaciente(id) {
 
   const recetasHtml = !recetasDelPaciente?.length ? '<div style="font-size:13px;color:var(--text-3)">Sin recetas registradas.</div>' :
     recetasDelPaciente.map(r => {
-      const vigente = recetaVigente(r.fecha_emision);
-      const venc = calcularVencimientoReceta(r.fecha_emision);
+      const vigente = recetaVigente(r.fecha_emision, r.fecha_vencimiento);
+      const venc = calcularVencimientoReceta(r.fecha_emision, r.fecha_vencimiento);
       return `
       <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
         <div>
@@ -9785,7 +9799,7 @@ function abrirNuevaOrdenElaboracion() {
       </div>
     </div>`;
   document.body.appendChild(modal);
-  window.__oeEstado = { pacienteId: null, recetaId: null, recetaUrl: null };
+  window.__oeEstado = { pacienteId: null, recetaId: null, recetaUrl: null, recetaVencimiento: null };
   window.__oeTipoPago = 'total';
   setTimeout(() => { document.getElementById('oe-paciente-input')?.focus(); seleccionarTipoPagoOE('total'); }, 50);
 }
@@ -9817,7 +9831,7 @@ async function seleccionarPacienteOE(id, nombre, telefono) {
 
   // Buscar solo recetas VIGENTES de este paciente
   const recetasDelPaciente = await fetchAll('recetas', `select=*&paciente_id=eq.${id}&order=fecha_emision.desc`);
-  const vigentes = (recetasDelPaciente || []).filter(r => recetaVigente(r.fecha_emision));
+  const vigentes = (recetasDelPaciente || []).filter(r => recetaVigente(r.fecha_emision, r.fecha_vencimiento));
 
   // Obtener órdenes anteriores para el historial
   const ordenesDelPaciente = ordenesElaboracion.filter(o => o.paciente_id === id);
@@ -9833,9 +9847,9 @@ function mostrarRecetasVigentesEnFormulario(vigentes) {
   if (!vigentes.length) return;
   const cont = document.getElementById('oe-recetas-anteriores');
   cont.innerHTML = vigentes.map(r => {
-    const venc = calcularVencimientoReceta(r.fecha_emision);
+    const venc = calcularVencimientoReceta(r.fecha_emision, r.fecha_vencimiento);
     return `<div style="padding:10px 12px;border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;background:var(--accent-light)"
-                 onclick="reutilizarReceta(${r.id},'${(r.archivo_nombre||'').replace(/'/g,"\\'")}','${r.fecha_emision}','${r.archivo_url||''}')">
+                 onclick="reutilizarReceta(${r.id},'${(r.archivo_nombre||'').replace(/'/g,"\\'")}','${r.fecha_emision}','${r.archivo_url||''}','${r.fecha_vencimiento||''}')">
       <div style="font-weight:500">📋 Receta emitida el ${fDate(r.fecha_emision)}</div>
       <div style="font-size:11px;color:var(--green);margin-top:2px">✓ Vigente hasta ${fDate(venc.toISOString())}</div>
       ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px">📎 ${r.archivo_nombre}</div>` : ''}
@@ -9863,7 +9877,7 @@ function mostrarAlertaPacienteExistente(nombre, ordenes, recetasVigentes, todasR
         <div style="max-height:340px;overflow-y:auto">
           ${ordenes.slice().sort((a,b) => (b.fecha_orden||'').localeCompare(a.fecha_orden||'')).slice(0,10).map(o => {
             const recetaOrden = todasRecetas.find(r => r.id === o.receta_id);
-            const vigente = recetaOrden && recetaVigente(recetaOrden.fecha_emision);
+            const vigente = recetaOrden && recetaVigente(recetaOrden.fecha_emision, recetaOrden.fecha_vencimiento);
             return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;font-size:13px;${vigente?'border-color:var(--accent)':''}"
                          onclick="prerellenarOrdenDesdeHistorial(${JSON.stringify(o).replace(/"/g,'&quot;')},${JSON.stringify(recetaOrden||null).replace(/"/g,'&quot;')})">
               <div style="font-weight:500">${o.indicacion||'—'}</div>
@@ -9907,8 +9921,8 @@ function prerellenarOrdenDesdeHistorial(orden, receta) {
   }
 
   // Intentamos usar la receta si existe y está vigente
-  if (receta && recetaVigente(receta.fecha_emision)) {
-    reutilizarReceta(receta.id, receta.archivo_nombre||'', receta.fecha_emision, receta.archivo_url||'');
+  if (receta && recetaVigente(receta.fecha_emision, receta.fecha_vencimiento)) {
+    reutilizarReceta(receta.id, receta.archivo_nombre||'', receta.fecha_emision, receta.archivo_url||'', receta.fecha_vencimiento||'');
   } else {
     // Receta vencida → ocultamos las vigentes también (ya filtradas) y pedimos receta nueva
     document.getElementById('oe-receta-opciones').style.display = 'none';
@@ -9918,9 +9932,12 @@ function prerellenarOrdenDesdeHistorial(orden, receta) {
   }
 }
 
-function reutilizarReceta(recetaId, nombre, fechaEmision, url) {
+function reutilizarReceta(recetaId, nombre, fechaEmision, url, fechaVencimiento) {
   window.__oeEstado.recetaId = recetaId;
   window.__oeEstado.recetaUrl = url;
+  // Guardamos el vencimiento que ya tiene la receta en la base para no
+  // recalcularlo con el plazo nuevo cuando se reutiliza una receta antigua.
+  window.__oeEstado.recetaVencimiento = fechaVencimiento || null;
   document.getElementById('oe-subir-receta').style.display = 'none';
   const reutDiv = document.getElementById('oe-receta-reutilizada');
   document.getElementById('oe-receta-reutilizada-texto').textContent = `✓ Reutilizando receta: ${nombre||'archivo guardado'} (emitida ${fDate(fechaEmision)})`;
@@ -9934,6 +9951,7 @@ function reutilizarReceta(recetaId, nombre, fechaEmision, url) {
 function cancelarReutilizarReceta() {
   window.__oeEstado.recetaId = null;
   window.__oeEstado.recetaUrl = null;
+  window.__oeEstado.recetaVencimiento = null;
   document.getElementById('oe-receta-reutilizada').style.display = 'none';
   document.getElementById('oe-subir-receta').style.display = 'block';
   document.getElementById('oe-receta-fecha').value = '';
@@ -9944,7 +9962,9 @@ function validarVigenciaReceta() {
   const fecha = document.getElementById('oe-receta-fecha').value;
   const info = document.getElementById('oe-vigencia-info');
   if (!fecha) { info.textContent = ''; return; }
-  const venc = calcularVencimientoReceta(fecha);
+  // Si se está reutilizando una receta ya guardada, mandamos el vencimiento
+  // que trae de la base; si es receta nueva, se calcula con el plazo actual.
+  const venc = calcularVencimientoReceta(fecha, window.__oeEstado?.recetaId ? window.__oeEstado.recetaVencimiento : null);
   const hoy = new Date();
   if (venc < hoy) {
     info.innerHTML = `<span style="color:var(--red);font-weight:500">⚠️ Receta VENCIDA<br>Venció el ${fDate(venc.toISOString())}</span>`;
@@ -9975,7 +9995,7 @@ async function guardarNuevaOrdenOE() {
   if (tipoPago === 'abonado' && !montoAbonado) { toast('Escribe el monto que se abonó.', 'err'); return; }
 
   // Verificar vigencia antes de guardar
-  const venc = calcularVencimientoReceta(fechaReceta);
+  const venc = calcularVencimientoReceta(fechaReceta, window.__oeEstado.recetaId ? window.__oeEstado.recetaVencimiento : null);
   if (venc < new Date()) {
     if (!(await confirmModal(`⚠️ Esta receta venció el ${fDate(venc.toISOString())}. ¿Deseas guardar la orden de todas formas?`, { textoOk: 'Guardar igual', peligro: false }))) return;
   }
@@ -10093,7 +10113,9 @@ function abrirDetalleOE(id) {
   cerrarTodosLosModales();
   const nombre = o.pacientes?.nombre || '—';
   const receta = o.recetas || {};
-  const venc = receta.fecha_emision ? calcularVencimientoReceta(receta.fecha_emision) : null;
+  const venc = (receta.fecha_emision || receta.fecha_vencimiento)
+    ? calcularVencimientoReceta(receta.fecha_emision, receta.fecha_vencimiento)
+    : null;
   const vigente = venc && venc >= new Date();
 
   const modal = document.createElement('div');
@@ -10151,10 +10173,258 @@ function abrirDetalleOE(id) {
           </div>
         </div>
 
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
           <button class="page-btn" style="padding:8px 16px;color:var(--red)" onclick="eliminarOrdenOE(${o.id})">Eliminar orden</button>
+          <button class="page-btn" style="padding:8px 16px" onclick="navPush(()=>abrirDetalleOE(${o.id}));abrirComprobanteOE(${o.id})">🧾 Comprobante de retiro</button>
           <button class="page-btn" style="padding:8px 16px" onclick="abrirEditarOE(${o.id})">✎ Editar</button>
           <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarModalOE('oe-detalle-modal-overlay')">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ── COMPROBANTE DE RETIRO ─────────────────────────────────────────────────
+// Arma un ticket con lo que la orden ya tiene (paciente, preparado, valor,
+// forma de pago y cuándo retira) para imprimirlo, descargarlo o mandarlo por
+// WhatsApp al paciente. No guarda ni modifica nada: es otra vista de la misma
+// orden, así que se puede generar las veces que se quiera y el número de
+// comprobante siempre sale igual porque se deriva del id de la orden.
+const montoComprobante = n => (n || n === 0) ? '$ ' + Math.round(n).toLocaleString('es-CL') : '—';
+
+function datosComprobanteOE(id) {
+  const o = ordenesElaboracion.find(x => x.id === id);
+  if (!o) return null;
+  // El JOIN de la orden solo trae el nombre del paciente, no el teléfono,
+  // así que el teléfono lo buscamos en la lista global de pacientes.
+  const pac = pacientes.find(p => p.id === o.paciente_id) || {};
+  const abonado = o.tipo_pago === 'abonado';
+  const valor = o.valor || 0;
+  const pagado = abonado ? (o.monto_abonado || 0) : valor;
+  const anio = (o.fecha_orden || '').slice(0, 4) || String(new Date().getFullYear());
+  const telefono = pac.telefono || '';
+  return {
+    id: o.id,
+    nombre: o.pacientes?.nombre || pac.nombre || '—',
+    telefono,
+    wa: telefonoWhatsAppSW(telefono),
+    numero: `OE-${anio}-${String(o.id).padStart(5, '0')}`,
+    preparado: o.indicacion || '—',
+    valor,
+    abonado,
+    pagado,
+    saldo: Math.max(0, valor - pagado),
+    formaPago: o.pago || '—',
+    fechaRetiro: o.fecha_retiro || '',
+    horaRetiro: o.hora_retiro ? String(o.hora_retiro).slice(0, 5) : '',
+    emitido: fechaHoraCL(new Date().toISOString()),
+    // Si la orden todavía no tiene precio no decimos que está cancelada:
+    // mejor queda "por confirmar" que un ticket que afirma algo que no es.
+    valorTexto: valor ? montoComprobante(valor) : 'Por confirmar',
+    estado: !valor ? 'POR CONFIRMAR' : (abonado ? 'ABONADO' : 'CANCELADO'),
+  };
+}
+
+// Solo habilitamos WhatsApp cuando el número quedó en formato chileno válido
+// (56 + 9 dígitos). Si el teléfono está mal escrito, preferimos avisarlo antes
+// que abrir un chat a un número equivocado.
+function waValidoComprobante(wa) {
+  return /^56[2-9]\d{8}$/.test(wa || '');
+}
+
+function retiroTextoComprobante(d) {
+  if (!d.fechaRetiro && !d.horaRetiro) return 'por confirmar';
+  return (d.fechaRetiro ? fDate(d.fechaRetiro) : 'fecha por confirmar')
+       + (d.horaRetiro ? ` a las ${d.horaRetiro} hrs` : ' (hora por confirmar)');
+}
+
+function ticketComprobanteOE(d) {
+  const fila = (k, v, extra) => `<tr><td style="padding:3px 6px 3px 0;color:#555;white-space:nowrap">${k}</td><td style="padding:3px 0;text-align:right;font-weight:700;word-break:break-word;${extra || ''}">${v}</td></tr>`;
+  const sep = '<div style="border-top:1px dashed #9a9a9a;margin:9px 0"></div>';
+  return `
+  <div class="tk" style="font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.4;color:#000;background:#fff;width:300px;max-width:100%;margin:0 auto;padding:16px;border:1px solid #ddd;box-sizing:border-box">
+    <div style="text-align:center">
+      <div style="font-size:15px;font-weight:700;letter-spacing:1px">FARMACIA BULFOR</div>
+      <div style="font-size:10px;letter-spacing:.5px">RECETARIO MAGISTRAL</div>
+      <div style="font-size:12px;font-weight:700;margin-top:7px">COMPROBANTE DE RETIRO</div>
+    </div>
+    ${sep}
+    <table style="width:100%;border-collapse:collapse">
+      ${fila('N°', escapeHtml(d.numero))}
+      ${fila('Emitido', escapeHtml(d.emitido))}
+      ${fila('Paciente', escapeHtml(d.nombre))}
+    </table>
+    <div style="margin-top:7px;font-size:10px;color:#555;letter-spacing:.5px">PREPARADO</div>
+    <div style="font-weight:700;word-break:break-word">${escapeHtml(d.preparado)}</div>
+    ${sep}
+    <div style="text-align:center;font-size:10px;font-weight:700;letter-spacing:1.5px">RETIRO</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:4px">
+      ${fila('Fecha', d.fechaRetiro ? escapeHtml(fDate(d.fechaRetiro)) : 'Por confirmar')}
+      ${fila('Hora', d.horaRetiro ? escapeHtml(d.horaRetiro) + ' hrs' : 'Por confirmar')}
+    </table>
+    ${sep}
+    <table style="width:100%;border-collapse:collapse">
+      ${fila('Valor', escapeHtml(d.valorTexto))}
+      ${fila('Forma de pago', escapeHtml(d.formaPago))}
+      ${d.abonado ? fila('Abonado', montoComprobante(d.pagado)) : ''}
+      ${d.abonado ? fila('Saldo al retirar', montoComprobante(d.saldo)) : ''}
+      ${fila('Estado', d.estado)}
+    </table>
+    ${sep}
+    <div style="text-align:center;font-size:10px;line-height:1.6;color:#333">
+      Presente este comprobante al retirar.${d.abonado && d.saldo ? '<br>El saldo se paga al momento del retiro.' : ''}<br>
+      Gracias por preferirnos.
+    </div>
+  </div>`;
+}
+
+// Documento completo e independiente, para imprimir o descargar. Sale en
+// ancho de boleta (80 mm) pero se imprime igual en hoja normal.
+function documentoComprobanteOE(d) {
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Comprobante ${escapeHtml(d.numero)} — ${escapeHtml(d.nombre)}</title>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  html,body { margin:0; background:#fff; }
+  body { padding:14px; display:flex; justify-content:center; }
+  @media print { body { padding:0 } .tk { border:none !important; width:72mm !important; padding:0 !important } }
+</style></head><body>${ticketComprobanteOE(d)}</body></html>`;
+}
+
+function imprimirComprobanteOE(id) {
+  const d = datosComprobanteOE(id);
+  if (!d) return;
+  // Mismo patrón que la impresión de recetas: iframe oculto en el mismo
+  // dominio, así no se abre una pestaña ni dependemos del bloqueador de popups.
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;visibility:hidden';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(documentoComprobanteOE(d));
+  doc.close();
+  const limpiar = () => { try { iframe.remove(); } catch (_) {} };
+  iframe.contentWindow.onafterprint = limpiar;
+  setTimeout(() => {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (_) { limpiar(); toast('No se pudo abrir la impresión.', 'err'); }
+  }, 150);
+}
+
+function descargarComprobanteOE(id) {
+  const d = datosComprobanteOE(id);
+  if (!d) return;
+  const blob = new Blob([documentoComprobanteOE(d)], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `Comprobante ${d.numero} - ${d.nombre}.html`.replace(/[\\/:*?"<>|]/g, ' ');
+  // El <a> tiene que estar en el documento para que el navegador respete el
+  // nombre del atributo download; si no, el archivo baja como "download".
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+}
+
+function mensajeComprobanteOE(d) {
+  const L = [];
+  L.push('*Farmacia Bulfor* — Comprobante de retiro');
+  L.push('N° ' + d.numero);
+  L.push('');
+  L.push('Paciente: ' + d.nombre);
+  L.push('Preparado: ' + d.preparado);
+  L.push('Valor: ' + d.valorTexto);
+  if (d.abonado) {
+    L.push('Abonado: ' + montoComprobante(d.pagado) + ' (' + d.formaPago + ')');
+    L.push('Saldo a pagar al retirar: ' + montoComprobante(d.saldo));
+  } else if (d.valor) {
+    L.push('Pago: ' + d.formaPago + ' — cancelado');
+  } else {
+    L.push('Pago: ' + d.formaPago);
+  }
+  L.push('');
+  L.push('Retiro: ' + retiroTextoComprobante(d));
+  L.push('');
+  L.push('Presente este comprobante al retirar. Gracias por preferirnos.');
+  return L.join('\n');
+}
+
+function enviarWhatsAppComprobanteOE(wa) {
+  const caja = document.getElementById('oe-comp-msg');
+  const texto = caja ? caja.value : '';
+  window.open(`https://wa.me/${wa}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+}
+
+function copiarMensajeComprobanteOE() {
+  const caja = document.getElementById('oe-comp-msg');
+  if (!caja) return;
+  const fallback = () => { caja.select(); try { document.execCommand('copy'); } catch (_) {} };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(caja.value).then(() => toast('Mensaje copiado.'), () => { fallback(); toast('Mensaje copiado.'); });
+  } else {
+    fallback();
+    toast('Mensaje copiado.');
+  }
+}
+
+function abrirComprobanteOE(id) {
+  const d = datosComprobanteOE(id);
+  if (!d) { toast('No encontramos la orden.', 'err'); return; }
+  cerrarTodosLosModales();
+
+  const waOk = waValidoComprobante(d.wa);
+  const avisos = [];
+  if (!d.fechaRetiro) avisos.push('La orden no tiene <strong>fecha de retiro</strong> registrada.');
+  if (!d.horaRetiro) avisos.push('La orden no tiene <strong>hora de retiro</strong> registrada.');
+  if (!d.valor) avisos.push('La orden no tiene <strong>valor</strong> registrado.');
+  if (!d.telefono) avisos.push('El paciente no tiene <strong>teléfono</strong> guardado, así que el envío por WhatsApp está desactivado. Puedes agregarlo en la ficha del paciente.');
+  else if (!waOk) avisos.push(`El teléfono guardado (<strong>${escapeHtml(d.telefono)}</strong>) no quedó en formato de celular chileno, así que el envío por WhatsApp está desactivado.`);
+
+  const modal = document.createElement('div');
+  modal.id = 'oe-comprobante-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
+  modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('oe-comprobante-overlay'); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-lg" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-size:13px;color:var(--text-2)">Comprobante ${escapeHtml(d.numero)}</div>
+          <div style="font-size:17px;font-weight:600">${escapeHtml(d.nombre)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${botonAtrasHtml()}
+          <button onclick="cerrarModalOE('oe-comprobante-overlay')" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        ${avisos.length ? `
+        <div style="border:1px solid #F0C36D;background:#FEF6E4;border-radius:var(--radius);padding:11px 13px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:5px">⚠️ Revisa antes de enviarlo</div>
+          <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6;color:var(--text-2)">
+            ${avisos.map(a => `<li>${a}</li>`).join('')}
+          </ul>
+        </div>` : ''}
+
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+          <div style="flex:0 0 272px;max-width:100%">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Ticket</div>
+            ${ticketComprobanteOE(d)}
+          </div>
+          <div style="flex:1 1 240px;min-width:220px">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Mensaje para el paciente</div>
+            <textarea id="oe-comp-msg" rows="14" style="width:100%;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical">${escapeHtml(mensajeComprobanteOE(d))}</textarea>
+            <div style="font-size:11px;color:var(--text-3);margin-top:6px">Puedes editarlo acá antes de enviarlo. El botón de WhatsApp abre el chat con este texto ya escrito; el envío lo haces tú.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
+          <button class="page-btn" style="padding:8px 14px" onclick="imprimirComprobanteOE(${d.id})">🖨 Imprimir</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})">⬇ Descargar</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="copiarMensajeComprobanteOE()">Copiar mensaje</button>
+          ${waOk
+            ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="enviarWhatsAppComprobanteOE('${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> Enviar por WhatsApp</button>`
+            : `<button class="page-btn" style="padding:8px 14px;opacity:.45;cursor:not-allowed" disabled>WhatsApp sin teléfono válido</button>`}
+          <button class="import-btn" style="margin-top:0;padding:8px 14px" onclick="cerrarModalOE('oe-comprobante-overlay')">Cerrar</button>
         </div>
       </div>
     </div>`;
