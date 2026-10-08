@@ -1656,9 +1656,21 @@
   </div>
 
   <div class="page" id="page-farmacia-compras">
+    <style>
+      /* Tabla con casillas (solo escritorio; en celular se mantiene la vista en tarjetas) */
+      @media (min-width: 761px) {
+        .farm-grilla table { border-collapse: collapse; width: 100%; }
+        .farm-grilla th, .farm-grilla td { border: 1px solid var(--border); padding: 7px 10px; }
+        .farm-grilla thead th { background: var(--bg); position: sticky; top: 0; z-index: 1; }
+        .farm-grilla tbody tr:nth-child(even) td { background: #FAFAF8; }
+        .farm-grilla tbody tr:hover td { background: var(--accent-light); }
+        .farm-grilla tfoot td { background: var(--bg); border-top: 2px solid var(--text-3); }
+      }
+      .farm-grilla input[type=number] { padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; font-family: var(--font); }
+    </style>
     <div class="page-header">
       <div class="page-title">Sugerencia de compra</div>
-      <div class="page-sub">Elige un rango de ventas y para cuántos días quieres comprar: te sugiero cuánto pedir de cada producto, agrupado por proveedor</div>
+      <div class="page-sub">Elige un rango de ventas y para cuántos días quieres comprar: te sugiero cuánto pedir de cada producto</div>
     </div>
     <div class="toolbar">
       <div class="fpp-status-tabs" id="farmacia-compras-rangos"></div>
@@ -12922,10 +12934,21 @@ function farmComprasCantidad(r) {
   return farmaciaComprasEdit[r.codigo] !== undefined ? farmaciaComprasEdit[r.codigo] : Number(r.sugerido || 0);
 }
 
-function farmComprasEditar(codigo, valor) {
+function farmComprasEditar(codigo, valor, input) {
+  const r = (farmaciaComprasData || []).find(x => x.codigo === codigo);
+  if (!r) return;
   const n = Math.max(0, Math.round(Number(valor) || 0));
   farmaciaComprasEdit[codigo] = n;
-  renderSugerenciaCompra();
+  if (input) {
+    input.value = n;
+    const editado = n !== Number(r.sugerido);
+    input.style.borderColor = editado ? 'var(--amber)' : '';
+    input.style.background = editado ? 'var(--amber-light)' : '';
+    input.title = editado ? `Sugerido por el sistema: ${r.sugerido}` : 'Puedes cambiar la cantidad';
+  }
+  const celda = document.getElementById(`farm-compra-total-${codigo}`);
+  if (celda) celda.textContent = n > 0 ? farmClp(n * Number(r.costo_unit || 0)) : '—';
+  farmComprasRenderTotales();
 }
 
 function farmComprasFiltradas() {
@@ -12939,43 +12962,48 @@ function farmComprasFiltradas() {
   return filas;
 }
 
-function renderSugerenciaCompra() {
-  if (!farmaciaComprasData) return;
-  const p = farmaciaComprasParams;
-  const filas = farmComprasFiltradas();
+// Resumen de arriba y fila de totales de abajo (se recalculan al editar, sin redibujar la tabla)
+function farmComprasRenderTotales() {
+  const filas = farmaciaComprasVisibles || [];
   const aComprar = filas.filter(r => farmComprasCantidad(r) > 0);
   const totalCosto = aComprar.reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
   const totalUds = aComprar.reduce((s, r) => s + farmComprasCantidad(r), 0);
-  const provs = new Set(aComprar.map(r => r.proveedor));
   const sinStock = filas.filter(r => Number(r.stock_util) <= 0).length;
   document.getElementById('farmacia-compras-resumen').innerHTML = `
-    <div class="stat destacado"><div class="stat-label">Costo estimado del pedido</div><div class="stat-val" style="font-size:20px">${farmClp(totalCosto)}</div><div class="stat-sub">Costo neto de la última compra</div></div>
+    <div class="stat destacado"><div class="stat-label">Total del pedido</div><div class="stat-val" style="font-size:20px">${farmClp(totalCosto)}</div><div class="stat-sub">Costo neto de la última compra</div></div>
     <div class="stat"><div class="stat-label">Productos a comprar</div><div class="stat-val" style="font-size:16px">${aComprar.length}</div><div class="stat-sub">${farmNum(totalUds)} unidades</div></div>
-    <div class="stat"><div class="stat-label">Proveedores</div><div class="stat-val" style="font-size:16px">${provs.size}</div><div class="stat-sub">Agrupado abajo por proveedor</div></div>
-    <div class="stat"><div class="stat-label">Vendidos sin stock útil</div><div class="stat-val" style="font-size:16px">${sinStock}</div><div class="stat-sub">Se vendieron en el rango y hoy no hay stock</div></div>`;
+    <div class="stat"><div class="stat-label">Productos en la lista</div><div class="stat-val" style="font-size:16px">${filas.length}</div><div class="stat-sub">Vendidos en el rango elegido</div></div>
+    <div class="stat"><div class="stat-label">Vendidos sin stock útil</div><div class="stat-val" style="font-size:16px">${sinStock}</div><div class="stat-sub">Se vendieron y hoy no hay stock</div></div>`;
+  const pie = document.getElementById('farm-compras-pie');
+  if (pie) pie.innerHTML = `<td colspan="7" style="text-align:right;font-weight:600">TOTAL PEDIDO</td>
+    <td style="text-align:right;font-weight:700">${farmNum(totalUds)}</td><td></td>
+    <td style="text-align:right;font-weight:700;white-space:nowrap">${farmClp(totalCosto)}</td><td></td>`;
+}
+
+let farmaciaComprasVisibles = [];
+
+function renderSugerenciaCompra() {
+  if (!farmaciaComprasData) return;
+  const p = farmaciaComprasParams;
+  const filas = farmComprasFiltradas().slice()
+    .sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
+  farmaciaComprasVisibles = filas;
 
   const dias = Math.round((new Date(p.hasta) - new Date(p.desde)) / 86400000) + 1;
   document.getElementById('farmacia-compras-nota').innerHTML =
     `Ventas del <b>${fDate(p.desde)}</b> al <b>${fDate(p.hasta)}</b> (${dias} días${p.traspasos ? ', incluye traspasos de salida' : ''}) proyectadas para cubrir <b>${p.cobertura} días</b>. ` +
-    `Sugerido = venta diaria × ${p.cobertura} − stock útil (lotes no vencidos) − compras pendientes en camino. Puedes corregir la cantidad antes de descargar el pedido.`;
+    `Sugerido = venta diaria × ${p.cobertura} − stock útil (lotes no vencidos) − compras pendientes en camino. Puedes corregir la cantidad: la fila se queda en su lugar.`;
 
   const cont = document.getElementById('farmacia-compras-tabla');
   if (filas.length === 0) {
     cont.innerHTML = `<div class="table-card"><div class="empty"><p>No hay productos para sugerir con estos filtros.</p></div></div>`;
+    farmComprasRenderTotales();
     return;
   }
-
-  // Agrupa por proveedor; los grupos con más plata primero
-  const grupos = {};
-  filas.forEach(r => { (grupos[r.proveedor] = grupos[r.proveedor] || []).push(r); });
-  const orden = Object.keys(grupos).sort((a, b) => {
-    const ta = grupos[a].reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
-    const tb = grupos[b].reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
-    return tb - ta || a.localeCompare(b);
-  });
-
-  const COLS = 10;
-  let html = `<div class="table-card"><table><thead><tr>
+  const LIM = 800;
+  const visibles = filas.slice(0, LIM);
+  cont.innerHTML = `
+    <div class="table-card farm-grilla"><table><thead><tr>
       <th>Código</th><th>Producto</th>
       <th style="text-align:right" title="Unidades vendidas en el rango (entre paréntesis: mismo período del año anterior)">Vendidas</th>
       <th style="text-align:right">Venta/día</th>
@@ -12983,69 +13011,59 @@ function renderSugerenciaCompra() {
       <th style="text-align:right" title="Días que alcanza el stock útil al ritmo de venta del rango">Alcanza</th>
       <th style="text-align:right" title="Compras pendientes de recepción en el sistema de ventas">En camino</th>
       <th style="text-align:right">Comprar</th>
+      <th style="text-align:right">Precio unit.</th>
       <th style="text-align:right">Total</th>
       <th>Última compra</th>
-    </tr></thead><tbody>`;
-  let mostradas = 0;
-  for (const prov of orden) {
-    const arr = grupos[prov].slice().sort((a, b) => (farmComprasCantidad(b) * Number(b.costo_unit || 0)) - (farmComprasCantidad(a) * Number(a.costo_unit || 0)) || Number(b.unidades_vendidas) - Number(a.unidades_vendidas));
-    const subtotal = arr.reduce((s, r) => s + farmComprasCantidad(r) * Number(r.costo_unit || 0), 0);
-    const nComprar = arr.filter(r => farmComprasCantidad(r) > 0).length;
-    const esRecetario = /recetario/i.test(prov);
-    html += `<tr style="background:var(--bg)"><td colspan="${COLS}" style="font-weight:600;padding-top:12px">
-        ${farmEsc(prov)} <span style="font-weight:400;color:var(--text-2);font-size:12px">· ${nComprar} producto${nComprar === 1 ? '' : 's'} · ${farmClp(subtotal)}${esRecetario ? ' · se prepara en el recetario' : ''}</span>
-      </td></tr>`;
-    for (const r of arr) {
-      if (mostradas >= 600) break;
-      mostradas++;
+    </tr></thead><tbody>
+    ${visibles.map(r => {
       const cant = farmComprasCantidad(r);
       const editado = farmaciaComprasEdit[r.codigo] !== undefined && farmaciaComprasEdit[r.codigo] !== Number(r.sugerido);
       const alcanza = r.dias_stock === null ? '—' : Number(r.dias_stock) >= 999 ? '999+' : `${farmNum(r.dias_stock)} d`;
       const alcanzaColor = r.dias_stock !== null && Number(r.dias_stock) < Math.min(7, p.cobertura) ? 'color:var(--red);font-weight:600' : r.dias_stock !== null && Number(r.dias_stock) < p.cobertura ? 'color:var(--amber)' : 'color:var(--text-2)';
-      html += `<tr>
-        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${farmEsc(r.codigo)}</td>
-        <td data-label="Producto">${farmEsc(r.producto)}${r.proximo_venc ? `<div style="font-size:11px;color:var(--text-3)">Próx. venc. ${fDate(r.proximo_venc)}</div>` : ''}</td>
+      const cod = farmEsc(r.codigo);
+      return `<tr>
+        <td data-label="Código" class="mono" style="color:var(--accent);white-space:nowrap">${cod}</td>
+        <td data-label="Producto">${farmEsc(r.producto)}</td>
         <td data-label="Vendidas" style="text-align:right;white-space:nowrap"><b>${farmNum(r.unidades_vendidas)}</b>${Number(r.unidades_anio_anterior) > 0 ? ` <span style="font-size:11px;color:var(--text-3)" title="Mismo período del año anterior">(${farmNum(r.unidades_anio_anterior)})</span>` : ''}</td>
         <td data-label="Venta/día" style="text-align:right;color:var(--text-2)">${Number(r.venta_diaria).toLocaleString('es-CL', { maximumFractionDigits: 2 })}</td>
         <td data-label="Stock útil" style="text-align:right;${Number(r.stock_util) <= 0 ? 'color:var(--red);font-weight:600' : ''}">${farmNum(r.stock_util)}</td>
         <td data-label="Alcanza" style="text-align:right;white-space:nowrap;${alcanzaColor}">${alcanza}</td>
         <td data-label="En camino" style="text-align:right;color:var(--text-2)">${Number(r.en_camino) > 0 ? farmNum(r.en_camino) : '—'}</td>
         <td data-label="Comprar" style="text-align:right">
-          <input type="number" min="0" step="1" value="${cant}" onchange="farmComprasEditar('${farmEsc(r.codigo)}', this.value)"
-            style="width:64px;text-align:right;font-weight:700;${editado ? 'border-color:var(--amber);background:var(--amber-light)' : ''}" title="${editado ? `Sugerido original: ${r.sugerido}` : 'Puedes cambiar la cantidad'}">
+          <input type="number" min="0" step="1" value="${cant}" onchange="farmComprasEditar('${cod}', this.value, this)"
+            style="width:64px;text-align:right;font-weight:700;${editado ? 'border-color:var(--amber);background:var(--amber-light)' : ''}" title="${editado ? `Sugerido por el sistema: ${r.sugerido}` : 'Puedes cambiar la cantidad'}">
         </td>
-        <td data-label="Total" style="text-align:right;white-space:nowrap">${cant > 0 ? farmClp(cant * Number(r.costo_unit || 0)) : '—'}</td>
+        <td data-label="Precio unit." style="text-align:right;white-space:nowrap;color:var(--text-2)">${r.costo_unit === null ? '—' : farmClp(r.costo_unit)}</td>
+        <td data-label="Total" id="farm-compra-total-${cod}" style="text-align:right;white-space:nowrap;font-weight:600">${cant > 0 ? farmClp(cant * Number(r.costo_unit || 0)) : '—'}</td>
         <td data-label="Última compra" style="white-space:nowrap;font-size:12px;color:var(--text-2)">${r.ultima_compra ? `${fDate(r.ultima_compra)} · ${farmNum(r.ultima_compra_cant)} u.` : '—'}</td>
       </tr>`;
-    }
-    if (mostradas >= 600) break;
-  }
-  html += `</tbody></table></div>`;
-  if (mostradas >= 600) html += `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Mostrando 600 productos; usa los filtros para acotar (el Excel trae todo).</div>`;
-  cont.innerHTML = html;
+    }).join('')}
+    </tbody><tfoot><tr id="farm-compras-pie"></tr></tfoot></table></div>
+    ${filas.length > LIM ? `<div style="font-size:12px;color:var(--text-3);padding:6px 2px">Mostrando ${LIM} de ${filas.length}; usa el buscador para acotar (el Excel trae todo).</div>` : ''}`;
+  farmComprasRenderTotales();
 }
 
 function descargarPedidoExcel() {
   if (!farmaciaComprasData || typeof XLSX === 'undefined') { toast('Primero calcula la sugerencia.', 'err'); return; }
   const filas = farmComprasFiltradas().filter(r => farmComprasCantidad(r) > 0)
-    .sort((a, b) => a.proveedor.localeCompare(b.proveedor) || a.producto.localeCompare(b.producto));
+    .sort((a, b) => (a.producto || '').localeCompare(b.producto || '', 'es', { sensitivity: 'base' }));
   if (filas.length === 0) { toast('No hay productos con cantidad a comprar.', 'err'); return; }
-  const fila = r => ({
-    'Proveedor': r.proveedor, 'Código': r.codigo, 'Producto': r.producto,
-    'Cantidad a comprar': farmComprasCantidad(r), 'Sugerido sistema': Number(r.sugerido),
-    'Costo unit.': r.costo_unit === null ? '' : Number(r.costo_unit), 'Total': Math.round(farmComprasCantidad(r) * Number(r.costo_unit || 0)),
-    'Vendidas en rango': Number(r.unidades_vendidas), 'Venta diaria': Number(r.venta_diaria), 'Stock útil': Number(r.stock_util),
-    'En camino': Number(r.en_camino), 'Última compra': r.ultima_compra || '',
-  });
+  const datos = filas.map(r => ({
+    'Código': r.codigo, 'Producto': r.producto,
+    'Cantidad': farmComprasCantidad(r),
+    'Precio unitario': r.costo_unit === null ? '' : Math.round(Number(r.costo_unit)),
+    'Total': Math.round(farmComprasCantidad(r) * Number(r.costo_unit || 0)),
+    'Sugerido sistema': Number(r.sugerido),
+    'Vendidas en rango': Number(r.unidades_vendidas), 'Stock útil': Number(r.stock_util),
+    'En camino': Number(r.en_camino), 'Última compra': r.ultima_compra || '', 'Proveedor (maestro)': r.proveedor,
+  }));
+  const totalCant = datos.reduce((s, d) => s + d['Cantidad'], 0);
+  const totalPedido = datos.reduce((s, d) => s + d['Total'], 0);
+  datos.push({ 'Código': '', 'Producto': 'TOTAL PEDIDO', 'Cantidad': totalCant, 'Precio unitario': '', 'Total': totalPedido });
+  const ws = XLSX.utils.json_to_sheet(datos);
+  ws['!cols'] = [{ wch: 10 }, { wch: 42 }, { wch: 9 }, { wch: 14 }, { wch: 12 }, { wch: 15 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 13 }, { wch: 24 }];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas.map(fila)), 'Pedido completo');
-  const usados = new Set(['Pedido completo']);
-  [...new Set(filas.map(r => r.proveedor))].forEach(prov => {
-    let nombre = prov.replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31).trim() || 'Proveedor';
-    let i = 2; while (usados.has(nombre)) nombre = nombre.slice(0, 28) + ' ' + (i++);
-    usados.add(nombre);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas.filter(r => r.proveedor === prov).map(fila)), nombre);
-  });
+  XLSX.utils.book_append_sheet(wb, ws, 'Pedido');
   const p = farmaciaComprasParams;
   XLSX.writeFile(wb, `pedido_sugerido_${p.desde}_a_${p.hasta}_cubre_${p.cobertura}d.xlsx`);
 }
