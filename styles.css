@@ -681,3 +681,15 @@
 .fpp-status-tabs { height: var(--control-h); align-items: center; padding: 3px; box-sizing: border-box; }
 .fpp-status-tab { height: calc(var(--control-h) - 8px); padding: 0 14px; display: inline-flex; align-items: center; }
 .toolbar .search-wrap { min-width: 240px; }
+
+/* ─── Tablas con cuadrícula (escritorio) ─────────────────────────────────
+   Mismo estilo que Sugerencia de compra: líneas en cada celda, franjas
+   alternas y resaltado al pasar el mouse. En celular (≤760 px) las tablas
+   se muestran como tarjetas, así que esta regla no las afecta. */
+@media (min-width: 761px) {
+  .table-card table { border-collapse: collapse; width: 100%; }
+  .table-card th, .table-card td { border: 1px solid var(--border); }
+  .table-card tbody tr:not(.letra-header):nth-child(even) td { background: #FAFAF8; }
+  .table-card tbody tr:not(.letra-header):hover td { background: var(--accent-light); }
+  .table-card tfoot td { background: var(--bg); border-top: 2px solid var(--text-3); }
+}
