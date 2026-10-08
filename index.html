@@ -624,6 +624,7 @@
         <button data-alcance="anio" onclick="setAlcance('doc','anio')">Año</button>
         <button data-alcance="todo" onclick="setAlcance('doc','todo')">Todo</button>
       </div>
+      <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
     </div>
     <div id="doc-contenido"></div>
   </div>
@@ -6237,9 +6238,25 @@ function badgeEstadoDocGdexpress(estado) {
   return '<span class="badge-estado neutral">—</span>';
 }
 
+// Muestra "Limpiar filtros" solo si hay búsqueda o algún tipo de documento desactivado.
+function actualizarLimpiarDoc() {
+  const btn = document.getElementById('doc-limpiar');
+  if (!btn) return;
+  const hay = !!docBusqueda || !docTiposActivos['33'] || !docTiposActivos['61'] || !docTiposActivos['52'];
+  btn.style.display = hay ? 'inline-flex' : 'none';
+}
+
+// Vacía la búsqueda y vuelve a activar los tres tipos de documento.
+function limpiarFiltrosDoc() {
+  document.getElementById('doc-search').value = '';
+  docBusqueda = '';
+  docMostrarTodosLosTipos();
+}
+
 function renderDocumentosGdexpress(soloTabla) {
   const cont = document.getElementById('doc-contenido');
   const delPeriodo = docListaDelPeriodo();
+  actualizarLimpiarDoc();
 
   // Contadores por tipo — ANTES de aplicar el filtro de tipo (para que se
   // pueda ver cuántas facturas hay aunque estén desactivadas en este momento).
