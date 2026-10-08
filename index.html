@@ -17,668 +17,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
-<style>
-  :root {
-    --bg: #F7F6F3;
-    --surface: #FFFFFF;
-    --border: #E5E3DD;
-    --border-strong: #C8C5BC;
-    --text: #1A1917;
-    --text-2: #6B6860;
-    --text-3: #9E9B94;
-    --accent: #C0392B;
-    --accent-light: #FBEAE9;
-    --green: #2D6A4F;
-    --green-light: #D8F3DC;
-    --amber: #92400E;
-    --amber-light: #FEF3C7;
-    --red: #991B1B;
-    --red-light: #FEE2E2;
-    --font: 'Inter', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
-    --radius: 8px;
-    --radius-lg: 12px;
-    /* Escala de espaciado: usar SIEMPRE uno de estos valores, nunca un
-       número suelto, para que el aire entre elementos sea consistente
-       en toda la app. */
-    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
-    --focus-ring: 0 0 0 3px rgba(192,57,43,.25);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  /* Red de seguridad secundaria: el objetivo real es que nada desborde
-     (ver reglas de .toolbar, .fpp-*, tablas, modales, etc. más abajo), pero
-     esto evita que un caso no contemplado abra scroll horizontal global. */
-  html, body { overflow-x: hidden; max-width: 100%; }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; min-height: 100dvh; }
+<link rel="stylesheet" href="styles.css">
 
-  /* Layout */
-  .sidebar { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); padding: 0; display: flex; flex-direction: column; z-index: 100; }
-  .logo { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-  .logo-badge { width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 3px 8px rgba(192,57,43,.3); }
-  .logo-text { flex: 1; min-width: 0; }
-  .logo-title { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .logo-sub { font-size: 10.5px; color: var(--text-3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nav { padding: 12px 10px; flex: 1; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; transition: all .15s; margin-bottom: 2px; }
-  .nav-item:hover { background: var(--bg); color: var(--text); }
-  .nav-item.active { background: #E6F1FB; color: #185FA5; font-weight: 500; }
-  .nav-back { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; margin-bottom: 4px; transition: all .15s; }
-  .nav-back:hover { background: var(--bg); color: var(--text); }
-  .nav-divider { height: 1px; background: var(--border); margin: 6px 10px 10px; }
-  #nav-submenu { display: none; }
-
-  /* ─── Accordion: cada módulo con más de un ítem expande su propio
-     submenú debajo, sin ocultar ni reemplazar el resto del sidebar. Solo
-     un módulo puede estar expandido a la vez (ver mostrarModulo()). */
-  .nav-group { margin-bottom: 2px; }
-  .nav-item-modulo { position: relative; }
-  .nav-item-modulo.active { background: #E6F1FB; color: #185FA5; font-weight: 500; }
-  .nav-item-modulo.active::before { content: ''; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
-  .nav-chevron { margin-left: auto; font-size: 13px !important; color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
-  .nav-group.abierto .nav-chevron { transform: rotate(180deg); }
-  .nav-subgroup { display: none; margin: 2px 0 4px; }
-  .nav-group.abierto .nav-subgroup { display: block; }
-
-  /* ─── Dónde estoy parado ────────────────────────────────────────────────
-     El acordeón desplegaba las subsecciones pero no las "entonaba": los
-     ítems quedaban flotando y no se notaba ni qué módulo estaba abierto ni
-     en qué subsección estabas. Peor todavía, el encabezado del módulo y la
-     subsección activa usaban EXACTAMENTE la misma píldora azul, así que
-     competían entre sí en vez de ordenar.
-
-     Se arregla en dos niveles, con dos volúmenes distintos a propósito:
-       el módulo     dice "estás trabajando acá adentro", en voz baja
-       la subsección dice "estás en ESTA página", en voz alta            */
-
-  /* Un módulo desplegado se lee como un solo bloque, no como ítems sueltos
-     apilados. */
-  .nav-group.abierto { background: var(--bg); border-radius: var(--radius-lg); padding: 2px 0 5px; margin-bottom: 6px; }
-  .nav-group.abierto > .nav-item-modulo { color: var(--text); font-weight: 600; }
-  .nav-group.abierto > .nav-item-modulo .nav-icon,
-  .nav-group.abierto > .nav-item-modulo .nav-chevron { color: var(--accent); }
-  /* Dentro del bloque el hover tiene que ACLARAR: el gris del hover normal
-     es justo el fondo que ahora tiene el bloque, así que ahí no se veía.
-     El :not(.active) importa — sin él, pasar el mouse por encima de la
-     subsección en la que estás parado le borraba la píldora azul y por un
-     momento parecía que te habías salido de ella. */
-  .nav-group.abierto .nav-item:not(.active):hover { background: var(--surface); }
-
-  /* El encabezado de un módulo desplegado le cede la píldora azul a su
-     subsección activa y se queda con la negrita y la barra roja. Un módulo
-     de un solo ítem (FedEx) no cede nada: ahí el encabezado ES la página,
-     y por eso esta regla solo aplica cuando el acordeón está abierto. */
-  .nav-group.abierto > .nav-item-modulo.active { background: none; }
-
-  /* La subsección activa: la píldora azul con una barra al costado — el
-     mismo recurso que ya usaban los sub-bloques de Facturas, así que el
-     sidebar habla un solo idioma. */
-  .nav-subitem { padding-left: 31px; font-size: 12.5px;
-    border-left: 3px solid transparent; border-radius: 0 var(--radius) var(--radius) 0; }
-  .nav-subitem:hover { border-left-color: var(--border-strong); }
-  .nav-subitem.active { border-left-color: #185FA5; font-weight: 600; }
-
-  /* ─── Sub-bloques anidados dentro de un módulo (ej. Facturas: "Facturas
-     Bulfor" / "Facturas Proveedor"), cada uno con su propio acordeón,
-     independiente del acordeón del módulo que los contiene. El borde
-     izquierdo funciona como "guía" visual de que están anidados dentro
-     de Facturas, sin ser un simple rótulo en mayúsculas. */
-  .nav-item-subbloque { padding-left: 18px; margin-left: 10px; border-left: 2px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
-  .nav-item-subbloque:hover { color: var(--text); background: var(--bg); border-left-color: var(--accent); }
-  .nav-subbloque.abierto > .nav-item-subbloque { color: var(--text); border-left-color: var(--accent); }
-  .nav-item-subbloque .nav-icon { font-size: 14px; color: var(--text-3); }
-  .nav-subbloque.abierto > .nav-item-subbloque .nav-icon { color: var(--accent); }
-  .nav-chevron-sub { margin-left: auto; font-size: 12px !important; color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
-  .nav-subbloque.abierto .nav-chevron-sub { transform: rotate(180deg); }
-  .nav-subgroup-nivel2 { display: none; margin: 2px 0 6px; }
-  .nav-subbloque.abierto .nav-subgroup-nivel2 { display: block; }
-  .nav-subgroup-nivel2 .nav-subitem { padding-left: 41px; }   /* 41 + 3 de borde = los 44 de siempre */
-
-
-  /* ─── Sidebar colapsable: modo solo-iconos controlado por el usuario
-     (distinto del modo ícono-solo forzado por ancho de pantalla, más
-     abajo). Preferencia guardada en localStorage. */
-  #sidebar-toggle { background: none; border: none; color: var(--text-3); cursor: pointer; padding: 4px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background .15s; }
-  #sidebar-toggle:hover { background: var(--bg); color: var(--text); }
-  #sidebar-toggle i { font-size: 16px; transition: transform .15s; }
-  body.sidebar-colapsado #sidebar-toggle i { transform: rotate(180deg); }
-  body.sidebar-colapsado .sidebar { width: 60px; transition: width .15s; }
-  body.sidebar-colapsado .main { margin-left: 60px; }
-  body.sidebar-colapsado .system-bar { left: 60px; }
-  body.sidebar-colapsado .logo { justify-content: center; }
-  body.sidebar-colapsado .logo-text, body.sidebar-colapsado .nav-section-label,
-  body.sidebar-colapsado .nav-item span:not(.nav-icon), body.sidebar-colapsado .nav-chevron,
-  body.sidebar-colapsado .nav-subgroup { display: none !important; }
-  /* Igual que en el modo ícono por ancho de pantalla: sin subsecciones a la
-     vista, el bloque gris del módulo abierto no encierra nada. */
-  body.sidebar-colapsado .nav-group.abierto { background: none; padding: 0; margin-bottom: 2px; }
-  @media (max-width: 900px) { #sidebar-toggle { display: none; } }
-
-  /* ─── Pantalla Inicio ────────────────────────────────────────────────── */
-  .inicio-seccion { margin-bottom: 28px; }
-  .inicio-seccion-titulo { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 12px; }
-  .inicio-accesos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .inicio-acceso { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; font-size: 13px; color: var(--text); font-weight: 500; }
-  .inicio-acceso:hover { border-color: var(--border-strong); box-shadow: 0 2px 8px rgba(26,25,23,.06); }
-  .inicio-acceso .nav-icon { font-size: 18px; color: var(--accent); flex-shrink: 0; }
-  .inicio-atencion-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; font-size: 13px; color: var(--text); transition: background .15s; }
-  .inicio-atencion-item:hover { background: var(--bg); }
-  .inicio-atencion-item .badge-estado { padding: 0; width: 8px; height: 8px; min-width: 0; flex-shrink: 0; }
-  .inicio-atencion-item .badge-estado::before { margin: 0; }
-  .inicio-atencion-item span:nth-child(2) { flex: 1; }
-  .inicio-atencion-item i { color: var(--text-3); font-size: 15px; }
-  .inicio-atencion-vacio { color: var(--text-2); font-size: 13px; padding: 10px 2px; }
-  @media (max-width: 900px) { .inicio-accesos { grid-template-columns: repeat(2, 1fr); } }
-  .modulo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 20px; color: var(--text-2); }
-  .modulo-placeholder .icono { font-size: 48px; margin-bottom: 16px; opacity: .5; }
-  .modulo-placeholder h2 { font-size: 18px; color: var(--text); margin-bottom: 8px; font-weight: 600; }
-  .modulo-placeholder p { font-size: 14px; max-width: 360px; }
-  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-  .nav-icon i { font-size: 16px; vertical-align: -3px; }
-  .nav-section-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; color: var(--text-3); text-transform: uppercase; padding: 14px 10px 6px; }
-  .nav-section-label:first-child { padding-top: 4px; }
-
-  /* Toasts */
-  .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
-
-  /* ─── Sistema de modales ───────────────────────────────────────────────
-     3 anchos fijos nada más — nunca un ancho suelto. sm para confirmaciones
-     y formularios cortos, md para fichas de detalle, lg para fichas con
-     tablas adentro (ítems, historial). Header y footer con el mismo padding
-     siempre, para que ninguna ventana "se sienta" distinta a otra. */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(26,25,23,.5); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: var(--sp-5); overflow-y: auto; }
-  /* El scroll va DENTRO del cuerpo, no en toda la ventana: el encabezado
-     (folio, hospital, flechas y cerrar) y el pie quedan siempre fijos, y la
-     barra de scroll aparece solo al costado del contenido. Antes scrolleaba
-     el shell completo y la barra recorría toda la ficha de arriba abajo. */
-  .modal-shell { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-height: 90vh; overflow-y: auto; overflow-x: hidden; box-shadow: 0 12px 32px rgba(26,25,23,.18); display: flex; flex-direction: column; }
-  .modal-sm { max-width: 420px; }
-  .modal-md { max-width: 520px; }
-  .modal-lg { max-width: 640px; }
-  .modal-xl { max-width: 760px; } /* excepción: solo para fichas con tabla ancha adentro (ítems con 4+ columnas) */
-  .modal-header { padding: var(--sp-5); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-4); background: var(--surface); z-index: 1; flex-shrink: 0; position: sticky; top: 0; }
-  .modal-header > *:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-  .modal-eyebrow { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
-  .modal-title { font-size: 16px; font-weight: 600; letter-spacing: -.2px; overflow-wrap: anywhere; }
-  .modal-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
-  .modal-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-2); padding: 4px 8px; border-radius: var(--radius); }
-  .modal-close:hover { background: var(--bg); color: var(--text); }
-  .modal-body { padding: var(--sp-5); overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 0; }
-  /* Fichas donde solo una parte scrollea (ej. el detalle de pago: los datos de
-     la factura quedan arriba, el pago abajo, y la lista de productos scrollea
-     en el medio). El bloque con scroll cede altura antes
-     que los fijos, con un piso de 64px, para que el boton de guardar siga
-     alcanzable sin scrollear la ficha entera. */
-  .modal-zona-fija { padding: 0 var(--sp-5); flex: 0 0 auto; }
-  .modal-zona-fija:first-of-type { padding-top: var(--sp-5); }
-  .modal-zona-scroll { padding: 0 var(--sp-5); overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 64px; }
-  .modal-zona-cierre { padding: var(--sp-4) var(--sp-5) var(--sp-5); flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--surface); }
-  .modal-footer { padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--sp-2); flex-shrink: 0; }
-
-  /* Pestañas dentro de una ficha (estilo sistema hospitalario: la info se
-     separa por pestaña en vez de un solo bloque largo con scroll). */
-  .modal-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--sp-5); position: sticky; top: 61px; background: var(--surface); z-index: 1; }
-  .modal-tab { padding: var(--sp-3) var(--sp-2); margin-right: var(--sp-4); font-size: 13px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; }
-  .modal-tab:hover { color: var(--text); }
-  .modal-tab.active { color: #185FA5; border-bottom-color: #185FA5; font-weight: 500; }
-  .modal-tab-panel { display: none; }
-  .modal-tab-panel.active { display: block; }
-  /* Grilla tipo "ficha clínica": bordes marcados entre celdas, no solo una línea sutil. */
-  .clinical-grid { width: 100%; font-size: 13px; border-collapse: collapse; border: 1px solid var(--border); }
-  .clinical-grid td { padding: 8px 12px; border: 1px solid var(--border); }
-  .clinical-grid td:first-child { color: var(--text-2); background: var(--bg); width: 40%; }
-  .toast { display: flex; align-items: center; gap: 8px; background: var(--text); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.18); animation: toast-in .18s ease-out; }
-  .toast.toast-err { background: var(--red); }
-  .toast.toast-ok i { color: #8FD9A8; }
-  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-  /* Sombras suaves para dar un poco más de profundidad */
-  .table-card, .stat { box-shadow: 0 1px 3px rgba(26,25,23,.04); }
-  .page-btn:hover { box-shadow: 0 1px 4px rgba(26,25,23,.08); }
-  .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
-  .sync-status { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
-  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-
-  .system-bar { position: fixed; top: 0; left: 220px; right: 0; height: 34px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 11px; color: var(--text-3); z-index: 90; }
-  .system-bar-brand { display: flex; align-items: baseline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .header-kebab-btn { display: none; background: none; border: 1px solid var(--border); border-radius: 6px; width: 26px; height: 26px; align-items: center; justify-content: center; color: var(--text-2); cursor: pointer; font-size: 15px; flex-shrink: 0; }
-  .main { margin-left: 220px; margin-top: 34px; padding: 28px 32px; min-height: calc(100vh - 34px); }
-  .page { display: none; }
-  .page.active { display: block; }
-
-  /* Page header */
-  .page-header { margin-bottom: 24px; }
-  .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.4px; }
-  .page-sub { color: var(--text-2); font-size: 13px; margin-top: 4px; }
-
-  /* Stats row */
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
-  .stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
-  .stat-val { font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
-  .stat-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
-
-  /* Search + filters */
-  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-  .search-wrap { position: relative; flex: 1; min-width: 260px; }
-
-  /* Alcance de la búsqueda: "Este mes" / "Todo". Control segmentado
-     compacto que vive al lado del buscador (y debajo en celular, porque
-     .search-wrap pasa a ocupar el 100% del ancho). */
-  .scope-toggle { display: inline-flex; flex-shrink: 0; border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; background: var(--surface); }
-  .scope-toggle button { border: none; background: none; padding: 8px 13px; font-size: 12px;
-    font-family: var(--font); color: var(--text-2); cursor: pointer; white-space: nowrap;
-    transition: background .12s, color .12s; }
-  .scope-toggle button + button { border-left: 1px solid var(--border); }
-  .scope-toggle button:hover { background: var(--bg); }
-  .scope-toggle button.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
-  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 15px; pointer-events: none; }
-  input[type=text], select {
-    width: 100%; padding: 9px 12px 9px 34px;
-    border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--surface); color: var(--text); font-size: 13px;
-    font-family: var(--font); outline: none; transition: border-color .15s;
-  }
-  select { padding-left: 12px; min-width: 160px; width: auto; cursor: pointer; }
-  input[type=text]:focus, select:focus { border-color: var(--accent); }
-  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .page-btn:focus-visible, [tabindex]:focus-visible {
-    outline: none; box-shadow: var(--focus-ring); border-color: var(--accent);
-  }
-
-  /* ─── Pantalla de login ───────────────────────────────────────────────── */
-  #login-overlay { background: radial-gradient(circle at 30% 20%, #FBEAE9 0%, var(--bg) 55%); }
-  .login-card { background: var(--surface); border-radius: 20px; box-shadow: 0 24px 64px rgba(26,25,23,.16), 0 2px 8px rgba(26,25,23,.08); max-width: 400px; width: 100%; padding: 44px 40px 36px; }
-  .login-badge { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); color: #fff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; box-shadow: 0 6px 16px rgba(192,57,43,.35); }
-  .login-field { margin-bottom: 18px; }
-  .login-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
-  .login-input-wrap { position: relative; }
-  .login-input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 17px; color: var(--text-3); pointer-events: none; }
-  .login-input-wrap input { width: 100%; padding: 13px 14px 13px 42px; font-size: 15px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s, background .15s; }
-  .login-input-wrap input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px rgba(192,57,43,.1); }
-  .login-btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s; box-shadow: 0 4px 12px rgba(192,57,43,.25); }
-  .login-btn:hover:not(:disabled) { background: #A93225; }
-  .login-btn:active:not(:disabled) { transform: scale(.98); }
-  .login-btn:disabled { opacity: .6; cursor: default; }
-
-  /* Table */
-  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-
-  /* ─── Índice alfabético (Productos, Hospitales) ─────────────────────────
-     Barra fija de letras A-Z a la derecha para saltar directo a esa
-     sección, y encabezados de letra dentro de la tabla — igual que una
-     libreta de contactos clásica. */
-  .alfabetico-wrap { display: flex; gap: 0; }
-  .alfabetico-tabla { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
-  .alfabetico-jump { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg); }
-  .alfabetico-jump button { border: none; background: none; font-size: 10px; font-weight: 600; color: var(--text-3); cursor: pointer; padding: 1px 5px; border-radius: 3px; font-family: var(--font); line-height: 1.5; }
-  .alfabetico-jump button:hover { background: var(--surface); color: var(--accent); }
-  .alfabetico-jump button:disabled { color: var(--border); cursor: default; }
-  .alfabetico-jump button:disabled:hover { background: none; }
-  tr.letra-header td { background: var(--bg); font-weight: 700; font-size: 12px; color: var(--accent); padding: 5px 16px; position: sticky; top: 0; z-index: 1; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  table { width: 100%; border-collapse: collapse; }
-  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tbody tr { cursor: pointer; transition: background .1s; }
-  tbody tr:hover td { background: #FAFAF8; }
-  tbody tr.expanded td { background: var(--accent-light); }
-
-  .detail-row td { padding: 0; }
-  .detail-inner { padding: 16px 14px; background: var(--accent-light); border-bottom: 1px solid var(--border); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 13px; }
-  .detail-field label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 3px; }
-  .detail-field span { color: var(--text); font-weight: 500; }
-
-  /* Badges */
-  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-  /* Un solo componente de "estado" para toda la app — Aceptada/Anulada/
-     Pendiente siempre se ven igual, tengan la data que tengan alrededor. */
-  .badge-estado { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; }
-  .badge-estado::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .badge-estado.ok { background: var(--green-light); color: var(--green); }
-  .badge-estado.err { background: var(--red-light); color: var(--red); }
-  .badge-estado.warn { background: var(--amber-light); color: var(--amber); }
-  .badge-estado.neutral { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); }
-
-  /* ─── Facturas por pagar: selector de período + pestañas de estado ──────
-     Separados a propósito: el período es NAVEGACIÓN (a dónde voy), las
-     pestañas son FILTRO (qué veo) — nunca se mezclan en el mismo control. */
-  .fpp-toolbar-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
-  .fpp-period { display: flex; align-items: center; gap: 6px; }
-  .fpp-period-btn { width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); cursor: pointer; font-size: 15px; color: var(--text); display: flex; align-items: center; justify-content: center; transition: background .12s; }
-  .fpp-period-btn:hover { background: var(--bg); }
-  .fpp-period select { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; font-size: 14px; font-weight: 600; font-family: var(--font); background: var(--surface); color: var(--text); cursor: pointer; }
-  .fpp-status-tabs { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; }
-  .fpp-status-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; border: none; background: none; font-family: var(--font); }
-  .fpp-status-tab:hover { color: var(--text); }
-  .fpp-status-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(26,25,23,.08); }
-  .fpp-status-tab.active[data-estado="paid"] { color: var(--green); }
-  .fpp-status-tab.active[data-estado="overdue"] { color: var(--red); }
-  .fpp-status-tab.active[data-estado="pending"] { color: var(--amber); }
-
-  .fpp-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-  .fpp-resumen .stat { padding: 12px 14px; }
-  .fpp-resumen .stat.destacado { background: var(--accent-light); border-color: var(--accent); }
-  .fpp-resumen .stat.destacado .stat-val { color: var(--accent); }
-
-  /* Resumen compacto de Facturas rechazadas: una sola línea en vez de
-     cuatro tarjetas grandes. Lo que requiere gestión es lo único que se
-     destaca — el resto es contexto. */
-  .rechazadas-resumen { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px;
-    padding: 10px 14px; margin-bottom: 14px; border: 1px solid var(--border);
-    border-radius: var(--radius); background: var(--surface); font-size: 13px; }
-  .rechazadas-resumen .rz-total { font-weight: 600; }
-  .rechazadas-resumen .rz-sep { color: var(--border-strong); }
-  .rechazadas-resumen .rz-gestion { display: inline-flex; align-items: center; gap: 6px;
-    padding: 3px 10px; border-radius: 20px; background: var(--accent-light);
-    color: var(--accent); font-weight: 600; }
-  .rechazadas-resumen .rz-dato { color: var(--text-2); }
-  .rechazadas-resumen .rz-dato strong { color: var(--text); font-weight: 600; }
-  .rechazadas-resumen .rz-ok { color: var(--green); }
-
-
-  /* ─── RRHH · Vacaciones ─────────────────────────────────────────────────
-     Reutiliza .stat, .table-card, .badge-estado y .fpp-status-tabs del
-     resto de la app. Acá solo va lo que no existía: la fila de alerta y
-     la grilla del calendario. */
-  .vac-dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  .vac-alerta { display: flex; align-items: center; gap: 10px; padding: 11px 18px;
-    border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; transition: background .1s; }
-  .vac-alerta:last-child { border-bottom: none; }
-  .vac-alerta:hover { background: #FAFAF8; }
-  .vac-alerta .badge-estado { padding: 0; width: 8px; height: 8px; min-width: 0; flex-shrink: 0; }
-  .vac-alerta .badge-estado::before { margin: 0; }
-
-  .vac-cal-wrap { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
-  .vac-cal-head { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--bg); border-bottom: 1px solid var(--border); }
-  .vac-cal-head > div { padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text-3);
-    text-transform: uppercase; letter-spacing: .5px; text-align: center; }
-  .vac-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); }
-  .vac-cal-dia { background: var(--surface); min-height: 96px; padding: 6px 7px; }
-  .vac-cal-dia.fuera   { background: var(--bg); opacity: .5; }
-  .vac-cal-dia.finde   { background: #FBFAF8; }
-  .vac-cal-dia.feriado { background: var(--amber-light); }
-  .vac-cal-dia.hoy     { box-shadow: inset 0 0 0 2px var(--accent); }
-  .vac-cal-num { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
-  .vac-cal-dia.hoy .vac-cal-num { color: var(--accent); }
-  .vac-cal-feriado { font-size: 9.5px; color: var(--amber); margin-top: 2px; line-height: 1.3;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vac-cal-chip { display: block; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; margin-top: 3px;
-    background: var(--green-light); color: var(--green); cursor: pointer; font-weight: 500;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vac-cal-chip:hover { filter: brightness(.95); }
-  .vac-cal-chip.pend { background: var(--amber-light); color: var(--amber); }
-  .vac-leyenda { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  .vac-leyenda.ok   { background: var(--green-light); border: 1px solid var(--green); }
-  .vac-leyenda.pend { background: var(--amber-light); border: 1px solid var(--amber); }
-  .vac-leyenda.fer  { background: var(--amber-light); }
-
-  @media (max-width: 900px) {
-    .vac-dos-columnas { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 700px) {
-    /* El calendario no se comprime: se desplaza. Siete columnas de 40px en
-       un celular son ilegibles. */
-    .vac-cal-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .vac-cal-head, .vac-cal-grid { min-width: 620px; }
-    .vac-cal-dia { min-height: 78px; }
-    .fpp-resumen { grid-template-columns: repeat(2, 1fr) !important; }
-  }
-
-  .fpp-bulk-bar { align-items: center; gap: 12px; background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius); padding: 9px 16px; margin-bottom: 10px; font-size: 13px; }
-  .fpp-bulk-bar #fpp-bulk-count { font-weight: 600; color: var(--accent); }
-  .fpp-bulk-sep { width: 1px; height: 18px; background: var(--accent); opacity: .3; }
-  .fpp-bulk-bar input[type=date] { width: auto; padding: 6px 10px; }
-  .fpp-bulk-cancelar { background: none; border: none; color: var(--text-2); font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: auto; font-family: var(--font); }
-  .fpp-bulk-cancelar:hover { color: var(--text); }
-
-  .fpp-venc-contexto { font-size: 11px; display: block; margin-top: 1px; }
-  .fpp-venc-contexto.hoy, .fpp-venc-contexto.atraso { color: var(--red); font-weight: 500; }
-  .fpp-venc-contexto.proximo { color: var(--amber); }
-  .fpp-venc-contexto.normal { color: var(--text-3); }
-
-  .fpp-empty { text-align: center; padding: 48px 20px; color: var(--text-2); }
-  .fpp-empty .fpp-empty-icon { font-size: 15px; margin-bottom: 8px; }
-  .fpp-empty a { color: var(--accent); cursor: pointer; }
-
-  .grafico-selector-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent; }
-  .grafico-selector-item:hover { background: var(--bg); }
-  .grafico-selector-item.active { background: var(--accent-light); border-color: var(--accent); }
-  .grafico-selector-item.active .grafico-selector-titulo { color: var(--accent); font-weight: 600; }
-  .grafico-selector-icono { font-size: 18px; flex-shrink: 0; }
-  .grafico-selector-titulo { font-size: 13px; font-weight: 500; }
-  .grafico-selector-sub { font-size: 11px; color: var(--text-2); }
-
-  /* Skeleton loader: un rectángulo gris que "respira" mientras carga algo,
-     en vez del texto plano "Cargando…". */
-  .skeleton { background: linear-gradient(90deg, var(--bg) 25%, #EFEEE9 37%, var(--bg) 63%); background-size: 400% 100%; animation: skeleton-pulse 1.4s ease infinite; border-radius: var(--radius); }
-  @keyframes skeleton-pulse { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
-  .badge-green { background: var(--green-light); color: var(--green); }
-  .badge-amber { background: var(--amber-light); color: var(--amber); }
-  .badge-red { background: var(--red-light); color: var(--red); }
-  .badge-blue { background: #E6F1FB; color: #185FA5; }
-  .badge-gray { background: #F1F0EC; color: var(--text-2); }
-
-  /* Mono text */
-  .mono { font-family: var(--mono); font-size: 12px; color: var(--accent); }
-
-  /* Pagination */
-  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
-  .page-btns { display: flex; gap: 4px; }
-  .page-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text-2); transition: all .1s; }
-  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .page-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-  .page-btn:disabled { opacity: .4; cursor: default; }
-
-  /* Import */
-  .drop-zone { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 48px; text-align: center; cursor: pointer; transition: all .2s; background: var(--surface); }
-  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: var(--accent-light); }
-  .drop-icon { font-size: 36px; color: var(--text-3); margin-bottom: 12px; }
-  .drop-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
-  .drop-sub { font-size: 13px; color: var(--text-2); }
-  .import-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); }
-  .import-btn:disabled { opacity: .5; cursor: default; }
-  .progress-wrap { margin-top: 20px; }
-  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
-  .progress-fill { height: 100%; background: var(--accent); transition: width .3s; }
-  .log { margin-top: 16px; background: #1A1917; border-radius: var(--radius); padding: 14px; font-family: var(--mono); font-size: 12px; color: #A8A29E; max-height: 200px; overflow-y: auto; }
-  .log-line { margin-bottom: 4px; }
-  .log-ok { color: #6EE7B7; }
-  .log-err { color: #FCA5A5; }
-
-  /* Empty state */
-  .empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
-  .empty-icon { font-size: 32px; margin-bottom: 12px; }
-
-  /* Loading spinner */
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; vertical-align: middle; }
-
-  /* Responsive */
-  @media (max-width: 900px) {
-    .sidebar { width: 60px; }
-    .logo-title, .logo-sub, .nav-item span:not(.nav-icon), .nav-back span:not(.nav-icon) { display: none; }
-    .nav-item, .nav-back { justify-content: center; }
-    .nav-icon { margin: 0; font-size: 20px; }
-    .main { margin-left: 60px; padding: 20px 16px; margin-top: 34px; }
-    .system-bar { left: 60px; }
-    .stats { grid-template-columns: repeat(2, 1fr); }
-    .logo { justify-content: center; }
-    .nav-subgroup, .nav-chevron { display: none !important; }
-    /* En modo solo-iconos el bloque del módulo abierto no tiene nada que
-       encerrar — las subsecciones están ocultas — y quedaría como un
-       recuadro gris suelto detrás de un ícono. */
-    .nav-group.abierto { background: none; padding: 0; margin-bottom: 2px; }
-  }
-
-  /* ─── Celular: barra inferior fija + submenú como pestañas horizontales,
-     en vez del sidebar de escritorio — para que se sienta como una app
-     nativa instalada, no como una página web angosta. */
-  .bottom-tabbar { display: none; }
-  @media (max-width: 640px) {
-    .sidebar { display: contents; }
-    .logo, #nav-modulos { display: none; }
-    .system-bar { left: 0; right: 0; padding: 0 12px; padding-top: env(safe-area-inset-top, 0);
-      height: calc(34px + env(safe-area-inset-top, 0)); justify-content: space-between; }
-    .system-bar-brand-sub { display: none; } /* el texto largo del sistema no cabe ni hace falta en celular */
-    .system-bar-brand-main { font-size: 12px; font-weight: 600; color: var(--text-2); }
-    .refresh-label { display: none; }
-
-    /* El resto del header (reloj, Actualizar, usuario, estado de conexión) se
-       agrupa detrás del botón "⋮" para no saturar la barra superior. */
-    .header-kebab-btn { display: flex; }
-    #header-more-panel { display: none !important; position: fixed;
-      top: calc(34px + env(safe-area-inset-top, 0) + 6px); right: 10px; left: auto;
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      box-shadow: 0 8px 24px rgba(26,25,23,.16); padding: 12px; z-index: 120;
-      flex-direction: column !important; align-items: stretch !important; gap: 10px !important;
-      min-width: 200px; max-width: calc(100vw - 20px); }
-    .system-bar.header-menu-abierto #header-more-panel { display: flex !important; }
-    #header-more-panel #systemClock { order: 3; font-size: 11px; color: var(--text-3); text-align: right; }
-    #header-more-panel button { width: 100%; justify-content: center !important; }
-    #header-more-panel .refresh-label { display: inline !important; }
-    #header-more-panel #usuario-sesion { display: flex !important; flex-wrap: wrap; }
-
-    .bottom-tabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0;
-      height: calc(58px + env(safe-area-inset-bottom, 0));
-      background: var(--surface); border-top: 1px solid var(--border); z-index: 100;
-      padding-bottom: env(safe-area-inset-bottom, 0); }
-    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; font-size: 10px; color: var(--text-2); cursor: pointer; min-height: 44px; }
-    .tab-item i { font-size: 20px; }
-    .tab-item.active { color: #185FA5; font-weight: 600; position: relative; }
-    .tab-item.active::before { content: ''; position: absolute; top: 2px; width: 18px; height: 2px;
-      border-radius: 2px; background: #185FA5; }
-
-    /* El submenú de cada módulo (antes vertical en el sidebar) pasa a ser
-       una fila de pestañas horizontal, pegada arriba, con scroll lateral local
-       (solo esa barra se desplaza, nunca la página). */
-    #nav-submenu { position: fixed !important; top: calc(34px + env(safe-area-inset-top, 0)); left: 0; right: 0; z-index: 95;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      display: flex !important; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;
-      padding: 6px 10px; gap: 6px; scrollbar-width: thin; }
-    #nav-submenu .nav-back, #nav-submenu .nav-divider { display: none; }
-    #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: 20px; scroll-snap-align: start; }
-    #nav-submenu .nav-item span:not(.nav-icon) { display: inline !important; }
-    #nav-submenu .nav-icon { width: auto; font-size: 14px; }
-    #nav-submenu:empty { display: none !important; }
-
-    .main { margin-left: 0 !important; margin-top: calc(34px + env(safe-area-inset-top, 0));
-      padding: 16px 12px calc(74px + env(safe-area-inset-bottom, 0)); min-height: 0; }
-    body:has(#nav-submenu:not(:empty)) .main { margin-top: calc(78px + env(safe-area-inset-top, 0)); }
-    .stats { grid-template-columns: 1fr 1fr !important; }
-
-    /* Componentes compartidos de alto impacto: sin estos, casi todas las
-       páginas de Facturas/Pagos/FedEx/Elaboración/Farmacia desbordan. */
-    .toolbar { gap: 8px; }
-    .search-wrap { min-width: 0; flex: 1 1 100%; }
-    .toolbar select, .toolbar input[type=text] { min-width: 0; flex: 1 1 auto; }
-    select { min-width: 0; max-width: 100%; }
-    input[type=text], input[type=number], input[type=date], input[type=email],
-    input[type=password], input[type=tel], textarea, select { max-width: 100%; }
-
-    .fpp-period { flex-wrap: wrap; }
-    .fpp-status-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap;
-      max-width: 100%; scrollbar-width: thin; }
-    .fpp-status-tab { flex-shrink: 0; }
-    .fpp-resumen { grid-template-columns: repeat(2, 1fr); }
-
-    /* Sistema de modales: nunca más angostos que la pantalla, headers que
-       envuelven en vez de comprimirse a texto vertical, y las fichas
-       largas (modal-lg / modal-xl, formularios como "Nueva Orden de
-       Elaboración") pasan a hoja casi de pantalla completa con scroll
-       interno, usable con el teclado abierto. */
-    .modal-overlay { padding: 0; align-items: flex-end; }
-    .modal-shell { width: calc(100% - 24px); max-width: 100% !important;
-      margin: 12px auto calc(12px + env(safe-area-inset-bottom, 0));
-      max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0)); }
-    .modal-header { padding: 14px 16px; flex-wrap: wrap; }
-    .modal-body { padding: 16px; }
-    .modal-footer { padding: 12px 16px; flex-wrap: wrap; }
-    .modal-actions { width: 100%; justify-content: flex-start; }
-    .modal-tabs { top: 53px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
-    .modal-tab { flex-shrink: 0; }
-
-    .modal-lg, .modal-xl {
-      width: 100%; max-width: 100% !important; margin: 0;
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-      max-height: calc(100dvh - env(safe-area-inset-top, 0) - 24px);
-      padding-bottom: env(safe-area-inset-bottom, 0);
-    }
-
-    /* Selector de gráficos de pagos: de columna fija de 270px a franja
-       horizontal con scroll local, arriba del gráfico. */
-    #pagos-graficos-layout, #pagos-graficos-prov-layout { flex-direction: column !important; }
-    #pagos-graficos-selector, #pagos-graficos-prov-selector { width: 100% !important; flex-direction: row !important;
-      overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    #pagos-graficos-selector > *, #pagos-graficos-prov-selector > * { flex-shrink: 0; }
-
-    /* Visor de receta (overlay a medida, no usa .modal-shell): mismo criterio
-       de ancho y padding que el resto de los modales en celular. */
-    #oe-receta-visor-overlay { padding: 0 !important; align-items: flex-end !important; }
-    .receta-visor-shell { max-width: 100% !important; width: calc(100% - 24px) !important;
-      margin: 0 auto calc(12px + env(safe-area-inset-bottom, 0)); }
-    .receta-visor-header { padding: 12px !important; }
-
-    /* Barra de selección múltiple de Facturas por pagar: de una fila fija a
-       varias filas, para que la fecha y los botones no se corten. */
-    .fpp-bulk-bar { display: flex !important; flex-wrap: wrap; row-gap: 8px; }
-    .fpp-bulk-sep { display: none; }
-    .fpp-bulk-bar input[type=date] { flex: 1 1 auto; min-width: 0; }
-    .fpp-bulk-cancelar { margin-left: 0; }
-  }
-
-  @media (max-width: 400px) {
-    .fpp-resumen { grid-template-columns: 1fr; }
-  }
-
-  /* Tablas -> tarjetas apiladas en celular. Cada <tr> con onclick sigue
-     funcionando como fila clicable, solo que se ve como una tarjeta con
-     una fila por dato (usando el texto de data-label como etiqueta). */
-  @media (max-width: 760px) {
-    .table-card table, .table-card thead, .table-card tbody, .table-card tr, .table-card td {
-      display: block;
-      width: 100%;
-    }
-    .table-card thead { position: absolute; left: -9999px; top: -9999px; } /* oculto pero accesible */
-    .table-card tr {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 10px;
-      padding: 10px 14px;
-      background: var(--surface);
-    }
-    .table-card tr:hover { background: var(--surface); }
-    .table-card td {
-      border: none !important;
-      padding: 6px 0 !important;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      max-width: none !important;
-      overflow: visible !important;
-      text-overflow: clip !important;
-      white-space: normal !important;
-      text-align: left !important;
-    }
-    .table-card td::before {
-      content: attr(data-label);
-      font-size: 11px;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: .03em;
-      flex-shrink: 0;
-      margin-right: 10px;
-    }
-    .table-card td:empty, .table-card td[data-label=""] { display: none; }
-    .table-card td.empty {
-      display: block !important;
-      text-align: center !important;
-    }
-    .table-card td.empty::before { content: none; }
-  }
-</style>
 </head>
 <body>
 
@@ -731,16 +71,16 @@
       <span class="nav-icon"><i class="ti ti-home" aria-hidden="true"></i></span><span>Inicio</span>
     </div>
 
-    <div class="nav-section-label">Compras</div>
+    <div class="nav-section-label">Compras y ventas</div>
 
     <div class="nav-group" data-modulo="oc-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo', true)" title="Órdenes de Compra">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo')" title="Órdenes de Compra">
         <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span>
         <span style="flex:1">Órdenes de Compra</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-oc-modulo">
-        <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Órdenes de compra</span></div>
+        <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Listado de OC</span></div>
         <div class="nav-item nav-subitem" data-page="items" data-page-alt="oc-clientes" onclick="abrirPreciosOC(this)"><span>Precios</span></div>
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
@@ -749,7 +89,7 @@
     </div>
 
     <div class="nav-group" data-modulo="facturas">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas')" title="Facturas">
         <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas</span>
         <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
@@ -766,7 +106,7 @@
             <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscador de documentos</span></div>
             <div class="nav-item nav-subitem" data-page="facturas-productos" data-page-alt="facturas-clientes" onclick="abrirPrecios(this)"><span>Precios</span></div>
             <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
-            <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de pagos</span></div>
+            <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
             <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
           </div>
         </div>
@@ -786,15 +126,15 @@
     </div>
 
     <div class="nav-group" data-modulo="fedex">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex', true)" title="Seguimiento FedEx">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="Seguimiento FedEx">
         <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span style="flex:1">Seguimiento FedEx</span>
       </div>
     </div>
 
-    <div class="nav-section-label">Operaciones</div>
+    <div class="nav-section-label">Farmacia</div>
 
     <div class="nav-group" data-modulo="elaboracion">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion', true)" title="Órdenes de Elaboración">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion')" title="Órdenes de Elaboración">
         <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de Elaboración</span>
         <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
@@ -802,14 +142,14 @@
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-elaboracion">
-        <div class="nav-item nav-subitem" data-page="elaboracion" onclick="seleccionarSubpagina('elaboracion','elaboracion',this)"><span>Órdenes de Elaboración</span></div>
+        <div class="nav-item nav-subitem" data-page="elaboracion" onclick="seleccionarSubpagina('elaboracion','elaboracion',this)"><span>Órdenes</span></div>
         <div class="nav-item nav-subitem" data-page="pacientes" onclick="seleccionarSubpagina('elaboracion','pacientes',this)"><span>Pacientes</span></div>
         <div class="nav-item nav-subitem" data-page="solicitudes-web" onclick="seleccionarSubpagina('elaboracion','solicitudes-web',this)"><span>Solicitudes Web</span></div>
       </div>
     </div>
 
     <div class="nav-group" data-modulo="farmacia-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo', true)" title="Control Farmacia">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo')" title="Control Farmacia">
         <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span>
         <span style="flex:1">Control Farmacia</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
@@ -824,10 +164,10 @@
       </div>
     </div>
 
-    <div class="nav-section-label">Gestión</div>
+    <div class="nav-section-label">Personas</div>
 
     <div class="nav-group" data-modulo="rrhh">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh', true)" title="Recursos Humanos">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh')" title="Recursos Humanos">
         <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span style="flex:1">Recursos Humanos</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
@@ -836,6 +176,7 @@
         <div class="nav-item nav-subitem" data-page="rrhh-vacaciones" onclick="seleccionarSubpagina('rrhh','rrhh-vacaciones',this)"><span>Vacaciones Personal</span></div>
       </div>
     </div>
+
   </div>
   <div class="nav" id="nav-submenu"></div>
 </nav>
@@ -898,19 +239,37 @@
     </div>
 
     <div class="inicio-seccion">
-      <div class="inicio-seccion-titulo">Accesos frecuentes</div>
+      <div class="inicio-seccion-titulo">Compras y ventas</div>
       <div class="inicio-accesos">
         <div class="inicio-acceso" onclick="mostrarModulo('oc-modulo')">
           <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span><span>Órdenes de compra</span>
         </div>
-        <div class="inicio-acceso" onclick="irAModuloPagina('facturas','facturas-por-pagar')">
-          <span class="nav-icon"><i class="ti ti-report-money" aria-hidden="true"></i></span><span>Facturas por pagar</span>
-        </div>
-        <div class="inicio-acceso" onclick="mostrarModulo('elaboracion')">
-          <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de Elaboración</span>
+        <div class="inicio-acceso" onclick="mostrarModulo('facturas')">
+          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas</span>
         </div>
         <div class="inicio-acceso" onclick="mostrarModulo('fedex')">
           <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>Seguimiento FedEx</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="inicio-seccion">
+      <div class="inicio-seccion-titulo">Farmacia</div>
+      <div class="inicio-accesos">
+        <div class="inicio-acceso" onclick="mostrarModulo('elaboracion')">
+          <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de elaboración</span>
+        </div>
+        <div class="inicio-acceso" onclick="mostrarModulo('farmacia-modulo')">
+          <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span><span>Control de farmacia</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="inicio-seccion">
+      <div class="inicio-seccion-titulo">Personas</div>
+      <div class="inicio-accesos">
+        <div class="inicio-acceso" onclick="mostrarModulo('rrhh')">
+          <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span>Recursos humanos</span>
         </div>
       </div>
     </div>
@@ -1480,7 +839,7 @@
 
   <div class="page" id="page-pagos-graficos">
     <div class="page-header">
-      <div class="page-title">Gráficos de pagos</div>
+      <div class="page-title">Gráficos de cobros</div>
       <div class="page-sub">Quién paga más, más rápido, y quién se demora</div>
     </div>
     <div id="pagos-graficos-layout" style="display:flex;gap:16px;align-items:flex-start">
@@ -13394,7 +12753,7 @@ showPage = function(id, el) {
 const SUBMENUS = {
   'oc-modulo': {
     items: [
-      { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Órdenes de compra', page: 'oc' },
+      { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Listado de OC', page: 'oc' },
       { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'items' },
       { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
       { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
@@ -13405,7 +12764,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'facturas-productos' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
-    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de pagos', page: 'pagos-graficos' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
     { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
     { icon: '<i class="ti ti-building-store"></i>', label: 'Productos (proveedor)', page: 'facturas-prov-productos' },
@@ -13413,7 +12772,7 @@ const SUBMENUS = {
   ] },
   'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
-    { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes de Elaboración', page: 'elaboracion' },
+    { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes', page: 'elaboracion' },
     { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
     { icon: '<i class="ti ti-world"></i>', label: 'Solicitudes Web', page: 'solicitudes-web' },
   ] },
@@ -13539,6 +12898,8 @@ function renderNavSubmenuMobile(modulo, pagina) {
   if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
 
+let navegandoPorHistorial = false;
+
 function showPage(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -13554,7 +12915,35 @@ function showPage(id, el) {
     const label = el.querySelector('span:last-child')?.textContent?.trim();
     if (label) document.title = `${label} — Farmacia Bulfor`;
   }
+  if (!navegandoPorHistorial && location.hash !== '#' + id) history.pushState(null, '', '#' + id);
 }
+
+// Abre una página por su id (la misma que va en la URL después del #).
+// Devuelve false si no existe en el menú.
+function irAPaginaPorId(id) {
+  if (id === 'inicio') { irAInicio(); return true; }
+  const sub = document.querySelector(`.nav-subitem[data-page="${id}"], .nav-subitem[data-page-alt="${id}"]`);
+  const modulo = sub ? sub.closest('.nav-group')?.dataset.modulo : null;
+  if (!modulo) return false;
+  if (id === 'oc-clientes' || id === 'items') preciosOCVista = id === 'oc-clientes' ? 'cliente' : 'producto';
+  if (id === 'facturas-clientes' || id === 'facturas-productos') preciosVista = id === 'facturas-clientes' ? 'cliente' : 'producto';
+  ultimaSubpagina[modulo] = id;
+  seleccionarSubpagina(modulo, id, sub);
+  return true;
+}
+
+function restaurarDesdeHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id) return;
+  navegandoPorHistorial = true;
+  try { irAPaginaPorId(id); } finally { navegandoPorHistorial = false; }
+}
+
+window.addEventListener('popstate', () => {
+  const id = decodeURIComponent(location.hash.slice(1)) || 'inicio';
+  navegandoPorHistorial = true;
+  try { irAPaginaPorId(id); } finally { navegandoPorHistorial = false; }
+});
 
 // ─── Sidebar colapsable (modo solo-iconos controlado por el usuario,
 // distinto del modo ícono forzado por ancho de pantalla a ≤900px). La
@@ -13712,6 +13101,7 @@ function arrancarApp() {
     badge.className = 'badge-estado neutral';
   }
   init();
+  restaurarDesdeHash();
 }
 
 (function iniciarApp() {
