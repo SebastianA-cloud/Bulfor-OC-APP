@@ -18,6 +18,8 @@
     --mono: 'JetBrains Mono', monospace;
     --radius: 8px;
     --radius-lg: 12px;
+    --control-h: 40px;   /* altura única para buscadores, selects, botones y pestañas */
+    --bloque-gap: 16px;  /* separación única entre bloques de una página */
     /* Escala de espaciado: usar SIEMPRE uno de estos valores, nunca un
        número suelto, para que el aire entre elementos sea consistente
        en toda la app. */
@@ -658,3 +660,24 @@
     }
     .table-card td.empty::before { content: none; }
   }
+
+/* ─── Sistema unificado de controles (listas y menús) ─────────────────────
+   Una sola altura para todos los controles de una barra, una sola separación
+   entre bloques y un solo estilo para pestañas y selectores segmentados.
+   No cambia la lógica: solo el aspecto. */
+.toolbar, .fpp-toolbar-top, .fpp-resumen, .fpp-status-tabs-wrap { margin-bottom: var(--bloque-gap); }
+.toolbar { align-items: center; }
+.toolbar select, .toolbar .page-btn, .toolbar .import-btn,
+.toolbar .scope-toggle, .fpp-toolbar-top .fpp-period-btn,
+.fpp-toolbar-top .fpp-period select, .fpp-toolbar-top .page-btn {
+  height: var(--control-h); box-sizing: border-box;
+}
+.toolbar .search-wrap input[type=text] { height: var(--control-h); box-sizing: border-box; }
+.toolbar .scope-toggle button { height: calc(var(--control-h) - 2px); padding: 0 14px; display: inline-flex; align-items: center; }
+.toolbar .page-btn, .toolbar .import-btn { display: inline-flex; align-items: center; padding: 0 14px !important; margin-top: 0 !important; }
+.fpp-period-btn { height: var(--control-h); width: var(--control-h); }
+.fpp-period select { height: var(--control-h); }
+/* Pestañas de estado: mismo alto y mismo contenedor que los selectores segmentados */
+.fpp-status-tabs { height: var(--control-h); align-items: center; padding: 3px; box-sizing: border-box; }
+.fpp-status-tab { height: calc(var(--control-h) - 8px); padding: 0 14px; display: inline-flex; align-items: center; }
+.toolbar .search-wrap { min-width: 240px; }
