@@ -693,3 +693,41 @@
   .table-card tbody tr:not(.letra-header):hover td { background: var(--accent-light); }
   .table-card tfoot td { background: var(--bg); border-top: 2px solid var(--text-3); }
 }
+
+/* ─── Navegación de escritorio: barra de módulos + barra de páginas ──────
+   Escritorio (≥901 px): se reemplaza la barra lateral por dos barras
+   superiores. La primera elige el módulo; la segunda muestra solo sus
+   páginas, separadas por grupo cuando corresponde. En celular no cambia. */
+.modulos-bar, .tab-badge { display: none; }
+#nav-submenu .submenu-sep { display: none; }
+@media (min-width: 901px) {
+  .sidebar { display: none !important; }
+  .system-bar { left: 0; }
+  .main { margin-left: 0; margin-top: 82px; padding: 24px 32px; }
+  body:has(#nav-submenu:not(:empty)) .main { margin-top: 128px; }
+
+  .modulos-bar { display: flex; position: fixed; top: 34px; left: 0; right: 0; height: 48px; z-index: 96;
+    background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; gap: 2px;
+    overflow-x: auto; scrollbar-width: none; }
+  .modulo-tab { display: flex; align-items: center; gap: 7px; padding: 0 14px; font-size: 13px; font-weight: 500;
+    color: var(--text-2); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
+    position: relative; transition: color .12s; }
+  .modulo-tab i { font-size: 16px; }
+  .modulo-tab:hover { color: var(--text); }
+  .modulo-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+    padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; }
+  .tab-badge.tab-badge-azul { background: #1E40AF; }
+
+  #nav-submenu { display: flex !important; position: fixed; top: 82px; left: 0; right: 0; z-index: 95;
+    background: var(--bg); border-bottom: 1px solid var(--border); padding: 7px 16px; gap: 6px; align-items: center;
+    overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+  #nav-submenu:empty { display: none !important; }
+  #nav-submenu .nav-back, #nav-submenu .nav-divider { display: none; }
+  #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: var(--radius); font-size: 13px; }
+  #nav-submenu .nav-item.active { background: var(--surface); color: var(--accent); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(26,25,23,.08); }
+  #nav-submenu .submenu-sep { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--text-3); padding: 0 8px 0 14px; margin-left: 6px; border-left: 1px solid var(--border); }
+  #nav-submenu .submenu-sep:first-child { border-left: none; margin-left: 0; padding-left: 4px; }
+}

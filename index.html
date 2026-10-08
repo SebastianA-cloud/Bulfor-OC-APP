@@ -178,7 +178,6 @@
     </div>
 
   </div>
-  <div class="nav" id="nav-submenu"></div>
 </nav>
 
 <nav class="bottom-tabbar" id="bottom-tabbar">
@@ -228,6 +227,17 @@
     </span>
   </span>
 </div>
+
+<nav id="modulos-bar" class="modulos-bar" aria-label="Módulos">
+  <div class="modulo-tab active" data-modulo="inicio" onclick="irAInicio()"><i class="ti ti-home"></i><span>Inicio</span></div>
+  <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
+  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>Seguimiento FedEx</span></div>
+  <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
+  <div class="modulo-tab" data-modulo="rrhh" onclick="mostrarModulo('rrhh')"><i class="ti ti-users"></i><span>Recursos humanos</span></div>
+</nav>
+<div class="nav" id="nav-submenu"></div>
 
 <main class="main">
 
@@ -4782,7 +4792,7 @@ function limpiarFiltrosOE() {
 function actualizarBadgeOEDigitar() {
   const cantidad = ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length;
   const texto = cantidad > 3 ? '3+' : String(cantidad);
-  [document.getElementById('badge-oe-digitar'), document.getElementById('badge-oe-digitar-mobile')].forEach(badge => {
+  [document.getElementById('badge-oe-digitar'), document.getElementById('badge-oe-digitar-mobile'), document.getElementById('badge-oe-digitar-tab')].forEach(badge => {
     if (!badge) return;
     if (!cantidad) { badge.style.display = 'none'; return; }
     badge.textContent = texto;
@@ -4858,6 +4868,8 @@ function actualizarBadgeSW() {
   const n = solicitudesWeb.filter(x => x.estado === 'Nueva').length;
   const el = document.getElementById('badge-sw-nuevas');
   if (el) { el.style.display = n ? 'flex' : 'none'; el.textContent = n > 9 ? '9+' : String(n); }
+  const elTab = document.getElementById('badge-sw-nuevas-tab');
+  if (elTab) { elTab.style.display = n ? 'flex' : 'none'; elTab.textContent = n > 9 ? '9+' : String(n); }
   const sub = document.querySelector('.nav-subitem[data-page="solicitudes-web"] span');
   if (sub) sub.textContent = n ? `Solicitudes Web (${n})` : 'Solicitudes Web';
 }
@@ -8182,7 +8194,8 @@ function actualizarBadgeRechazadas() {
   const texto = cantidad > 3 ? '3+' : String(cantidad);
   [document.getElementById('badge-rechazadas'),
    document.getElementById('badge-rechazadas-subitem'),
-   document.getElementById('badge-rechazadas-mobile')].forEach(badge => {
+   document.getElementById('badge-rechazadas-mobile'),
+   document.getElementById('badge-rechazadas-tab')].forEach(badge => {
     if (!badge) return;
     if (!cantidad) { badge.style.display = 'none'; return; }
     badge.textContent = texto;
@@ -12876,12 +12889,12 @@ const SUBMENUS = {
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'facturas-productos' },
-    { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
+    { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento de pagos', page: 'pagos' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
     { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
-    { icon: '<i class="ti ti-building-store"></i>', label: 'Productos (proveedor)', page: 'facturas-prov-productos' },
-    { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos (proveedor)', page: 'facturas-prov-graficos' },
+    { icon: '<i class="ti ti-building-store"></i>', label: 'Productos', page: 'facturas-prov-productos' },
+    { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos de pagos', page: 'facturas-prov-graficos' },
   ] },
   'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'Seguimiento FedEx', page: 'fedex' }] },
   'elaboracion': { items: [
@@ -12913,6 +12926,10 @@ function marcarModuloActivoEnNav(modulo) {
   const header = document.querySelector(`.nav-group[data-modulo="${modulo}"] .nav-item-modulo`);
   if (header) header.classList.add('active');
   document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
+  document.querySelectorAll('.modulo-tab').forEach(t => t.classList.toggle('active', t.dataset.modulo === modulo));
+  // En escritorio la barra lateral ya no se usa: el módulo activo queda desplegado.
+  const grupoActivo = document.querySelector(`.nav-group[data-modulo="${modulo}"]`);
+  if (grupoActivo) document.querySelectorAll('.nav-group').forEach(g => g.classList.toggle('abierto', g === grupoActivo));
 
   // Si el módulo tiene sub-bloques anidados (ej. Facturas: "Facturas Bulfor" /
   // "Facturas Proveedor"), abre automáticamente el que contiene la
@@ -12993,20 +13010,36 @@ function irAInicio() {
   showPage('inicio', document.getElementById('nav-item-inicio'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.modulo === 'inicio'));
   renderNavSubmenuMobile(null, null);
+  document.querySelectorAll('.modulo-tab').forEach(t => t.classList.toggle('active', t.dataset.modulo === 'inicio'));
   renderInicio();
 }
 
 // Pestañas horizontales fijas arriba, solo visibles en celular (≤640px).
 // En escritorio el sidebar usa el acordeón inline de #nav-modulos.
+// Agrupa las páginas de un módulo dentro de la barra de páginas (escritorio).
+const GRUPO_PAGINA = {
+  'facturas': 'Ventas', 'pagos': 'Ventas', 'pagos-graficos': 'Ventas', 'facturas-rechazadas': 'Ventas', 'facturas-productos': 'Ventas',
+  'facturas-por-pagar': 'Proveedores', 'facturas-prov-productos': 'Proveedores', 'facturas-prov-graficos': 'Proveedores',
+};
+// Páginas que comparte un mismo ítem (la vista "Por cliente" de Precios).
+const ALT_PAGINA = { 'items': 'oc-clientes', 'facturas-productos': 'facturas-clientes' };
+
 function renderNavSubmenuMobile(modulo, pagina) {
   const cont = document.getElementById('nav-submenu');
   if (!cont) return;
   const config = modulo ? SUBMENUS[modulo] : null;
   if (!config) { cont.innerHTML = ''; return; }
-  cont.innerHTML = config.items.map(it => `
-    <div class="nav-item${it.page === pagina ? ' active' : ''}" data-page="${it.page}" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
+  let html = '', grupoAnterior = null;
+  config.items.forEach(it => {
+    const grupo = GRUPO_PAGINA[it.page] || null;
+    if (grupo && grupo !== grupoAnterior) html += `<span class="submenu-sep">${grupo}</span>`;
+    grupoAnterior = grupo;
+    const activo = it.page === pagina || ALT_PAGINA[it.page] === pagina;
+    html += `<div class="nav-item${activo ? ' active' : ''}" data-page="${it.page}" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
       <span class="nav-icon">${it.icon}</span><span>${it.label}</span>
-    </div>`).join('');
+    </div>`;
+  });
+  cont.innerHTML = html;
   const activo = cont.querySelector('.nav-item.active');
   if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
