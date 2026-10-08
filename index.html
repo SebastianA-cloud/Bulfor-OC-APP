@@ -963,6 +963,7 @@
       <label style="display:flex;align-items:center;gap:6px;margin-left:10px;color:var(--text-2);font-size:13px">
         <input type="checkbox" id="farmacia-stock-solo-bajo" onchange="farmStockFiltro()"> Solo bajo el mínimo
       </label>
+      <button class="page-btn" id="farmacia-stock-limpiar" style="white-space:nowrap;display:none" onclick="limpiarFiltrosStock()">✕ Limpiar filtros</button>
       <button class="page-btn" style="white-space:nowrap" onclick="descargarStockExcel()">⬇️ Excel</button>
     </div>
     <div id="farmacia-stock-resultados"></div>
@@ -1011,6 +1012,7 @@
       <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
         <input type="checkbox" id="farmacia-venc-solo-riesgo" onchange="renderVencimientos()"> Solo con unidades en riesgo
       </label>
+      <button class="page-btn" id="farmacia-venc-limpiar" style="white-space:nowrap;display:none" onclick="limpiarFiltrosVenc()">✕ Limpiar filtros</button>
       <button class="page-btn" style="white-space:nowrap" onclick="cargarVencimientosERP(true)">↻ Actualizar</button>
       <button class="page-btn" style="white-space:nowrap" onclick="descargarVencimientosExcel()">⬇️ Excel</button>
     </div>
@@ -11776,7 +11778,27 @@ function farmStockFilas() {
   };
 }
 
+// Muestra "Limpiar filtros" si hay búsqueda, familia, "solo bajo el mínimo" o una pestaña distinta de "Con stock".
+function actualizarLimpiarStock() {
+  const btn = document.getElementById('farmacia-stock-limpiar');
+  if (!btn) return;
+  const hay = !!(document.getElementById('farmacia-stock-search').value || '').trim()
+    || !!document.getElementById('farmacia-stock-familia').value
+    || document.getElementById('farmacia-stock-solo-bajo').checked
+    || farmaciaStockTab !== 'stock';
+  btn.style.display = hay ? 'inline-flex' : 'none';
+}
+
+// Vuelve a la pestaña "Con stock" y limpia búsqueda, familia y "solo bajo el mínimo".
+function limpiarFiltrosStock() {
+  document.getElementById('farmacia-stock-search').value = '';
+  document.getElementById('farmacia-stock-familia').value = '';
+  document.getElementById('farmacia-stock-solo-bajo').checked = false;
+  farmStockSetTab('stock');
+}
+
 function renderStockActual() {
+  actualizarLimpiarStock();
   const grupos = farmStockFilas();
   const tabs = [
     { id: 'stock', label: 'Con stock' }, { id: 'neg', label: 'Negativos' },
@@ -12176,7 +12198,25 @@ function farmVencFiltradas() {
   return filas;
 }
 
+// Muestra "Limpiar filtros" si hay búsqueda, "solo con unidades en riesgo" o una pestaña distinta de "Vencidos".
+function actualizarLimpiarVenc() {
+  const btn = document.getElementById('farmacia-venc-limpiar');
+  if (!btn) return;
+  const hay = !!(document.getElementById('farmacia-venc-search').value || '').trim()
+    || document.getElementById('farmacia-venc-solo-riesgo').checked
+    || farmaciaVencTab !== 'Vencido';
+  btn.style.display = hay ? 'inline-flex' : 'none';
+}
+
+// Vacía la búsqueda, desmarca "solo con unidades en riesgo" y vuelve a la pestaña "Vencidos".
+function limpiarFiltrosVenc() {
+  document.getElementById('farmacia-venc-search').value = '';
+  document.getElementById('farmacia-venc-solo-riesgo').checked = false;
+  farmVencSetTab('Vencido');
+}
+
 function renderVencimientos() {
+  actualizarLimpiarVenc();
   const syncEl = document.getElementById('farmacia-venc-sync');
   if (syncEl) syncEl.innerHTML = htmlEstadoSyncFarmacia();
   if (!farmaciaVencData) return;
