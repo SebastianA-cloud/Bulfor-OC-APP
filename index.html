@@ -701,6 +701,7 @@
         <option value="Para entrega">Para entrega</option>
         <option value="Entregado">Entregado</option>
       </select>
+      <button class="page-btn" id="oe-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOE()">✕ Limpiar filtros</button>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevaOrdenElaboracion()">+ Nueva orden</button>
     </div>
     <div class="table-card">
@@ -4752,6 +4753,26 @@ function filterOE() {
     })
     .sort((a,b) => (b.fecha_orden||'').localeCompare(a.fecha_orden||'')); // más reciente → más antigua, sobre el conjunto completo antes de paginar
   oePage = 1; renderOE();
+  actualizarLimpiarOE();
+}
+
+// Muestra "Limpiar filtros" solo cuando hay algún filtro activo (igual que en OC).
+function actualizarLimpiarOE() {
+  const btn = document.getElementById('oe-limpiar');
+  if (!btn) return;
+  const hay = !!document.getElementById('oe-search').value
+    || !!document.getElementById('oe-estado-entrega').value
+    || oeCategoria !== 'todos';
+  btn.style.display = hay ? 'inline-flex' : 'none';
+}
+
+// Restablece búsqueda, estado, pestaña de categoría y alcance a sus valores iniciales.
+function limpiarFiltrosOE() {
+  document.getElementById('oe-search').value = '';
+  document.getElementById('oe-estado-entrega').value = '';
+  oeCategoria = 'todos';
+  renderTabsOE();
+  filterOE();
 }
 
 function actualizarBadgeOEDigitar() {
