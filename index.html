@@ -103,7 +103,7 @@
             <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
           </div>
           <div class="nav-subgroup-nivel2">
-            <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscador de documentos</span></div>
+            <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Documentos</span></div>
             <div class="nav-item nav-subitem" data-page="facturas-productos" data-page-alt="facturas-clientes" onclick="abrirPrecios(this)"><span>Precios</span></div>
             <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
             <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
@@ -136,7 +136,7 @@
     <div class="nav-group" data-modulo="elaboracion">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion')" title="Órdenes de Elaboración">
         <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de Elaboración</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Elaboración</span>
         <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <span id="badge-sw-nuevas" title="Solicitudes web nuevas" style="display:none;flex-shrink:0;margin-left:4px;background:#1E40AF;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
@@ -1996,7 +1996,7 @@ function renderOC() {
     <tr onclick="navReset();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
       <td data-label="N° OC"><span class="mono">${r.codigooc||''}</span></td>
       <td data-label="Tipo">${tipoBadge(r.tipooc)}</td>
-      <td data-label="Descripción" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+      <td data-label="Descripción" style="max-width:340px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${descripcion}">${descripcion}</td>
       <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
       <td data-label="Hospital" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
       <td data-label="Región" style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
@@ -6327,7 +6327,7 @@ function renderDocumentosGdexpress(soloTabla) {
     <div class="table-card">
       <table>
         <thead><tr>
-          <th>Tipo</th><th>Emisión</th><th>N° Documento</th><th>Hospital</th><th>RUT Hospital</th><th>N° OC</th><th>Monto</th><th>Estado</th>
+          <th>Tipo</th><th>Emisión</th><th>N° Documento</th><th>Hospital</th><th>RUT Hospital</th><th>N° OC</th><th style="text-align:right">Monto</th><th>Estado</th>
         </tr></thead>
         <tbody>
           ${lista.map(d => `
@@ -6338,7 +6338,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
               <td data-label="RUT Hospital" style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
               <td data-label="N° OC" style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
-              <td data-label="Monto" style="white-space:nowrap">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
+              <td data-label="Monto" style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
               <td data-label="Estado">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
             </tr>`).join('')}
         </tbody>
@@ -9596,6 +9596,21 @@ async function guardarNuevaOrdenOE() {
 }
 
 // ── DETALLE DE ORDEN ──────────────────────────────────────────────────────
+// Flechas ‹ › para pasar a la orden anterior o siguiente de la lista que se ve
+// en pantalla (la misma orden y filtros de la tabla, en el mismo orden).
+function botonNavOEHtml(idActual) {
+  const lista = ordenesElaboracionF || [];
+  const idx = lista.findIndex(o => o.id === idActual);
+  if (idx === -1) return '';
+  const hayAnterior = idx > 0, haySiguiente = idx < lista.length - 1;
+  const pos = `${idx+1} de ${lista.length}`;
+  const base = 'background:none;border:1px solid var(--border);border-radius:var(--radius);width:32px;height:32px;font-size:18px;color:var(--text);display:flex;align-items:center;justify-content:center;';
+  const btn = (txt, activo, destino, titulo) =>
+    `<button onclick="${activo ? `abrirDetalleOE(${destino})` : ''}" ${activo ? '' : 'disabled'} title="${titulo} (${pos})" aria-label="${titulo}" style="${base}${activo ? 'cursor:pointer' : 'opacity:.35;cursor:default'}">${txt}</button>`;
+  return btn('‹', hayAnterior, hayAnterior ? lista[idx-1].id : null, 'Orden anterior')
+       + btn('›', haySiguiente, haySiguiente ? lista[idx+1].id : null, 'Orden siguiente');
+}
+
 function abrirDetalleOE(id) {
   const o = ordenesElaboracion.find(x => x.id === id);
   if (!o) return;
@@ -9619,7 +9634,8 @@ function abrirDetalleOE(id) {
           <div style="font-size:13px;color:var(--text-2)">${fDate(o.fecha_orden)}</div>
           <div style="font-size:17px;font-weight:600">${nombre}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          ${botonNavOEHtml(o.id)}
           ${botonAtrasHtml()}
           <button onclick="cerrarModalOE('oe-detalle-modal-overlay')" class="modal-close" aria-label="Cerrar">✕</button>
         </div>
@@ -10835,7 +10851,7 @@ function renderHospitalOCsTable(lista) {
               const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
               return `<tr style="cursor:pointer" onclick="navPush(()=>openHospitalOCs('${window.__hospActualNombre.replace(/'/g,"\\'")}'));cerrarTodosLosModales();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
                 <td data-label="N° OC"><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
-                <td data-label="Descripción" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${descripcion}">${descripcion}</td>
+                <td data-label="Descripción" style="max-width:340px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${descripcion}">${descripcion}</td>
                 <td data-label="Fecha" style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
                 <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
               </tr>`;
@@ -12858,7 +12874,7 @@ const SUBMENUS = {
     ],
   },
   'facturas': { items: [
-    { icon: '<i class="ti ti-search"></i>', label: 'Buscador de documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'facturas-productos' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento pago de facturas', page: 'pagos' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
