@@ -705,6 +705,16 @@
   .system-bar { left: 0; }
   .main { margin-left: 0; margin-top: 82px; padding: 24px 32px; }
   body:has(#nav-submenu:not(:empty)) .main { margin-top: 128px; }
+  /* clip (no hidden) para que body no se vuelva contenedor de scroll y la cabecera fija funcione */
+  html, body { overflow-x: clip; }
+  /* Cabecera de cada módulo (título, período, KPI y buscador) queda fija al bajar, bajo la barra de navegación */
+  :root { --nav-top: 82px; }
+  body:has(#nav-submenu:not(:empty)) { --nav-top: 128px; }
+  .page-sticky { position: sticky; top: var(--nav-top); z-index: 90; background: var(--bg);
+    padding-top: 4px; padding-bottom: 6px; }
+  .page-sticky .page-header { margin-bottom: 12px; }
+  .page-sticky .fpp-resumen { margin-bottom: 10px; }
+  .page-sticky .toolbar { margin-bottom: 0; }
 
   .modulos-bar { display: flex; position: fixed; top: 34px; left: 0; right: 0; height: 48px; z-index: 96;
     background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; gap: 2px;

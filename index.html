@@ -13276,5 +13276,28 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<script>
+// Agrupa la cabecera de cada módulo (título, período, KPI, buscador) en un bloque que queda fijo al bajar en escritorio.
+(function () {
+  const CABECERA = ['page-header', 'fpp-toolbar-top', 'fpp-resumen', 'toolbar'];
+  function envolverCabeceras() {
+    document.querySelectorAll('.page').forEach(function (pg) {
+      if (pg.querySelector(':scope > .page-sticky')) return;
+      const hijos = Array.from(pg.children);
+      let ultimo = -1;
+      for (let i = 0; i < hijos.length; i++) {
+        if (CABECERA.some(function (c) { return hijos[i].classList.contains(c); })) ultimo = i; else break;
+      }
+      if (ultimo < 0) return;
+      const bloque = document.createElement('div');
+      bloque.className = 'page-sticky';
+      pg.insertBefore(bloque, hijos[0]);
+      hijos.slice(0, ultimo + 1).forEach(function (el) { bloque.appendChild(el); });
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', envolverCabeceras);
+  else envolverCabeceras();
+})();
+</script>
 </body>
 </html>
