@@ -699,11 +699,12 @@
    superiores. La primera elige el módulo; la segunda muestra solo sus
    páginas, separadas por grupo cuando corresponde. En celular no cambia. */
 .modulos-bar, .tab-badge { display: none; }
+.oc-desc { line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #nav-submenu .submenu-sep { display: none; }
 @media (min-width: 901px) {
   .sidebar { display: none !important; }
   .system-bar { left: 0; }
-  .main { margin-left: 0; margin-top: 82px; padding: 24px 32px; }
+  .main { margin-left: 0; margin-top: 82px; padding: 16px 32px 24px; }
   body:has(#nav-submenu:not(:empty)) .main { margin-top: 128px; }
   /* clip (no hidden) para que body no se vuelva contenedor de scroll y la cabecera fija funcione */
   html, body { overflow-x: clip; }
@@ -711,7 +712,7 @@
   :root { --nav-top: 82px; }
   body:has(#nav-submenu:not(:empty)) { --nav-top: 128px; }
   .page-sticky { position: sticky; top: var(--nav-top); z-index: 90; background: var(--bg);
-    padding-top: 4px; padding-bottom: 6px; }
+    padding-top: 0; padding-bottom: 6px; }
   .page-sticky .page-header { margin-bottom: 12px; }
   .page-sticky .fpp-resumen { margin-bottom: 10px; }
   .page-sticky .toolbar { margin-bottom: 0; }
