@@ -721,6 +721,11 @@
 
   .modulos-bar { display: flex; position: fixed; top: 34px; left: 0; right: 0; height: 48px; z-index: 96;
     background: #1F1D1A; padding: 0 16px; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .modulos-logo { display: flex; align-items: center; gap: 10px; padding-right: 18px; margin-right: 8px;
+    border-right: 1px solid rgba(255,255,255,.12); flex-shrink: 0; }
+  .modulos-logo .logo-badge { width: 30px; height: 30px; font-size: 13px; box-shadow: none; }
+  .modulos-logo-titulo { font-size: 13px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.2px; line-height: 1.2; white-space: nowrap; }
+  .modulos-logo-sub { font-size: 10px; color: #B9B4AA; white-space: nowrap; margin-top: 1px; }
   .modulo-tab { display: flex; align-items: center; gap: 7px; padding: 0 14px; font-size: 13px; font-weight: 500;
     color: #B9B4AA; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent;
     position: relative; transition: color .12s; }
