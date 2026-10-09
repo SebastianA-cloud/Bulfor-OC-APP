@@ -148,6 +148,22 @@
       </div>
     </div>
 
+    <div class="nav-group" data-modulo="recetario-modulo">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('recetario-modulo', true)" title="Recetario Magistral">
+        <span class="nav-icon"><i class="ti ti-prescription" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recetario Magistral</span>
+        <span id="badge-rec-alertas" title="RM con lote vencido en los últimos 7 días" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
+        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
+      </div>
+      <div class="nav-subgroup" id="subgroup-recetario-modulo">
+        <div class="nav-item nav-subitem" data-page="rec-buscar" onclick="seleccionarSubpagina('recetario-modulo','rec-buscar',this)"><span>Buscar RM</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-alertas" onclick="seleccionarSubpagina('recetario-modulo','rec-alertas',this)"><span>Alertas de lotes</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-materias" onclick="seleccionarSubpagina('recetario-modulo','rec-materias',this)"><span>Materias primas</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-costos" onclick="seleccionarSubpagina('recetario-modulo','rec-costos',this)"><span>Costos y márgenes</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-produccion" onclick="seleccionarSubpagina('recetario-modulo','rec-produccion',this)"><span>Producción</span></div>
+      </div>
+    </div>
+
     <div class="nav-group" data-modulo="farmacia-modulo">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo')" title="Control Farmacia">
         <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span>
@@ -198,6 +214,10 @@
     <i class="ti ti-flask" aria-hidden="true"></i><span>Elaborac.</span>
     <span id="badge-oe-digitar-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
   </div>
+  <div class="tab-item" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')" style="position:relative">
+    <i class="ti ti-prescription" aria-hidden="true"></i><span>Recetario</span>
+    <span id="badge-rec-alertas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
+  </div>
   <div class="tab-item" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')">
     <i class="ti ti-first-aid-kit" aria-hidden="true"></i><span>Farmacia</span>
   </div>
@@ -241,6 +261,7 @@
   <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>Seguimiento FedEx</span></div>
   <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')"><i class="ti ti-prescription"></i><span>Recetario</span><span class="tab-badge" id="badge-rec-alertas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
   <div class="modulo-tab" data-modulo="rrhh" onclick="mostrarModulo('rrhh')"><i class="ti ti-users"></i><span>Recursos humanos</span></div>
 </nav>
@@ -690,6 +711,130 @@
     </div>
   </div>
 
+  <style>
+    .rec-aviso { border: 1px solid #F0C36D; background: #FEF6E4; border-radius: var(--radius); padding: 11px 13px; font-size: 12px; line-height: 1.6; color: var(--text-2); margin-bottom: 12px; }
+    .rec-nota { font-size: 12px; color: var(--text-3); padding: 2px 2px 10px; line-height: 1.5; }
+  </style>
+
+  <div class="page" id="page-rec-buscar">
+    <div class="page-header">
+      <div class="page-title">Buscar RM</div>
+      <div class="page-sub">Fórmula completa de cada receta magistral: materias primas, cantidades, lotes con su vencimiento y costo</div>
+    </div>
+    <div id="rec-estado-buscar"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), contraseña de la etiqueta, materia prima, hospital…" onkeydown="if(event.key==='Enter')recBuscar()" autocomplete="off">
+      </div>
+      <button class="import-btn" style="margin-top:0" onclick="recBuscar()">Buscar</button>
+    </div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="rec-buscar-rangos"></div>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
+        <input type="checkbox" id="rec-buscar-alertas" onchange="recBuscar()"> Solo con lote vencido
+      </label>
+    </div>
+    <div id="rec-buscar-res"></div>
+  </div>
+
+  <div class="page" id="page-rec-alertas">
+    <div class="page-header">
+      <div class="page-title">Alertas de lotes</div>
+      <div class="page-sub">Lotes vencidos registrados al elaborar y lotes en uso por vencer</div>
+    </div>
+    <div id="rec-estado-alertas"></div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="rec-alertas-tabs"></div>
+      <span id="rec-alertas-dias-wrap" style="display:none">
+        <select onchange="recAlertasSetDias(this.value)">
+          <option value="30">Últimos 30 días</option>
+          <option value="90" selected>Últimos 90 días</option>
+          <option value="365">Último año</option>
+        </select>
+      </span>
+      <button class="page-btn" style="white-space:nowrap" onclick="recHistorial=null;recAlertasInit(true)">↻ Actualizar</button>
+    </div>
+    <div id="rec-alertas-cont"></div>
+  </div>
+
+  <div class="page" id="page-rec-materias">
+    <div class="page-header">
+      <div class="page-title">Materias primas</div>
+      <div class="page-sub">Cuánto se gasta de cada materia prima según las fórmulas elaboradas, qué comprar y qué lotes vencen</div>
+    </div>
+    <div id="rec-estado-materias"></div>
+    <div class="toolbar"><div class="fpp-status-tabs" id="rec-mat-tabs"></div></div>
+    <div id="rec-mat-compra">
+      <div class="toolbar">
+        <div class="fpp-status-tabs" id="rec-mat-rangos"></div>
+        <label style="font-size:13px;color:var(--text-2)">Comprar para</label>
+        <select id="rec-mat-cobertura" onchange="recMatCargar()">
+          <option value="15">15 días</option>
+          <option value="30" selected>30 días</option>
+          <option value="45">45 días</option>
+          <option value="60">60 días</option>
+          <option value="90">90 días</option>
+        </select>
+      </div>
+      <div class="fpp-resumen" id="rec-mat-resumen"></div>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="rec-mat-search" placeholder="Materia prima o proveedor…" oninput="recMatRender()" autocomplete="off">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
+          <input type="checkbox" id="rec-mat-solo" checked onchange="recMatRender()"> Solo lo que hay que comprar
+        </label>
+        <button class="page-btn" style="white-space:nowrap" onclick="recMatExcel()">⬇️ Descargar pedido (Excel)</button>
+      </div>
+      <div class="rec-nota">El stock que muestra Pharma_RM no es confiable (muchas materias primas están en negativo), por eso el <b>saldo estimado</b> se calcula con las compras menos lo consumido en las fórmulas de los últimos 12 meses. Para un stock exacto hay que contar las materias primas.</div>
+      <div id="rec-mat-tabla"></div>
+    </div>
+    <div id="rec-mat-venc" style="display:none">
+      <div class="toolbar">
+        <div class="fpp-status-tabs" id="rec-venc-tabs"></div>
+      </div>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="rec-venc-search" placeholder="Materia prima o lote…" oninput="recVencRender()" autocomplete="off">
+        </div>
+      </div>
+      <div id="rec-venc-tabla"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-rec-costos">
+    <div class="page-header">
+      <div class="page-title">Costos y márgenes</div>
+      <div class="page-sub">Cuánto cuesta cada preparado en materias primas y cuánto se gana</div>
+    </div>
+    <div id="rec-estado-costos"></div>
+    <div class="toolbar">
+      <div class="fpp-status-tabs" id="rec-costos-tabs"></div>
+      <div class="fpp-status-tabs" id="rec-costos-rangos"></div>
+    </div>
+    <div class="toolbar" id="rec-costos-filtros-formula" style="display:none">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rec-costos-search" placeholder="Principio activo, hospital…" oninput="recCostosRenderFormulas()" autocomplete="off">
+      </div>
+      <select id="rec-costos-forma" onchange="recCostosRenderFormulas()"><option value="">Todas las formas</option></select>
+    </div>
+    <div id="rec-costos-cont"></div>
+  </div>
+
+  <div class="page" id="page-rec-produccion">
+    <div class="page-header">
+      <div class="page-title">Producción del recetario</div>
+      <div class="page-sub">RM elaborados por mes, por forma farmacéutica y por institución</div>
+    </div>
+    <div id="rec-estado-produccion"></div>
+    <div class="toolbar"><div class="fpp-status-tabs" id="rec-prod-rangos"></div></div>
+    <div id="rec-prod-cont"></div>
+  </div>
+
   <div class="page" id="page-elaboracion">
     <div class="page-header">
       <div class="page-title">Órdenes de Elaboración</div>
@@ -726,7 +871,7 @@
     <div class="table-card">
       <table>
         <thead><tr>
-          <th>Fecha</th><th>Paciente</th><th>Preparado</th><th>Valor</th>
+          <th>Fecha</th><th>Paciente</th><th>Preparado</th><th>RM</th><th>Valor</th>
           <th>Pago</th><th>Digitación</th><th>Entrega</th>
         </tr></thead>
         <tbody id="oe-body"></tbody>
@@ -1521,6 +1666,7 @@ async function init() {
     // la app tiene que seguir funcionando igual.
     const rrhhListo = cargarRRHH().catch(() => {});
     cargarSolicitudesWeb().catch(() => {});
+    cargarRecResumen().catch(() => {});
     if (!window.__swTimer) window.__swTimer = setInterval(() => { if (sesionActual) cargarSolicitudesWeb().catch(() => {}); }, 5 * 60 * 1000);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -1735,6 +1881,7 @@ const MODAL_OVERLAY_IDS = [
   'oe-form-modal-overlay',
   'oe-detalle-modal-overlay',
   'oe-editar-modal-overlay',
+  'rec-rm-modal-overlay',
   'oe-comprobante-overlay',
   'oe-receta-visor-overlay',
   'sw-detalle-overlay',
@@ -4823,7 +4970,7 @@ function renderOE() {
       entregado: `No hay órdenes entregadas en ${nombrePeriodo}.`,
     };
     const hayFiltroActivo = document.getElementById('oe-search').value || document.getElementById('oe-estado-entrega').value;
-    document.getElementById('oe-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltroActivo ? 'No encontramos órdenes con estos criterios.' : mensajes[oeCategoria]}</p>${oeCategoria!=='todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
+    document.getElementById('oe-body').innerHTML = `<tr><td colspan="8"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltroActivo ? 'No encontramos órdenes con estos criterios.' : mensajes[oeCategoria]}</p>${oeCategoria!=='todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
     return;
   }
   document.getElementById('oe-body').innerHTML = slice.map(o => {
@@ -4832,6 +4979,7 @@ function renderOE() {
       <td data-label="Fecha" style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(o.fecha_orden)}</td>
       <td data-label="Paciente" style="font-weight:500">${nombre}</td>
       <td data-label="Preparado" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.indicacion||''}">${o.indicacion||'—'}</td>
+      <td data-label="RM" class="mono" style="font-size:12px;white-space:nowrap">${o.numero_rm ? escapeHtml(o.numero_rm) : '<span style="color:var(--text-3)">—</span>'}</td>
       <td data-label="Valor" style="text-align:right;font-variant-numeric:tabular-nums">${o.valor ? clp(o.valor) : '—'}</td>
       <td data-label="Pago" style="font-size:12px">${o.pago||'—'}</td>
       <td data-label="Digitación">${badgeOE(o.estado_digitacion, ESTADOS_DIGITACION_OE)}</td>
@@ -9687,6 +9835,8 @@ function abrirDetalleOE(id) {
           </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>'}
         </div>` : ''}
 
+        ${recSeccionOEHtml(o)}
+
         <div style="margin-top:16px">
           <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Cambiar estado</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -9707,6 +9857,7 @@ function abrirDetalleOE(id) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  recPintarSeccionOE(o.id, false);
 }
 
 // ── COMPROBANTE DE RETIRO ─────────────────────────────────────────────────
@@ -12560,6 +12711,806 @@ function descargarPedidoExcel() {
   XLSX.writeFile(wb, `pedido_sugerido_${p.desde}_a_${p.hasta}_cubre_${p.cobertura}d.xlsx`);
 }
 
+// ─── RECETARIO MAGISTRAL (copia de Pharma_RM) ─────────────────────────────
+// El agente "BulforSync Recetario" del servidor lee Pharma_RM (solo lectura)
+// cada 30 minutos y sube a Supabase: materias primas, lotes, compras y cada RM
+// con su fórmula. Aquí solo se LEE esa copia (no se toca Pharma_RM).
+// Sin datos personales de pacientes ni médicos: solo el nombre cuando el
+// "paciente" es una institución (hospital).
+let recResumen = null;
+let recBuscarRango = 90, recBuscarData = null;
+let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null;
+let recMatTab = 'compra', recMatRango = 90, recMatData = null, recMatEdit = {}, recMatParams = null;
+let recVencData = null, recVencFiltro = 'vencidos';
+let recCostosTab = 'ordenes', recCostosMeses = 3, recCostosOE = null, recCostosFormulas = null, recProductosOC = null;
+let recProdMeses = 12, recProdData = null, recInstData = null, recTopFormulas = null;
+
+const recNum = (n, dec = 0) => (n === null || n === undefined || n === '' || isNaN(Number(n)))
+  ? '—' : Number(n).toLocaleString('es-CL', { maximumFractionDigits: dec });
+const recClp = n => (n === null || n === undefined || isNaN(Number(n))) ? '—' : '$ ' + Math.round(Number(n)).toLocaleString('es-CL');
+const recFechaHora = f => {
+  if (!f) return '—';
+  const d = new Date(f);
+  return isNaN(d) ? '—' : d.toLocaleDateString('es-CL') + ' ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+};
+const recFechaTs = f => { if (!f) return '—'; const d = new Date(f); return isNaN(d) ? '—' : d.toLocaleDateString('es-CL'); };
+const recHaceDias = dias => { const d = new Date(); d.setDate(d.getDate() - dias); return fechaLocalISO(d); };
+const recGramos = u => ({ G: 1, GR: 1, MG: 0.001, MCG: 0.000001, KG: 1000, LT: 1000, L: 1000, CC: 1, ML: 1 })[String(u || '').trim().toUpperCase()];
+const recNorm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const recEsInterno = lote => /^\s*R[OM]\s*\d/i.test(lote || '');
+
+async function recRpc(fn, params) {
+  const qs = Object.entries(params || {}).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  const rows = await fetchAll(`rpc/${fn}`, qs);
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function cargarRecResumen() {
+  try {
+    const res = await sb('rpc/rec_resumen');
+    if (!res.ok) return;
+    recResumen = await res.json();
+    const n = recResumen?.rm_lote_vencido_7d || 0;
+    ['badge-rec-alertas', 'badge-rec-alertas-mobile', 'badge-rec-alertas-tab'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = n; el.style.display = n > 0 ? 'inline-flex' : 'none'; }
+    });
+    if (document.getElementById('page-inicio')?.classList.contains('active')) renderInicio();
+  } catch (e) { /* el módulo es opcional: si falla, la app sigue igual */ }
+}
+
+function recEstadoHtml() {
+  const r = recResumen;
+  if (!r || !r.rm_total) {
+    return `<div class="rec-aviso">Todavía no llegan datos del recetario. Falta instalar el agente <b>BulforSync Recetario</b> en el servidor (ver instrucciones).</div>`;
+  }
+  let sync = '';
+  if (r.ultima_sync) {
+    const min = Math.round((Date.now() - new Date(r.ultima_sync)) / 60000);
+    sync = min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} días`;
+    if (min > 90) sync = `<span style="color:var(--red);font-weight:600">${sync} — revisa el agente del servidor</span>`;
+  } else sync = 'pendiente (solo datos de prueba)';
+  return `<div style="font-size:12px;color:var(--text-3);margin:-6px 0 12px">
+    ${recNum(r.rm_total)} RM desde ${recFechaTs(r.rm_desde)} hasta ${recFechaHora(r.rm_hasta)} · Actualizado ${sync}</div>`;
+}
+
+function recPintarEstado(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = recEstadoHtml();
+}
+
+function recTabsHtml(opciones, activo, fn) {
+  return opciones.map(o => `<button class="fpp-status-tab${o.id === activo ? ' active' : ''}" onclick="${fn}(${typeof o.id === 'string' ? `'${o.id}'` : o.id})">${o.label}</button>`).join('');
+}
+
+function recAvisosRm(r) {
+  const b = [];
+  if (r.n_lote_vencido > 0) b.push('<span class="badge badge-red" title="Se registró un lote que ya estaba vencido al elaborar">Lote vencido</span>');
+  if (r.n_precio_dudoso > 0) b.push('<span class="badge badge-amber" title="Una materia prima tiene un precio por gramo muy alto: revisa la unidad en Pharma_RM">Revisar precio</span>');
+  if (r.n_sin_costo > 0) b.push('<span class="badge badge-gray" title="Hay materias primas sin costo en Pharma_RM (ej. M.R.)">Sin costo: ' + r.n_sin_costo + '</span>');
+  return b.join(' ');
+}
+
+function recCantidadRm(r) {
+  const env = Number(r.frascos || 1);
+  return `${recNum(r.cantidad, 2)} ${escapeHtml(r.unidad || '')}${env > 1 ? ` × ${recNum(env)}` : ''}`;
+}
+
+// ── BUSCAR RM ──────────────────────────────────────────────────────────────
+function recBuscarInit() {
+  recBuscarRenderRangos();
+  recPintarEstado('rec-estado-buscar');
+  cargarRecResumen().then(() => recPintarEstado('rec-estado-buscar'));
+  if (!recBuscarData) recBuscar();
+}
+
+function recBuscarRenderRangos() {
+  const ops = [{ id: 7, label: '7 días' }, { id: 30, label: '30 días' }, { id: 90, label: '90 días' }, { id: 365, label: '1 año' }, { id: 0, label: 'Todo' }];
+  document.getElementById('rec-buscar-rangos').innerHTML = recTabsHtml(ops, recBuscarRango, 'recBuscarSetRango');
+}
+function recBuscarSetRango(d) { recBuscarRango = d; recBuscarRenderRangos(); recBuscar(); }
+
+async function recBuscar() {
+  const q = (document.getElementById('rec-buscar-q').value || '').trim();
+  const solo = document.getElementById('rec-buscar-alertas').checked;
+  const esNumero = /^\s*(rm)?\s*\d/i.test(q);
+  const cont = document.getElementById('rec-buscar-res');
+  cont.innerHTML = `<div class="table-card"><div class="empty"><p>Buscando…</p></div></div>`;
+  const params = { p_q: q, p_solo_alertas: solo, p_limite: 300 };
+  if (!esNumero && recBuscarRango) { params.p_desde = recHaceDias(recBuscarRango - 1); params.p_hasta = fechaLocalISO(); }
+  recBuscarData = await recRpc('rec_buscar', params);
+  recBuscarRender(q);
+}
+
+function recBuscarRender(q) {
+  const cont = document.getElementById('rec-buscar-res');
+  const filas = recBuscarData || [];
+  if (!filas.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🔍</div><p>${q ? 'No encontré RM con esa búsqueda.' : 'No hay RM en este período.'}</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div style="font-size:12px;color:var(--text-3);padding:4px 2px 8px">${filas.length === 300 ? 'Mostrando los 300 más recientes.' : `${filas.length} RM.`} Haz clic en uno para ver la fórmula completa.</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>RM</th><th>Fecha</th><th>Forma</th><th style="text-align:right">Cantidad</th><th>Fórmula</th><th>Institución</th>
+      <th style="text-align:right">Costo MP</th><th>Avisos</th></tr></thead><tbody>
+      ${filas.map(r => `<tr style="cursor:pointer" onclick="recAbrirRm(${r.id_rp_detalle})">
+        <td data-label="RM" class="mono" style="color:var(--accent);white-space:nowrap;font-weight:600">${escapeHtml(r.rm || ('#' + r.id_rp))}</td>
+        <td data-label="Fecha" style="white-space:nowrap;font-size:12px;color:var(--text-2)">${recFechaHora(r.fecha)}</td>
+        <td data-label="Forma" style="font-size:12px">${escapeHtml(r.forma || '—')}</td>
+        <td data-label="Cantidad" style="text-align:right;white-space:nowrap">${recCantidadRm(r)}</td>
+        <td data-label="Fórmula" style="max-width:360px;font-size:12px" title="${escapeHtml(r.descripcion || '')}">${escapeHtml(r.descripcion || '—')}</td>
+        <td data-label="Institución" style="font-size:12px;color:var(--text-2)">${escapeHtml(r.institucion || '')}</td>
+        <td data-label="Costo MP" style="text-align:right;white-space:nowrap">${recClp(r.costo)}</td>
+        <td data-label="Avisos">${recAvisosRm(r)}</td>
+      </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ── DETALLE DE UN RM (fórmula, lotes, costos) ──────────────────────────────
+async function recAbrirRm(idDetalle) {
+  cerrarTodosLosModales();
+  const modal = document.createElement('div');
+  modal.id = 'rec-rm-modal-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1000';
+  modal.onclick = (e) => { if (e.target === modal) cerrarModalOE('rec-rm-modal-overlay'); };
+  modal.innerHTML = `<div class="modal-shell modal-lg" onclick="event.stopPropagation()"><div class="modal-body"><p style="color:var(--text-3)">Cargando fórmula…</p></div></div>`;
+  document.body.appendChild(modal);
+
+  const [rRes, lRes] = await Promise.all([
+    sb(`rec_rm_v?id_rp_detalle=eq.${idDetalle}`),
+    sb(`rec_lineas?id_rp_detalle=eq.${idDetalle}&order=excipiente.asc,materia.asc`),
+  ]);
+  const r = rRes.ok ? (await rRes.json())[0] : null;
+  const lineas = lRes.ok ? await lRes.json() : [];
+  if (!r) { modal.querySelector('.modal-body').innerHTML = '<p>No encontré ese RM.</p>'; return; }
+
+  const env = Math.max(Number(r.frascos || 1), 1);
+  const unidadesTot = Number(r.cantidad || 0) * env;
+  const unidadNombre = { 'Cap.': 'cápsula', 'u': 'unidad', 'un': 'unidad' }[r.unidad] || (r.unidad || 'unidad');
+  const oe = (typeof ordenesElaboracion !== 'undefined' ? ordenesElaboracion : []).find(o => o.numero_rm && o.numero_rm === r.rm);
+  const avisos = [];
+  if (r.n_lote_vencido > 0) avisos.push('Al menos un lote registrado <b>ya estaba vencido</b> el día que se elaboró. Si físicamente se usó otro lote, corrige el lote en Pharma_RM.');
+  if (r.n_precio_dudoso > 0) avisos.push('Hay un precio por gramo muy alto (más de $40.000/g): seguramente la unidad de la materia prima está mal cargada en Pharma_RM (por mg en vez de por g).');
+  if (r.n_sin_costo > 0) avisos.push(`${r.n_sin_costo} materia${r.n_sin_costo === 1 ? '' : 's'} prima${r.n_sin_costo === 1 ? '' : 's'} sin costo en Pharma_RM (los "M.R." no tienen precio), así que el costo real es mayor.`);
+
+  modal.querySelector('.modal-shell').innerHTML = `
+    <div class="modal-header">
+      <div>
+        <div style="font-size:13px;color:var(--text-2)">${recFechaHora(r.fecha)}</div>
+        <div style="font-size:17px;font-weight:600">RM ${escapeHtml(r.rm || '(sin folio)')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        ${botonAtrasHtml()}
+        <button onclick="cerrarModalOE('rec-rm-modal-overlay')" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <table class="clinical-grid">
+        <tr><td>Forma farmacéutica</td><td>${escapeHtml(r.forma || '—')} · ${recCantidadRm(r)}${env > 1 ? ' envases' : ''}</td></tr>
+        ${r.institucion ? `<tr><td>Institución</td><td>${escapeHtml(r.institucion)}</td></tr>` : ''}
+        ${r.indicaciones ? `<tr><td>Indicaciones</td><td>${escapeHtml(r.indicaciones)}</td></tr>` : ''}
+        <tr><td>Contraseña (sale como "Rp" en la etiqueta)</td><td class="mono">${r.contrasena ?? '—'}</td></tr>
+        <tr><td>N° interno Pharma_RM</td><td class="mono">${r.id_rp}</td></tr>
+      </table>
+      ${avisos.length ? `<div class="rec-aviso" style="margin-top:12px"><ul style="margin:0;padding-left:18px">${avisos.map(a => `<li>${a}</li>`).join('')}</ul></div>` : ''}
+      <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px">Fórmula</div>
+      <div class="table-card farm-grilla" style="margin:0;overflow-x:auto"><table style="font-size:12.5px"><thead><tr>
+        <th>Materia prima · dosis</th><th style="text-align:right">Cantidad usada</th><th>Lote · vence</th><th style="text-align:right">Costo</th>
+      </tr></thead><tbody>
+        ${lineas.map(l => `<tr>
+          <td data-label="Materia prima">${escapeHtml(l.materia || ('#' + l.id_producto))}${l.controlado ? ' <span class="badge badge-blue">Controlado</span>' : ''}
+            <div style="font-size:11px;color:var(--text-2)">${escapeHtml(l.etiqueta || '')}${l.excipiente ? ' · excipiente' : ''}</div></td>
+          <td data-label="Cantidad usada" style="text-align:right;white-space:nowrap">${recNum(l.cant_total, 3)} ${escapeHtml(l.unidad || '')}</td>
+          <td data-label="Lote · vence" style="white-space:nowrap">${l.sin_lote ? '<span style="color:var(--text-3)">sin lote</span>' : `<span class="mono" style="font-size:12px">${escapeHtml(l.lote || '—')}</span>`}
+            <div style="font-size:11px;${l.lote_vencido ? 'color:var(--red);font-weight:700' : 'color:var(--text-3)'}">${l.vence ? 'vence ' + fDate(l.vence) : ''}${l.lote_vencido ? ' · VENCIDO' : ''}</div></td>
+          <td data-label="Costo" style="text-align:right;white-space:nowrap">${l.costo_tipo === 'sin costo' ? '<span style="color:var(--text-3)">sin costo</span>' : recClp(l.costo)}
+            ${l.costo_tipo === 'estimado' ? '<div style="font-size:10px;color:var(--text-3)">estimado</div>' : ''}
+            ${l.precio_dudoso ? '<div style="font-size:10px;color:var(--amber);font-weight:600">⚠ revisar precio</div>' : ''}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600">Costo materias primas</td><td style="text-align:right;font-weight:700;white-space:nowrap">${recClp(r.costo)}</td></tr></tfoot>
+      </table></div>
+      <div style="font-size:12px;color:var(--text-2);margin-top:8px">
+        ${env > 1 ? `Por envase: <b>${recClp(r.costo / env)}</b> · ` : ''}${unidadesTot > 0 ? `Por ${escapeHtml(unidadNombre)}: <b>${recClp(r.costo / unidadesTot)}</b>` : ''}
+        <div style="color:var(--text-3);margin-top:4px">Solo materias primas registradas en Pharma_RM (no incluye envase, cápsula vacía si no está en la fórmula, ni mano de obra).</div>
+      </div>
+      ${oe ? `<div style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:var(--radius)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">Orden de elaboración</div>
+        <div style="font-size:13px">${escapeHtml(oe.pacientes?.nombre || '')} · ${escapeHtml(oe.indicacion || '')} · cobrado ${recClp(oe.valor)}
+          ${oe.valor && r.costo != null ? ` · margen sobre materias primas <b>${recClp(oe.valor - r.costo)}</b> (${Math.round((oe.valor - r.costo) / oe.valor * 100)}%)` : ''}</div>
+        <button class="page-btn" style="margin-top:8px;padding:5px 12px;font-size:12px" onclick="navPush(()=>recAbrirRm(${r.id_rp_detalle}));abrirDetalleOE(${oe.id})">Abrir orden</button>
+      </div>` : ''}
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarModalOE('rec-rm-modal-overlay')">Cerrar</button>
+      </div>
+    </div>`;
+}
+
+// ── ALERTAS DE LOTES ───────────────────────────────────────────────────────
+async function recAlertasInit(forzar) {
+  recPintarEstado('rec-estado-alertas');
+  if (!recLotesUso || forzar) {
+    document.getElementById('rec-alertas-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Revisando lotes…</p></div></div>`;
+    recLotesUso = await recRpc('rec_lotes_en_uso', { p_dias: 120 });
+  }
+  if (recAlertasTab === 'historial' && (!recHistorial || forzar)) await recCargarHistorial();
+  recAlertasRender();
+}
+
+async function recCargarHistorial() {
+  const desde = recHaceDias(recAlertasDias - 1);
+  recHistorial = await fetchAll('rec_lineas', `select=id_rp_detalle,rm,fecha,materia,lote,vence,institucion&lote_vencido=is.true&fecha=gte.${desde}&order=fecha.desc`);
+  if (!Array.isArray(recHistorial)) recHistorial = [];
+}
+
+function recAlertasSetTab(t) { recAlertasTab = t; recAlertasInit(false); }
+async function recAlertasSetDias(d) { recAlertasDias = Number(d); recHistorial = null; await recAlertasInit(false); }
+
+function recAlertasRender() {
+  const lotes = recLotesUso || [];
+  const corregir = lotes.filter(l => l.dias_para_vencer !== null && l.dias_para_vencer < 0);
+  const porVencer = lotes.filter(l => l.dias_para_vencer !== null && l.dias_para_vencer >= 0 && l.dias_para_vencer <= 60)
+    .sort((a, b) => a.dias_para_vencer - b.dias_para_vencer);
+  const tabs = [
+    { id: 'corregir', label: `Corregir en Pharma_RM (${corregir.length})` },
+    { id: 'vencer', label: `Por vencer en 60 días (${porVencer.length})` },
+    { id: 'historial', label: 'Historial de RM con lote vencido' },
+  ];
+  document.getElementById('rec-alertas-tabs').innerHTML = recTabsHtml(tabs, recAlertasTab, 'recAlertasSetTab');
+  document.getElementById('rec-alertas-dias-wrap').style.display = recAlertasTab === 'historial' ? '' : 'none';
+  const cont = document.getElementById('rec-alertas-cont');
+
+  if (recAlertasTab === 'corregir') {
+    if (!corregir.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ninguna materia prima se está registrando con un lote vencido.</p></div></div>`; return; }
+    cont.innerHTML = `
+      <div class="rec-nota">Materias primas cuyo <b>último uso</b> (últimos 120 días) quedó registrado con un lote vencido. Casi siempre es porque Pharma_RM sigue ofreciendo un lote antiguo por defecto: elige el lote correcto al digitar (o desactiva el lote viejo). Si de verdad se usó ese lote, hay que retirarlo.</div>
+      <div class="table-card farm-grilla"><table><thead><tr>
+        <th>Materia prima</th><th>Lote que se está registrando</th><th>Venció</th><th>Último RM</th><th style="text-align:right">RM con ese lote</th><th>Lote más nuevo comprado</th>
+      </tr></thead><tbody>
+      ${corregir.map(l => `<tr>
+        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}</td>
+        <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
+        <td data-label="Venció" style="color:var(--red);font-weight:600;white-space:nowrap">${fDate(l.vence)}<div style="font-size:11px;font-weight:400">hace ${recNum(-l.dias_para_vencer)} días</div></td>
+        <td data-label="Último RM" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(l.ultimo_rm || '')}')">${escapeHtml(l.ultimo_rm || '—')}</a><div style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</div></td>
+        <td data-label="RM con ese lote" style="text-align:right">${recNum(l.usos_vencido)} de ${recNum(l.usos)}</td>
+        <td data-label="Lote nuevo">${l.lote_nuevo ? `<span class="mono">${escapeHtml(l.lote_nuevo)}</span> <span style="font-size:11px;color:var(--text-2)">vence ${fDate(l.lote_nuevo_vence)} · comprado ${fDate(l.lote_nuevo_compra)}</span>` : '<span style="color:var(--text-3);font-size:12px">No hay compras recientes registradas</span>'}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`;
+    return;
+  }
+
+  if (recAlertasTab === 'vencer') {
+    if (!porVencer.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ningún lote en uso vence en los próximos 60 días.</p></div></div>`; return; }
+    cont.innerHTML = `
+      <div class="rec-nota">Lote que se está usando hoy en cada materia prima y que vence en los próximos 60 días. Las bases internas (lotes RO/RM: agua preservada, jarabe simple, cremas base) duran poco por diseño: solo hay que preparar la siguiente a tiempo.</div>
+      <div class="table-card farm-grilla"><table><thead><tr>
+        <th>Materia prima</th><th>Lote en uso</th><th>Vence</th><th style="text-align:right">Días</th><th>Último uso</th><th style="text-align:right">RM (120 días)</th>
+      </tr></thead><tbody>
+      ${porVencer.map(l => `<tr>
+        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}${recEsInterno(l.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
+        <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
+        <td data-label="Vence" style="white-space:nowrap">${fDate(l.vence)}</td>
+        <td data-label="Días" style="text-align:right;font-weight:600;color:${l.dias_para_vencer <= 15 ? 'var(--red)' : 'var(--amber)'}">${l.dias_para_vencer}</td>
+        <td data-label="Último uso" style="white-space:nowrap">${escapeHtml(l.ultimo_rm || '')} <span style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</span></td>
+        <td data-label="RM" style="text-align:right">${recNum(l.usos)}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`;
+    return;
+  }
+
+  // Historial agrupado por materia + lote
+  const grupos = {};
+  (recHistorial || []).forEach(l => {
+    const k = `${l.materia}|${l.lote}`;
+    if (!grupos[k]) grupos[k] = { materia: l.materia, lote: l.lote, vence: l.vence, rms: [], ultimo: l.fecha, maxDias: 0 };
+    const g = grupos[k];
+    if (!g.rms.find(x => x.id === l.id_rp_detalle)) g.rms.push({ id: l.id_rp_detalle, rm: l.rm, fecha: l.fecha });
+    if (new Date(l.fecha) > new Date(g.ultimo)) g.ultimo = l.fecha;
+    const dias = Math.floor((new Date(l.fecha) - new Date(l.vence + 'T00:00:00')) / 86400000);
+    if (dias > g.maxDias) g.maxDias = dias;
+  });
+  const lista = Object.values(grupos).sort((a, b) => b.rms.length - a.rms.length);
+  const totalRm = new Set((recHistorial || []).map(l => l.id_rp_detalle)).size;
+  if (!lista.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>No hay RM con lote vencido en este período.</p></div></div>`; return; }
+  cont.innerHTML = `
+    <div class="rec-nota"><b>${totalRm} RM</b> del período quedaron registrados con al menos un lote vencido. Agrupado por materia prima y lote.</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Materia prima</th><th>Lote</th><th>Venció</th><th style="text-align:right">RM</th><th>Último uso</th><th style="text-align:right">Días vencido (máx.)</th><th>RM afectados</th>
+    </tr></thead><tbody>
+    ${lista.map(g => `<tr>
+      <td data-label="Materia prima" style="font-weight:500">${escapeHtml(g.materia)}${recEsInterno(g.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
+      <td data-label="Lote" class="mono">${escapeHtml(g.lote || '')}</td>
+      <td data-label="Venció" style="white-space:nowrap">${fDate(g.vence)}</td>
+      <td data-label="RM" style="text-align:right;font-weight:600">${g.rms.length}</td>
+      <td data-label="Último uso" style="white-space:nowrap">${recFechaTs(g.ultimo)}</td>
+      <td data-label="Días vencido" style="text-align:right;color:var(--red)">${recNum(g.maxDias)}</td>
+      <td data-label="RM afectados" style="font-size:12px">${g.rms.slice(0, 8).map(x => `<a style="cursor:pointer;color:var(--accent);margin-right:6px;white-space:nowrap" onclick="recAbrirRm(${x.id})">${escapeHtml(x.rm || ('#' + x.id))}</a>`).join('')}${g.rms.length > 8 ? `<span style="color:var(--text-3)">+${g.rms.length - 8} más</span>` : ''}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+async function recAbrirRmPorNumero(rm) {
+  if (!rm) return;
+  const filas = await recRpc('rec_buscar', { p_q: rm, p_limite: 1 });
+  if (filas.length) recAbrirRm(filas[0].id_rp_detalle);
+  else toast('No encontré ese RM.', 'err');
+}
+
+// ── MATERIAS PRIMAS: sugerencia de compra + vencimientos ───────────────────
+function recMatInit() {
+  recPintarEstado('rec-estado-materias');
+  recMatRenderTabs();
+  if (recMatTab === 'compra') {
+    recMatRenderRangos();
+    if (!recMatData) recMatCargar(); else recMatRender();
+  } else {
+    if (!recVencData) recVencCargar(); else recVencRender();
+  }
+}
+
+function recMatRenderTabs() {
+  document.getElementById('rec-mat-tabs').innerHTML = recTabsHtml([
+    { id: 'compra', label: 'Sugerencia de compra' }, { id: 'venc', label: 'Vencimientos de lotes' },
+  ], recMatTab, 'recMatSetTab');
+  document.getElementById('rec-mat-compra').style.display = recMatTab === 'compra' ? '' : 'none';
+  document.getElementById('rec-mat-venc').style.display = recMatTab === 'venc' ? '' : 'none';
+}
+function recMatSetTab(t) { recMatTab = t; recMatInit(); }
+
+function recMatRenderRangos() {
+  const ops = [30, 60, 90, 180].map(d => ({ id: d, label: `Consumo últimos ${d} días` }));
+  document.getElementById('rec-mat-rangos').innerHTML = recTabsHtml(ops, recMatRango, 'recMatSetRango');
+}
+function recMatSetRango(d) { recMatRango = d; recMatRenderRangos(); recMatCargar(); }
+
+async function recMatCargar() {
+  const cobertura = Number(document.getElementById('rec-mat-cobertura').value) || 30;
+  const desde = recHaceDias(recMatRango - 1), hasta = fechaLocalISO();
+  document.getElementById('rec-mat-tabla').innerHTML = `<div class="table-card"><div class="empty"><p>Calculando consumo…</p></div></div>`;
+  recMatData = await recRpc('rec_materias_resumen', { p_desde: desde, p_hasta: hasta, p_cobertura: cobertura });
+  recMatParams = { desde, hasta, cobertura };
+  recMatEdit = {};
+  recMatRender();
+}
+
+const recMatCantidad = m => recMatEdit[m.id_producto] !== undefined ? recMatEdit[m.id_producto] : Number(m.sugerido || 0);
+const recMatDudoso = m => { const g = recGramos(m.unidad); return g && m.precio && (Number(m.precio) / g) > 40000; };
+
+function recMatFilas() {
+  const q = recNorm(document.getElementById('rec-mat-search').value);
+  const solo = document.getElementById('rec-mat-solo').checked;
+  return (recMatData || [])
+    .filter(m => !q || recNorm(m.materia).includes(q) || recNorm(m.proveedor).includes(q))
+    .filter(m => !solo || Number(m.sugerido || 0) > 0 || recMatEdit[m.id_producto] > 0)
+    .sort((a, b) => (a.materia || '').localeCompare(b.materia || '', 'es'));
+}
+
+function recMatRender() {
+  const cont = document.getElementById('rec-mat-tabla');
+  const filas = recMatFilas();
+  if (!filas.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>${(recMatData || []).length ? 'Nada que comprar con estos filtros.' : 'No hay consumo de materias primas en el período.'}</p></div></div>`;
+    recMatTotales();
+    return;
+  }
+  cont.innerHTML = `
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Materia prima</th><th>Unidad</th><th style="text-align:right">Consumo</th><th style="text-align:right">Por día</th>
+      <th style="text-align:right" title="Compras − consumo de los últimos 12 meses (sin bajar de 0)">Saldo estimado</th>
+      <th style="text-align:right">Alcanza</th><th style="text-align:right">Comprar</th>
+      <th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th><th>Última compra</th>
+    </tr></thead><tbody>
+    ${filas.map(m => {
+      const cant = recMatCantidad(m);
+      const dud = recMatDudoso(m);
+      return `<tr>
+        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(m.materia)}${m.controlado ? ' <span class="badge badge-blue">Controlado</span>' : ''}<div style="font-size:11px;color:var(--text-3)">${m.n_rm} RM${m.lote_en_uso ? ` · lote ${escapeHtml(m.lote_en_uso)}${m.lote_en_uso_vence ? ' vence ' + fDate(m.lote_en_uso_vence) : ''}` : ''}</div></td>
+        <td data-label="Unidad">${escapeHtml(m.unidad || '—')}</td>
+        <td data-label="Consumo" style="text-align:right">${recNum(m.consumo, 2)}</td>
+        <td data-label="Por día" style="text-align:right;color:var(--text-2)">${recNum(m.consumo_diario, 2)}</td>
+        <td data-label="Saldo estimado" style="text-align:right">${recNum(m.saldo_estimado, 1)}</td>
+        <td data-label="Alcanza" style="text-align:right;white-space:nowrap;${m.alcance_dias !== null && Number(m.alcance_dias) < 15 ? 'color:var(--red);font-weight:600' : ''}">${m.alcance_dias === null ? '—' : recNum(m.alcance_dias) + ' días'}</td>
+        <td data-label="Comprar" style="text-align:right"><input type="number" min="0" step="any" value="${cant}" style="width:96px;text-align:right" onchange="recMatEditar(${m.id_producto}, this.value)"></td>
+        <td data-label="Precio unit." style="text-align:right;white-space:nowrap">${m.precio ? recNum(m.precio, 3) : '—'}${dud ? '<div style="font-size:10px;color:var(--amber);font-weight:600" title="Más de $40.000 por gramo: revisa la unidad en Pharma_RM">⚠ revisar</div>' : ''}</td>
+        <td data-label="Total" id="rec-mat-total-${m.id_producto}" style="text-align:right;white-space:nowrap;font-weight:600">${recClp(cant * Number(m.precio || 0))}</td>
+        <td data-label="Última compra" style="font-size:12px;white-space:nowrap">${m.ultima_compra ? `${fDate(m.ultima_compra)} · ${recNum(m.ultima_compra_cant, 2)} ${escapeHtml(m.unidad || '')}<div style="color:var(--text-3)">${escapeHtml(m.proveedor || '')}</div>` : '<span style="color:var(--text-3)">sin compras registradas</span>'}</td>
+      </tr>`; }).join('')}
+    </tbody><tfoot><tr id="rec-mat-pie"></tr></tfoot></table></div>`;
+  recMatTotales();
+}
+
+function recMatEditar(id, valor) {
+  const m = (recMatData || []).find(x => x.id_producto === id);
+  if (!m) return;
+  const n = Math.max(0, Number(valor) || 0);
+  recMatEdit[id] = n;
+  const celda = document.getElementById(`rec-mat-total-${id}`);
+  if (celda) celda.textContent = recClp(n * Number(m.precio || 0));
+  recMatTotales();
+}
+
+function recMatTotales() {
+  const todas = recMatData || [];
+  const aComprar = todas.filter(m => recMatCantidad(m) > 0);
+  const total = aComprar.reduce((s, m) => s + recMatCantidad(m) * Number(m.precio || 0), 0);
+  const sinCompra = todas.filter(m => !m.ultima_compra).length;
+  const corto = todas.filter(m => m.alcance_dias !== null && Number(m.alcance_dias) < 15).length;
+  document.getElementById('rec-mat-resumen').innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Total del pedido</div><div class="stat-val" style="font-size:20px">${recClp(total)}</div><div class="stat-sub">Al último precio de compra</div></div>
+    <div class="stat"><div class="stat-label">Materias a comprar</div><div class="stat-val" style="font-size:16px">${aComprar.length}</div><div class="stat-sub">de ${todas.length} usadas en el período</div></div>
+    <div class="stat"><div class="stat-label">Alcanzan menos de 15 días</div><div class="stat-val" style="font-size:16px">${corto}</div><div class="stat-sub">Según el saldo estimado</div></div>
+    <div class="stat"><div class="stat-label">Sin compras registradas</div><div class="stat-val" style="font-size:16px">${sinCompra}</div><div class="stat-sub">Ej. M.R. que vienen de farmacia</div></div>`;
+  const pie = document.getElementById('rec-mat-pie');
+  if (pie) pie.innerHTML = `<td colspan="8" style="text-align:right;font-weight:600">TOTAL PEDIDO</td><td style="text-align:right;font-weight:700;white-space:nowrap">${recClp(total)}</td><td></td>`;
+}
+
+function recMatExcel() {
+  if (typeof XLSX === 'undefined') { toast('No se pudo cargar el generador de Excel.', 'err'); return; }
+  const filas = (recMatData || []).filter(m => recMatCantidad(m) > 0)
+    .sort((a, b) => (a.materia || '').localeCompare(b.materia || '', 'es'));
+  if (!filas.length) { toast('No hay nada para pedir.', 'err'); return; }
+  const datos = filas.map(m => ({
+    'Materia prima': m.materia, 'Unidad': m.unidad, 'Comprar': recMatCantidad(m), 'Precio unitario': Number(m.precio || 0),
+    'Total': Math.round(recMatCantidad(m) * Number(m.precio || 0)), 'Consumo período': Number(m.consumo || 0),
+    'Saldo estimado': Number(m.saldo_estimado || 0), 'Último proveedor': m.proveedor || '', 'Última compra': m.ultima_compra || '',
+  }));
+  datos.push({ 'Materia prima': 'TOTAL', 'Total': datos.reduce((s, d) => s + d['Total'], 0) });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(datos), 'Pedido materias primas');
+  XLSX.writeFile(wb, `pedido_materias_primas_${fechaLocalISO()}.xlsx`);
+}
+
+async function recVencCargar() {
+  document.getElementById('rec-venc-tabla').innerHTML = `<div class="table-card"><div class="empty"><p>Revisando lotes…</p></div></div>`;
+  recVencData = await recRpc('rec_vencimientos', {});
+  recVencRender();
+}
+function recVencSetFiltro(f) { recVencFiltro = f; recVencRender(); }
+
+function recVencRender() {
+  const datos = recVencData || [];
+  const q = recNorm(document.getElementById('rec-venc-search').value);
+  const grupos = {
+    vencidos: datos.filter(l => l.dias_para_vencer < 0 && l.en_uso),
+    d30: datos.filter(l => l.dias_para_vencer >= 0 && l.dias_para_vencer <= 30),
+    d90: datos.filter(l => l.dias_para_vencer > 30 && l.dias_para_vencer <= 90),
+    todos: datos,
+  };
+  document.getElementById('rec-venc-tabs').innerHTML = recTabsHtml([
+    { id: 'vencidos', label: `Vencidos y usados en los últimos 60 días (${grupos.vencidos.length})` },
+    { id: 'd30', label: `Vencen en 30 días (${grupos.d30.length})` },
+    { id: 'd90', label: `Vencen en 31–90 días (${grupos.d90.length})` },
+    { id: 'todos', label: `Todos (${datos.length})` },
+  ], recVencFiltro, 'recVencSetFiltro');
+  const filas = grupos[recVencFiltro].filter(l => !q || recNorm(l.materia).includes(q) || recNorm(l.lote).includes(q));
+  const cont = document.getElementById('rec-venc-tabla');
+  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>No hay lotes en este grupo.</p></div></div>`; return; }
+  cont.innerHTML = `
+    <div class="rec-nota">Lotes comprados en los últimos 2 años o usados en el último año. Pharma_RM no lleva stock por lote, así que "en uso" significa que aparece en algún RM de los últimos 60 días.</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Materia prima</th><th>Lote</th><th>Vence</th><th style="text-align:right">Días</th><th>Compra</th><th>Último uso</th><th style="text-align:right">RM (12 m)</th>
+    </tr></thead><tbody>
+    ${filas.map(l => `<tr>
+      <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}${recEsInterno(l.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
+      <td data-label="Lote" class="mono">${escapeHtml(l.lote || '')}</td>
+      <td data-label="Vence" style="white-space:nowrap">${fDate(l.vence)}</td>
+      <td data-label="Días" style="text-align:right;font-weight:600;color:${l.dias_para_vencer < 0 ? 'var(--red)' : l.dias_para_vencer <= 30 ? 'var(--amber)' : 'var(--text-2)'}">${l.dias_para_vencer}</td>
+      <td data-label="Compra" style="font-size:12px;white-space:nowrap">${l.comprado ? `${fDate(l.comprado)} · ${recNum(l.cantidad_comprada, 2)} ${escapeHtml(l.unidad || '')}<div style="color:var(--text-3)">${escapeHtml(l.proveedor || '')}</div>` : '—'}</td>
+      <td data-label="Último uso" style="white-space:nowrap">${l.ultimo_uso ? recFechaTs(l.ultimo_uso) : '<span style="color:var(--text-3)">sin uso</span>'}${l.en_uso ? ' <span class="badge badge-green">en uso</span>' : ''}</td>
+      <td data-label="RM (12 m)" style="text-align:right">${recNum(l.usos_12m)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ── COSTOS Y MÁRGENES ──────────────────────────────────────────────────────
+function recCostosInit() {
+  recPintarEstado('rec-estado-costos');
+  document.getElementById('rec-costos-tabs').innerHTML = recTabsHtml([
+    { id: 'ordenes', label: 'Órdenes de elaboración con RM' }, { id: 'formulas', label: 'Costo por fórmula' },
+  ], recCostosTab, 'recCostosSetTab');
+  document.getElementById('rec-costos-rangos').innerHTML = recTabsHtml(
+    [{ id: 1, label: 'Último mes' }, { id: 3, label: '3 meses' }, { id: 12, label: '12 meses' }], recCostosMeses, 'recCostosSetMeses');
+  document.getElementById('rec-costos-filtros-formula').style.display = recCostosTab === 'formulas' ? '' : 'none';
+  if (recCostosTab === 'ordenes') { if (!recCostosOE) recCostosCargarOE(); else recCostosRenderOE(); }
+  else { if (!recCostosFormulas) recCostosCargarFormulas(); else recCostosRenderFormulas(); }
+}
+function recCostosSetTab(t) { recCostosTab = t; recCostosInit(); }
+function recCostosSetMeses(m) { recCostosMeses = m; recCostosOE = null; recCostosFormulas = null; recCostosInit(); }
+const recCostosDesde = () => { const d = new Date(); d.setMonth(d.getMonth() - recCostosMeses); return fechaLocalISO(d); };
+
+async function recCostosCargarOE() {
+  document.getElementById('rec-costos-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Calculando márgenes…</p></div></div>`;
+  recCostosOE = await recRpc('rec_margen_oe', { p_desde: recCostosDesde(), p_hasta: fechaLocalISO() });
+  recCostosRenderOE();
+}
+
+function recCostosRenderOE() {
+  const filas = recCostosOE || [];
+  const desde = recCostosDesde();
+  const sinRm = (typeof ordenesElaboracion !== 'undefined' ? ordenesElaboracion : [])
+    .filter(o => !o.numero_rm && o.fecha_orden >= desde).length;
+  const ok = filas.filter(f => f.encontrado && f.costo !== null && !f.n_sin_costo);
+  const venta = ok.reduce((s, f) => s + Number(f.valor || 0), 0);
+  const costo = ok.reduce((s, f) => s + Number(f.costo || 0), 0);
+  const nombrePac = id => (typeof pacientes !== 'undefined' ? pacientes : []).find(p => p.id === id)?.nombre || '—';
+  const resumen = `
+    <div class="fpp-resumen">
+      <div class="stat destacado"><div class="stat-label">Margen sobre materias primas</div><div class="stat-val" style="font-size:20px">${venta ? Math.round((venta - costo) / venta * 100) + '%' : '—'}</div><div class="stat-sub">${recClp(venta - costo)} de ${recClp(venta)} cobrados</div></div>
+      <div class="stat"><div class="stat-label">Órdenes con RM</div><div class="stat-val" style="font-size:16px">${filas.length}</div><div class="stat-sub">${ok.length} con costo completo (el margen se calcula con esas)</div></div>
+      <div class="stat"><div class="stat-label">Costo materias primas</div><div class="stat-val" style="font-size:16px">${recClp(costo)}</div><div class="stat-sub">Según Pharma_RM</div></div>
+      <div class="stat"><div class="stat-label">Órdenes sin N° RM</div><div class="stat-val" style="font-size:16px">${sinRm}</div><div class="stat-sub"><a style="cursor:pointer;color:var(--accent)" onclick="irAModuloPagina('elaboracion','elaboracion')">Ir a anotarlo</a></div></div>
+    </div>`;
+  const cont = document.getElementById('rec-costos-cont');
+  if (!filas.length) {
+    cont.innerHTML = resumen + `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay órdenes con N° RM en este período. Anótalo en cada orden (Órdenes de Elaboración → abrir orden → "N° RM") y aquí verás cuánto costó y cuánto se ganó.</p></div></div>`;
+    return;
+  }
+  cont.innerHTML = resumen + `
+    <div class="rec-nota">Costo solo de materias primas registradas en Pharma_RM: no incluye envase, etiqueta ni mano de obra. Si dice "sin costo", hay materias (ej. M.R.) sin precio en el recetario: esas órdenes salen con * y no entran al margen promedio.</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Fecha</th><th>Paciente</th><th>Preparado</th><th>RM</th><th style="text-align:right">Cobrado</th><th style="text-align:right">Costo MP</th><th style="text-align:right">Margen</th><th>Avisos</th>
+    </tr></thead><tbody>
+    ${filas.map(f => `<tr>
+      <td data-label="Fecha" style="white-space:nowrap;font-size:12px">${fDate(f.fecha_orden)}</td>
+      <td data-label="Paciente">${escapeHtml(nombrePac(f.paciente_id))}</td>
+      <td data-label="Preparado" style="font-size:12px">${escapeHtml(f.indicacion || '')}</td>
+      <td data-label="RM" class="mono" style="white-space:nowrap">${f.encontrado ? `<a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(f.numero_rm)}')">${escapeHtml(f.numero_rm)}</a>` : `${escapeHtml(f.numero_rm)} <span class="badge badge-amber" title="Ese número no está en el recetario: revisa que sea el de la orden de fabricación (ej. 7070/26)">no encontrado</span>`}</td>
+      <td data-label="Cobrado" style="text-align:right;white-space:nowrap">${recClp(f.valor)}</td>
+      <td data-label="Costo MP" style="text-align:right;white-space:nowrap">${f.encontrado ? recClp(f.costo) : '—'}</td>
+      <td data-label="Margen" style="text-align:right;white-space:nowrap;font-weight:600;${f.margen !== null && f.margen < 0 ? 'color:var(--red)' : ''}">${f.encontrado && f.margen !== null ? `${recClp(f.margen)}${f.n_sin_costo ? '<span title="Hay materias primas sin costo: el margen real es menor">*</span>' : ''} <span style="font-weight:400;color:var(--text-3)">${recNum(f.margen_pct)}%</span>` : '—'}</td>
+      <td data-label="Avisos">${recAvisosRm({ n_lote_vencido: f.n_lote_vencido, n_sin_costo: f.n_sin_costo, n_precio_dudoso: 0 })}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+async function recCostosCargarFormulas() {
+  document.getElementById('rec-costos-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Calculando costos por fórmula…</p></div></div>`;
+  const [formulas, prods] = await Promise.all([
+    recRpc('rec_costos_formulas', { p_desde: recCostosDesde(), p_hasta: fechaLocalISO() }),
+    recProductosOC ? Promise.resolve(recProductosOC) : fetchAll('productos', 'select=productonormalizado,preciopromedio,preciominimo,preciomaximo,cantidadvendida,ultimaventa'),
+  ]);
+  recCostosFormulas = formulas;
+  recProductosOC = Array.isArray(prods) ? prods : [];
+  const formas = [...new Set(formulas.map(f => f.forma).filter(Boolean))].sort();
+  const sel = document.getElementById('rec-costos-forma');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Todas las formas</option>' + formas.map(f => `<option${f === actual ? ' selected' : ''}>${escapeHtml(f)}</option>`).join('');
+  recCostosRenderFormulas();
+}
+
+// Posible producto de licitación para una fórmula: la palabra más larga del primer principio activo
+function recProductoOC(formula) {
+  if (!recProductosOC || !formula) return null;
+  const primero = recNorm(formula.split(' + ')[0]).replace(/\bm\.r\.\s*/g, '');
+  const palabras = primero.split(/[^a-z]+/).filter(w => w.length >= 5);
+  if (!palabras.length) return null;
+  const clave = palabras.sort((a, b) => b.length - a.length)[0];
+  const cands = recProductosOC.filter(p => recNorm(p.productonormalizado).includes(clave));
+  if (!cands.length) return null;
+  return cands.sort((a, b) => Number(b.cantidadvendida || 0) - Number(a.cantidadvendida || 0))[0];
+}
+
+function recCostosRenderFormulas() {
+  const q = recNorm(document.getElementById('rec-costos-search').value);
+  const forma = document.getElementById('rec-costos-forma').value;
+  const filas = (recCostosFormulas || [])
+    .filter(f => !forma || f.forma === forma)
+    .filter(f => !q || recNorm(f.formula).includes(q) || recNorm(f.instituciones).includes(q));
+  const cont = document.getElementById('rec-costos-cont');
+  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧪</div><p>No hay fórmulas con estos filtros.</p></div></div>`; return; }
+  cont.innerHTML = `
+    <div class="rec-nota">Costo de materias primas con el <b>último precio de compra</b>, agrupado por fórmula (principios activos y concentración). "Por unidad" es por cápsula, gramo o ml según la forma. La columna de licitaciones muestra el precio promedio que pagan los hospitales por un producto con ese nombre (coincidencia aproximada: revísala).</div>
+    <div style="font-size:12px;color:var(--text-3);padding:0 2px 8px">${filas.length} fórmulas${filas.length > 400 ? ' (mostrando 400)' : ''}.</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Forma</th><th>Fórmula</th><th style="text-align:right">RM</th><th style="text-align:right">Unidades</th>
+      <th style="text-align:right">Costo por unidad</th><th style="text-align:right">Costo por envase</th><th>Precio en OC (licitaciones)</th><th>Último RM</th>
+    </tr></thead><tbody>
+    ${filas.slice(0, 400).map(f => {
+      const p = recProductoOC(f.formula);
+      return `<tr>
+        <td data-label="Forma" style="font-size:12px">${escapeHtml(f.forma || '—')}</td>
+        <td data-label="Fórmula" style="max-width:340px">${escapeHtml(f.formula)}${f.n_instituciones ? `<div style="font-size:11px;color:var(--text-3)">${escapeHtml(f.instituciones)}</div>` : ''}${f.con_lineas_sin_costo ? '<div style="font-size:11px;color:var(--amber)">⚠ algún RM sin costo o con precio dudoso</div>' : ''}</td>
+        <td data-label="RM" style="text-align:right">${recNum(f.n_rm)}</td>
+        <td data-label="Unidades" style="text-align:right;white-space:nowrap">${recNum(f.unidades, 1)} ${escapeHtml(f.unidad || '')}</td>
+        <td data-label="Costo por unidad" style="text-align:right;white-space:nowrap;font-weight:600">${f.costo_por_unidad === null ? '—' : '$ ' + recNum(f.costo_por_unidad, 2)}</td>
+        <td data-label="Costo por envase" style="text-align:right;white-space:nowrap">${recClp(f.costo_por_envase)}</td>
+        <td data-label="Licitaciones" style="font-size:12px">${p ? `${recClp(p.preciopromedio)} <span style="color:var(--text-3)">(${recClp(p.preciominimo)}–${recClp(p.preciomaximo)})</span><div style="color:var(--text-3)">${escapeHtml(p.productonormalizado)}</div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td data-label="Último RM" class="mono" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(f.ultimo_rm || '')}')">${escapeHtml(f.ultimo_rm || '—')}</a></td>
+      </tr>`; }).join('')}
+    </tbody></table></div>`;
+}
+
+// ── PRODUCCIÓN ─────────────────────────────────────────────────────────────
+function recProdInit() {
+  recPintarEstado('rec-estado-produccion');
+  document.getElementById('rec-prod-rangos').innerHTML = recTabsHtml(
+    [{ id: 6, label: '6 meses' }, { id: 12, label: '12 meses' }, { id: 24, label: '24 meses' }], recProdMeses, 'recProdSetMeses');
+  if (!recProdData) recProdCargar(); else recProdRender();
+}
+function recProdSetMeses(m) { recProdMeses = m; recProdData = null; recProdInit(); }
+
+async function recProdCargar() {
+  document.getElementById('rec-prod-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Calculando producción…</p></div></div>`;
+  const d = new Date(); d.setMonth(d.getMonth() - recProdMeses); d.setDate(1);
+  const desde = fechaLocalISO(d), hasta = fechaLocalISO();
+  [recProdData, recInstData, recTopFormulas] = await Promise.all([
+    recRpc('rec_produccion', { p_desde: desde, p_hasta: hasta }),
+    recRpc('rec_instituciones', { p_desde: desde, p_hasta: hasta }),
+    recRpc('rec_costos_formulas', { p_desde: recHaceDias(89), p_hasta: hasta }),
+  ]);
+  recProdRender();
+}
+
+function recProdRender() {
+  const datos = recProdData || [];
+  const cont = document.getElementById('rec-prod-cont');
+  if (!datos.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📊</div><p>Sin datos de producción en el período.</p></div></div>`; return; }
+  const meses = {}, formas = {};
+  datos.forEach(r => {
+    const m = meses[r.mes] || (meses[r.mes] = { rm: 0, env: 0, inst: 0, costo: 0 });
+    m.rm += r.n_rm; m.env += Number(r.envases || 0); m.inst += r.institucionales; m.costo += Number(r.costo || 0);
+    const f = formas[r.forma] || (formas[r.forma] = { rm: 0, env: 0, costo: 0 });
+    f.rm += r.n_rm; f.env += Number(r.envases || 0); f.costo += Number(r.costo || 0);
+  });
+  const listaMeses = Object.entries(meses).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxRm = Math.max(...listaMeses.map(([, m]) => m.rm), 1);
+  const totalRm = listaMeses.reduce((s, [, m]) => s + m.rm, 0);
+  const nombreMes = k => { const [y, mo] = k.split('-'); return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('es-CL', { month: 'short', year: 'numeric' }); };
+  const listaFormas = Object.entries(formas).sort((a, b) => b[1].rm - a[1].rm);
+  cont.innerHTML = `
+    <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px">RM elaborados por mes</div>
+    <div class="table-card farm-grilla"><table><thead><tr>
+      <th>Mes</th><th style="text-align:right">RM</th><th style="width:40%"></th><th style="text-align:right">Envases</th><th style="text-align:right">Para instituciones</th><th style="text-align:right">Costo MP</th>
+    </tr></thead><tbody>
+    ${listaMeses.map(([k, m]) => `<tr title="${nombreMes(k)}: ${m.rm} RM, ${recNum(m.env)} envases">
+      <td data-label="Mes" style="white-space:nowrap">${nombreMes(k)}</td>
+      <td data-label="RM" style="text-align:right;font-weight:600">${recNum(m.rm)}</td>
+      <td data-label=""><div style="height:10px;width:${Math.max(2, m.rm / maxRm * 100)}%;background:var(--text-2);border-radius:0 4px 4px 0"></div></td>
+      <td data-label="Envases" style="text-align:right">${recNum(m.env)}</td>
+      <td data-label="Instituciones" style="text-align:right">${recNum(m.inst)}</td>
+      <td data-label="Costo MP" style="text-align:right;white-space:nowrap">${recClp(m.costo)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px">
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por forma farmacéutica</div>
+        <div class="table-card farm-grilla" style="margin:0"><table><thead><tr><th>Forma</th><th style="text-align:right">RM</th><th style="text-align:right">%</th><th style="text-align:right">Envases</th></tr></thead><tbody>
+        ${listaFormas.map(([f, x]) => `<tr><td data-label="Forma">${escapeHtml(f)}</td><td data-label="RM" style="text-align:right">${recNum(x.rm)}</td><td data-label="%" style="text-align:right;color:var(--text-2)">${Math.round(x.rm / totalRm * 100)}%</td><td data-label="Envases" style="text-align:right">${recNum(x.env)}</td></tr>`).join('')}
+        </tbody></table></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Instituciones (hospitales)</div>
+        <div class="table-card farm-grilla" style="margin:0"><table><thead><tr><th>Institución</th><th style="text-align:right">RM</th><th style="text-align:right">Envases</th><th>Último</th></tr></thead><tbody>
+        ${(recInstData || []).slice(0, 25).map(i => `<tr title="${escapeHtml(i.formulas || '')}"><td data-label="Institución">${escapeHtml(i.institucion)}</td><td data-label="RM" style="text-align:right">${recNum(i.n_rm)}</td><td data-label="Envases" style="text-align:right">${recNum(i.envases)}</td><td data-label="Último" style="white-space:nowrap;font-size:12px">${recFechaTs(i.ultima)}</td></tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-3)">Sin RM para instituciones en el período.</td></tr>'}
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px">Fórmulas más elaboradas (últimos 90 días)</div>
+    <div class="table-card farm-grilla"><table><thead><tr><th>Forma</th><th>Fórmula</th><th style="text-align:right">RM</th><th style="text-align:right">Unidades</th><th style="text-align:right">Costo por unidad</th></tr></thead><tbody>
+    ${(recTopFormulas || []).slice(0, 15).map(f => `<tr><td data-label="Forma" style="font-size:12px">${escapeHtml(f.forma || '')}</td><td data-label="Fórmula">${escapeHtml(f.formula)}</td><td data-label="RM" style="text-align:right;font-weight:600">${recNum(f.n_rm)}</td><td data-label="Unidades" style="text-align:right;white-space:nowrap">${recNum(f.unidades, 1)} ${escapeHtml(f.unidad || '')}</td><td data-label="Costo por unidad" style="text-align:right;white-space:nowrap">${f.costo_por_unidad === null ? '—' : '$ ' + recNum(f.costo_por_unidad, 2)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ── N° RM EN ÓRDENES DE ELABORACIÓN ────────────────────────────────────────
+// El número que sale como "Rp: RM7070/26" en la orden de fabricación de Pharma_RM.
+function recNormalizarRm(texto, fechaOrden) {
+  let t = String(texto || '').toUpperCase().replace(/\s+/g, '').replace(/^RM/, '');
+  if (/^\d+$/.test(t)) t += '/' + String(fechaOrden || fechaLocalISO()).slice(2, 4);
+  if (/^\d+\/\d{4}$/.test(t)) t = t.replace(/\/\d{2}(\d{2})$/, '/$1');
+  return /^\d+\/\d{2}$/.test(t) ? t.replace(/^0+(?=\d)/, '') : null;
+}
+
+function recSeccionOEHtml(o) {
+  return `<div id="oe-rm-${o.id}" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:var(--radius)">
+    <div style="font-size:12px;font-weight:500;margin-bottom:8px">🧪 Recetario (N° RM)</div>
+    <div style="font-size:12px;color:var(--text-3)">Cargando…</div></div>`;
+}
+
+async function recPintarSeccionOE(oeId, editando) {
+  const o = ordenesElaboracion.find(x => x.id === oeId);
+  const cont = document.getElementById(`oe-rm-${oeId}`);
+  if (!o || !cont) return;
+  const esEditor = sesionActual?.rol === 'editor';
+  const titulo = `<div style="font-size:12px;font-weight:500;margin-bottom:8px">🧪 Recetario (N° RM)</div>`;
+
+  if (o.numero_rm && !editando) {
+    cont.innerHTML = titulo + `<div style="font-size:12px;color:var(--text-3)">Buscando RM ${escapeHtml(o.numero_rm)}…</div>`;
+    const filas = await recRpc('rec_buscar', { p_q: o.numero_rm, p_limite: 1 });
+    const r = filas[0];
+    if (!document.getElementById(`oe-rm-${oeId}`)) return;
+    if (!r) {
+      cont.innerHTML = titulo + `<div style="font-size:13px">RM <b class="mono">${escapeHtml(o.numero_rm)}</b> <span class="badge badge-amber">no encontrado en el recetario</span></div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px">Revisa que sea el número de la orden de fabricación (ej. 7070/26). Si es de hoy, puede tardar hasta 30 minutos en llegar.</div>
+        ${esEditor ? `<button class="page-btn" style="margin-top:8px;padding:5px 12px;font-size:12px" onclick="recPintarSeccionOE(${oeId}, true)">Cambiar N° RM</button>` : ''}`;
+      return;
+    }
+    const margen = o.valor && r.costo !== null ? o.valor - r.costo : null;
+    cont.innerHTML = titulo + `
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+        <div style="font-size:13px;min-width:200px;flex:1">
+          <div><b class="mono">RM ${escapeHtml(r.rm)}</b> · ${escapeHtml(r.forma || '')} · ${recCantidadRm(r)} · ${recFechaHora(r.fecha)}</div>
+          <div style="color:var(--text-2);margin-top:4px">${escapeHtml(r.descripcion || '')}</div>
+          <div style="margin-top:6px">Costo materias primas: <b>${recClp(r.costo)}</b>${margen !== null ? ` · Margen: <b style="${margen < 0 ? 'color:var(--red)' : ''}">${recClp(margen)}</b> (${Math.round(margen / o.valor * 100)}%)` : ''}</div>
+          ${r.n_sin_costo ? '<div style="font-size:11px;color:var(--text-3);margin-top:2px">Hay materias primas sin costo en Pharma_RM (ej. M.R.): el costo real es mayor y el margen menor.</div>' : ''}
+          <div style="margin-top:6px">${recAvisosRm(r)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="page-btn" style="padding:5px 12px;font-size:12px" onclick="navPush(()=>abrirDetalleOE(${oeId}));recAbrirRm(${r.id_rp_detalle})">Ver fórmula</button>
+          ${esEditor ? `<button class="page-btn" style="padding:5px 12px;font-size:12px" onclick="recPintarSeccionOE(${oeId}, true)">Cambiar</button>` : ''}
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (!esEditor) {
+    cont.innerHTML = titulo + `<div style="font-size:12px;color:var(--text-3)">Sin N° RM anotado.</div>`;
+    return;
+  }
+  cont.innerHTML = titulo + `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="oe-rm-input-${oeId}" value="${escapeHtml(o.numero_rm || '')}" placeholder="Ej: 7070/26" style="width:130px" onkeydown="if(event.key==='Enter')recGuardarRmOE(${oeId})">
+      <button class="import-btn" style="margin-top:0;padding:6px 14px" onclick="recGuardarRmOE(${oeId})">Guardar</button>
+      ${o.numero_rm ? `<button class="page-btn" style="padding:6px 12px;font-size:12px" onclick="recPintarSeccionOE(${oeId}, false)">Cancelar</button>
+        <button class="page-btn" style="padding:6px 12px;font-size:12px;color:var(--red)" onclick="recGuardarRmOE(${oeId}, true)">Quitar</button>` : ''}
+    </div>
+    <div style="font-size:11px;color:var(--text-3);margin-top:6px">Es el número que sale como "Rp: RM7070/26" en la orden de fabricación de Pharma_RM (no el de la etiqueta).</div>
+    <div id="oe-rm-cand-${oeId}" style="margin-top:10px;font-size:12px;color:var(--text-3)">Buscando RM parecidos de esos días…</div>`;
+  const cand = await recRpc('rec_oe_candidatos', { p_fecha: o.fecha_orden, p_texto: o.indicacion || '', p_limite: 5 });
+  const cc = document.getElementById(`oe-rm-cand-${oeId}`);
+  if (!cc) return;
+  if (!cand.length) { cc.textContent = 'No encontré RM parecidos en el recetario para esos días.'; return; }
+  cc.innerHTML = `<div style="margin-bottom:6px">¿Es alguno de estos?</div>` + cand.map(c => `
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;color:var(--text)">
+      <div style="min-width:0">
+        <b class="mono">${escapeHtml(c.rm || '—')}</b> · ${escapeHtml(c.forma || '')} · ${recCantidadRm(c)} · <span style="color:var(--text-3)">${recFechaHora(c.fecha)}</span>
+        <div style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.descripcion || '')}</div>
+        ${c.ya_asignado ? '<div style="color:var(--amber)">Ya está anotado en otra orden</div>' : ''}
+      </div>
+      ${c.rm ? `<button class="page-btn" style="padding:4px 10px;font-size:12px;flex-shrink:0" onclick="document.getElementById('oe-rm-input-${oeId}').value='${escapeHtml(c.rm)}';recGuardarRmOE(${oeId})">Es este</button>` : ''}
+    </div>`).join('');
+}
+
+async function recGuardarRmOE(oeId, quitar) {
+  const o = ordenesElaboracion.find(x => x.id === oeId);
+  if (!o) return;
+  let valor = null;
+  if (!quitar) {
+    const input = document.getElementById(`oe-rm-input-${oeId}`);
+    valor = recNormalizarRm(input ? input.value : '', o.fecha_orden);
+    if (!valor) { toast('Escribe el N° RM como sale en la orden de fabricación, por ejemplo 7070/26.', 'err'); return; }
+    const otra = ordenesElaboracion.find(x => x.id !== oeId && x.numero_rm === valor);
+    if (otra && !confirmarRmDuplicado(otra)) return;
+  }
+  try {
+    const res = await sb(`ordenes_elaboracion?id=eq.${oeId}`, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify({ numero_rm: valor, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const act = (await res.json())[0] || {};
+    ordenesElaboracion = ordenesElaboracion.map(x => x.id === oeId ? { ...x, numero_rm: act.numero_rm ?? valor } : x);
+    ordenesElaboracionF = ordenesElaboracionF.map(x => x.id === oeId ? { ...x, numero_rm: act.numero_rm ?? valor } : x);
+    renderOE();
+    recCostosOE = null;
+    toast(quitar ? 'N° RM quitado.' : `RM ${valor} anotado en la orden.`);
+    recPintarSeccionOE(oeId, false);
+  } catch (e) {
+    toast('No se pudo guardar el N° RM: ' + e.message, 'err');
+  }
+}
+
+// Aviso suave si el mismo RM ya está en otra orden (puede pasar con dos frascos del mismo RM)
+function confirmarRmDuplicado(otra) {
+  toast(`Ojo: ese RM también está anotado en la orden de ${otra.pacientes?.nombre || 'otro paciente'} (${fDate(otra.fecha_orden)}).`, 'err');
+  return true;
+}
+
 // ─── FARMACIA: CONCILIACIÓN AUTOMÁTICA CON EL PC (sistema de ventas) ───────
 async function cargarConciliacionERP(forzar = false, silencioso = false) {
   if (!forzar && farmaciaConcData && Date.now() - farmaciaConcCargadoEn < 5 * 60 * 1000) { if (!silencioso) renderConciliacionERP(); return; }
@@ -12860,6 +13811,11 @@ showPage = function(id, el) {
   if (id === 'farmacia-compras') {
     farmComprasInit();
   }
+  if (id === 'rec-buscar') recBuscarInit();
+  if (id === 'rec-alertas') recAlertasInit(false);
+  if (id === 'rec-materias') recMatInit();
+  if (id === 'rec-costos') recCostosInit();
+  if (id === 'rec-produccion') recProdInit();
   if (id === 'facturas-productos') {
     cargarProductosFacturas();
   }
@@ -12912,6 +13868,13 @@ const SUBMENUS = {
   'rrhh': { items: [
     { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
     { icon: '<i class="ti ti-beach"></i>', label: 'Vacaciones Personal', page: 'rrhh-vacaciones' },
+  ] },
+  'recetario-modulo': { items: [
+    { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
+    { icon: '<i class="ti ti-alert-triangle"></i>', label: 'Alertas de lotes', page: 'rec-alertas' },
+    { icon: '<i class="ti ti-flask"></i>', label: 'Materias primas', page: 'rec-materias' },
+    { icon: '<i class="ti ti-coin"></i>', label: 'Costos y márgenes', page: 'rec-costos' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Producción', page: 'rec-produccion' },
   ] },
   'farmacia-modulo': { items: [
     { icon: '<i class="ti ti-clipboard-list"></i>', label: 'Catastro de stock', page: 'farmacia-catastro' },
@@ -13129,6 +14092,12 @@ function renderInicio() {
     const n = solicitudesWeb.filter(x => x.estado === 'Nueva').length;
     if (n > 0) items.push({ texto: `${n} solicitud${n===1?'':'es'} web nueva${n===1?'':'s'} por responder`, tipo: 'warn', modulo: 'elaboracion', pagina: 'solicitudes-web' });
   }
+  if (recResumen) {
+    const nV = recResumen.rm_lote_vencido_7d || 0;
+    if (nV > 0) items.push({ texto: `${nV} RM con lote vencido en los últimos 7 días`, tipo: 'err', modulo: 'recetario-modulo', pagina: 'rec-alertas' });
+    const nS = recResumen.oe_digitadas_sin_rm || 0;
+    if (nS > 0) items.push({ texto: `${nS} ${nS===1?'orden digitada':'órdenes digitadas'} sin N° RM (última semana)`, tipo: 'warn', modulo: 'elaboracion', pagina: 'elaboracion' });
+  }
   if (Array.isArray(facturasPorPagar) && facturasPorPagar.length) {
     const n = facturasPorPagar.filter(f => f.estado_aceptacion !== 'N' && categoriaFPP(f) === 'overdue').length;
     if (n > 0) items.push({ texto: `${n} factura${n===1?'':'s'} atrasada${n===1?'':'s'}`, tipo: 'err', modulo: 'facturas', pagina: 'facturas-por-pagar' });
@@ -13297,7 +14266,7 @@ if ('serviceWorker' in navigator) {
   }
   function esContenido(el) {
     return el.matches('table, .table-card') || !!el.querySelector('table, .table-card') ||
-      /contenido|tabla|grilla|lista|cuerpo|resultados/i.test(el.id);
+      /contenido|tabla|grilla|lista|cuerpo|resultados|-res$|-cont$/i.test(el.id);
   }
   function envolverCabeceras() {
     document.querySelectorAll('.page').forEach(function (pg) {
