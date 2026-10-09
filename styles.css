@@ -710,7 +710,8 @@
   :root { --nav-top: 34px; }
   .main { margin-left: 220px; margin-top: 34px; padding: 0 32px 24px; min-height: 0; }
   /* Con submenú abierto, el contenido se corre para dejar la columna de páginas */
-  body:has(#nav-submenu:not(:empty)) .main { margin-left: 428px; }
+  body:has(#nav-submenu:not(:empty)):not(.submenu-cerrado) .main { margin-left: 428px; }
+  body.submenu-cerrado #nav-submenu { display: none !important; }
 
   /* Cabecera de cada módulo (título, período, KPI y buscador) queda fija al bajar */
   .page-sticky { position: sticky; top: var(--nav-top); z-index: 90; background: var(--bg);

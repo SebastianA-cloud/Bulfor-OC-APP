@@ -14288,5 +14288,19 @@ if ('serviceWorker' in navigator) {
   else envolverCabeceras();
 })();
 </script>
+<script>
+// Escritorio: al elegir una página del submenú, el submenú se cierra para dar más espacio.
+// Al elegir un módulo, vuelve a abrirse.
+(function () {
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('.modulo-tab')) {
+      document.body.classList.remove('submenu-cerrado');
+    } else if (e.target.closest('#nav-submenu .nav-item')) {
+      document.body.classList.add('submenu-cerrado');
+    }
+  }, true);
+})();
+</script>
 </body>
 </html>
