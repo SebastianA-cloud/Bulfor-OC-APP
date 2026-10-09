@@ -14288,31 +14288,5 @@ if ('serviceWorker' in navigator) {
   else envolverCabeceras();
 })();
 </script>
-<script>
-// En escritorio, el submenú se esconde al bajar y reaparece al subir, al volver arriba o al elegir un módulo.
-(function () {
-  const escritorio = window.matchMedia('(min-width: 901px)');
-  let ultimoY = window.scrollY, pendiente = false;
-  function actualizar() {
-    pendiente = false;
-    const cuerpo = document.body;
-    if (!escritorio.matches) { cuerpo.classList.remove('nav-sub-oculto'); return; }
-    const y = window.scrollY, delta = y - ultimoY;
-    if (y <= 60) cuerpo.classList.remove('nav-sub-oculto');
-    else if (delta > 6) cuerpo.classList.add('nav-sub-oculto');
-    else if (delta < -6) cuerpo.classList.remove('nav-sub-oculto');
-    if (Math.abs(delta) > 6) ultimoY = y;
-  }
-  window.addEventListener('scroll', function () {
-    if (!pendiente) { pendiente = true; requestAnimationFrame(actualizar); }
-  }, { passive: true });
-  document.addEventListener('click', function (e) {
-    if (e.target.closest && e.target.closest('.modulo-tab')) {
-      document.body.classList.remove('nav-sub-oculto');
-      ultimoY = window.scrollY;
-    }
-  }, true);
-})();
-</script>
 </body>
 </html>
