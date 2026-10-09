@@ -710,8 +710,6 @@
   :root { --nav-top: 34px; }
   .main { margin-left: 220px; margin-top: 34px; padding: 0 32px 24px; min-height: 0; }
   /* Con submenú abierto, el contenido se corre para dejar la columna de páginas */
-  body:has(#nav-submenu:not(:empty)):not(.submenu-cerrado) .main { margin-left: 428px; }
-  body.submenu-cerrado #nav-submenu { display: none !important; }
 
   /* Cabecera de cada módulo (título, período, KPI y buscador) queda fija al bajar */
   .page-sticky { position: sticky; top: var(--nav-top); z-index: 90; background: var(--bg);
@@ -738,16 +736,21 @@
     padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; }
   .tab-badge.tab-badge-azul { background: #1E40AF; }
 
-  #nav-submenu { display: flex !important; flex-direction: column; position: fixed; top: 34px; bottom: 0; left: 220px;
-    width: 208px; z-index: 95; background: var(--surface); border-right: 1px solid var(--border);
-    padding: 10px 10px 16px; gap: 2px; overflow-y: auto; scrollbar-width: thin; }
+  /* Submenú flotante: aparece junto al módulo sobre el que está el mouse, con el alto de sus páginas */
+  #nav-submenu { display: none !important; position: fixed; top: 34px; left: 220px; width: 214px; max-height: calc(100vh - 48px);
+    z-index: 97; background: var(--surface); border: 1px solid var(--border); border-left: none;
+    border-radius: 0 10px 10px 0; box-shadow: 6px 6px 18px rgba(26,25,23,.12);
+    padding: 8px; flex-direction: column; gap: 2px; overflow-y: auto; scrollbar-width: thin; }
+  #nav-submenu.abierto { display: flex !important; }
   #nav-submenu:empty { display: none !important; }
   #nav-submenu .nav-back, #nav-submenu .nav-divider, #nav-submenu .nav-icon { display: none; }
-  #nav-submenu .nav-item { display: flex; align-items: center; margin-bottom: 0; padding: 9px 12px; border-radius: var(--radius);
-    font-size: 13px; color: var(--text-2); white-space: normal; }
+  #nav-submenu .nav-item { display: flex; align-items: center; margin-bottom: 0; padding: 8px 12px; border-radius: 8px;
+    font-size: 13px; color: var(--text-2); white-space: normal; cursor: pointer; }
   #nav-submenu .nav-item:hover { background: var(--bg); color: var(--text); }
   #nav-submenu .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
   #nav-submenu .submenu-sep { display: block; font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
-    color: var(--text-3); padding: 14px 12px 6px; }
+    color: var(--text-3); padding: 10px 12px 4px; }
   #nav-submenu .submenu-sep:first-child { padding-top: 4px; }
+  .modulos-grupo { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #7D786E;
+    padding: 16px 18px 6px; white-space: nowrap; }
 }

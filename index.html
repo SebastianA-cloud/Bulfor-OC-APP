@@ -257,12 +257,15 @@
     </div>
   </div>
   <div class="modulo-tab active" data-modulo="inicio" onclick="irAInicio()"><i class="ti ti-home"></i><span>Inicio</span></div>
+  <div class="modulos-grupo">Compras y ventas</div>
   <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
   <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>Seguimiento FedEx</span></div>
+  <div class="modulos-grupo">Farmacia</div>
   <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')"><i class="ti ti-prescription"></i><span>Recetario</span><span class="tab-badge" id="badge-rec-alertas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
+  <div class="modulos-grupo">Personas</div>
   <div class="modulo-tab" data-modulo="rrhh" onclick="mostrarModulo('rrhh')"><i class="ti ti-users"></i><span>Recursos humanos</span></div>
 </nav>
 <div class="nav" id="nav-submenu"></div>
@@ -14289,16 +14292,53 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 <script>
-// Escritorio: al elegir una página del submenú, el submenú se cierra para dar más espacio.
-// Al elegir un módulo, vuelve a abrirse.
+// Escritorio: el submenú aparece al pasar el mouse por un módulo, junto a él, y se oculta al salir.
+// Hacer clic en un módulo no navega: el submenú se elige desde el mismo lugar.
 (function () {
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest) return;
-    if (e.target.closest('.modulo-tab')) {
-      document.body.classList.remove('submenu-cerrado');
-    } else if (e.target.closest('#nav-submenu .nav-item')) {
-      document.body.classList.add('submenu-cerrado');
+  const escritorio = window.matchMedia('(min-width: 901px)');
+  const nav = document.getElementById('nav-submenu');
+  let timer = null, moduloMostrado = null;
+  function paginaActual() {
+    const p = document.querySelector('.page.active');
+    return p ? p.id.replace('page-', '') : '';
+  }
+  function ocultar() {
+    clearTimeout(timer);
+    nav.classList.remove('abierto');
+    moduloMostrado = null;
+  }
+  function programarOcultar() {
+    clearTimeout(timer);
+    timer = setTimeout(ocultar, 180);
+  }
+  function mostrar(tab) {
+    const modulo = tab.dataset.modulo;
+    if (!modulo || !SUBMENUS[modulo]) { ocultar(); return; }
+    clearTimeout(timer);
+    if (moduloMostrado !== modulo) {
+      renderNavSubmenuMobile(modulo, paginaActual());
+      moduloMostrado = modulo;
     }
+    nav.classList.add('abierto');
+    const r = tab.getBoundingClientRect();
+    const alto = nav.offsetHeight;
+    nav.style.top = Math.max(34, Math.min(r.top, window.innerHeight - alto - 8)) + 'px';
+  }
+  document.querySelectorAll('.modulo-tab').forEach(function (tab) {
+    tab.addEventListener('mouseenter', function () { if (escritorio.matches) mostrar(tab); });
+    tab.addEventListener('mouseleave', function () { if (escritorio.matches) programarOcultar(); });
+  });
+  nav.addEventListener('mouseenter', function () { clearTimeout(timer); });
+  nav.addEventListener('mouseleave', function () { if (escritorio.matches) programarOcultar(); });
+  // Clic en un módulo con submenú: no navega ni cambia nada.
+  document.addEventListener('click', function (e) {
+    if (!escritorio.matches || !e.target.closest) return;
+    const tab = e.target.closest('.modulo-tab');
+    if (tab && SUBMENUS[tab.dataset.modulo]) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
+  // Al elegir una página, el submenú se cierra.
+  document.addEventListener('click', function (e) {
+    if (escritorio.matches && e.target.closest && e.target.closest('#nav-submenu .nav-item')) ocultar();
   }, true);
 })();
 </script>
