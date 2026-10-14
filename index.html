@@ -236,6 +236,9 @@
     <button onclick="location.reload()" title="Actualizar datos" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:5px">
       <i class="ti ti-refresh" style="font-size:13px" aria-hidden="true"></i><span class="refresh-label">Actualizar</span>
     </button>
+    <button id="btn-instalar-app" onclick="instalarApp()" title="Instalar Bulfor OC en este equipo" style="display:none;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;align-items:center;gap:5px">
+      <i class="ti ti-download" style="font-size:13px" aria-hidden="true"></i><span>Instalar app</span>
+    </button>
     <span id="usuario-sesion" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-2)">
       <span id="usuario-email"></span>
       <span id="usuario-rol-badge" class="badge-estado neutral" style="font-size:10px;padding:1px 7px"></span>
@@ -14332,6 +14335,69 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+}
+
+// ─── Botón "Instalar app" (barra superior; en celular, dentro de los ⋮) ───
+// Chrome/Edge/Android entregan el instalador en "beforeinstallprompt"; el
+// iPhone no tiene instalador, así que ahí se muestran los pasos de Safari.
+// El botón se esconde si la app ya se está usando instalada.
+let promptInstalacion = null;
+
+function appYaInstalada() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function actualizarBotonInstalar() {
+  const btn = document.getElementById('btn-instalar-app');
+  if (btn) btn.style.display = appYaInstalada() ? 'none' : 'flex';
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  promptInstalacion = e;
+  actualizarBotonInstalar();
+});
+window.addEventListener('appinstalled', () => {
+  promptInstalacion = null;
+  const btn = document.getElementById('btn-instalar-app');
+  if (btn) btn.style.display = 'none';
+  toast('Bulfor OC quedó instalada en este equipo.');
+});
+actualizarBotonInstalar();
+
+async function instalarApp() {
+  toggleHeaderMenu(true);
+  if (promptInstalacion) {
+    promptInstalacion.prompt();
+    await promptInstalacion.userChoice.catch(() => null);
+    promptInstalacion = null;
+    return;
+  }
+  // Sin instalador disponible (iPhone, o el navegador no lo ofrece todavía): explicar los pasos.
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const pasos = esIOS
+    ? `<ol style="padding-left:20px;line-height:1.8;font-size:14px">
+         <li>Abre esta página en <b>Safari</b>.</li>
+         <li>Toca el botón <b>Compartir</b> <i class="ti ti-share-2" aria-hidden="true"></i> (abajo al centro).</li>
+         <li>Elige <b>Agregar a inicio</b> y luego <b>Agregar</b>.</li>
+       </ol>`
+    : `<ol style="padding-left:20px;line-height:1.8;font-size:14px">
+         <li>Abre el menú del navegador (<b>⋮</b> arriba a la derecha).</li>
+         <li>Elige <b>Instalar aplicación</b>, <b>Instalar Bulfor OC</b> o <b>Agregar a pantalla principal</b>.</li>
+       </ol>
+       <p style="font-size:12px;color:var(--text-2);margin-top:8px">Si no aparece esa opción, puede que la app ya esté instalada en este equipo o que el navegador no lo permita (usa Chrome o Edge).</p>`;
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-sm" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div><div class="modal-title">Instalar Bulfor OC</div><div class="modal-sub">Queda como una app más en este equipo</div></div>
+        <button class="modal-close" aria-label="Cerrar" onclick="this.closest('.modal-overlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">${pasos}</div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 </script>
 <script>
