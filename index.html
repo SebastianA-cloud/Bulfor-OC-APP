@@ -158,6 +158,7 @@
       <div class="nav-subgroup" id="subgroup-recetario-modulo">
         <div class="nav-item nav-subitem" data-page="rec-buscar" onclick="seleccionarSubpagina('recetario-modulo','rec-buscar',this)"><span>Buscar RM</span></div>
         <div class="nav-item nav-subitem" data-page="rec-preparados" onclick="seleccionarSubpagina('recetario-modulo','rec-preparados',this)"><span>Preparados</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-compras" onclick="seleccionarSubpagina('recetario-modulo','rec-compras',this)"><span>Compras de materias</span></div>
         <div class="nav-item nav-subitem" data-page="rec-alertas" onclick="seleccionarSubpagina('recetario-modulo','rec-alertas',this)"><span>Alertas de lotes</span></div>
         <div class="nav-item nav-subitem" data-page="rec-materias" onclick="seleccionarSubpagina('recetario-modulo','rec-materias',this)"><span>Materias primas</span></div>
         <div class="nav-item nav-subitem" data-page="rec-costos" onclick="seleccionarSubpagina('recetario-modulo','rec-costos',this)"><span>Costos y márgenes</span></div>
@@ -845,6 +846,21 @@
       </div>
     </div>
     <div id="rec-prep-cont"></div>
+  </div>
+
+  <div class="page" id="page-rec-compras">
+    <div class="page-header">
+      <div class="page-title">Compras de materias</div>
+      <div class="page-sub">Cada materia prima en orden alfabético con su costo actual; ábrela para ver sus últimas 10 compras con la factura del proveedor</div>
+    </div>
+    <div id="rec-estado-compras"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rec-cm-q" placeholder="Buscar materia prima (ej. captopril, glicerina)…" oninput="recCmFiltrar()" autocomplete="off">
+      </div>
+    </div>
+    <div id="rec-cm-cont"></div>
   </div>
 
   <div class="page" id="page-rec-produccion">
@@ -13533,7 +13549,7 @@ async function recPrepAbrir(idx) {
             <tr onclick="recPrepToggleCompras(${i}, ${l.id_producto}, '${String(l.unidad_stock || '').replace(/'/g, '')}')" title="Ver las últimas 10 compras">
               <td data-label="Materia prima"><span id="rec-prep-flecha-${i}" style="display:inline-block;width:14px;color:var(--text-3)">▸</span>${l.materia}${l.excipiente ? ' <span style="font-size:11px;color:var(--text-3)">(excipiente)</span>' : ''}</td>
               <td data-label="Cantidad" style="text-align:right;white-space:nowrap">${recNum(l.cantidad, 2)} ${l.unidad || ''}</td>
-              <td data-label="Costo unitario" style="text-align:right;white-space:nowrap">${l.precio_q !== null && l.precio_q !== undefined ? `${recClpDec(l.precio_q)} / ${l.unidad_stock || 'u'}` : '—'}</td>
+              <td data-label="Costo unitario" style="text-align:right;white-space:nowrap">${l.precio_q !== null && l.precio_q !== undefined ? `${recClpDec(l.precio_q)} / ${l.unidad || 'u'}` : '—'}</td>
               <td data-label="Costo en la fórmula" style="text-align:right;white-space:nowrap;font-weight:500">${recClp(l.costo_actual)}${l.costo_tipo === 'estimado' ? ' <span style="font-size:11px;color:var(--amber)" title="Costo estimado: la materia no tiene precio registrado en el recetario">est.</span>' : ''}</td>
             </tr>
             <tr id="rec-prep-compras-${i}" style="display:none;cursor:default" onclick="event.stopPropagation()"><td colspan="4" style="background:var(--bg);padding:10px 14px" data-label=""></td></tr>`).join('')}
@@ -13586,7 +13602,7 @@ function recFacturaDeCompra(c) {
   return mejor;
 }
 
-function recPrepComprasHtml(compras, unidad) {
+function recPrepComprasHtml(compras, unidad, verFactura = 'recPrepVerFactura') {
   if (!compras.length) return '<span style="color:var(--text-3);font-size:12px">No hay compras registradas de esta materia en el recetario.</span>';
   const nombreProv = id => {
     const p = (recProveedoresRec || []).find(x => x.id_proveedor === id);
@@ -13600,7 +13616,7 @@ function recPrepComprasHtml(compras, unidad) {
         ${compras.map(c => {
           const f = recFacturaDeCompra(c);
           const factura = f
-            ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();recPrepVerFactura(${f.id})" title="Abrir la factura del proveedor">${f.factura} ↗</span>${f.doc_url ? ` <a href="${f.doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ver el documento en GDExpress" style="color:var(--text-3);text-decoration:none">PDF</a>` : ''}`
+            ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();${verFactura}(${f.id})" title="Abrir la factura del proveedor">${f.factura} ↗</span>${f.doc_url ? ` <a href="${f.doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ver el documento en GDExpress" style="color:var(--text-3);text-decoration:none">PDF</a>` : ''}`
             : (c.guia ? `<span style="color:var(--text-3)" title="No se encontró una factura de proveedor con este N° cerca de esa fecha (puede ser una guía o un ingreso interno)">${c.guia}</span>` : '—');
           return `<tr style="cursor:default">
             <td data-label="Fecha" style="white-space:nowrap">${fDate(c.fecha)}</td>
@@ -13612,6 +13628,103 @@ function recPrepComprasHtml(compras, unidad) {
         }).join('')}
       </tbody>
     </table>`;
+}
+
+// ─── Compras de materias ────────────────────────────────────────────────
+// Materias primas en orden alfabético con su costo actual y su última
+// compra; al abrir una, sus últimas 10 compras con la factura del proveedor.
+let recCmMaterias = null, recCmComprasPorMateria = null, recCmF = [], recCmPagina = 1, recCmAbierta = null;
+const REC_CM_POR_PAGINA = 100;
+
+function recCmInit() {
+  recPintarEstado('rec-estado-compras');
+  if (!recCmMaterias) recCmCargar(); else recCmRender();
+}
+
+async function recCmCargar() {
+  document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Cargando materias primas y compras…</p></div></div>`;
+  try {
+    const [materias, ingresos, proveedores] = await Promise.all([
+      fetchAll('rec_materias', 'select=id_producto,nombre,unidad_stock,precio_costo,activo,sinonimo'),
+      fetchAll('rec_ingresos', 'select=fecha,guia,id_proveedor,id_producto,cantidad,precio_compra&order=fecha.desc,id_detalle.desc'),
+      recProveedoresRec ? Promise.resolve(recProveedoresRec) : fetchAll('rec_proveedores', 'select=id_proveedor,nombre,razon_social'),
+    ]);
+    recProveedoresRec = proveedores;
+    recCmComprasPorMateria = {};
+    (ingresos || []).forEach(c => { (recCmComprasPorMateria[c.id_producto] ||= []).push(c); });
+    // Se muestran las materias activas y cualquier otra que tenga compras.
+    recCmMaterias = (materias || [])
+      .filter(m => (m.activo && !m.sinonimo) || recCmComprasPorMateria[m.id_producto])
+      .sort((a, b) => String(a.nombre).trim().localeCompare(String(b.nombre).trim(), 'es'));
+  } catch (e) {
+    document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty"><p>No se pudieron cargar las compras: ${e.message}</p></div></div>`;
+    return;
+  }
+  recCmFiltrar();
+}
+
+function recCmFiltrar() {
+  if (!recCmMaterias) return;
+  const q = (document.getElementById('rec-cm-q')?.value || '').trim();
+  recCmF = q ? recCmMaterias.filter(m => coincideBusqueda(m.nombre, q)) : recCmMaterias.slice();
+  recCmPagina = 1;
+  recCmAbierta = null;
+  recCmRender();
+}
+
+function recCmIrPagina(n) { recCmPagina = n; recCmAbierta = null; recCmRender(); window.scrollTo({ top: 0 }); }
+
+function recCmToggle(idProducto) {
+  recCmAbierta = recCmAbierta === idProducto ? null : idProducto;
+  recCmRender();
+}
+
+function recCmRender() {
+  const cont = document.getElementById('rec-cm-cont');
+  if (!recCmF.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${recCmMaterias && recCmMaterias.length ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay materias primas sincronizadas.'}</p></div></div>`;
+    return;
+  }
+  const totalPag = Math.ceil(recCmF.length / REC_CM_POR_PAGINA);
+  const desde = (recCmPagina - 1) * REC_CM_POR_PAGINA;
+  const pagina = recCmF.slice(desde, desde + REC_CM_POR_PAGINA);
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Materia prima</th><th style="text-align:right">Costo actual</th><th>Última compra</th><th style="text-align:right">Último precio</th><th style="text-align:right">Compras</th></tr></thead>
+        <tbody>
+          ${pagina.map(m => {
+            const compras = recCmComprasPorMateria[m.id_producto] || [];
+            const ult = compras[0];
+            const u = m.unidad_stock ? ' / ' + m.unidad_stock : '';
+            const abierta = recCmAbierta === m.id_producto;
+            return `
+            <tr onclick="recCmToggle(${m.id_producto})" title="${compras.length ? 'Ver las últimas 10 compras' : 'Sin compras registradas'}">
+              <td data-label="Materia prima"><span style="display:inline-block;width:14px;color:var(--text-3)">${abierta ? '▾' : '▸'}</span>${m.nombre}${m.activo ? '' : ' <span style="font-size:11px;color:var(--text-3)">(inactiva)</span>'}</td>
+              <td data-label="Costo actual" style="text-align:right;white-space:nowrap">${Number(m.precio_costo) ? recClpDec(m.precio_costo) + u : '—'}</td>
+              <td data-label="Última compra" style="white-space:nowrap;color:var(--text-2)">${ult ? fDate(ult.fecha) : '—'}</td>
+              <td data-label="Último precio" style="text-align:right;white-space:nowrap">${ult ? recClpDec(ult.precio_compra) + u : '—'}</td>
+              <td data-label="Compras" style="text-align:right;font-variant-numeric:tabular-nums">${recNum(compras.length)}</td>
+            </tr>
+            ${abierta ? `<tr style="cursor:default" onclick="event.stopPropagation()"><td colspan="5" data-label="" style="background:var(--bg);padding:10px 14px">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</td></tr>` : ''}`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="pagination">
+        <span>${recNum(recCmF.length)} materia${recCmF.length === 1 ? '' : 's'} prima${recCmF.length === 1 ? '' : 's'} · página ${recCmPagina} de ${totalPag}</span>
+        <div class="page-btns">
+          <button class="page-btn" ${recCmPagina <= 1 ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina - 1})">‹</button>
+          <button class="page-btn" ${recCmPagina >= totalPag ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina + 1})">›</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// La ficha de la factura se abre encima de esta página; "Atrás" solo la cierra
+// y deja la materia abierta tal como estaba.
+function recCmVerFactura(idFactura) {
+  navPush(() => recCmRender());
+  abrirDetalleFacturaPorPagar(idFactura);
 }
 
 function recPrepVerFactura(idFactura) {
@@ -14109,6 +14222,7 @@ showPage = function(id, el) {
   }
   if (id === 'rec-buscar') recBuscarInit();
   if (id === 'rec-preparados') recPrepInit();
+  if (id === 'rec-compras') recCmInit();
   if (id === 'rec-alertas') recAlertasInit(false);
   if (id === 'rec-materias') recMatInit();
   if (id === 'rec-costos') recCostosInit();
@@ -14169,6 +14283,7 @@ const SUBMENUS = {
   'recetario-modulo': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
     { icon: '<i class="ti ti-list-details"></i>', label: 'Preparados', page: 'rec-preparados' },
+    { icon: '<i class="ti ti-receipt"></i>', label: 'Compras de materias', page: 'rec-compras' },
     { icon: '<i class="ti ti-alert-triangle"></i>', label: 'Alertas de lotes', page: 'rec-alertas' },
     { icon: '<i class="ti ti-flask"></i>', label: 'Materias primas', page: 'rec-materias' },
     { icon: '<i class="ti ti-coin"></i>', label: 'Costos y márgenes', page: 'rec-costos' },
