@@ -8353,7 +8353,8 @@ function actualizarBadgeRechazadas() {
   [document.getElementById('badge-rechazadas'),
    document.getElementById('badge-rechazadas-subitem'),
    document.getElementById('badge-rechazadas-mobile'),
-   document.getElementById('badge-rechazadas-tab')].forEach(badge => {
+   document.getElementById('badge-rechazadas-tab'),
+   ...document.querySelectorAll('.badge-rechazadas-sub')].forEach(badge => {
     if (!badge) return;
     if (!cantidad) { badge.style.display = 'none'; return; }
     badge.textContent = texto;
@@ -14008,11 +14009,15 @@ function renderNavSubmenuMobile(modulo, pagina) {
     if (grupo && grupo !== grupoAnterior) html += `<span class="submenu-sep">${grupo}</span>`;
     grupoAnterior = grupo;
     const activo = it.page === pagina || ALT_PAGINA[it.page] === pagina;
+    const aviso = it.page === 'facturas-rechazadas'
+      ? '<span class="badge-rechazadas-sub" style="display:none;margin-left:auto;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>'
+      : '';
     html += `<div class="nav-item${activo ? ' active' : ''}" data-page="${it.page}" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
-      <span class="nav-icon">${it.icon}</span><span>${it.label}</span>
+      <span class="nav-icon">${it.icon}</span><span>${it.label}</span>${aviso}
     </div>`;
   });
   cont.innerHTML = html;
+  actualizarBadgeRechazadas();
   const activo = cont.querySelector('.nav-item.active');
   if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
