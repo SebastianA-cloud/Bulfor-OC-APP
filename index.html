@@ -1637,16 +1637,44 @@ function recalcularProductoPorOC() {
   });
   productoPorOC = {};
   productosTextoPorOC = {};
-  for (const codigo in productosPorOCSet) {
-    const nombres = productosPorOCSet[codigo];
+  const codigos = new Set([...Object.keys(productosPorOCSet), ...Object.keys(nombresFacturaPorOC)]);
+  for (const codigo of codigos) {
+    const nombresOC = productosPorOCSet[codigo] || [];
+    const nombresFactura = nombresFacturaPorOC[codigo] || [];
+    // Si la OC ya se facturó, el listado muestra los productos de la factura
+    // (el nombre con que realmente se vendió); si no, los de la OC.
+    const nombres = nombresFactura.length ? nombresFactura : nombresOC;
     // Etiqueta visual del listado: primer producto + "+N" por cada producto
     // adicional. Es solo texto: productosTextoPorOC (y los precios) siguen
     // usando los nombres completos de cada línea.
     productoPorOC[codigo] = nombres.length > 1
       ? `${nombres[0]} +${nombres.length - 1}`
       : nombres[0];
-    productosTextoPorOC[codigo] = nombres.join(' ');
+    // El buscador encuentra la OC tanto por el nombre de la OC como por el de la factura.
+    productosTextoPorOC[codigo] = [...nombresOC, ...nombresFactura].join(' ');
   }
+}
+
+// Productos de las facturas emitidas para cada OC (sin contar las anuladas).
+// Se cargan en segundo plano después del inicio, porque requieren traer los
+// ítems de todas las facturas.
+async function cargarNombresFacturaPorOC() {
+  await cargarItemsFacturasVenta();
+  const ocPorDocumento = new Map();
+  documentosGdexpress
+    .filter(d => d.tipo_dte === '33' && d.orden_compra_ref && estadoAceptacionFusionado(d) !== 'N')
+    .sort((a, b) => Number(a.folio) - Number(b.folio))
+    .forEach(d => ocPorDocumento.set(d.id, d.orden_compra_ref));
+  const porOC = {};
+  for (const [docId, codigo] of ocPorDocumento) {
+    facturaItemsRaw.filter(it => it.documento_id === docId).forEach(it => {
+      const nombre = (it.nombre_producto || '').trim();
+      if (!nombre) return;
+      if (!porOC[codigo]) porOC[codigo] = [];
+      if (!porOC[codigo].includes(nombre)) porOC[codigo].push(nombre);
+    });
+  }
+  nombresFacturaPorOC = porOC;
 }
 
 async function init() {
@@ -1711,6 +1739,8 @@ async function init() {
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
     populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
+    // En segundo plano: cambia la descripción de las OC ya facturadas por los productos de su factura.
+    cargarNombresFacturaPorOC().then(() => { recalcularProductoPorOC(); renderOC(); }).catch(() => {});
     await rrhhListo; rrhhInit();
   } catch(e) {
     document.getElementById('syncDot').style.background = '#991B1B';
@@ -1867,6 +1897,7 @@ let productosUnicos = [];
 let productosUnicosF = [];
 let productoPorOC = {};
 let productosTextoPorOC = {};
+let nombresFacturaPorOC = {}; // codigooc -> productos de sus facturas (ver cargarNombresFacturaPorOC)
 let diccionarioNormalizacion = {}; // texto_original -> nombre_normalizado (combinado, para mostrar)
 let diccionarioCampos = {}; // texto_original -> {nombre_producto, dosis, cantidad_formato}
 
@@ -3038,7 +3069,15 @@ let facturaItemsRaw = []; // ítems crudos, para poder armar el detalle por hosp
 // Trae una sola vez los ítems de las facturas de venta y arma el índice de
 // productos. Lo usan tanto "Por producto" como "Por cliente", para no pedir
 // los mismos datos dos veces.
-async function cargarItemsFacturasVenta() {
+let cargaItemsFacturasPromesa = null;
+function cargarItemsFacturasVenta() {
+  if (!cargaItemsFacturasPromesa) {
+    cargaItemsFacturasPromesa = cargarItemsFacturasVentaUnaVez().catch(e => { cargaItemsFacturasPromesa = null; throw e; });
+  }
+  return cargaItemsFacturasPromesa;
+}
+
+async function cargarItemsFacturasVentaUnaVez() {
   if (facturaItemsCargados) return;
   const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
   const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
