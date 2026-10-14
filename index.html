@@ -1639,8 +1639,11 @@ function recalcularProductoPorOC() {
   productosTextoPorOC = {};
   for (const codigo in productosPorOCSet) {
     const nombres = productosPorOCSet[codigo];
+    // Etiqueta visual del listado: primer producto + "+N" por cada producto
+    // adicional. Es solo texto: productosTextoPorOC (y los precios) siguen
+    // usando los nombres completos de cada línea.
     productoPorOC[codigo] = nombres.length > 1
-      ? `${nombres[0]} +${nombres.length - 1} producto${nombres.length > 2 ? 's' : ''}`
+      ? `${nombres[0]} +${nombres.length - 1}`
       : nombres[0];
     productosTextoPorOC[codigo] = nombres.join(' ');
   }
