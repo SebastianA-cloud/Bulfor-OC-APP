@@ -157,6 +157,7 @@
       </div>
       <div class="nav-subgroup" id="subgroup-recetario-modulo">
         <div class="nav-item nav-subitem" data-page="rec-buscar" onclick="seleccionarSubpagina('recetario-modulo','rec-buscar',this)"><span>Buscar RM</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-preparados" onclick="seleccionarSubpagina('recetario-modulo','rec-preparados',this)"><span>Preparados</span></div>
         <div class="nav-item nav-subitem" data-page="rec-alertas" onclick="seleccionarSubpagina('recetario-modulo','rec-alertas',this)"><span>Alertas de lotes</span></div>
         <div class="nav-item nav-subitem" data-page="rec-materias" onclick="seleccionarSubpagina('recetario-modulo','rec-materias',this)"><span>Materias primas</span></div>
         <div class="nav-item nav-subitem" data-page="rec-costos" onclick="seleccionarSubpagina('recetario-modulo','rec-costos',this)"><span>Costos y márgenes</span></div>
@@ -829,6 +830,21 @@
       <select id="rec-costos-forma" onchange="recCostosRenderFormulas()"><option value="">Todas las formas</option></select>
     </div>
     <div id="rec-costos-cont"></div>
+  </div>
+
+  <div class="page" id="page-rec-preparados">
+    <div class="page-header">
+      <div class="page-title">Preparados</div>
+      <div class="page-sub">Cada fórmula magistral en orden alfabético: el costo de cada materia prima y sus últimas compras con la factura</div>
+    </div>
+    <div id="rec-estado-preparados"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rec-prep-q" placeholder="Buscar por materia prima o fórmula (ej. captopril, omeprazol)…" oninput="recPrepFiltrar()" autocomplete="off">
+      </div>
+    </div>
+    <div id="rec-prep-cont"></div>
   </div>
 
   <div class="page" id="page-rec-produccion">
@@ -13405,6 +13421,205 @@ function recCostosRenderFormulas() {
 }
 
 // ── PRODUCCIÓN ─────────────────────────────────────────────────────────────
+// ─── Preparados ─────────────────────────────────────────────────────────
+// Lista alfabética de fórmulas (una por fórmula + forma). Al abrir una se ve
+// su composición según la última RM elaborada, con el costo actual de cada
+// materia prima; al tocar una materia, sus últimas 10 compras con la factura
+// del proveedor (cruzada por N° de documento y fecha cercana).
+let recPrepData = null, recPrepF = [], recPrepPagina = 1, recProveedoresRec = null;
+const REC_PREP_POR_PAGINA = 100;
+
+function recPrepInit() {
+  recPintarEstado('rec-estado-preparados');
+  if (!recPrepData) recPrepCargar(); else recPrepRender();
+}
+
+async function recPrepCargar() {
+  document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Cargando preparados…</p></div></div>`;
+  try {
+    recPrepData = await recRpc('rec_preparados', {});
+  } catch (e) {
+    document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>No se pudieron cargar los preparados: ${e.message}</p></div></div>`;
+    return;
+  }
+  recPrepFiltrar();
+}
+
+function recPrepFiltrar() {
+  if (!recPrepData) return;
+  const q = (document.getElementById('rec-prep-q')?.value || '').trim();
+  recPrepF = q ? recPrepData.filter(p => coincideBusqueda(`${p.descripcion} ${p.forma || ''}`, q)) : recPrepData.slice();
+  recPrepPagina = 1;
+  recPrepRender();
+}
+
+function recPrepIrPagina(n) { recPrepPagina = n; recPrepRender(); window.scrollTo({ top: 0 }); }
+
+function recPrepRender() {
+  const cont = document.getElementById('rec-prep-cont');
+  if (!recPrepF.length) {
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${recPrepData && recPrepData.length ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay preparados sincronizados.'}</p></div></div>`;
+    return;
+  }
+  const totalPag = Math.ceil(recPrepF.length / REC_PREP_POR_PAGINA);
+  const desde = (recPrepPagina - 1) * REC_PREP_POR_PAGINA;
+  const pagina = recPrepF.slice(desde, desde + REC_PREP_POR_PAGINA);
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Preparado</th><th>Forma</th><th style="text-align:right">RM elaboradas</th><th>Última</th></tr></thead>
+        <tbody>
+          ${pagina.map((p, i) => `
+            <tr onclick="recPrepAbrir(${desde + i})">
+              <td data-label="Preparado">${p.descripcion}</td>
+              <td data-label="Forma" style="white-space:nowrap;color:var(--text-2)">${p.forma || '—'}</td>
+              <td data-label="RM elaboradas" style="text-align:right;font-variant-numeric:tabular-nums">${recNum(p.n_rm)}</td>
+              <td data-label="Última" style="white-space:nowrap;color:var(--text-2)">${recFechaTs(p.ultima)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="pagination">
+        <span>${recNum(recPrepF.length)} preparado${recPrepF.length === 1 ? '' : 's'} · página ${recPrepPagina} de ${totalPag}</span>
+        <div class="page-btns">
+          <button class="page-btn" ${recPrepPagina <= 1 ? 'disabled' : ''} onclick="recPrepIrPagina(${recPrepPagina - 1})">‹</button>
+          <button class="page-btn" ${recPrepPagina >= totalPag ? 'disabled' : ''} onclick="recPrepIrPagina(${recPrepPagina + 1})">›</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function recPrepAbrir(idx) {
+  const p = recPrepF[idx];
+  if (!p) return;
+  cerrarTodosLosModales();
+  const modal = document.createElement('div');
+  modal.id = 'rec-prep-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-xl" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Preparado · ${p.forma || 'sin forma'}</div>
+          <div class="modal-title">${p.descripcion}</div>
+          <div class="modal-sub">${recNum(p.n_rm)} RM elaboradas · composición de la última (${recFechaTs(p.ultima)}) con el costo actual de cada materia</div>
+        </div>
+        <div class="modal-actions">
+          ${botonAtrasHtml()}
+          <button onclick="document.getElementById('rec-prep-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" id="rec-prep-detalle"><div class="empty"><p>Cargando composición…</p></div></div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  let lineas = [];
+  try {
+    lineas = await fetchAll('rec_lineas', `select=id_producto,materia,cantidad,unidad,unidad_stock,cant_total,costo_actual,precio_q,costo_tipo,excipiente&id_rp_detalle=eq.${p.ultimo_id}`);
+  } catch (e) {
+    document.getElementById('rec-prep-detalle').innerHTML = `<div class="empty"><p>No se pudo cargar la composición: ${e.message}</p></div>`;
+    return;
+  }
+  lineas = (Array.isArray(lineas) ? lineas : []).sort((a, b) => (a.excipiente === b.excipiente ? 0 : a.excipiente ? 1 : -1) || String(a.materia).localeCompare(String(b.materia)));
+  const total = lineas.reduce((s, l) => s + (Number(l.costo_actual) || 0), 0);
+  const cont = document.getElementById('rec-prep-detalle');
+  if (!cont) return;
+  cont.innerHTML = `
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Materia prima</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Costo unitario</th><th style="text-align:right">Costo en la fórmula</th></tr></thead>
+        <tbody>
+          ${lineas.map((l, i) => `
+            <tr onclick="recPrepToggleCompras(${i}, ${l.id_producto}, '${String(l.unidad_stock || '').replace(/'/g, '')}')" title="Ver las últimas 10 compras">
+              <td data-label="Materia prima"><span id="rec-prep-flecha-${i}" style="display:inline-block;width:14px;color:var(--text-3)">▸</span>${l.materia}${l.excipiente ? ' <span style="font-size:11px;color:var(--text-3)">(excipiente)</span>' : ''}</td>
+              <td data-label="Cantidad" style="text-align:right;white-space:nowrap">${recNum(l.cantidad, 2)} ${l.unidad || ''}</td>
+              <td data-label="Costo unitario" style="text-align:right;white-space:nowrap">${l.precio_q !== null && l.precio_q !== undefined ? `${recClpDec(l.precio_q)} / ${l.unidad_stock || 'u'}` : '—'}</td>
+              <td data-label="Costo en la fórmula" style="text-align:right;white-space:nowrap;font-weight:500">${recClp(l.costo_actual)}${l.costo_tipo === 'estimado' ? ' <span style="font-size:11px;color:var(--amber)" title="Costo estimado: la materia no tiene precio registrado en el recetario">est.</span>' : ''}</td>
+            </tr>
+            <tr id="rec-prep-compras-${i}" style="display:none;cursor:default" onclick="event.stopPropagation()"><td colspan="4" style="background:var(--bg);padding:10px 14px" data-label=""></td></tr>`).join('')}
+        </tbody>
+        <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600">Costo total de la fórmula</td><td style="text-align:right;font-weight:600">${recClp(total)}</td></tr></tfoot>
+      </table>
+    </div>
+    <p style="font-size:12px;color:var(--text-3);margin-top:8px">Toca una materia prima para ver sus últimas 10 compras.</p>`;
+  window.__recPrepActual = idx;
+}
+
+// Pesos con decimales solo cuando hacen falta (precios por gramo suelen ser < $10).
+function recClpDec(n) {
+  const v = Number(n);
+  if (isNaN(v)) return '—';
+  return '$ ' + v.toLocaleString('es-CL', { maximumFractionDigits: v < 100 ? 2 : 0 });
+}
+
+async function recPrepToggleCompras(i, idProducto, unidad) {
+  const fila = document.getElementById(`rec-prep-compras-${i}`);
+  const flecha = document.getElementById(`rec-prep-flecha-${i}`);
+  if (!fila) return;
+  const abierta = fila.style.display !== 'none';
+  fila.style.display = abierta ? 'none' : '';
+  if (flecha) flecha.textContent = abierta ? '▸' : '▾';
+  if (abierta || fila.dataset.cargada) return;
+  const celda = fila.firstElementChild;
+  celda.innerHTML = '<span style="color:var(--text-3);font-size:12px">Cargando compras…</span>';
+  try {
+    if (!recProveedoresRec) recProveedoresRec = await fetchAll('rec_proveedores', 'select=id_proveedor,nombre,razon_social');
+    const compras = await fetchAll('rec_ingresos', `select=fecha,guia,id_proveedor,cantidad,precio_compra&id_producto=eq.${idProducto}&order=fecha.desc,id_detalle.desc&limit=10`);
+    celda.innerHTML = recPrepComprasHtml(Array.isArray(compras) ? compras.slice(0, 10) : [], unidad);
+    fila.dataset.cargada = '1';
+  } catch (e) {
+    celda.innerHTML = `<span style="color:var(--red);font-size:12px">No se pudieron cargar las compras: ${e.message}</span>`;
+  }
+}
+
+// Factura del proveedor de una compra del recetario: mismo N° de documento y
+// fecha de emisión a menos de 45 días del ingreso (el N° solo se repite entre
+// proveedores distintos, y la fecha deshace el empate).
+function recFacturaDeCompra(c) {
+  if (!c.guia) return null;
+  const candidatas = facturasPorPagar.filter(f => String(f.factura) === String(c.guia));
+  let mejor = null, mejorDif = 46;
+  candidatas.forEach(f => {
+    const dif = Math.abs((new Date(f.fecha_emision) - new Date(c.fecha)) / 86400000);
+    if (dif < mejorDif) { mejor = f; mejorDif = dif; }
+  });
+  return mejor;
+}
+
+function recPrepComprasHtml(compras, unidad) {
+  if (!compras.length) return '<span style="color:var(--text-3);font-size:12px">No hay compras registradas de esta materia en el recetario.</span>';
+  const nombreProv = id => {
+    const p = (recProveedoresRec || []).find(x => x.id_proveedor === id);
+    return p ? (p.nombre || p.razon_social) : '—';
+  };
+  return `
+    <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px">Últimas ${compras.length} compra${compras.length === 1 ? '' : 's'}</div>
+    <table style="font-size:12px;background:var(--surface)">
+      <thead><tr><th>Fecha</th><th>Proveedor</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unitario</th><th>Factura</th></tr></thead>
+      <tbody>
+        ${compras.map(c => {
+          const f = recFacturaDeCompra(c);
+          const factura = f
+            ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();recPrepVerFactura(${f.id})" title="Abrir la factura del proveedor">${f.factura} ↗</span>${f.doc_url ? ` <a href="${f.doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ver el documento en GDExpress" style="color:var(--text-3);text-decoration:none">PDF</a>` : ''}`
+            : (c.guia ? `<span style="color:var(--text-3)" title="No se encontró una factura de proveedor con este N° cerca de esa fecha (puede ser una guía o un ingreso interno)">${c.guia}</span>` : '—');
+          return `<tr style="cursor:default">
+            <td data-label="Fecha" style="white-space:nowrap">${fDate(c.fecha)}</td>
+            <td data-label="Proveedor">${f ? (f.proveedor || nombreProv(c.id_proveedor)) : nombreProv(c.id_proveedor)}</td>
+            <td data-label="Cantidad" style="text-align:right;white-space:nowrap">${recNum(c.cantidad, 2)} ${unidad || ''}</td>
+            <td data-label="Precio unitario" style="text-align:right;white-space:nowrap">${recClpDec(c.precio_compra)}${unidad ? ' / ' + unidad : ''}</td>
+            <td data-label="Factura" style="white-space:nowrap">${factura}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function recPrepVerFactura(idFactura) {
+  const idx = window.__recPrepActual;
+  navPush(() => recPrepAbrir(idx));
+  abrirDetalleFacturaPorPagar(idFactura);
+}
+
 function recProdInit() {
   recPintarEstado('rec-estado-produccion');
   document.getElementById('rec-prod-rangos').innerHTML = recTabsHtml(
@@ -13893,6 +14108,7 @@ showPage = function(id, el) {
     farmComprasInit();
   }
   if (id === 'rec-buscar') recBuscarInit();
+  if (id === 'rec-preparados') recPrepInit();
   if (id === 'rec-alertas') recAlertasInit(false);
   if (id === 'rec-materias') recMatInit();
   if (id === 'rec-costos') recCostosInit();
@@ -13952,6 +14168,7 @@ const SUBMENUS = {
   ] },
   'recetario-modulo': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
+    { icon: '<i class="ti ti-list-details"></i>', label: 'Preparados', page: 'rec-preparados' },
     { icon: '<i class="ti ti-alert-triangle"></i>', label: 'Alertas de lotes', page: 'rec-alertas' },
     { icon: '<i class="ti ti-flask"></i>', label: 'Materias primas', page: 'rec-materias' },
     { icon: '<i class="ti ti-coin"></i>', label: 'Costos y márgenes', page: 'rec-costos' },
