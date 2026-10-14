@@ -851,16 +851,17 @@
   <div class="page" id="page-rec-compras">
     <div class="page-header">
       <div class="page-title">Compras de materias</div>
-      <div class="page-sub">Cada materia prima en orden alfabético con su costo actual; ábrela para ver sus últimas 10 compras con la factura del proveedor</div>
+      <div class="page-sub">Cuánto se está pagando por cada materia prima y cómo cambia. Toca una tarjeta del resumen para filtrar, o una materia para ver su historia de precios y sus facturas.</div>
     </div>
     <div id="rec-estado-compras"></div>
-    <div class="toolbar">
-      <div class="search-wrap" style="flex:1 1 260px">
+    <div id="rec-cm-kpis"></div>
+    <div class="toolbar toolbar-compacta">
+      <div class="search-wrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="rec-cm-q" placeholder="Buscar materia prima (ej. captopril, glicerina)…" oninput="recCmFiltrar()" autocomplete="off">
       </div>
-      <select id="rec-cm-prov" style="flex:0 1 auto" onchange="recCmFiltrar()" aria-label="Proveedor"><option value="">Todos los proveedores</option></select>
-      <select id="rec-cm-periodo" style="flex:0 1 auto" onchange="recCmFiltrar()" aria-label="Última compra">
+      <select id="rec-cm-prov" onchange="recCmFiltrar()" aria-label="Proveedor"><option value="">Todos los proveedores</option></select>
+      <select id="rec-cm-periodo" onchange="recCmFiltrar()" aria-label="Última compra">
         <option value="">Comprada: cualquier fecha</option>
         <option value="30">Comprada: últimos 30 días</option>
         <option value="90">Comprada: últimos 3 meses</option>
@@ -869,12 +870,12 @@
         <option value="mas365">Sin comprar hace +1 año</option>
         <option value="sin">Nunca compradas</option>
       </select>
-      <select id="rec-cm-estado" style="flex:0 1 auto" onchange="recCmFiltrar()" aria-label="Estado">
-        <option value="">Todas (activas e inactivas)</option>
+      <select id="rec-cm-estado" onchange="recCmFiltrar()" aria-label="Estado">
+        <option value="">Activas e inactivas</option>
         <option value="activas">Solo activas</option>
         <option value="inactivas">Solo inactivas</option>
       </select>
-      <select id="rec-cm-orden" style="flex:0 1 auto" onchange="recCmSetOrden(this.value)" aria-label="Ordenar">
+      <select id="rec-cm-orden" onchange="recCmSetOrden(this.value)" aria-label="Ordenar">
         <option value="nombre:1">Orden: A → Z</option>
         <option value="nombre:-1">Orden: Z → A</option>
         <option value="ultima:-1">Orden: compra más reciente</option>
@@ -886,8 +887,8 @@
         <option value="variacion:1">Orden: mayor baja de precio</option>
         <option value="compras:-1">Orden: más compras</option>
       </select>
-      <button class="page-btn" onclick="recCmLimpiar()" title="Quitar búsqueda y filtros">✕ Limpiar filtros</button>
     </div>
+    <div class="chips-filtros" id="rec-cm-chips" style="display:none"></div>
     <div id="rec-cm-cont"></div>
   </div>
 
@@ -13659,22 +13660,48 @@ function recPrepComprasHtml(compras, unidad, verFactura = 'recPrepVerFactura') {
 }
 
 // ─── Compras de materias ────────────────────────────────────────────────
-// Materias primas en orden alfabético con su costo actual y su última
-// compra; al abrir una, sus últimas 10 compras con la factura del proveedor.
-let recCmMaterias = null, recCmComprasPorMateria = null, recCmF = [], recCmPagina = 1, recCmAbierta = null;
+// Página piloto del diseño v2: arriba un resumen que se puede tocar para
+// filtrar, los filtros activos como etiquetas, la lista con el dato
+// principal y su contexto en gris, y el detalle de cada materia en un panel
+// lateral (historia de precios + últimas 10 compras con su factura).
+let recCmMaterias = null, recCmComprasPorMateria = null, recCmIngresos = [], recCmF = [], recCmPagina = 1, recCmAbierta = null;
+// Filtro que viene de tocar una tarjeta del resumen ('alza' o 'sin6m').
+let recCmExtra = '';
 // Orden actual: campo y dirección (1 ascendente, -1 descendente). Se cambia
 // desde el selector "Orden" o haciendo clic en el encabezado de la columna.
 let recCmOrden = { campo: 'nombre', dir: 1 };
 const REC_CM_DIR_INICIAL = { nombre: 1, costo: -1, ultima: -1, precio: -1, variacion: -1, compras: -1 };
 const REC_CM_POR_PAGINA = 100;
+const REC_CM_ALZA = 0.10;           // alza que se considera "para revisar"
+const REC_CM_ALZA_DIAS = 90;        // solo cuenta si la última compra es reciente
+const REC_CM_SIN_COMPRA_DIAS = 180;
+
+function recCmHaceDias(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+
+function recCmDiasDesde(fecha) {
+  if (!fecha) return '';
+  const dias = Math.round((Date.now() - new Date(String(fecha).slice(0, 10) + 'T12:00:00').getTime()) / 86400000);
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias < 60) return `hace ${dias} días`;
+  if (dias < 730) return `hace ${Math.round(dias / 30)} meses`;
+  return `hace ${Math.round(dias / 365)} años`;
+}
+
+function recCmNombreProv(id) {
+  const p = (recProveedoresRec || []).find(x => x.id_proveedor === id);
+  return p ? String(p.nombre || p.razon_social || '').trim() : '';
+}
 
 function recCmInit() {
   recPintarEstado('rec-estado-compras');
-  if (!recCmMaterias) recCmCargar(); else recCmRender();
+  recCmAbierta = null;
+  if (!recCmMaterias) recCmCargar(); else { recCmRenderKpis(); recCmRender(); }
 }
 
 async function recCmCargar() {
-  document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Cargando materias primas y compras…</p></div></div>`;
+  document.getElementById('rec-cm-kpis').innerHTML = '<div class="kpi-grid">' + '<div class="kpi skeleton" style="height:92px"></div>'.repeat(4) + '</div>';
+  document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty-state"><div class="spinner"></div><p style="margin-top:10px">Cargando materias primas y compras…</p></div></div>`;
   try {
     const [materias, ingresos, proveedores] = await Promise.all([
       fetchAll('rec_materias', 'select=id_producto,nombre,unidad_stock,precio_costo,activo,sinonimo'),
@@ -13682,8 +13709,9 @@ async function recCmCargar() {
       recProveedoresRec ? Promise.resolve(recProveedoresRec) : fetchAll('rec_proveedores', 'select=id_proveedor,nombre,razon_social'),
     ]);
     recProveedoresRec = proveedores;
+    recCmIngresos = ingresos || [];
     recCmComprasPorMateria = {};
-    (ingresos || []).forEach(c => { (recCmComprasPorMateria[c.id_producto] ||= []).push(c); });
+    recCmIngresos.forEach(c => { (recCmComprasPorMateria[c.id_producto] ||= []).push(c); });
     // Se muestran las materias activas y cualquier otra que tenga compras.
     recCmMaterias = (materias || [])
       .filter(m => (m.activo && !m.sinonimo) || recCmComprasPorMateria[m.id_producto])
@@ -13696,9 +13724,68 @@ async function recCmCargar() {
       });
     recCmLlenarProveedores();
   } catch (e) {
-    document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty"><p>No se pudieron cargar las compras: ${e.message}</p></div></div>`;
+    document.getElementById('rec-cm-kpis').innerHTML = '';
+    document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty-state"><i class="ti ti-alert-triangle"></i><h4>No se pudieron cargar las compras</h4><p>${e.message}</p></div></div>`;
     return;
   }
+  recCmRenderKpis();
+  recCmFiltrar();
+}
+
+// Lo que dispara el resumen, calculado una sola vez por carga.
+function recCmEsAlza(m) { return m._variacion !== null && m._variacion > REC_CM_ALZA && m._ult && String(m._ult.fecha).slice(0, 10) >= recCmHaceDias(REC_CM_ALZA_DIAS); }
+function recCmEsSinCompra(m) { return m.activo && m._ult && String(m._ult.fecha).slice(0, 10) < recCmHaceDias(REC_CM_SIN_COMPRA_DIAS); }
+
+function recCmRenderKpis() {
+  const el = document.getElementById('rec-cm-kpis');
+  if (!el || !recCmMaterias) return;
+  const d30 = recCmHaceDias(30), d60 = recCmHaceDias(60);
+  let gasto = 0, gastoPrev = 0;
+  const porProv = {};
+  recCmIngresos.forEach(c => {
+    const f = String(c.fecha).slice(0, 10);
+    const monto = (Number(c.cantidad) || 0) * (Number(c.precio_compra) || 0);
+    if (f >= d30) { gasto += monto; porProv[c.id_proveedor] = (porProv[c.id_proveedor] || 0) + monto; }
+    else if (f >= d60) gastoPrev += monto;
+  });
+  const cambio = gastoPrev ? (gasto - gastoPrev) / gastoPrev : null;
+  const alzas = recCmMaterias.filter(recCmEsAlza).length;
+  const sinCompra = recCmMaterias.filter(recCmEsSinCompra).length;
+  const [provTop, provMonto] = Object.entries(porProv).sort((a, b) => b[1] - a[1])[0] || [];
+  const provSel = document.getElementById('rec-cm-prov')?.value || '';
+  const pct = v => (Math.abs(v) * 100).toLocaleString('es-CL', { maximumFractionDigits: 0 }) + '%';
+  el.innerHTML = `<div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-receipt"></i></span>Gasto en materias · 30 días</div>
+      <div class="kpi-val">${recClp(gasto)}</div>
+      <div class="kpi-sub">${cambio === null ? 'sin compras el período anterior' : `<span class="${cambio > 0 ? 'sube' : 'baja'}">${cambio > 0 ? '▲' : '▼'} ${pct(cambio)}</span> vs los 30 días anteriores`}</div>
+    </div>
+    <button class="kpi${recCmExtra === 'alza' ? ' activa' : ''}" onclick="recCmSetExtra('alza')" title="Ver las materias cuyo último precio subió más de ${REC_CM_ALZA * 100}%">
+      <div class="kpi-top"><span class="kpi-ico ${alzas ? 'rojo' : 'verde'}"><i class="ti ti-trending-up"></i></span>Alzas sobre ${REC_CM_ALZA * 100}%</div>
+      <div class="kpi-val">${recNum(alzas)}</div>
+      <div class="kpi-sub">materias compradas en los últimos 3 meses</div>
+    </button>
+    <button class="kpi${recCmExtra === 'sin6m' ? ' activa' : ''}" onclick="recCmSetExtra('sin6m')" title="Ver las materias activas que no se compran hace más de 6 meses">
+      <div class="kpi-top"><span class="kpi-ico ${sinCompra ? 'ambar' : 'verde'}"><i class="ti ti-clock-pause"></i></span>Sin comprar hace +6 meses</div>
+      <div class="kpi-val">${recNum(sinCompra)}</div>
+      <div class="kpi-sub">materias activas</div>
+    </button>
+    <button class="kpi${provTop && provSel === String(provTop) ? ' activa' : ''}" ${provTop ? `onclick="recCmFiltrarProveedor('${provTop}')"` : 'disabled'} title="Ver las materias que se le compran a este proveedor">
+      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-building-store"></i></span>Proveedor principal · 30 días</div>
+      <div class="kpi-val chico">${provTop ? (recCmNombreProv(Number(provTop)) || recCmNombreProv(provTop) || '—') : '—'}</div>
+      <div class="kpi-sub">${provTop ? `${recClp(provMonto)} · ${pct(gasto ? provMonto / gasto : 0)} del gasto` : 'sin compras en 30 días'}</div>
+    </button>
+  </div>`;
+}
+
+function recCmSetExtra(tipo) {
+  recCmExtra = recCmExtra === tipo ? '' : tipo;
+  recCmFiltrar();
+}
+
+function recCmFiltrarProveedor(id) {
+  const sel = document.getElementById('rec-cm-prov');
+  if (sel) sel.value = sel.value === String(id) ? '' : String(id);
   recCmFiltrar();
 }
 
@@ -13723,23 +13810,49 @@ function recCmFiltrar() {
   const prov = document.getElementById('rec-cm-prov')?.value || '';
   const periodo = document.getElementById('rec-cm-periodo')?.value || '';
   const estado = document.getElementById('rec-cm-estado')?.value || '';
-  const hoy = new Date();
-  const haceDias = n => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
   recCmF = recCmMaterias.filter(m => {
     if (q && !coincideBusqueda(String(m.nombre || ''), q)) return false;
     if (prov && !m._provs.has(Number(prov)) && !m._provs.has(prov)) return false;
     if (estado === 'activas' && !m.activo) return false;
     if (estado === 'inactivas' && m.activo) return false;
+    if (recCmExtra === 'alza' && !recCmEsAlza(m)) return false;
+    if (recCmExtra === 'sin6m' && !recCmEsSinCompra(m)) return false;
     const fecha = m._ult ? String(m._ult.fecha).slice(0, 10) : '';
     if (periodo === 'sin') return !m._ult;
-    if (periodo === 'mas365') return !!m._ult && fecha < haceDias(365);
-    if (periodo) return !!m._ult && fecha >= haceDias(Number(periodo));
+    if (periodo === 'mas365') return !!m._ult && fecha < recCmHaceDias(365);
+    if (periodo) return !!m._ult && fecha >= recCmHaceDias(Number(periodo));
     return true;
   });
   recCmOrdenar();
   recCmPagina = 1;
   recCmAbierta = null;
+  recCmRenderKpis();
+  recCmRenderChips();
   recCmRender();
+}
+
+// Etiquetas con los filtros activos: cada una se quita con su ✕.
+function recCmRenderChips() {
+  const el = document.getElementById('rec-cm-chips');
+  if (!el) return;
+  const chips = [];
+  const texto = id => { const s = document.getElementById(id); return s && s.value ? s.options[s.selectedIndex].text : ''; };
+  const q = (document.getElementById('rec-cm-q')?.value || '').trim();
+  if (q) chips.push(['Búsqueda', `"${q}"`, "recCmQuitar('rec-cm-q')"]);
+  if (recCmExtra === 'alza') chips.push(['Resumen', `Alzas sobre ${REC_CM_ALZA * 100}%`, "recCmSetExtra('alza')"]);
+  if (recCmExtra === 'sin6m') chips.push(['Resumen', 'Sin comprar hace +6 meses', "recCmSetExtra('sin6m')"]);
+  if (texto('rec-cm-prov')) chips.push(['Proveedor', texto('rec-cm-prov'), "recCmQuitar('rec-cm-prov')"]);
+  if (texto('rec-cm-periodo')) chips.push(['Fecha', texto('rec-cm-periodo').replace(/^Comprada: /, ''), "recCmQuitar('rec-cm-periodo')"]);
+  if (texto('rec-cm-estado')) chips.push(['Estado', texto('rec-cm-estado'), "recCmQuitar('rec-cm-estado')"]);
+  el.style.display = chips.length ? '' : 'none';
+  el.innerHTML = chips.map(([k, v, fn]) => `<span class="chip-filtro">${k}: <b>${v}</b><button onclick="${fn}" title="Quitar este filtro" aria-label="Quitar filtro ${k}">✕</button></span>`).join('')
+    + (chips.length > 1 ? '<button class="chips-limpiar" onclick="recCmLimpiar()">Limpiar todo</button>' : '');
+}
+
+function recCmQuitar(id) {
+  const el = document.getElementById(id);
+  if (el) el.value = '';
+  recCmFiltrar();
 }
 
 // Las materias sin el dato (sin compras, sin costo) siempre quedan al final.
@@ -13784,20 +13897,30 @@ function recCmLimpiar() {
   const sel = document.getElementById('rec-cm-orden');
   if (sel) sel.value = 'nombre:1';
   recCmOrden = { campo: 'nombre', dir: 1 };
+  recCmExtra = '';
   recCmFiltrar();
 }
 
 function recCmIrPagina(n) { recCmPagina = n; recCmAbierta = null; recCmRender(); window.scrollTo({ top: 0 }); }
 
-function recCmToggle(idProducto) {
-  recCmAbierta = recCmAbierta === idProducto ? null : idProducto;
-  recCmRender();
+function recCmAbrir(idProducto) { recCmAbierta = idProducto; recCmRender(); }
+function recCmCerrar() { recCmAbierta = null; recCmRender(); }
+
+function recCmVariacionHtml(v) {
+  if (v === null || !isFinite(v)) return '';
+  if (Math.abs(v) < 0.005) return '<span style="color:var(--text-3)">sin cambio</span>';
+  const pct = (Math.abs(v) * 100).toLocaleString('es-CL', { maximumFractionDigits: Math.abs(v) < 0.1 ? 1 : 0 });
+  return v > 0
+    ? `<span style="color:var(--red);font-weight:600" title="Subió respecto de la compra anterior">▲ ${pct}%</span>`
+    : `<span style="color:var(--green);font-weight:600" title="Bajó respecto de la compra anterior">▼ ${pct}%</span>`;
 }
 
 function recCmRender() {
   const cont = document.getElementById('rec-cm-cont');
   if (!recCmF.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${recCmMaterias && recCmMaterias.length ? 'Sin resultados con esta búsqueda y filtros. <span style="cursor:pointer;color:var(--accent)" onclick="recCmLimpiar()">Limpiar filtros</span>' : 'Todavía no hay materias primas sincronizadas.'}</p></div></div>`;
+    cont.innerHTML = recCmMaterias && recCmMaterias.length
+      ? `<div class="table-card"><div class="empty-state"><i class="ti ti-filter-off"></i><h4>Ninguna materia cumple estos filtros</h4><p>Prueba quitando alguno, o <a onclick="recCmLimpiar()">limpia todos los filtros</a>.</p></div></div>`
+      : `<div class="table-card"><div class="empty-state"><i class="ti ti-database-off"></i><h4>Todavía no hay materias primas sincronizadas</h4></div></div>`;
     return;
   }
   const totalPag = Math.ceil(recCmF.length / REC_CM_POR_PAGINA);
@@ -13805,50 +13928,132 @@ function recCmRender() {
   const pagina = recCmF.slice(desde, desde + REC_CM_POR_PAGINA);
   const th = (campo, texto, derecha) => {
     const activa = recCmOrden.campo === campo;
-    return `<th onclick="recCmOrdenarPor('${campo}')" title="Ordenar por ${texto.toLowerCase()}" style="cursor:pointer;user-select:none;white-space:nowrap${derecha ? ';text-align:right' : ''}${activa ? ';color:var(--accent)' : ''}">${texto} <span style="opacity:${activa ? 1 : .3}">${activa ? (recCmOrden.dir === 1 ? '▲' : '▼') : '↕'}</span></th>`;
+    return `<th onclick="recCmOrdenarPor('${campo}')" title="Ordenar por ${texto.toLowerCase()}" style="cursor:pointer;user-select:none;white-space:nowrap${derecha ? ';text-align:right' : ''}${activa ? ';color:var(--text)' : ''}">${texto} <span style="opacity:${activa ? 1 : .3}">${activa ? (recCmOrden.dir === 1 ? '▲' : '▼') : '↕'}</span></th>`;
   };
-  const variacionHtml = v => {
-    if (v === null || !isFinite(v)) return '<span style="color:var(--text-3)">—</span>';
-    if (Math.abs(v) < 0.005) return '<span style="color:var(--text-3)">= 0%</span>';
-    const pct = (Math.abs(v) * 100).toLocaleString('es-CL', { maximumFractionDigits: v > -0.1 && v < 0.1 ? 1 : 0 });
-    return v > 0
-      ? `<span style="color:var(--red, #c0392b)" title="Subió respecto de la compra anterior">▲ ${pct}%</span>`
-      : `<span style="color:var(--green, #1e8449)" title="Bajó respecto de la compra anterior">▼ ${pct}%</span>`;
-  };
+  const abierta = recCmAbierta !== null ? recCmMaterias.find(m => m.id_producto === recCmAbierta) : null;
   cont.innerHTML = `
     <div class="table-card">
       <table>
-        <thead><tr>${th('nombre', 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}${th('variacion', 'Variación', true)}${th('compras', 'Compras', true)}</tr></thead>
+        <thead><tr>${th('nombre', 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}</tr></thead>
         <tbody>
           ${pagina.map(m => {
-            const compras = recCmComprasPorMateria[m.id_producto] || [];
-            const ult = compras[0];
+            const ult = m._ult;
             const u = m.unidad_stock ? ' / ' + m.unidad_stock : '';
-            const abierta = recCmAbierta === m.id_producto;
+            const prov = ult ? recCmNombreProv(ult.id_proveedor) : '';
             return `
-            <tr onclick="recCmToggle(${m.id_producto})" title="${compras.length ? 'Ver las últimas 10 compras' : 'Sin compras registradas'}">
-              <td data-label="Materia prima"><span style="display:inline-block;width:14px;color:var(--text-3)">${abierta ? '▾' : '▸'}</span>${m.nombre}${m.activo ? '' : ' <span style="font-size:11px;color:var(--text-3)">(inactiva)</span>'}</td>
-              <td data-label="Costo actual" style="text-align:right;white-space:nowrap">${Number(m.precio_costo) ? recClpDec(m.precio_costo) + u : '—'}</td>
-              <td data-label="Última compra" style="white-space:nowrap;color:var(--text-2)">${ult ? fDate(ult.fecha) : '—'}</td>
-              <td data-label="Último precio" style="text-align:right;white-space:nowrap">${ult ? recClpDec(ult.precio_compra) + u : '—'}</td>
-              <td data-label="Variación" style="text-align:right;white-space:nowrap;font-size:12px">${variacionHtml(m._variacion)}</td>
-              <td data-label="Compras" style="text-align:right;font-variant-numeric:tabular-nums">${recNum(compras.length)}</td>
-            </tr>
-            ${abierta ? `<tr style="cursor:default" onclick="event.stopPropagation()"><td colspan="6" data-label="" style="background:var(--bg);padding:10px 14px">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</td></tr>` : ''}`;
+            <tr onclick="recCmAbrir(${m.id_producto})" class="${abierta && abierta.id_producto === m.id_producto ? 'fila-sel' : ''}" title="Ver detalle e historia de precios">
+              <td data-label="Materia prima"><div class="celda">
+                <div class="celda-pri">${m.nombre}${m.activo ? '' : ' <span class="badge badge-gray">Inactiva</span>'}</div>
+                <div class="celda-sec">${m._nCompras ? `${prov ? prov + ' · ' : ''}${recNum(m._nCompras)} compra${m._nCompras === 1 ? '' : 's'}` : 'Sin compras registradas'}</div>
+              </div></td>
+              <td data-label="Costo actual" style="text-align:right;white-space:nowrap">${Number(m.precio_costo) ? `<div class="celda"><div class="celda-pri">${recClpDec(m.precio_costo)}</div><div class="celda-sec">${u ? 'por ' + m.unidad_stock : ''}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+              <td data-label="Última compra" style="white-space:nowrap">${ult ? `<div class="celda"><div>${fDate(ult.fecha)}</div><div class="celda-sec">${recCmDiasDesde(ult.fecha)}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+              <td data-label="Último precio" style="text-align:right;white-space:nowrap">${ult ? `<div class="celda"><div class="celda-pri">${recClpDec(ult.precio_compra)}${u}</div><div class="celda-sec">${recCmVariacionHtml(m._variacion) || 'primera compra'}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+            </tr>`;
           }).join('')}
         </tbody>
       </table>
       <div class="pagination">
-        <span>${recNum(recCmF.length)} materia${recCmF.length === 1 ? '' : 's'} prima${recCmF.length === 1 ? '' : 's'} · página ${recCmPagina} de ${totalPag}</span>
-        <div class="page-btns">
+        <span>${recNum(recCmF.length)} materia${recCmF.length === 1 ? '' : 's'} prima${recCmF.length === 1 ? '' : 's'}${totalPag > 1 ? ` · página ${recCmPagina} de ${totalPag}` : ''}</span>
+        ${totalPag > 1 ? `<div class="page-btns">
           <button class="page-btn" ${recCmPagina <= 1 ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina - 1})">‹</button>
           <button class="page-btn" ${recCmPagina >= totalPag ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina + 1})">›</button>
-        </div>
+        </div>` : ''}
       </div>
-    </div>`;
+    </div>
+    ${abierta ? recCmPanelHtml(abierta) : ''}`;
+  if (abierta) recCmActivarGrafico();
 }
 
-// La ficha de la factura se abre encima de esta página; "Atrás" solo la cierra
+// Panel lateral de una materia: datos clave, historia de precios y últimas compras.
+function recCmPanelHtml(m) {
+  const compras = recCmComprasPorMateria[m.id_producto] || [];
+  const ult = m._ult;
+  const u = m.unidad_stock ? ' / ' + m.unidad_stock : '';
+  const hace12 = recCmHaceDias(365);
+  const ult12 = compras.filter(c => String(c.fecha).slice(0, 10) >= hace12);
+  const cant12 = ult12.reduce((s, c) => s + (Number(c.cantidad) || 0), 0);
+  const prom12 = cant12 ? ult12.reduce((s, c) => s + (Number(c.cantidad) || 0) * (Number(c.precio_compra) || 0), 0) / cant12 : null;
+  const dato = (label, valor) => `<div class="drawer-dato"><label>${label}</label><span>${valor}</span></div>`;
+  return `
+    <div class="drawer-fondo" onclick="recCmCerrar()"></div>
+    <aside class="drawer" role="dialog" aria-label="Detalle de ${m.nombre}">
+      <div class="drawer-head">
+        <div>
+          <div class="drawer-eyebrow">Materia prima</div>
+          <div class="drawer-titulo">${m.nombre}</div>
+          <div class="drawer-sub">${m.unidad_stock ? 'Unidad: ' + m.unidad_stock : ''}${m.activo ? '' : ' · Inactiva'}</div>
+        </div>
+        <button class="modal-close" onclick="recCmCerrar()" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-datos">
+          ${dato('Costo actual', Number(m.precio_costo) ? recClpDec(m.precio_costo) + u : '—')}
+          ${dato('Último precio', ult ? recClpDec(ult.precio_compra) + u : '—')}
+          ${dato('Variación', recCmVariacionHtml(m._variacion) || '—')}
+          ${dato('Promedio 12 meses', prom12 !== null ? recClpDec(prom12) + u : '—')}
+          ${dato('Última compra', ult ? recCmDiasDesde(ult.fecha) : '—')}
+          ${dato('Proveedores', recNum(m._provs.size))}
+        </div>
+        ${compras.length > 1 ? `<div class="drawer-seccion">Historia de precios${compras.length > 24 ? ' · últimas 24 compras' : ''}</div><div class="mini-graf" id="rec-cm-graf">${recCmGraficoSvg(compras.slice(0, 24).reverse())}</div>` : ''}
+        <div class="table-card drawer-compras">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</div>
+      </div>
+    </aside>`;
+}
+
+// Línea de precios en el tiempo (una sola serie; el hover muestra cada compra).
+function recCmGraficoSvg(compras) {
+  const W = 500, H = 150, pl = 8, pr = 8, pt = 12, pb = 22;
+  const xs = compras.map(c => new Date(String(c.fecha).slice(0, 10) + 'T12:00:00').getTime());
+  const ys = compras.map(c => Number(c.precio_compra) || 0);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const padY = (y1 - y0) * 0.15 || y1 * 0.1 || 1;
+  const sx = t => pl + (x1 === x0 ? (W - pl - pr) / 2 : (t - x0) / (x1 - x0) * (W - pl - pr));
+  const sy = v => pt + (1 - (v - (y0 - padY)) / ((y1 + padY) - (y0 - padY))) * (H - pt - pb);
+  const pts = compras.map((c, i) => ({ x: sx(xs[i]), y: sy(ys[i]), c }));
+  window._recCmPuntos = pts;
+  const linea = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const yMax = sy(y1), yMin = sy(y0);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Historia de precios">
+      <line x1="${pl}" x2="${W - pr}" y1="${yMax}" y2="${yMax}" stroke="var(--border)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+      <line x1="${pl}" x2="${W - pr}" y1="${yMin}" y2="${yMin}" stroke="var(--border)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+      <path d="${linea}" fill="none" stroke="var(--ink-chart)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle id="rec-cm-graf-pt" r="4" cx="-20" cy="-20" fill="var(--ink-chart)" stroke="var(--surface)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:-16px">
+      <span>${fDate(compras[0].fecha)}</span><span>máx ${recClpDec(y1)} · mín ${recClpDec(y0)}</span><span>${fDate(compras[compras.length - 1].fecha)}</span>
+    </div>
+    <div class="tip" id="rec-cm-graf-tip" style="display:none"></div>`;
+}
+
+function recCmActivarGrafico() {
+  const caja = document.getElementById('rec-cm-graf');
+  if (!caja) return;
+  const svg = caja.querySelector('svg'), tip = document.getElementById('rec-cm-graf-tip'), pt = document.getElementById('rec-cm-graf-pt');
+  const mover = ev => {
+    const r = svg.getBoundingClientRect();
+    const xVb = (ev.clientX - r.left) / r.width * 500;
+    const p = (window._recCmPuntos || []).reduce((a, b) => Math.abs(b.x - xVb) < Math.abs(a.x - xVb) ? b : a);
+    pt.setAttribute('cx', p.x); pt.setAttribute('cy', p.y);
+    tip.style.display = '';
+    tip.style.left = (p.x / 500 * r.width) + 'px';
+    tip.style.top = (p.y / 150 * r.height) + 'px';
+    const prov = recCmNombreProv(p.c.id_proveedor);
+    tip.innerHTML = `${recClpDec(p.c.precio_compra)}<small>${fDate(p.c.fecha)}${prov ? ' · ' + prov : ''}</small>`;
+  };
+  svg.addEventListener('pointermove', mover);
+  svg.addEventListener('pointerdown', mover);
+  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; pt.setAttribute('cx', -20); });
+}
+
+// Esc cierra el panel (si no hay una ficha de factura abierta encima).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || recCmAbierta === null) return;
+  if (document.querySelector('.modal-overlay')) return;
+  recCmCerrar();
+});
+
+// La ficha de la factura se abre encima del panel; "Atrás" solo la cierra
 // y deja la materia abierta tal como estaba.
 function recCmVerFactura(idFactura) {
   navPush(() => recCmRender());
