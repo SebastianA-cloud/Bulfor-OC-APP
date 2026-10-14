@@ -1657,7 +1657,7 @@ async function init() {
       fetchAll('ordenes_elaboracion', 'select=*,pacientes(nombre),recetas(fecha_emision,fecha_vencimiento,archivo_url,archivo_nombre)&order=created_at.desc'),
       fetchAll('pacientes', 'select=*&order=nombre.asc'),
       fetchAll('facturas_pago', 'select=*&order=fecha_emision.desc'),
-      fetchAll('documentos_gdexpress', 'select=id,tipo_dte,folio,rut_hospital,hospital,fecha_emision,fecha_emision_real,monto,estado_aceptacion,doc_url,orden_compra_ref,created_at,updated_at,detalle_sincronizado,estado_fiscal_status,estado_fiscal_actualizado,nc_factura_ref,monto_total&order=fecha_emision.desc'),
+      fetchAll('documentos_gdexpress', 'select=id,tipo_dte,folio,rut_hospital,hospital,fecha_emision,fecha_emision_real,monto,estado_aceptacion,doc_url,orden_compra_ref,created_at,updated_at,detalle_sincronizado,estado_fiscal_status,estado_fiscal_actualizado,nc_factura_ref,monto_total,estado_reclamo,fecha_respuesta_comercial&order=fecha_emision.desc'),
       fetchAll('farmacia_productos', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_familias', 'select=*&order=nombre.asc'),
       fetchAll('farmacia_lotes', 'select=*'),
@@ -5750,6 +5750,7 @@ function estadoFusionadoPago(f) {
 function filaFacturaHtml(f, opts) {
   opts = opts || {};
   const estado = estadoFusionadoPago(f);
+  const reclamo = reclamoDeFactura(f.factura);
   const vencReal = !!f.fecha_vencimiento;
   const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
@@ -5760,7 +5761,7 @@ function filaFacturaHtml(f, opts) {
       <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
       <td data-label="Vencimiento" style="font-size:12px;white-space:nowrap">${vencHtml}</td>
       <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-      <td data-label="Estado">${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+      <td data-label="Estado">${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : reclamo ? `<span style="color:var(--red);font-size:12px" title="${reclamo}">Reclamada</span>` : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
       <td data-label="Fecha de pago" style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
       <td data-label="Estado de pago">${badgeEstadoPagoHtml(f)}</td>`}
@@ -5930,7 +5931,7 @@ ${doc && fechaDocumentoDesalineada(doc) ? `
           <tr><td>Monto total (con IVA)</td><td style="font-weight:600">${clp(montoTotalDoc(doc))}</td></tr>
           <tr><td>RUT Hospital</td><td>${doc.rut_hospital||'—'}</td></tr>
           ` : `<tr><td>Monto</td><td>${clp(f.monto)}</td></tr>`}
-          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado)}</td></tr>
+          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado, doc)}</td></tr>
           ${doc && doc.orden_compra_ref ? `
           <tr><td>N° Orden de Compra relacionada</td><td>${oc.find(o => o.codigooc === doc.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleFacturaPago(${f.id}));openOCDetail('${doc.orden_compra_ref.replace(/'/g,"\\'")}')">${doc.orden_compra_ref} ↗</span>` : doc.orden_compra_ref}</td></tr>` : ''}
           ${doc && notaCreditoQueAnula(doc.folio) ? `
@@ -6405,8 +6406,19 @@ function estadoAceptacionFusionado(d) {
   return d.estado_aceptacion;
 }
 
-function badgeEstadoDocGdexpress(estado) {
+// Reclamo del receptor (Ley 19.983): el SII la autorizó, pero el hospital la reclamó.
+const RECLAMOS_RECEPTOR = { RCD: 'Reclamo al contenido', RFP: 'Falta parcial de mercaderías', RFT: 'Falta total de mercaderías' };
+
+// Motivo del reclamo de una factura emitida (o null si el hospital no la reclamó).
+function reclamoDeFactura(folio) {
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(folio));
+  return doc ? (RECLAMOS_RECEPTOR[doc.estado_reclamo] || null) : null;
+}
+
+function badgeEstadoDocGdexpress(estado, d) {
   if (estado === 'N') return '<span class="badge-estado err">Anulada/Rechazada</span>';
+  const reclamo = d && RECLAMOS_RECEPTOR[d.estado_reclamo];
+  if (reclamo) return `<span class="badge-estado err" title="${reclamo}${d.fecha_respuesta_comercial ? ' · ' + fDate(d.fecha_respuesta_comercial) : ''}">Reclamada</span>`;
   if (estado === 'A') return '<span class="badge-estado ok">Aceptada</span>';
   return '<span class="badge-estado neutral">—</span>';
 }
@@ -6509,7 +6521,7 @@ function renderDocumentosGdexpress(soloTabla) {
               <td data-label="RUT Hospital" style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
               <td data-label="N° OC" style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
               <td data-label="Monto" style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
-              <td data-label="Estado">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d))}</td>
+              <td data-label="Estado">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d), d)}</td>
             </tr>`).join('')}
         </tbody>
       </table>
@@ -6628,7 +6640,7 @@ ${fechaDocumentoDesalineada(d) ? `
           <tr><td>Monto neto</td><td>${clp(d.monto)}</td></tr>
           <tr><td>Monto total (con IVA)</td><td style="font-weight:600">${clp(montoTotalDoc(d))}</td></tr>
           <tr><td>RUT Hospital</td><td>${d.rut_hospital||'—'}</td></tr>
-          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado)}</td></tr>
+          <tr><td>Estado</td><td>${badgeEstadoDocGdexpress(estadoFusionado, d)}</td></tr>
           <tr><td>N° Orden de Compra relacionada</td><td>${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="color:#185FA5;cursor:pointer" onclick="navPush(()=>abrirDetalleDocumentoGdexpress(${d.id}));openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || 'No detectada')}</td></tr>
           ${d.tipo_dte === '33' && notaCreditoQueAnula(d.folio) ? `
           <tr><td>Anulada por Nota de Crédito</td><td><span style="color:var(--red);cursor:pointer" onclick="verNotaCreditoDesdeRechazadas('${String(notaCreditoQueAnula(d.folio).folio).replace(/'/g,"\\'")}')">N° ${notaCreditoQueAnula(d.folio).folio} ↗</span></td></tr>` : ''}
@@ -6734,6 +6746,26 @@ function facturasRechazadas() {
       _ncAutoDetectada: nc.folio,
       _sinRegistroPagos: true,
     });
+  });
+
+  // 3) Las que el hospital reclamó en el SII (luz "L" roja en GDExpress),
+  // aunque el SII las haya autorizado.
+  documentosGdexpress.filter(d => d.tipo_dte === '33' && RECLAMOS_RECEPTOR[d.estado_reclamo]).forEach(doc => {
+    const folio = String(doc.folio);
+    const fila = map.get(folio) || facturasPago.find(f => String(f.factura) === folio) || {
+      id: null,
+      factura: doc.folio,
+      hospital: doc.hospital,
+      rut_hospital: doc.rut_hospital,
+      fecha_emision: doc.fecha_emision,
+      monto: montoTotalDoc(doc),
+      estado_aceptacion: doc.estado_aceptacion,
+      factura_reemplazo: null,
+      nota_credito_asociada: null,
+      _sinRegistroPagos: true,
+    };
+    fila._reclamo = RECLAMOS_RECEPTOR[doc.estado_reclamo];
+    map.set(folio, fila);
   });
 
   return Array.from(map.values());
@@ -9108,7 +9140,7 @@ function renderRechazadas(soloTabla) {
         <tbody>
           ${lista.map((f, idx) => `
             <tr style="cursor:pointer" onclick="abrirDetalleRechazada(${idx})">
-              <td data-label="Factura" class="mono">${f.factura}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠</span>' : ''}</td>
+              <td data-label="Factura" class="mono">${f.factura}${f._reclamo ? ` <span class="badge-estado err" style="font-size:10px;padding:1px 6px" title="${f._reclamo}">Reclamada</span>` : ''}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠</span>' : ''}</td>
               <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
               <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
               <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>

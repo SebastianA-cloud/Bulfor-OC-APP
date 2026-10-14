@@ -92,6 +92,27 @@ def es_verdadero(texto):
     return texto.strip().lower() not in ('no', 'false', '0', 'indefinido', '')
 
 
+# Respuesta comercial del receptor (Ley 19.983), tal como la entrega GDExpress
+# en el campo ClaimAction del listado. Es la luz "L" del portal: el hospital
+# puede reclamar una factura aunque el SII la haya autorizado.
+#   ACD = acepta el contenido · ERM = acusa recibo de mercaderías
+#   RCD = reclamo al contenido · RFP = falta parcial · RFT = falta total
+CODIGOS_RESPUESTA_COMERCIAL = {'ACD', 'ERM', 'RCD', 'RFP', 'RFT'}
+
+
+def respuesta_comercial(texto):
+    codigo = (texto or '').strip().upper()
+    return codigo if codigo in CODIGOS_RESPUESTA_COMERCIAL else None
+
+
+def fecha_respuesta_comercial(texto):
+    # Viene como "09-10-2026 09:29:53" (o "Indefinido" si no hay respuesta).
+    try:
+        return datetime.strptime((texto or '').strip()[:10], '%d-%m-%Y').strftime('%Y-%m-%d')
+    except ValueError:
+        return None
+
+
 def extraer_oc_referenciada(texto_referencias):
     """DocumentReferences trae un texto tipo JSON con documentos relacionados
     (guías, OC, etc). Buscamos ahí un código con pinta de OC de Mercado
@@ -121,6 +142,8 @@ def documentos_desde_xml(xml_bytes, tipo_dte):
             'fecha_emision': parse_fecha(campo('FchEmis') or campo('EmissionDate') or campo('DocumentDate')),
             'monto': float(campo('MntNeto')) if campo('MntNeto') else None,
             'estado_aceptacion': 'N' if anulado else ('A' if autorizado else None),
+            'estado_reclamo': respuesta_comercial(campo('ClaimAction')),
+            'fecha_respuesta_comercial': fecha_respuesta_comercial(campo('FchRespComercial')),
             'doc_url': campo('DownloadCustomerDocumentUrl'),
             'orden_compra_ref': extraer_oc_referenciada(campo('DocumentReferences')),
         })
