@@ -9923,6 +9923,44 @@ function botonNavOEHtml(idActual) {
        + btn('›', haySiguiente, haySiguiente ? lista[idx+1].id : null, 'Orden siguiente');
 }
 
+// Adjuntar la imagen o PDF de la receta a una orden ya creada (cuando se
+// olvidó al crearla). Sube el archivo igual que "Nueva orden" y lo anota
+// en la receta de la orden.
+async function adjuntarRecetaOE(ordenId, input) {
+  const o = ordenesElaboracion.find(x => x.id === ordenId);
+  const archivo = input.files && input.files[0];
+  if (!o || !o.receta_id || !archivo) return;
+  input.disabled = true;
+  try {
+    const ext = archivo.name.split('.').pop();
+    const nombreArchivo = `${Date.now()}_${o.paciente_id}.${ext}`;
+    const rUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/recetas/${nombreArchivo}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sesionActual?.access_token || SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY,
+        'Content-Type': archivo.type || 'application/octet-stream',
+      },
+      body: archivo
+    });
+    if (!rUpload.ok) throw new Error(await rUpload.text());
+    const cambios = {
+      archivo_url: `${SUPABASE_URL}/storage/v1/object/public/recetas/${nombreArchivo}`,
+      archivo_nombre: archivo.name,
+      archivo_size_kb: Math.round(archivo.size / 1024),
+    };
+    const r = await sb(`recetas?id=eq.${o.receta_id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
+    if (!r.ok) throw new Error(await r.text());
+    // Todas las órdenes que comparten esta receta quedan con el archivo.
+    ordenesElaboracion.forEach(x => { if (x.receta_id === o.receta_id) x.recetas = { ...(x.recetas || {}), ...cambios }; });
+    toast('Receta adjuntada');
+    abrirDetalleOE(ordenId);
+  } catch (e) {
+    toast('No se pudo adjuntar la receta: ' + e.message, 'err');
+    input.disabled = false;
+  }
+}
+
 function abrirDetalleOE(id) {
   const o = ordenesElaboracion.find(x => x.id === id);
   if (!o) return;
@@ -9976,7 +10014,13 @@ function abrirDetalleOE(id) {
           ${receta.archivo_url ? `
           <div style="margin-top:10px">
             <button onclick="navPush(()=>abrirDetalleOE(${o.id}));verRecetaEnModal('${receta.archivo_url}')" class="page-btn" style="padding:6px 14px;font-size:12px">👁 Ver receta</button>
-          </div>` : '<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>'}
+          </div>` : `<div style="font-size:12px;color:var(--text-3);margin-top:6px">Sin imagen adjunta</div>
+          ${sesionActual?.rol === 'editor' && o.receta_id ? `
+          <div style="margin-top:10px">
+            <label class="page-btn" style="padding:6px 14px;font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer">📎 Adjuntar receta
+              <input type="file" accept="image/*,application/pdf" style="display:none" onchange="adjuntarRecetaOE(${o.id}, this)">
+            </label>
+          </div>` : ''}`}
         </div>` : ''}
 
         ${recSeccionOEHtml(o)}
