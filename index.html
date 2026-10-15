@@ -836,7 +836,7 @@
   <div class="page" id="page-rec-preparados">
     <div class="page-header">
       <div class="page-title">Preparados</div>
-      <div class="page-sub">Cada fórmula magistral en orden alfabético: el costo de cada materia prima y sus últimas compras con la factura</div>
+      <div class="page-sub">Costo de cada fórmula por materia prima, con sus últimas compras</div>
     </div>
     <div id="rec-estado-preparados"></div>
     <div class="toolbar">
@@ -851,7 +851,7 @@
   <div class="page" id="page-rec-compras">
     <div class="page-header">
       <div class="page-title">Compras de materias</div>
-      <div class="page-sub">Cuánto se está pagando por cada materia prima y cómo cambia. Toca una tarjeta del resumen para filtrar, o una materia para ver su historia de precios y sus facturas.</div>
+      <div class="page-sub">Precio, variación y facturas de cada materia prima</div>
     </div>
     <div id="rec-estado-compras"></div>
     <div id="rec-cm-kpis"></div>
@@ -12911,10 +12911,11 @@ function recEstadoHtml() {
   if (r.ultima_sync) {
     const min = Math.round((Date.now() - new Date(r.ultima_sync)) / 60000);
     sync = min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} días`;
-    if (min > 90) sync = `<span style="color:var(--red);font-weight:600">${sync} — revisa el agente del servidor</span>`;
+    if (min > 90) sync = `${sync} — revisa el agente del servidor`;
   } else sync = 'pendiente (solo datos de prueba)';
-  return `<div style="font-size:12px;color:var(--text-3);margin:-6px 0 12px">
-    ${recNum(r.rm_total)} RM desde ${recFechaTs(r.rm_desde)} hasta ${recFechaHora(r.rm_hasta)} · Actualizado ${sync}</div>`;
+  const atrasado = r.ultima_sync && (Date.now() - new Date(r.ultima_sync)) / 60000 > 90;
+  return `<div class="estado-sync${atrasado ? ' atrasado' : ''}" title="Recetas magistrales registradas desde ${recFechaTs(r.rm_desde)} hasta ${recFechaHora(r.rm_hasta)}">
+    <span class="dot"></span>Actualizado ${sync}<span class="estado-extra"><span class="sep">·</span> ${recNum(r.rm_total)} RM desde ${recFechaTs(r.rm_desde)}</span></div>`;
 }
 
 function recPintarEstado(id) {
@@ -14797,6 +14798,33 @@ function irAPaginaPorId(id) {
   seleccionarSubpagina(modulo, id, sub);
   return true;
 }
+
+// Encabezado de cada página: ícono y ruta del módulo arriba del título,
+// sacados del mismo menú, para que todas las páginas se vean iguales.
+function decorarEncabezados() {
+  document.querySelectorAll('.page').forEach(page => {
+    const header = page.querySelector('.page-header');
+    const titulo = header && header.querySelector(':scope > .page-title');
+    if (!titulo || header.classList.contains('decorado') || titulo.getAttribute('style')) return;
+    const id = page.id.replace(/^page-/, '');
+    let modulo = '', icono = 'ti-home';
+    if (id !== 'inicio') {
+      const sub = document.querySelector(`.nav-subitem[data-page="${id}"], .nav-subitem[data-page-alt="${id}"]`);
+      const clave = sub ? sub.closest('.nav-group')?.dataset.modulo : null;
+      // Un módulo de una sola página (FedEx) no tiene subítems: la página es el módulo.
+      const tab = document.querySelector(`.modulo-tab[data-modulo="${clave || id}"]`);
+      if (!tab) return;
+      modulo = tab.querySelector('span')?.textContent.trim() || '';
+      icono = [...(tab.querySelector('i')?.classList || [])].find(c => c.startsWith('ti-') && c !== 'ti') || 'ti-folder';
+    }
+    const grupo = GRUPO_PAGINA[id] || GRUPO_PAGINA[Object.keys(ALT_PAGINA).find(k => ALT_PAGINA[k] === id)];
+    header.insertAdjacentHTML('afterbegin', `<div class="ph-ico" aria-hidden="true"><i class="ti ${icono}"></i></div>`
+      + `<div class="ph-ruta">${modulo ? `<b>${modulo}</b>${grupo ? ' · ' + grupo : ''}` : 'Bulfor OC'}</div>`);
+    header.classList.add('decorado');
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorarEncabezados);
+else decorarEncabezados();
 
 function restaurarDesdeHash() {
   const id = decodeURIComponent(location.hash.slice(1));
