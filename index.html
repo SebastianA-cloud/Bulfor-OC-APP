@@ -281,8 +281,9 @@
   <div class="page active" id="page-inicio">
     <div class="page-header">
       <div class="page-title">Inicio</div>
-      <div class="page-sub">Resumen del sistema</div>
+      <div class="page-sub">Lo que requiere atención hoy</div>
     </div>
+    <div id="inicio-kpis"></div>
 
     <div class="inicio-seccion">
       <div class="inicio-seccion-titulo">Compras y ventas</div>
@@ -839,6 +840,7 @@
       <div class="page-sub">Costo de cada fórmula por materia prima, con sus últimas compras</div>
     </div>
     <div id="rec-estado-preparados"></div>
+    <div id="rec-prep-kpis"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -13473,6 +13475,7 @@ function recCostosRenderFormulas() {
 // materia prima; al tocar una materia, sus últimas 10 compras con la factura
 // del proveedor (cruzada por N° de documento y fecha cercana).
 let recPrepData = null, recPrepF = [], recPrepPagina = 1, recProveedoresRec = null;
+let recPrepExtra = '';   // filtro que viene de tocar una tarjeta del resumen
 const REC_PREP_POR_PAGINA = 100;
 
 function recPrepInit() {
@@ -13483,7 +13486,8 @@ function recPrepInit() {
 async function recPrepCargar() {
   document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Cargando preparados…</p></div></div>`;
   try {
-    recPrepData = await recRpc('rec_preparados', {});
+    recPrepData = (await recRpc('rec_preparados', {}) || [])
+      .sort((a, b) => claveOrdenNombre(a.descripcion).localeCompare(claveOrdenNombre(b.descripcion), 'es'));
   } catch (e) {
     document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>No se pudieron cargar los preparados: ${e.message}</p></div></div>`;
     return;
@@ -13494,9 +13498,52 @@ async function recPrepCargar() {
 function recPrepFiltrar() {
   if (!recPrepData) return;
   const q = (document.getElementById('rec-prep-q')?.value || '').trim();
-  recPrepF = q ? recPrepData.filter(p => coincideBusqueda(`${p.descripcion} ${p.forma || ''}`, q)) : recPrepData.slice();
+  const d30 = recCmHaceDias(30), d365 = recCmHaceDias(365);
+  recPrepF = recPrepData.filter(p => {
+    if (q && !coincideBusqueda(`${p.descripcion} ${p.forma || ''}`, q)) return false;
+    const f = String(p.ultima || '').slice(0, 10);
+    if (recPrepExtra === '30d') return f >= d30;
+    if (recPrepExtra === '1a') return !!f && f < d365;
+    return true;
+  });
   recPrepPagina = 1;
+  recPrepRenderKpis();
   recPrepRender();
+}
+
+function recPrepSetExtra(tipo) { recPrepExtra = recPrepExtra === tipo ? '' : tipo; recPrepFiltrar(); }
+
+function recPrepRenderKpis() {
+  const el = document.getElementById('rec-prep-kpis');
+  if (!el || !recPrepData) return;
+  const d30 = recCmHaceDias(30), d365 = recCmHaceDias(365);
+  const fecha = p => String(p.ultima || '').slice(0, 10);
+  const n30 = recPrepData.filter(p => fecha(p) >= d30).length;
+  const viejas = recPrepData.filter(p => fecha(p) && fecha(p) < d365).length;
+  const formas = new Set(recPrepData.map(p => p.forma).filter(Boolean)).size;
+  const top = recPrepData.reduce((a, b) => (Number(b.n_rm) || 0) > (Number(a?.n_rm) || 0) ? b : a, null);
+  el.innerHTML = `<div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-list-details"></i></span>Fórmulas distintas</div>
+      <div class="kpi-val">${recNum(recPrepData.length)}</div>
+      <div class="kpi-sub">en ${recNum(formas)} forma${formas === 1 ? '' : 's'} farmacéutica${formas === 1 ? '' : 's'}</div>
+    </div>
+    <button class="kpi${recPrepExtra === '30d' ? ' activa' : ''}" onclick="recPrepSetExtra('30d')" title="Ver solo las fórmulas elaboradas en los últimos 30 días">
+      <div class="kpi-top"><span class="kpi-ico verde"><i class="ti ti-flask"></i></span>Elaboradas en 30 días</div>
+      <div class="kpi-val">${recNum(n30)}</div>
+      <div class="kpi-sub">fórmulas con al menos una RM</div>
+    </button>
+    <div class="kpi">
+      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-trophy"></i></span>Más elaborada</div>
+      <div class="kpi-val chico" title="${top ? top.descripcion : ''}">${top ? top.descripcion : '—'}</div>
+      <div class="kpi-sub">${top ? recNum(top.n_rm) + ' RM en total' : ''}</div>
+    </div>
+    <button class="kpi${recPrepExtra === '1a' ? ' activa' : ''}" onclick="recPrepSetExtra('1a')" title="Ver las fórmulas que no se elaboran hace más de un año">
+      <div class="kpi-top"><span class="kpi-ico ambar"><i class="ti ti-clock-pause"></i></span>Sin elaborar hace +1 año</div>
+      <div class="kpi-val">${recNum(viejas)}</div>
+      <div class="kpi-sub">fórmulas</div>
+    </button>
+  </div>`;
 }
 
 function recPrepIrPagina(n) { recPrepPagina = n; recPrepRender(); window.scrollTo({ top: 0 }); }
@@ -13504,7 +13551,9 @@ function recPrepIrPagina(n) { recPrepPagina = n; recPrepRender(); window.scrollT
 function recPrepRender() {
   const cont = document.getElementById('rec-prep-cont');
   if (!recPrepF.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${recPrepData && recPrepData.length ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay preparados sincronizados.'}</p></div></div>`;
+    cont.innerHTML = recPrepData && recPrepData.length
+      ? `<div class="table-card"><div class="empty-state"><i class="ti ti-filter-off"></i><h4>Ninguna fórmula cumple la búsqueda</h4>${recPrepExtra ? '<p><a onclick="recPrepSetExtra(recPrepExtra)">Quitar el filtro del resumen</a></p>' : ''}</div></div>`
+      : `<div class="table-card"><div class="empty-state"><i class="ti ti-database-off"></i><h4>Todavía no hay preparados sincronizados</h4></div></div>`;
     return;
   }
   const totalPag = Math.ceil(recPrepF.length / REC_PREP_POR_PAGINA);
@@ -13676,6 +13725,12 @@ const REC_CM_POR_PAGINA = 100;
 const REC_CM_ALZA = 0.10;           // alza que se considera "para revisar"
 const REC_CM_ALZA_DIAS = 90;        // solo cuenta si la última compra es reciente
 const REC_CM_SIN_COMPRA_DIAS = 180;
+
+// Clave para ordenar por nombre ignorando guiones, puntos o asteriscos al
+// inicio: "--VITAMINA B2 NO VIGENTE" queda en la V, no al principio.
+function claveOrdenNombre(nombre) {
+  return String(nombre || '').trim().replace(/^[^0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/, '');
+}
 
 function recCmHaceDias(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
@@ -13860,14 +13915,14 @@ function recCmQuitar(id) {
 function recCmOrdenar() {
   const { campo, dir } = recCmOrden;
   const valor = m => ({
-    nombre: String(m.nombre || '').trim(),
+    nombre: claveOrdenNombre(m.nombre),
     costo: Number(m.precio_costo) || null,
     ultima: m._ult ? String(m._ult.fecha).slice(0, 10) : null,
     precio: m._ult ? Number(m._ult.precio_compra) : null,
     variacion: m._variacion,
     compras: m._nCompras,
   })[campo];
-  const porNombre = (a, b) => String(a.nombre || '').trim().localeCompare(String(b.nombre || '').trim(), 'es');
+  const porNombre = (a, b) => claveOrdenNombre(a.nombre).localeCompare(claveOrdenNombre(b.nombre), 'es');
   recCmF.sort((a, b) => {
     const va = valor(a), vb = valor(b);
     if (va === null && vb === null) return porNombre(a, b);
@@ -14826,6 +14881,46 @@ function decorarEncabezados() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorarEncabezados);
 else decorarEncabezados();
 
+// Tarjetas de resumen (.stat) de toda la app: se les pone ícono y color
+// según lo que dicen, para que se vean como las de Compras de materias sin
+// tocar cada página. El orden importa: gana la primera regla que calza.
+const STAT_ICONOS = [
+  [/vencid|atrasad|rechaz|negativ|riesgo|sin stock/i, 'ti-alert-triangle', 'rojo'],
+  [/vencen|pendiente|por facturar|por digitar|sin n° rm|alcanzan menos|con diferencia|diferencia|sin vencimiento|sin vacaciones|sin compras|a comprar/i, 'ti-clock', 'ambar'],
+  [/pagad|cuadran|disponibles|activos|con rm/i, 'ti-circle-check', 'verde'],
+  [/monto|total|neto|plata|costo|precio|margen|\$/i, 'ti-cash', ''],
+  [/factura|nota|guía/i, 'ti-file-invoice', ''],
+  [/hospital|cliente/i, 'ti-building-hospital', ''],
+  [/proveedor/i, 'ti-building-store', ''],
+  [/producto|materia/i, 'ti-pill', ''],
+  [/lote|stock|utilizad/i, 'ti-packages', ''],
+  [/personal|trabajador|de vacaciones/i, 'ti-users', ''],
+  [/fecha|últim|rango|antigüedad|días|vacaciones|programad|progresiv/i, 'ti-calendar', ''],
+  [/orden|\boc\b|solicitud/i, 'ti-clipboard-list', ''],
+];
+function decorarStats(raiz) {
+  (raiz || document).querySelectorAll('.stat:not([data-deco])').forEach(st => {
+    st.dataset.deco = '1';
+    const label = st.querySelector('.stat-label');
+    if (!label || label.querySelector('.kpi-ico')) return;
+    const texto = label.textContent || '';
+    const [, icono, tono] = STAT_ICONOS.find(([re]) => re.test(texto)) || [null, 'ti-chart-bar', ''];
+    label.insertAdjacentHTML('afterbegin', `<span class="kpi-ico ${st.classList.contains('destacado') ? 'acento' : tono}" aria-hidden="true"><i class="ti ${icono}"></i></span>`);
+  });
+}
+let decorarStatsPendiente = false;
+function iniciarDecoradoStats() {
+  decorarStats();
+  const main = document.querySelector('main') || document.body;
+  new MutationObserver(() => {
+    if (decorarStatsPendiente) return;
+    decorarStatsPendiente = true;
+    requestAnimationFrame(() => { decorarStatsPendiente = false; decorarStats(); });
+  }).observe(main, { childList: true, subtree: true });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciarDecoradoStats);
+else iniciarDecoradoStats();
+
 function restaurarDesdeHash() {
   const id = decodeURIComponent(location.hash.slice(1));
   if (!id) return;
@@ -14857,7 +14952,39 @@ if (localStorage.getItem('bulfor_sidebar_colapsado') === '1') {
 // la app ya carga en memoria en init() — mismos criterios que usan el
 // badge de Elaboración, "Facturas por pagar" y el resumen de FedEx.
 // Ninguna consulta nueva a Supabase. ────────────────────────────────────
+// Tarjetas de arriba: lo que hay que pagar o hacer, con un clic al lugar.
+function renderInicioKpis() {
+  const el = document.getElementById('inicio-kpis');
+  if (!el) return;
+  const hoy = new Date().toISOString().slice(0, 10);
+  const en7 = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
+  // Una lista vacía es que todavía no carga: no se muestra "todo al día" antes de tiempo.
+  const fpp = Array.isArray(facturasPorPagar) && facturasPorPagar.length ? facturasPorPagar : null;
+  const monto = l => l.reduce((s, f) => s + Number(f.monto_total ?? f.monto ?? 0), 0);
+  const atrasadas = fpp ? fpp.filter(f => categoriaFPP(f) === 'overdue') : [];
+  const semana = fpp ? fpp.filter(f => categoriaFPP(f) === 'pending' && f.fecha_vencimiento && f.fecha_vencimiento >= hoy && f.fecha_vencimiento <= en7) : [];
+  const porDigitar = Array.isArray(ordenesElaboracion) && ordenesElaboracion.length ? ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length : null;
+  const nuevas = Array.isArray(solicitudesWeb) && solicitudesWeb.length ? solicitudesWeb.filter(x => x.estado === 'Nueva').length : null;
+  const tarjeta = (titulo, icono, tono, valor, sub, modulo, pagina) => `
+    <button class="kpi" onclick="irAModuloPagina('${modulo}','${pagina}')">
+      <div class="kpi-top"><span class="kpi-ico ${tono}"><i class="ti ${icono}"></i></span>${titulo}</div>
+      <div class="kpi-val">${valor}</div>
+      <div class="kpi-sub">${sub}</div>
+    </button>`;
+  el.innerHTML = `<div class="kpi-grid">
+    ${tarjeta('Facturas proveedor atrasadas', 'ti-alert-triangle', atrasadas.length ? 'rojo' : 'verde', fpp ? recNum(atrasadas.length) : '—',
+      fpp ? (atrasadas.length ? clp(monto(atrasadas)) + ' vencido' : 'todo al día') : 'cargando…', 'facturas', 'facturas-por-pagar')}
+    ${tarjeta('Por pagar en 7 días', 'ti-calendar-due', semana.length ? 'ambar' : 'verde', fpp ? recNum(semana.length) : '—',
+      fpp ? (semana.length ? clp(monto(semana)) : 'nada vence esta semana') : 'cargando…', 'facturas', 'facturas-por-pagar')}
+    ${tarjeta('Órdenes por digitar', 'ti-flask', porDigitar ? 'rojo' : 'verde', porDigitar === null ? '—' : recNum(porDigitar),
+      porDigitar === null ? 'cargando…' : porDigitar ? 'órdenes de elaboración' : 'sin pendientes', 'elaboracion', 'elaboracion')}
+    ${tarjeta('Solicitudes web nuevas', 'ti-world', nuevas ? 'ambar' : 'verde', nuevas === null ? '—' : recNum(nuevas),
+      nuevas === null ? 'cargando…' : nuevas ? 'por responder' : 'sin pendientes', 'elaboracion', 'solicitudes-web')}
+  </div>`;
+}
+
 function renderInicio() {
+  renderInicioKpis();
   const cont = document.getElementById('inicio-atencion');
   if (!cont) return;
   const items = [];
