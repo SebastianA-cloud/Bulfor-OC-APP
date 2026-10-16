@@ -14081,10 +14081,156 @@ function recCmRender() {
       </div>
     </div>
     ${abierta ? recCmPanelHtml(abierta) : ''}`;
-  if (abierta) recCmActivarGrafico();
+  if (abierta) { recCmActivarGrafico(); recCmActivarGraficoCC(); recCmCargarConsumo(abierta.id_producto); }
 }
 
 // Panel lateral de una materia: datos clave, historia de precios y últimas compras.
+// ── Compras vs consumo de una materia ──────────────────────────────────
+// Compras: rec_ingresos (ya cargadas). Consumo: lo que usaron las RM
+// elaboradas (rec_lineas.cant_stock, en la misma unidad de stock), que se
+// pide al abrir la materia y queda guardado mientras la página esté abierta.
+const REC_CM_PERIODOS = [
+  { id: '30', label: '30 días', dias: 30, tramo: 5 },
+  { id: '90', label: '90 días', dias: 91, tramo: 7 },
+  { id: '180', label: '6 meses', meses: 6 },
+  { id: '365', label: '1 año', meses: 12 },
+];
+let recCmPeriodo = '90';
+const recCmConsumo = {};   // id_producto -> [{ d: 'YYYY-MM-DD', cant, rm }] | 'cargando' | 'error'
+
+function recCmSetPeriodo(id) { recCmPeriodo = id; recCmRender(); }
+
+function recCmFechaCL(ts) {
+  return new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+}
+
+async function recCmCargarConsumo(id) {
+  if (recCmConsumo[id]) return;
+  recCmConsumo[id] = 'cargando';
+  try {
+    const desde = new Date(Date.now() - 370 * 86400000).toISOString();
+    const filas = await fetchAll('rec_lineas', `select=fecha,cant_stock,id_rp_detalle&id_producto=eq.${id}&fecha=gte.${desde}&order=fecha.asc`);
+    recCmConsumo[id] = (filas || []).map(l => ({ d: recCmFechaCL(l.fecha), cant: Number(l.cant_stock) || 0, rm: l.id_rp_detalle }));
+  } catch (e) {
+    recCmConsumo[id] = 'error';
+  }
+  if (recCmAbierta === id) {
+    const el = document.getElementById('rec-cm-cc');
+    const m = recCmMaterias.find(x => x.id_producto === id);
+    if (el && m) { el.innerHTML = recCmCompVsConsHtml(m); recCmActivarGraficoCC(); }
+  }
+}
+
+// Tramos del gráfico: días fijos (30 → 6 de 5 días, 90 → 13 semanas) o meses calendario.
+function recCmTramos(per) {
+  const hoy = fechaLocalISO();
+  const iso = d => d.toLocaleDateString('sv-SE');
+  if (per.meses) {
+    const t = [], base = new Date(hoy + 'T12:00:00');
+    for (let i = per.meses - 1; i >= 0; i--) {
+      const ini = new Date(base.getFullYear(), base.getMonth() - i, 1, 12);
+      const fin = new Date(base.getFullYear(), base.getMonth() - i + 1, 0, 12);
+      t.push({ ini: iso(ini), fin: i === 0 ? hoy : iso(fin), label: ini.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '') });
+    }
+    return t;
+  }
+  const t = [], n = Math.round(per.dias / per.tramo);
+  for (let i = n - 1; i >= 0; i--) {
+    const fin = new Date(hoy + 'T12:00:00'); fin.setDate(fin.getDate() - i * per.tramo);
+    const ini = new Date(fin); ini.setDate(ini.getDate() - per.tramo + 1);
+    t.push({ ini: iso(ini), fin: iso(fin), label: ini.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }) });
+  }
+  return t;
+}
+
+function recCmCompVsConsHtml(m) {
+  const cons = recCmConsumo[m.id_producto];
+  if (!cons || cons === 'cargando') return '<div class="skeleton" style="height:200px"></div>';
+  if (cons === 'error') return '<div style="font-size:12px;color:var(--text-3)">No se pudo cargar el consumo de esta materia.</div>';
+  const per = REC_CM_PERIODOS.find(x => x.id === recCmPeriodo) || REC_CM_PERIODOS[1];
+  const tramos = recCmTramos(per);
+  const desde = tramos[0].ini, hasta = tramos[tramos.length - 1].fin;
+  const compras = (recCmComprasPorMateria[m.id_producto] || []).map(c => ({ d: String(c.fecha).slice(0, 10), cant: Number(c.cantidad) || 0 }));
+  const enTramo = (lista, t) => lista.reduce((s, x) => x.d >= t.ini && x.d <= t.fin ? s + x.cant : s, 0);
+  tramos.forEach(t => { t.compra = enTramo(compras, t); t.consumo = enTramo(cons, t); });
+  const totC = tramos.reduce((s, t) => s + t.compra, 0), totU = tramos.reduce((s, t) => s + t.consumo, 0);
+  const nRm = new Set(cons.filter(x => x.d >= desde && x.d <= hasta).map(x => x.rm)).size;
+  const u = m.unidad_stock || '';
+  const num = n => recNum(n, n && Math.abs(n) < 10 ? 2 : 0);
+  const dias = Math.round((new Date(hasta) - new Date(desde)) / 86400000) + 1;
+  const diario = totU / dias;
+  const dif = totC - totU;
+  window._recCmTramos = tramos.map(t => ({ ...t, u }));
+  const dato = (label, valor, extra = '') => `<div class="drawer-dato"><label>${label}</label><span${extra}>${valor}</span></div>`;
+  return `
+    <div class="drawer-datos">
+      ${dato('Comprado', `<i class="cc-dot" style="background:var(--cc-compra)"></i>${num(totC)} ${u}`)}
+      ${dato('Consumido', `<i class="cc-dot" style="background:var(--cc-consumo)"></i>${num(totU)} ${u}`)}
+      ${dato('Diferencia', `${dif > 0 ? '+' : ''}${num(dif)} ${u}`, ` style="color:${dif < 0 ? 'var(--red)' : 'var(--text)'}" title="${dif < 0 ? 'Se consumió más de lo que se compró en el período' : 'Se compró igual o más de lo que se consumió'}"`)}
+      ${dato('Consumo diario', `${num(diario)} ${u}`)}
+      ${dato('Usada en', `${recNum(nRm)} RM`)}
+      ${dato('Lo comprado alcanza', diario > 0 && totC > 0 ? `${recNum(Math.round(totC / diario))} días` : '—', ' title="Lo comprado en el período dividido por el consumo diario"')}
+    </div>
+    ${totC || totU ? `<div class="mini-graf cc-graf" id="rec-cm-cc-graf">${recCmGraficoCCSvg(tramos)}</div>
+    <div class="cc-leyenda"><span><i class="cc-dot" style="background:var(--cc-compra)"></i>Compras</span><span><i class="cc-dot" style="background:var(--cc-consumo)"></i>Consumo en RM</span><span style="margin-left:auto">${u ? 'en ' + u : ''}</span></div>`
+      : '<div style="font-size:12px;color:var(--text-3);margin-top:10px">Sin compras ni consumo en este período.</div>'}`;
+}
+
+// Barras agrupadas compras / consumo por tramo, con eje y recesivo.
+function recCmGraficoCCSvg(tramos) {
+  const W = 520, H = 190, pl = 44, pr = 6, pt = 10, pb = 24;
+  const max = Math.max(...tramos.flatMap(t => [t.compra, t.consumo]), 0) || 1;
+  const paso = Math.pow(10, Math.floor(Math.log10(max)));
+  const tope = Math.ceil(max / paso) * paso;
+  const sy = v => pt + (1 - v / tope) * (H - pt - pb);
+  const g = (W - pl - pr) / tramos.length;
+  const bw = Math.max(3, Math.min(16, g * 0.32));
+  const fmt = v => v >= 1000 ? (v / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + 'k' : v.toLocaleString('es-CL', { maximumFractionDigits: 1 });
+  const cada = Math.ceil(tramos.length / 7);
+  const barra = (x, v, color) => {
+    if (!v) return '';
+    const y = sy(v), h = H - pb - y, r = Math.min(4, bw / 2, h);
+    return `<path d="M${x},${H - pb} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${H - pb} Z" fill="${color}"/>`;
+  };
+  let s = '';
+  [0, tope / 2, tope].forEach(v => {
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--border)" ${v ? 'stroke-dasharray="3 3"' : ''}/>`;
+    s += `<text x="${pl - 6}" y="${sy(v) + 4}" text-anchor="end" font-size="10" fill="var(--text-3)">${fmt(v)}</text>`;
+  });
+  tramos.forEach((t, i) => {
+    const cx = pl + g * i + g / 2;
+    s += barra(cx - bw - 1, t.compra, 'var(--cc-compra)') + barra(cx + 1, t.consumo, 'var(--cc-consumo)');
+    if (i % cada === 0 || i === tramos.length - 1) s += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--text-3)">${t.label}</text>`;
+    s += `<rect class="cc-hit" data-i="${i}" x="${pl + g * i}" y="${pt}" width="${g}" height="${H - pt - pb}" fill="transparent"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Compras y consumo por período">${s}</svg><div class="tip" id="rec-cm-cc-tip" style="display:none"></div>`;
+}
+
+function recCmActivarGraficoCC() {
+  const caja = document.getElementById('rec-cm-cc-graf');
+  if (!caja) return;
+  const svg = caja.querySelector('svg'), tip = document.getElementById('rec-cm-cc-tip');
+  svg.querySelectorAll('.cc-hit').forEach(r => {
+    const mostrar = () => {
+      const t = (window._recCmTramos || [])[Number(r.dataset.i)];
+      if (!t) return;
+      svg.querySelectorAll('.cc-hit').forEach(x => x.setAttribute('fill', 'transparent'));
+      r.setAttribute('fill', 'rgba(26,25,23,.05)');
+      const box = svg.getBoundingClientRect(), rb = r.getBoundingClientRect();
+      const n = v => recNum(v, v && v < 10 ? 2 : 0);
+      tip.innerHTML = `${n(t.compra)} comprado · ${n(t.consumo)} consumido ${t.u}<small>${fDate(t.ini)} al ${fDate(t.fin)}</small>`;
+      tip.style.display = '';
+      // Que el globo no se salga por los bordes del panel.
+      const mitad = tip.offsetWidth / 2, x = rb.left - box.left + rb.width / 2;
+      tip.style.left = Math.min(Math.max(x, mitad), box.width - mitad) + 'px';
+      tip.style.top = '30px';
+    };
+    r.addEventListener('pointerenter', mostrar);
+    r.addEventListener('pointerdown', mostrar);
+  });
+  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; svg.querySelectorAll('.cc-hit').forEach(x => x.setAttribute('fill', 'transparent')); });
+}
+
 function recCmPanelHtml(m) {
   const compras = recCmComprasPorMateria[m.id_producto] || [];
   const ult = m._ult;
@@ -14114,6 +14260,10 @@ function recCmPanelHtml(m) {
           ${dato('Última compra', ult ? recCmDiasDesde(ult.fecha) : '—')}
           ${dato('Proveedores', recNum(m._provs.size))}
         </div>
+        <div class="drawer-seccion cc-cab">Compras vs consumo
+          <div class="fpp-status-tabs cc-tabs">${REC_CM_PERIODOS.map(pr => `<button class="fpp-status-tab${pr.id === recCmPeriodo ? ' active' : ''}" onclick="recCmSetPeriodo('${pr.id}')">${pr.label}</button>`).join('')}</div>
+        </div>
+        <div id="rec-cm-cc">${recCmCompVsConsHtml(m)}</div>
         ${compras.length > 1 ? `<div class="drawer-seccion">Historia de precios${compras.length > 24 ? ' · últimas 24 compras' : ''}</div><div class="mini-graf" id="rec-cm-graf">${recCmGraficoSvg(compras.slice(0, 24).reverse())}</div>` : ''}
         <div class="table-card drawer-compras">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</div>
       </div>
