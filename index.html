@@ -12953,11 +12953,21 @@ async function recRpc(fn, params) {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function cargarRecResumen() {
+// El resumen llega después de que se dibuja la página: al llegar se
+// repintan todas las píldoras de estado del recetario (no solo la de Buscar
+// RM), y se vuelve a pedir si tiene más de 5 minutos.
+let recResumenEn = 0, recResumenCargando = null;
+function cargarRecResumen() {
+  if (!recResumenCargando) recResumenCargando = cargarRecResumenAhora().finally(() => { recResumenCargando = null; });
+  return recResumenCargando;
+}
+async function cargarRecResumenAhora() {
   try {
     const res = await sb('rpc/rec_resumen');
     if (!res.ok) return;
     recResumen = await res.json();
+    recResumenEn = Date.now();
+    document.querySelectorAll('[id^="rec-estado-"]').forEach(el => { if (el.innerHTML) el.innerHTML = recEstadoHtml(); });
     const n = recResumen?.rm_lote_vencido_7d || 0;
     ['badge-rec-alertas', 'badge-rec-alertas-mobile', 'badge-rec-alertas-tab'].forEach(id => {
       const el = document.getElementById(id);
@@ -12986,6 +12996,7 @@ function recEstadoHtml() {
 function recPintarEstado(id) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = recEstadoHtml();
+  if (!recResumen || Date.now() - recResumenEn > 5 * 60 * 1000) cargarRecResumen();
 }
 
 function recTabsHtml(opciones, activo, fn) {
