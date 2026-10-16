@@ -159,9 +159,8 @@
       <div class="nav-subgroup" id="subgroup-recetario-modulo">
         <div class="nav-item nav-subitem" data-page="rec-buscar" onclick="seleccionarSubpagina('recetario-modulo','rec-buscar',this)"><span>Buscar RM</span></div>
         <div class="nav-item nav-subitem" data-page="rec-preparados" onclick="seleccionarSubpagina('recetario-modulo','rec-preparados',this)"><span>Preparados</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-compras" onclick="seleccionarSubpagina('recetario-modulo','rec-compras',this)"><span>Compras de materias</span></div>
+        <div class="nav-item nav-subitem" data-page="rec-compras" onclick="seleccionarSubpagina('recetario-modulo','rec-compras',this)"><span>Consumo y compras</span></div>
         <div class="nav-item nav-subitem" data-page="rec-alertas" onclick="seleccionarSubpagina('recetario-modulo','rec-alertas',this)"><span>Alertas de lotes</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-materias" onclick="seleccionarSubpagina('recetario-modulo','rec-materias',this)"><span>Materias primas</span></div>
         <div class="nav-item nav-subitem" data-page="rec-costos" onclick="seleccionarSubpagina('recetario-modulo','rec-costos',this)"><span>Costos y márgenes</span></div>
         <div class="nav-item nav-subitem" data-page="rec-produccion" onclick="seleccionarSubpagina('recetario-modulo','rec-produccion',this)"><span>Producción</span></div>
       </div>
@@ -853,10 +852,11 @@
 
   <div class="page" id="page-rec-compras">
     <div class="page-header">
-      <div class="page-title">Compras de materias</div>
-      <div class="page-sub">Precio, variación y facturas de cada materia prima</div>
+      <div class="page-title">Consumo y compras</div>
+      <div class="page-sub">Lo que se compra y se consume, con precios y facturas</div>
     </div>
     <div id="rec-estado-compras"></div>
+    <div class="fpp-status-tabs" id="rec-cm-tabs" style="display:inline-flex;margin-bottom:var(--bloque-gap)"></div>
     <div id="rec-cm-kpis"></div>
     <div class="toolbar toolbar-compacta">
       <div class="search-wrap">
@@ -13802,6 +13802,40 @@ const REC_CM_SIN_COMPRA_DIAS = 180;
 
 // Clave para ordenar por nombre ignorando guiones, puntos o asteriscos al
 // inicio: "--VITAMINA B2 NO VIGENTE" queda en la V, no al principio.
+// Pestañas de Consumo y compras: materias primas vs envases e insumos
+// (frascos, potes, tapas, bolsas, cápsulas vacías, etiquetas, guantes…).
+// Se clasifica por nombre y unidad; los M.R. y los sachets de una materia
+// son materia prima aunque se cuenten por unidad.
+let recCmGrupo = 'mp', recCmInsumoPorId = {};
+const REC_CM_INSUMO_NOMBRE = /^(BOLSA|BOT\.|BOTELLA|BOTE |POTE|POMO|TAPA|TAPON|CONTRATAPA|FRASCO|FCO |ENVASE|GOTARIO|GOTERO|ATOMIZADOR|BOMBA DISP|CAPSULA|NO USAR CAPSULA|CAJA|ETIQ|FILM|PAPEL|CINTA|GUANTE|GORRO|MASCARILLA|JABON|ALCOHOL GEL|BIDON|SELLOS|MANGA)/;
+const REC_CM_MATERIA_NOMBRE = /^(M\.?\s?R\.?\s|MR |--|POVISEPT|POTASIO|VITAMINA)/;
+function recCmEsInsumo(m) {
+  const nombre = String(m.nombre || '').trim().toUpperCase();
+  if (REC_CM_MATERIA_NOMBRE.test(nombre)) return false;
+  const u = String(m.unidad_stock || '').trim().toUpperCase();
+  return u === 'UN' || u === 'CAJ' || REC_CM_INSUMO_NOMBRE.test(nombre);
+}
+const recCmEnGrupo = m => (recCmGrupo === 'ins') === m._insumo;
+
+function recCmSetGrupo(g) {
+  if (g === recCmGrupo) return;
+  recCmGrupo = g;
+  recCmExtra = '';
+  ['rec-cm-q', 'rec-cm-prov'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  recCmLlenarProveedores();
+  recCmFiltrar();
+}
+
+function recCmRenderTabs() {
+  const el = document.getElementById('rec-cm-tabs');
+  if (!el || !recCmMaterias) return;
+  const n = g => recCmMaterias.filter(m => m._insumo === (g === 'ins')).length;
+  el.innerHTML = [['mp', 'Materias primas', 'ti-flask'], ['ins', 'Envases e insumos', 'ti-package']].map(([g, t, i]) =>
+    `<button class="fpp-status-tab${recCmGrupo === g ? ' active' : ''}" onclick="recCmSetGrupo('${g}')"><i class="ti ${i}" style="margin-right:6px"></i>${t} <span style="color:var(--text-3);margin-left:6px">${recNum(n(g))}</span></button>`).join('');
+  const q = document.getElementById('rec-cm-q');
+  if (q) q.placeholder = recCmGrupo === 'ins' ? 'Buscar envase o insumo (ej. pote, frasco gotario, cápsula)…' : 'Buscar materia prima (ej. captopril, glicerina)…';
+}
+
 function claveOrdenNombre(nombre) {
   return String(nombre || '').trim().replace(/^[^0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/, '');
 }
@@ -13850,8 +13884,10 @@ async function recCmCargar() {
         const compras = recCmComprasPorMateria[m.id_producto] || [];
         const ult = compras[0], prev = compras[1];
         const variacion = ult && prev && Number(prev.precio_compra) ? (Number(ult.precio_compra) - Number(prev.precio_compra)) / Number(prev.precio_compra) : null;
-        return { ...m, _ult: ult || null, _variacion: variacion, _nCompras: compras.length, _provs: new Set(compras.map(c => c.id_proveedor)) };
+        return { ...m, _ult: ult || null, _variacion: variacion, _nCompras: compras.length, _provs: new Set(compras.map(c => c.id_proveedor)), _insumo: recCmEsInsumo(m) };
       });
+    recCmInsumoPorId = {};
+    (materias || []).forEach(m => { recCmInsumoPorId[m.id_producto] = recCmEsInsumo(m); });
     recCmLlenarProveedores();
   } catch (e) {
     document.getElementById('rec-cm-kpis').innerHTML = '';
@@ -13872,33 +13908,37 @@ function recCmRenderKpis() {
   const d30 = recCmHaceDias(30), d60 = recCmHaceDias(60);
   let gasto = 0, gastoPrev = 0;
   const porProv = {};
+  const esIns = recCmGrupo === 'ins';
   recCmIngresos.forEach(c => {
+    if (!!recCmInsumoPorId[c.id_producto] !== esIns) return;
     const f = String(c.fecha).slice(0, 10);
     const monto = (Number(c.cantidad) || 0) * (Number(c.precio_compra) || 0);
     if (f >= d30) { gasto += monto; porProv[c.id_proveedor] = (porProv[c.id_proveedor] || 0) + monto; }
     else if (f >= d60) gastoPrev += monto;
   });
   const cambio = gastoPrev ? (gasto - gastoPrev) / gastoPrev : null;
-  const alzas = recCmMaterias.filter(recCmEsAlza).length;
-  const sinCompra = recCmMaterias.filter(recCmEsSinCompra).length;
+  const delGrupo = recCmMaterias.filter(recCmEnGrupo);
+  const alzas = delGrupo.filter(recCmEsAlza).length;
+  const sinCompra = delGrupo.filter(recCmEsSinCompra).length;
+  const cosas = esIns ? 'artículos' : 'materias';
   const [provTop, provMonto] = Object.entries(porProv).sort((a, b) => b[1] - a[1])[0] || [];
   const provSel = document.getElementById('rec-cm-prov')?.value || '';
   const pct = v => (Math.abs(v) * 100).toLocaleString('es-CL', { maximumFractionDigits: 0 }) + '%';
   el.innerHTML = `<div class="kpi-grid">
     <div class="kpi">
-      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-receipt"></i></span>Gasto en materias · 30 días</div>
+      <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-receipt"></i></span>Gasto · 30 días</div>
       <div class="kpi-val">${recClp(gasto)}</div>
       <div class="kpi-sub">${cambio === null ? 'sin compras el período anterior' : `<span class="${cambio > 0 ? 'sube' : 'baja'}">${cambio > 0 ? '▲' : '▼'} ${pct(cambio)}</span> vs los 30 días anteriores`}</div>
     </div>
     <button class="kpi${recCmExtra === 'alza' ? ' activa' : ''}" onclick="recCmSetExtra('alza')" title="Ver las materias cuyo último precio subió más de ${REC_CM_ALZA * 100}%">
       <div class="kpi-top"><span class="kpi-ico ${alzas ? 'rojo' : 'verde'}"><i class="ti ti-trending-up"></i></span>Alzas sobre ${REC_CM_ALZA * 100}%</div>
       <div class="kpi-val">${recNum(alzas)}</div>
-      <div class="kpi-sub">materias compradas en los últimos 3 meses</div>
+      <div class="kpi-sub">${cosas} comprados en los últimos 3 meses</div>
     </button>
-    <button class="kpi${recCmExtra === 'sin6m' ? ' activa' : ''}" onclick="recCmSetExtra('sin6m')" title="Ver las materias activas que no se compran hace más de 6 meses">
+    <button class="kpi${recCmExtra === 'sin6m' ? ' activa' : ''}" onclick="recCmSetExtra('sin6m')" title="Ver los ${cosas} activos que no se compran hace más de 6 meses">
       <div class="kpi-top"><span class="kpi-ico ${sinCompra ? 'ambar' : 'verde'}"><i class="ti ti-clock-pause"></i></span>Sin comprar hace +6 meses</div>
       <div class="kpi-val">${recNum(sinCompra)}</div>
-      <div class="kpi-sub">materias activas</div>
+      <div class="kpi-sub">${cosas} activos</div>
     </button>
     <button class="kpi${provTop && provSel === String(provTop) ? ' activa' : ''}" ${provTop ? `onclick="recCmFiltrarProveedor('${provTop}')"` : 'disabled'} title="Ver las materias que se le compran a este proveedor">
       <div class="kpi-top"><span class="kpi-ico"><i class="ti ti-building-store"></i></span>Proveedor principal · 30 días</div>
@@ -13925,7 +13965,7 @@ function recCmLlenarProveedores() {
   if (!sel) return;
   const actual = sel.value;
   const ids = new Set();
-  Object.values(recCmComprasPorMateria || {}).forEach(cs => cs.forEach(c => ids.add(c.id_proveedor)));
+  Object.values(recCmComprasPorMateria || {}).forEach(cs => cs.forEach(c => { if (!!recCmInsumoPorId[c.id_producto] === (recCmGrupo === 'ins')) ids.add(c.id_proveedor); }));
   const opciones = (recProveedoresRec || [])
     .filter(p => ids.has(p.id_proveedor))
     .map(p => ({ id: p.id_proveedor, nombre: String(p.nombre || p.razon_social || p.id_proveedor).trim() }))
@@ -13941,6 +13981,7 @@ function recCmFiltrar() {
   const periodo = document.getElementById('rec-cm-periodo')?.value || '';
   const estado = document.getElementById('rec-cm-estado')?.value || '';
   recCmF = recCmMaterias.filter(m => {
+    if (!recCmEnGrupo(m)) return false;
     if (q && !coincideBusqueda(String(m.nombre || ''), q)) return false;
     if (prov && !m._provs.has(Number(prov)) && !m._provs.has(prov)) return false;
     if (estado === 'activas' && !m.activo) return false;
@@ -13956,6 +13997,7 @@ function recCmFiltrar() {
   recCmOrdenar();
   recCmPagina = 1;
   recCmAbierta = null;
+  recCmRenderTabs();
   recCmRenderKpis();
   recCmRenderChips();
   recCmRender();
@@ -14049,7 +14091,7 @@ function recCmRender() {
   const cont = document.getElementById('rec-cm-cont');
   if (!recCmF.length) {
     cont.innerHTML = recCmMaterias && recCmMaterias.length
-      ? `<div class="table-card"><div class="empty-state"><i class="ti ti-filter-off"></i><h4>Ninguna materia cumple estos filtros</h4><p>Prueba quitando alguno, o <a onclick="recCmLimpiar()">limpia todos los filtros</a>.</p></div></div>`
+      ? `<div class="table-card"><div class="empty-state"><i class="ti ti-filter-off"></i><h4>Nada cumple estos filtros</h4><p>Prueba quitando alguno, o <a onclick="recCmLimpiar()">limpia todos los filtros</a>.</p></div></div>`
       : `<div class="table-card"><div class="empty-state"><i class="ti ti-database-off"></i><h4>Todavía no hay materias primas sincronizadas</h4></div></div>`;
     return;
   }
@@ -14064,7 +14106,7 @@ function recCmRender() {
   cont.innerHTML = `
     <div class="table-card">
       <table>
-        <thead><tr>${th('nombre', 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}</tr></thead>
+        <thead><tr>${th('nombre', recCmGrupo === 'ins' ? 'Envase o insumo' : 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}</tr></thead>
         <tbody>
           ${pagina.map(m => {
             const ult = m._ult;
@@ -14072,7 +14114,7 @@ function recCmRender() {
             const prov = ult ? recCmNombreProv(ult.id_proveedor) : '';
             return `
             <tr onclick="recCmAbrir(${m.id_producto})" class="${abierta && abierta.id_producto === m.id_producto ? 'fila-sel' : ''}" title="Ver detalle e historia de precios">
-              <td data-label="Materia prima"><div class="celda">
+              <td data-label="Nombre"><div class="celda">
                 <div class="celda-pri">${m.nombre}${m.activo ? '' : ' <span class="badge badge-gray">Inactiva</span>'}</div>
                 <div class="celda-sec">${m._nCompras ? `${prov ? prov + ' · ' : ''}${recNum(m._nCompras)} compra${m._nCompras === 1 ? '' : 's'}` : 'Sin compras registradas'}</div>
               </div></td>
@@ -14084,7 +14126,7 @@ function recCmRender() {
         </tbody>
       </table>
       <div class="pagination">
-        <span>${recNum(recCmF.length)} materia${recCmF.length === 1 ? '' : 's'} prima${recCmF.length === 1 ? '' : 's'}${totalPag > 1 ? ` · página ${recCmPagina} de ${totalPag}` : ''}</span>
+        <span>${recNum(recCmF.length)} ${recCmGrupo === 'ins' ? (recCmF.length === 1 ? 'envase o insumo' : 'envases e insumos') : (recCmF.length === 1 ? 'materia prima' : 'materias primas')}${totalPag > 1 ? ` · página ${recCmPagina} de ${totalPag}` : ''}</span>
         ${totalPag > 1 ? `<div class="page-btns">
           <button class="page-btn" ${recCmPagina <= 1 ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina - 1})">‹</button>
           <button class="page-btn" ${recCmPagina >= totalPag ? 'disabled' : ''} onclick="recCmIrPagina(${recCmPagina + 1})">›</button>
@@ -14256,7 +14298,7 @@ function recCmPanelHtml(m) {
     <aside class="drawer" role="dialog" aria-label="Detalle de ${m.nombre}">
       <div class="drawer-head">
         <div>
-          <div class="drawer-eyebrow">Materia prima</div>
+          <div class="drawer-eyebrow">${m._insumo ? 'Envase o insumo' : 'Materia prima'}</div>
           <div class="drawer-titulo">${m.nombre}</div>
           <div class="drawer-sub">${m.unidad_stock ? 'Unidad: ' + m.unidad_stock : ''}${m.activo ? '' : ' · Inactiva'}</div>
         </div>
@@ -15019,9 +15061,8 @@ const SUBMENUS = {
   'recetario-modulo': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
     { icon: '<i class="ti ti-list-details"></i>', label: 'Preparados', page: 'rec-preparados' },
-    { icon: '<i class="ti ti-receipt"></i>', label: 'Compras de materias', page: 'rec-compras' },
+    { icon: '<i class="ti ti-receipt"></i>', label: 'Consumo y compras', page: 'rec-compras' },
     { icon: '<i class="ti ti-alert-triangle"></i>', label: 'Alertas de lotes', page: 'rec-alertas' },
-    { icon: '<i class="ti ti-flask"></i>', label: 'Materias primas', page: 'rec-materias' },
     { icon: '<i class="ti ti-coin"></i>', label: 'Costos y márgenes', page: 'rec-costos' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Producción', page: 'rec-produccion' },
   ] },
