@@ -72,6 +72,132 @@ function dteNuevo(tipo) {
 function dteGuardarBorrador(t) { try { localStorage.setItem('bulfor_dte_' + t, JSON.stringify(dteEstado[t])); } catch (e) { /* sin almacenamiento */ } }
 function dteCargarBorrador(t) { try { const s = localStorage.getItem('bulfor_dte_' + t); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
+// ── Borradores guardados: listado aparte, como en GDExpress. Se abren
+// después con toda la información para seguir editando o enviarlos.
+// Se borran solos a los 30 días y al emitir el documento.
+const DTE_BORR_KEY = 'bulfor_dte_borradores';
+const DTE_BORR_DIAS = 30;
+const DTE_PAGINAS = { 33: 'doc-factura', 52: 'doc-guia' };
+const DTE_TIPO_LARGO = { 33: '(33) Factura afecta', 52: '(52) Guía de despacho' };
+function dteBorradores() {
+  let l = [];
+  try { l = JSON.parse(localStorage.getItem(DTE_BORR_KEY) || '[]'); } catch (e) { /* sin almacenamiento */ }
+  const limite = Date.now() - DTE_BORR_DIAS * 864e5;
+  const vigentes = l.filter(b => b && b.datos && b.editado >= limite);
+  if (vigentes.length !== l.length) dteGuardarBorradores(vigentes);
+  return vigentes;
+}
+function dteGuardarBorradores(l) {
+  try { localStorage.setItem(DTE_BORR_KEY, JSON.stringify(l)); } catch (e) { /* sin almacenamiento */ }
+  dteFabActualizar();
+}
+const dteUsuario = () => (typeof sesionActual !== 'undefined' && sesionActual?.email) || '';
+const dteTieneDatos = s => !!(s && (s.rut || s.recep?.rzn || (s.det || []).some(d => d.nombre || d.qty || d.precio)));
+
+function dteGuardarComoBorrador(t) {
+  const s = dteEstado[t];
+  if (!dteTieneDatos(s)) { toast('El documento está vacío: no hay nada que guardar.', 'err'); return; }
+  const l = dteBorradores();
+  const ahora = Date.now();
+  let b = s.borradorId && l.find(x => x.id === s.borradorId);
+  if (!b) {
+    b = { id: 'b' + ahora.toString(36) + Math.random().toString(36).slice(2, 6), tipo: t, creado: ahora, creadoPor: dteUsuario() };
+    l.unshift(b);
+    s.borradorId = b.id;
+  }
+  Object.assign(b, { editado: ahora, editadoPor: dteUsuario(), datos: JSON.parse(JSON.stringify(s)) });
+  dteGuardarBorradores(l);
+  dteGuardarBorrador(t);
+  dteRender(t);
+  toast('Borrador guardado correctamente.');
+}
+
+function dteAbrirBorrador(id) {
+  const b = dteBorradores().find(x => x.id === id);
+  if (!b) { toast('Ese borrador ya no existe.', 'err'); dteBorradoresRender(); return; }
+  const t = b.tipo;
+  const actual = dteEstado[t] || dteCargarBorrador(t);
+  if (actual && actual.borradorId !== id && !actual.borradorId && dteTieneDatos(actual)
+      && !confirm(`Tienes una ${DTE_NOMBRES[t]} a medio escribir que no está guardada como borrador. ¿Reemplazarla por este borrador?`)) return;
+  dteEstado[t] = { ...dteNuevo(t), ...JSON.parse(JSON.stringify(b.datos)), borradorId: id };
+  dteGuardarBorrador(t);
+  irAModuloPagina('documentos', DTE_PAGINAS[t]);
+}
+
+function dteQuitarDeBorradores(id) {
+  if (!id) return;
+  dteGuardarBorradores(dteBorradores().filter(x => x.id !== id));
+  [33, 52].forEach(t => { if (dteEstado[t] && dteEstado[t].borradorId === id) { delete dteEstado[t].borradorId; dteGuardarBorrador(t); } });
+}
+function dteEliminarBorrador(id) {
+  if (!confirm('¿Eliminar este borrador?')) return;
+  dteQuitarDeBorradores(id);
+  dteBorradoresRender();
+}
+function dteEliminarTodosBorradores() {
+  const l = dteBorradores();
+  if (!l.length || !confirm(`¿Eliminar los ${l.length} borradores?`)) return;
+  l.forEach(b => dteQuitarDeBorradores(b.id));
+  dteBorradoresRender();
+}
+
+function dteBorradoresInit() { dteBorradoresRender(); }
+function dteBorradoresRender() {
+  const cont = document.getElementById('dte-borradores');
+  if (!cont) return;
+  const l = dteBorradores().sort((a, b) => b.editado - a.editado);
+  const fecha = ts => new Date(ts).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const filas = l.map(b => {
+    const s = b.datos;
+    return `<tr class="dte-borr-fila" onclick="dteAbrirBorrador('${b.id}')">
+      <td>${fecha(b.creado)}</td>
+      <td>${DTE_TIPO_LARGO[b.tipo] || b.tipo}</td>
+      <td>${dteEsc(s.rut || '—')}</td>
+      <td class="dte-borr-rzn">${dteEsc(s.recep?.rzn || '—')}</td>
+      <td style="text-align:right">${dteClp(dteTotales(s).total)}</td>
+      <td>${fecha(b.editado)}<small class="dte-sub">${dteEsc(b.editadoPor || b.creadoPor || '')}</small></td>
+      <td class="dte-borr-acc" onclick="event.stopPropagation()">
+        <button class="dte-icono" title="Abrir y editar" onclick="dteAbrirBorrador('${b.id}')"><i class="ti ti-pencil"></i></button>
+        <button class="dte-icono dte-icono-rojo" title="Eliminar" onclick="dteEliminarBorrador('${b.id}')"><i class="ti ti-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+  cont.innerHTML = `
+    <div class="dte-card">
+      <div class="dte-borr-barra">
+        <small class="dte-sub"><i class="ti ti-info-circle"></i> Los borradores se eliminan automáticamente luego de ${DTE_BORR_DIAS} días, y al emitir el documento. Quedan guardados en este navegador.</small>
+        ${l.length ? `<button class="dte-btn dte-btn-suave" onclick="dteEliminarTodosBorradores()"><i class="ti ti-trash"></i> Eliminar todo</button>` : ''}
+      </div>
+      ${l.length ? `<div class="dte-borr-tabla"><table>
+        <thead><tr><th>Creado</th><th>Tipo de documento</th><th>RUT receptor</th><th>Razón social</th><th style="text-align:right">Total</th><th>Última edición</th><th></th></tr></thead>
+        <tbody>${filas}</tbody></table></div>`
+      : `<div class="empty-state"><i class="ti ti-file-pencil"></i><h4>No hay borradores</h4><p>En una factura o guía, aprieta “Guardar borrador” para dejarla pendiente.</p></div>`}
+    </div>`;
+}
+
+// Botón flotante (abajo a la derecha) con la cantidad de borradores.
+// Solo aparece en las páginas de documentos y si hay alguno guardado.
+let dtePaginaActual = '';
+function dteFabActualizar(pagina) {
+  if (pagina !== undefined) dtePaginaActual = pagina;
+  let fab = document.getElementById('dte-fab');
+  const n = dteBorradoresContar();
+  const mostrar = n > 0 && /^doc-/.test(dtePaginaActual) && dtePaginaActual !== 'doc-borradores';
+  if (!fab) {
+    if (!mostrar) return;
+    fab = document.createElement('button');
+    fab.id = 'dte-fab';
+    fab.className = 'dte-fab';
+    fab.title = 'Borradores';
+    fab.onclick = () => irAModuloPagina('documentos', 'doc-borradores');
+    document.body.appendChild(fab);
+  }
+  fab.innerHTML = `<i class="ti ti-files"></i><span class="dte-fab-n">${n}</span>`;
+  fab.style.display = mostrar ? '' : 'none';
+}
+function dteBorradoresContar() {
+  try { return (JSON.parse(localStorage.getItem(DTE_BORR_KEY) || '[]')).length; } catch (e) { return 0; }
+}
+
 function dteInit(tipo) {
   if (!dteEstado[tipo]) {
     const b = dteCargarBorrador(tipo);
@@ -505,8 +631,9 @@ function dteRender(t) {
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
           <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-send"></i> Emitir ${DTE_NOMBRES[t]}</button>
           <button class="dte-btn" onclick="dteVistaPrevia(${t})"><i class="ti ti-eye"></i> Vista previa</button>
+          <button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
           <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>
-          <small class="dte-sub">El borrador se guarda solo en este navegador.</small>
+          <small class="dte-sub">${s.borradorId ? '<i class="ti ti-file-pencil"></i> Está en Borradores. Si cambias algo, vuelve a apretar “Guardar borrador”.' : ''}</small>
         </div>
       </aside>
     </div>`;
@@ -624,7 +751,9 @@ async function dteEnviar(t) {
     return;
   }
   dteMostrarEmitido(t, r);
-  // Emitido: el formulario parte de nuevo para no enviarlo dos veces.
+  // Emitido: el formulario parte de nuevo para no enviarlo dos veces,
+  // y su borrador sale del listado.
+  dteQuitarDeBorradores(s.borradorId);
   dteEstado[t] = dteNuevo(t);
   dteGuardarBorrador(t);
   dteRender(t);

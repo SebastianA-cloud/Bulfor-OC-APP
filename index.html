@@ -134,6 +134,7 @@
         <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('documentos','doc-factura',this)"><span>Factura</span></div>
         <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('documentos','doc-guia',this)"><span>Guía de despacho</span></div>
         <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('documentos','doc-nc',this)"><span>Nota de crédito</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-borradores" onclick="seleccionarSubpagina('documentos','doc-borradores',this)" style="display:none"><span>Borradores</span></div>
       </div>
     </div>
 
@@ -1388,6 +1389,13 @@
       <div class="page-sub">Nota de crédito electrónica</div>
     </div>
     <div class="table-card"><div class="empty-state"><i class="ti ti-tools"></i><h4>Próximamente</h4><p>Primero dejamos funcionando la factura y la guía de despacho.</p></div></div>
+  </div>
+  <div class="page" id="page-doc-borradores">
+    <div class="page-header">
+      <div class="page-title">Borradores</div>
+      <div class="page-sub">Documentos guardados para terminar o enviar después</div>
+    </div>
+    <div id="dte-borradores"></div>
   </div>
 </main>
 
@@ -15038,6 +15046,8 @@ showPage = function(id, el) {
   if (id === 'rec-compras') recCmInit();
   if (id === 'doc-factura') dteInit(33);
   if (id === 'doc-guia') dteInit(52);
+  if (id === 'doc-borradores') dteBorradoresInit();
+  if (typeof dteFabActualizar === 'function') dteFabActualizar(id);
   if (id === 'rec-alertas') recAlertasInit(false);
   if (id === 'rec-materias') recMatInit();
   if (id === 'rec-costos') recCostosInit();
