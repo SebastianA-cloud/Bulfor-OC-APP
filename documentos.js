@@ -724,26 +724,25 @@ function dteVistaPrevia(t) {
      <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="dteEnviar(${t})"><i class="ti ti-send"></i> Enviar</button>`);
 }
 
-// Documento ya emitido: folio asignado por GDExpress y su PDF oficial.
+// Documento ya emitido: se muestra e imprime el PDF de GDExpress tal cual
+// (con su logo y el timbre del SII). La hoja de la app es solo la vista previa.
 // resultado = { folio, pdfBase64?, pdfUrl? } (lo devuelve la función del servidor).
 function dteMostrarEmitido(t, resultado) {
   const s = dteEstado[t];
-  dteEstilosHoja();
   let pdfSrc = '';
   if (resultado.pdfBase64) {
     const bytes = Uint8Array.from(atob(resultado.pdfBase64), c => c.charCodeAt(0));
     pdfSrc = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
   } else if (resultado.pdfUrl) pdfSrc = resultado.pdfUrl;
-  const titulo = `${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '').replace(/^\w/, c => c)} N° ${resultado.folio}`;
-  const oficial = pdfSrc
-    ? `<iframe class="dte-pdf" src="${dteAttr(pdfSrc)}" title="PDF oficial"></iframe>`
-    : `<div class="dte-aviso-caja">El PDF oficial todavía no está disponible; usa la hoja de la app o vuelve a abrirlo en unos minutos.</div>`;
-  window._dteUltimoEmitido = { t, folio: resultado.folio, html: dteHojaHtml(s, resultado.folio), pdfSrc };
+  const titulo = `${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '')} N° ${resultado.folio}`;
+  window._dteUltimoEmitido = { t, folio: resultado.folio, pdfSrc };
   dteModal(`${titulo} emitida`, `
     <div class="dte-ok"><i class="ti ti-circle-check"></i> ${titulo} emitida correctamente.</div>
-    ${dteTabs('dteem', [['pdf', 'PDF oficial (para imprimir)', oficial], ['doc', 'Hoja de la app', `<div class="dte-papel">${window._dteUltimoEmitido.html}</div>`]])}`,
-    `${pdfSrc ? `<button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" onclick="dteImprimirPdf()"><i class="ti ti-printer"></i> Imprimir PDF oficial</button>` : ''}
-     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(window._dteUltimoEmitido.html)"><i class="ti ti-printer"></i> Imprimir hoja de la app</button>
+    ${pdfSrc
+      ? `<iframe class="dte-pdf" src="${dteAttr(pdfSrc)}" title="PDF de GDExpress"></iframe>`
+      : `<div class="dte-aviso-caja">GDExpress todavía no entrega el PDF de este documento. Vuelve a abrirlo en unos minutos desde Facturas → Documentos.</div>`}`,
+    `${pdfSrc ? `<button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" onclick="dteImprimirPdf()"><i class="ti ti-printer"></i> Imprimir</button>
+     <a class="dte-btn" style="width:auto;padding:0 16px;text-decoration:none" href="${dteAttr(pdfSrc)}" download="${s.tipo === 33 ? 'Factura' : 'Guia'}_${resultado.folio}.pdf"><i class="ti ti-download"></i> Descargar PDF</a>` : ''}
      <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cerrar</button>`);
 }
 
