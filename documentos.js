@@ -504,7 +504,7 @@ function dteRender(t) {
           <div><span>IVA 19%</span><b id="dte-${t}-iva">${dteClp(tot.iva)}</b></div>
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
           <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-send"></i> Emitir ${DTE_NOMBRES[t]}</button>
-          <button class="dte-btn" onclick="dteVerXml(${t})"><i class="ti ti-code"></i> Ver XML</button>
+          <button class="dte-btn" onclick="dteVistaPrevia(${t})"><i class="ti ti-eye"></i> Vista previa</button>
           <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>
           <small class="dte-sub">El borrador se guarda solo en este navegador.</small>
         </div>
@@ -550,15 +550,16 @@ function dteXml(s) {
 <DTE version="1.0"><Documento ID="T${s.tipo}F0"><Encabezado><IdDoc>${idDoc}</IdDoc><Emisor>${e('RUTEmisor', DTE_EMISOR.rut)}${e('RznSoc', DTE_EMISOR.rzn)}${e('GiroEmis', DTE_EMISOR.giro)}${e('Acteco', DTE_EMISOR.acteco)}${e('Sucursal', DTE_EMISOR.sucursal)}${e('DirOrigen', DTE_EMISOR.dir)}${e('CmnaOrigen', DTE_EMISOR.cmna)}${e('CiudadOrigen', DTE_EMISOR.ciudad)}</Emisor><Receptor>${e('RUTRecep', s.rut)}${e('RznSocRecep', s.recep.rzn.trim().slice(0, 100))}${e('GiroRecep', s.recep.giro.trim().slice(0, 40))}${e('DirRecep', s.recep.dir.trim().slice(0, 70))}${e('CmnaRecep', s.recep.cmna.trim().toUpperCase())}${e('CiudadRecep', s.recep.ciudad.trim())}</Receptor>${transporte}<Totales><MntNeto>${tot.neto}</MntNeto><MntExe>0</MntExe><TasaIVA>19</TasaIVA><IVA>${tot.iva}</IVA><MntTotal>${tot.total}</MntTotal></Totales></Encabezado>${detalle}${refs}</Documento></DTE>`;
 }
 
-function dteModal(titulo, cuerpo) {
+function dteModal(titulo, cuerpo, pie) {
   cerrarTodosLosModales();
+  document.querySelectorAll('#dte-modal-overlay').forEach(m => m.remove());
   const m = document.createElement('div');
   m.className = 'modal-overlay';
   m.id = 'dte-modal-overlay';
   m.onclick = ev => { if (ev.target === m) m.remove(); };
-  m.innerHTML = `<div class="modal-shell modal-xl" onclick="event.stopPropagation()">
+  m.innerHTML = `<div class="modal-shell modal-xl" style="max-width:900px" onclick="event.stopPropagation()">
     <div class="modal-header"><div><div class="modal-title">${titulo}</div></div><button class="modal-close" onclick="document.getElementById('dte-modal-overlay').remove()" aria-label="Cerrar">✕</button></div>
-    <div class="modal-body">${cuerpo}</div></div>`;
+    <div class="modal-body">${cuerpo}</div>${pie ? `<div class="modal-footer">${pie}</div>` : ''}</div>`;
   document.body.appendChild(m);
 }
 
@@ -570,14 +571,186 @@ function dteVerXml(t) {
     <pre class="dte-xml">${dteEsc(xml)}</pre>`);
 }
 
-function dteEmitir(t) {
+function dteEmitir(t) { dteVistaPrevia(t); }
+
+function dteEnviar(t) {
   const s = dteEstado[t];
-  const err = dteValidar(s);
-  if (err.length) {
-    dteModal(`No se puede emitir todavía`, `<div class="dte-aviso-caja">Falta completar: ${dteEsc(err.join(', '))}.</div>`);
-    return;
-  }
+  if (dteValidar(s).length) return;
   if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
   dteModal(`Emisión pendiente de conectar`, `<p style="font-size:13px;line-height:1.6">La ${DTE_NOMBRES[t]} está completa y su XML está listo, pero la app todavía no está conectada a GDExpress para emitir.
-    Falta crear la función del servidor que guarda la llave de GDExpress y envía el documento (primero en homologación). Mientras tanto, puedes revisar el XML con el botón "Ver XML".</p>`);
+    Falta crear la función del servidor que guarda la llave de GDExpress y envía el documento (primero en homologación). Cuando esté conectada, al enviar aparecerá el número de folio asignado y el PDF oficial para imprimir.</p>`);
+}
+
+// ── Hoja del documento (vista previa y emitido) ──────────────────────────
+// Imita el PDF de GDExpress. En la vista previa el folio es 0 y lleva la
+// marca "VISTA PREVIA"; el documento emitido muestra su folio, pero el que
+// vale para imprimir es el PDF oficial de GDExpress (trae el timbre del SII).
+const DTE_EMISOR_HOJA = { giro: 'Farmacia y Droguería', dir: 'Coquimbo - 35, 1 - Santiago', email: 'genoveva@farmaciabulfor.cl', fono: '22 6355809', sii: 'S.I.I. - SANTIAGO CENTRO' };
+const DTE_TITULOS = { 33: 'FACTURA ELECTRONICA', 52: 'GUIA DE DESPACHO ELECTRONICA' };
+const DTE_NOMBRE_REF = Object.fromEntries(DTE_TIPOS_REF.map(([v, l]) => [v, l.replace(/^\S+ · /, '')]));
+const DTE_HOJA_CSS = `
+.dh-hoja { position: relative; background: #fff; color: #111; width: 780px; max-width: 100%; margin: 0 auto; padding: 28px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; box-sizing: border-box; }
+.dh-cab { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+.dh-emisor { display: flex; gap: 12px; align-items: flex-start; }
+.dh-emisor img { width: 64px; height: 64px; border-radius: 12px; }
+.dh-emisor h1 { font-size: 15px; margin: 0 0 4px; line-height: 1.2; }
+.dh-emisor div { font-size: 12px; line-height: 1.4; }
+.dh-caja { border: 2.5px solid #D0021B; color: #D0021B; text-align: center; padding: 12px 18px; min-width: 250px; font-weight: 700; }
+.dh-caja div { margin: 6px 0; font-size: 14px; }
+.dh-sii { color: #D0021B; text-align: center; font-weight: 700; font-size: 12px; margin-top: 8px; }
+.dh-tabla { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.dh-tabla th, .dh-tabla td { border: 1px solid #111; padding: 3px 6px; text-align: left; vertical-align: top; font-size: 10.5px; }
+.dh-tabla th { background: #fff !important; color: #111 !important; font-weight: 700; text-align: center; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.dh-hoja td { color: #111; }
+.dh-datos { border: 1px solid #111; margin-top: 14px; padding: 6px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.dh-datos div { display: grid; grid-template-columns: 92px 10px 1fr; font-size: 10.5px; line-height: 1.55; }
+.dh-datos b { font-weight: 700; }
+.dh-titulo { font-weight: 700; font-size: 10.5px; margin-top: 10px; }
+.dh-det td { height: 18px; }
+.dh-det .dh-relleno td { height: 120px; }
+.dh-num { text-align: right !important; white-space: nowrap; }
+.dh-pie { display: flex; justify-content: space-between; gap: 18px; margin-top: 14px; align-items: flex-start; }
+.dh-timbre { width: 330px; border: 1px dashed #999; color: #555; text-align: center; padding: 16px 10px; font-size: 10px; line-height: 1.5; }
+.dh-totales { min-width: 240px; border: 1px solid #111; }
+.dh-totales div { display: flex; justify-content: space-between; padding: 3px 8px; font-size: 11px; }
+.dh-totales div:last-child { font-weight: 700; border-top: 1px solid #111; }
+.dh-pago { font-size: 10.5px; margin-top: 8px; }
+.dh-marca { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; font-size: 86px; font-weight: 800; color: rgba(208, 2, 27, .08); transform: rotate(-28deg); letter-spacing: 6px; }
+@media print { @page { size: A4; margin: 10mm; } body { margin: 0; } .dh-hoja { width: auto; padding: 0; } }`;
+
+function dteRutPuntos(rut) {
+  const m = /^(\d+)-([\dK])$/.exec(rut || '');
+  return m ? Number(m[1]).toLocaleString('es-CL') + '-' + m[2] : (rut || '');
+}
+function dteFechaLarga(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  return `${d.getDate()} de ${d.toLocaleDateString('es-CL', { month: 'long' })} del ${d.getFullYear()}`;
+}
+const dteNum = n => (Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 3 });
+
+function dteHojaHtml(s, folio) {
+  const tot = dteTotales(s);
+  const lineas = s.det.filter(d => d.nombre.trim());
+  const fila = (k, v) => `<div><b>${k}</b><span>:</span><span>${dteEsc(v || '')}</span></div>`;
+  const forma = (DTE_FORMAS_PAGO.find(f => f[0] === s.fmaPago) || [, ''])[1].toUpperCase();
+  const izquierda = fila('SEÑOR(ES)', s.recep.rzn) + fila('R.U.T.', dteRutPuntos(s.rut)) + fila('DIRECCIÓN', s.recep.dir) + fila('GIRO', s.recep.giro)
+    + (s.tipo === 52 ? fila('TRASLADO', (DTE_TRASLADOS.find(x => x[0] === s.indTraslado) || [, ''])[1].toUpperCase()) : fila('VENDEDOR', ''));
+  const derecha = fila('FECHA EMISIÓN', dteFechaLarga(s.fchEmis)) + fila('FECHA VENC.', dteFechaLarga(s.fchVenc)) + fila('COMUNA', s.recep.cmna)
+    + (s.tipo === 33 ? fila('FORMA DE PAGO', forma) : fila('DESPACHO', (DTE_DESPACHOS.find(x => x[0] === s.tipoDespacho) || [, ''])[1].toUpperCase())) + fila('CIUDAD', s.recep.ciudad) + fila('CONTACTO', '');
+  const transporte = s.tipo !== 52 ? '' : `<div class="dh-titulo">TRANSPORTE</div>
+    <table class="dh-tabla" style="margin-top:2px"><tr><th>DIRECCIÓN DESTINO</th><th>COMUNA</th><th>CIUDAD</th><th>PATENTE</th><th>CHOFER</th></tr>
+    <tr><td>${dteEsc(s.dest.dir)}</td><td>${dteEsc(String(s.dest.cmna || '').toUpperCase())}</td><td>${dteEsc(s.dest.ciudad)}</td><td>${dteEsc(s.trans.patente)}</td><td>${dteEsc(s.trans.nombreChofer)} ${s.trans.rutChofer ? '(' + dteEsc(s.trans.rutChofer) + ')' : ''}</td></tr></table>`;
+  const refs = s.refs.length ? `<div class="dh-titulo">DOCUMENTOS</div>
+    <table class="dh-tabla" style="margin-top:2px"><tr><th>TIPO DOCUMENTO</th><th>FOLIO</th><th>FECHA</th><th>RAZON REF</th></tr>
+    ${s.refs.map(r => `<tr><td>${dteEsc(DTE_NOMBRE_REF[r.tipo] || r.tipo)}</td><td style="text-align:center">${dteEsc(r.folio)}</td><td style="text-align:center">${dteDmy(r.fecha)}</td><td>${dteEsc(r.razon)}</td></tr>`).join('')}</table>` : '';
+  return `<div class="dh-hoja">
+    ${folio ? '' : '<div class="dh-marca">VISTA PREVIA</div>'}
+    <div class="dh-cab">
+      <div class="dh-emisor"><img src="icon-192.png" alt="">
+        <div><h1>SOCIEDAD FARMACEUTICA<br>BULFOR LIMITADA</h1>
+          <div>Giro: ${DTE_EMISOR_HOJA.giro}<br>Dirección: ${DTE_EMISOR_HOJA.dir}<br>E-mail: ${DTE_EMISOR_HOJA.email}<br>Teléfono: ${DTE_EMISOR_HOJA.fono}</div></div></div>
+      <div><div class="dh-caja"><div>R.U.T.: ${dteRutPuntos(DTE_EMISOR.rut)}</div><div>${DTE_TITULOS[s.tipo]}</div><div>Nº ${folio || 0}</div></div><div class="dh-sii">${DTE_EMISOR_HOJA.sii}</div></div>
+    </div>
+    <div class="dh-datos"><div style="display:block">${izquierda}</div><div style="display:block">${derecha}</div></div>
+    ${transporte}
+    ${refs}
+    <table class="dh-tabla dh-det"><tr><th style="width:90px">CÓDIGO</th><th>DETALLE</th><th style="width:34px">UM</th><th style="width:70px">CANTIDAD</th><th style="width:76px">PRECIO</th><th style="width:84px">Total</th></tr>
+      ${lineas.map(d => `<tr><td style="text-align:center">${d.cod.trim() ? dteEsc((d.tpoCod || '').trim() + ' - ' + d.cod.trim()) : ''}</td><td>${dteEsc(d.nombre)}${d.dsc && d.dsc.trim() ? '<br>' + dteEsc(d.dsc.trim()) : ''}</td><td style="text-align:center">${dteEsc(d.unidad)}</td><td class="dh-num">${dteNum(d.qty)}</td><td class="dh-num">${dteNum(d.precio)}</td><td class="dh-num">${dteNum(dteMontoLinea(d))}</td></tr>`).join('')}
+      <tr class="dh-relleno"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    </table>
+    <div class="dh-pie">
+      <div><div class="dh-timbre">${folio ? 'Timbre Electrónico SII<br>(en el PDF oficial de GDExpress)' : 'Timbre Electrónico SII<br>Se genera al emitir el documento'}<br>Res. ${DTE_RESOLUCION.numero} de ${DTE_RESOLUCION.fecha.slice(0, 4)} · Verifique documento: www.sii.cl</div>
+        ${s.tipo === 33 ? `<div class="dh-pago"><b>Pago:</b> ${dteEsc((DTE_MEDIOS_PAGO.find(m => m[0] === s.pago.medio) || [, ''])[1])} · ${dteDmy(s.pago.fchPago || s.fchVenc)}<br>${dteEsc(s.pago.glosa)}</div>` : ''}</div>
+      <div class="dh-totales"><div><span>MONTO NETO $</span><span>${dteNum(tot.neto)}</span></div><div><span>MONTO EXENTO $</span><span>0</span></div><div><span>I.V.A. 19% $</span><span>${dteNum(tot.iva)}</span></div><div><span>TOTAL $</span><span>${dteNum(tot.total)}</span></div></div>
+    </div>
+  </div>`;
+}
+
+function dteEstilosHoja() {
+  if (document.getElementById('dte-hoja-css')) return;
+  const st = document.createElement('style');
+  st.id = 'dte-hoja-css';
+  st.textContent = DTE_HOJA_CSS;
+  document.head.appendChild(st);
+}
+
+// Imprime solo la hoja, en un iframe aparte (sin el resto de la app).
+function dteImprimirHoja(html) {
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const base = location.href.replace(/[^/]*$/, '');
+  f.contentDocument.open();
+  f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><base href="${base}"><style>${DTE_HOJA_CSS}</style></head><body>${html}</body></html>`);
+  f.contentDocument.close();
+  setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1000); }, 300);
+}
+
+function dteDetallesHtml(s) {
+  const tot = dteTotales(s);
+  const fila = (k, v) => `<tr><td>${k}</td><td>${dteEsc(v || '')}</td></tr>`;
+  return `<div class="dte-detalles">
+    <div class="dte-card"><h3>${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '')}${s.tipo === 33 ? ' AFECTA' : ''}</h3>
+      <p>Emitida el ${dteDmy(s.fchEmis)}, por un monto de ${dteClp(tot.total)}.</p><p>Número de folio pendiente de asignación: GDExpress lo asigna al enviar.</p></div>
+    <div class="dte-detalles-2">
+      <div class="dte-card"><h3>Emisor</h3><table class="clinical-grid">${fila('RUT', DTE_EMISOR.rut)}${fila('Razón social', DTE_EMISOR.rzn.trim())}${fila('Giro', DTE_EMISOR.giro)}${fila('Dirección', DTE_EMISOR.dir)}${fila('Comuna', DTE_EMISOR.cmna)}</table></div>
+      <div class="dte-card"><h3>Receptor</h3><table class="clinical-grid">${fila('RUT', s.rut)}${fila('Razón social', s.recep.rzn)}${fila('Giro', s.recep.giro)}${fila('Dirección', s.recep.dir)}${fila('Comuna', s.recep.cmna)}</table></div>
+      <div class="dte-card"><h3>Totales</h3><table class="clinical-grid">${fila('Monto neto', dteClp(tot.neto))}${fila('Monto exento', '$ 0')}${fila('IVA', dteClp(tot.iva))}${fila('Monto total', dteClp(tot.total))}</table></div>
+      ${s.tipo === 52 ? `<div class="dte-card"><h3>Transporte</h3><table class="clinical-grid">${fila('Dirección', s.dest.dir)}${fila('Comuna', s.dest.cmna)}${fila('Ciudad', s.dest.ciudad)}${fila('Chofer', s.trans.nombreChofer)}${fila('Patente', s.trans.patente)}</table></div>` : ''}
+    </div></div>`;
+}
+
+function dteTabs(id, tabs) {
+  return `<div class="modal-tabs" style="position:static;padding:0;margin-bottom:12px">${tabs.map(([k, l], i) => `<div class="modal-tab${i === 0 ? ' active' : ''}" onclick="dteTab('${id}','${k}',this)">${l}</div>`).join('')}</div>`
+    + tabs.map(([k, , html], i) => `<div class="modal-tab-panel${i === 0 ? ' active' : ''}" data-tab="${id}-${k}">${html}</div>`).join('');
+}
+function dteTab(id, k, el) {
+  el.parentElement.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t === el));
+  document.querySelectorAll(`[data-tab^="${id}-"]`).forEach(p => p.classList.toggle('active', p.dataset.tab === `${id}-${k}`));
+}
+
+// Vista previa: lo que se va a enviar, con N° 0, antes de emitir.
+function dteVistaPrevia(t) {
+  const s = dteEstado[t];
+  const err = dteValidar(s);
+  dteEstilosHoja();
+  const xml = dteXml(s).replace(/></g, '>\n<');
+  dteModal(`Vista previa de la ${DTE_NOMBRES[t]}`, `
+    ${err.length ? `<div class="dte-aviso-caja">Falta completar antes de enviar: ${dteEsc(err.join(', '))}.</div>` : ''}
+    ${dteTabs('dtevp', [['det', 'Detalles del documento', dteDetallesHtml(s)], ['doc', 'Ver documento', `<div class="dte-papel">${dteHojaHtml(s, 0)}</div>`], ['xml', 'Ver XML', `<pre class="dte-xml">${dteEsc(xml)}</pre>`]])}`,
+    `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(dteHojaHtml(dteEstado[${t}],0))"><i class="ti ti-printer"></i> Imprimir vista previa</button>
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cancelar</button>
+     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="dteEnviar(${t})"><i class="ti ti-send"></i> Enviar</button>`);
+}
+
+// Documento ya emitido: folio asignado por GDExpress y su PDF oficial.
+// resultado = { folio, pdfBase64?, pdfUrl? } (lo devuelve la función del servidor).
+function dteMostrarEmitido(t, resultado) {
+  const s = dteEstado[t];
+  dteEstilosHoja();
+  let pdfSrc = '';
+  if (resultado.pdfBase64) {
+    const bytes = Uint8Array.from(atob(resultado.pdfBase64), c => c.charCodeAt(0));
+    pdfSrc = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  } else if (resultado.pdfUrl) pdfSrc = resultado.pdfUrl;
+  const titulo = `${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '').replace(/^\w/, c => c)} N° ${resultado.folio}`;
+  const oficial = pdfSrc
+    ? `<iframe class="dte-pdf" src="${dteAttr(pdfSrc)}" title="PDF oficial"></iframe>`
+    : `<div class="dte-aviso-caja">El PDF oficial todavía no está disponible; usa la hoja de la app o vuelve a abrirlo en unos minutos.</div>`;
+  window._dteUltimoEmitido = { t, folio: resultado.folio, html: dteHojaHtml(s, resultado.folio), pdfSrc };
+  dteModal(`${titulo} emitida`, `
+    <div class="dte-ok"><i class="ti ti-circle-check"></i> ${titulo} emitida correctamente.</div>
+    ${dteTabs('dteem', [['pdf', 'PDF oficial (para imprimir)', oficial], ['doc', 'Hoja de la app', `<div class="dte-papel">${window._dteUltimoEmitido.html}</div>`]])}`,
+    `${pdfSrc ? `<button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" onclick="dteImprimirPdf()"><i class="ti ti-printer"></i> Imprimir PDF oficial</button>` : ''}
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(window._dteUltimoEmitido.html)"><i class="ti ti-printer"></i> Imprimir hoja de la app</button>
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cerrar</button>`);
+}
+
+function dteImprimirPdf() {
+  const u = window._dteUltimoEmitido;
+  if (!u || !u.pdfSrc) return;
+  const f = document.querySelector('#dte-modal-overlay iframe.dte-pdf');
+  try { f.contentWindow.focus(); f.contentWindow.print(); }
+  catch (e) { window.open(u.pdfSrc, '_blank'); }   // si el visor no deja imprimir desde aquí, se abre en otra pestaña
 }

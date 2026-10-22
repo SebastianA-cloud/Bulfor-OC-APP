@@ -971,3 +971,11 @@ tr.fila-sel td { background: var(--accent-light) !important; }
   .dte-det { grid-template-columns: 70px 90px 220px 130px 80px 55px 100px 100px 36px; }
 }
 .dte-sub:empty { display: none; }
+.dte-papel { background: #525659; padding: 18px; border-radius: var(--radius); max-height: 64vh; overflow: auto; }
+.dte-papel .dh-hoja { box-shadow: 0 4px 18px rgba(0,0,0,.35); }
+.dte-detalles p { font-size: 13px; color: var(--text-2); margin: 4px 0; }
+.dte-detalles-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 760px) { .dte-detalles-2 { grid-template-columns: 1fr; } }
+.dte-pdf { width: 100%; height: 64vh; border: 1px solid var(--border); border-radius: var(--radius); background: #525659; }
+.dte-ok { background: var(--green-light); color: var(--green); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.dte-btn-principal:disabled { opacity: .5; cursor: default; }
