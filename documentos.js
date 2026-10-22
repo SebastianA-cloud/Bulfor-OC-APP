@@ -20,6 +20,8 @@ const DTE_TIPOS_REF = [['801', '801 · Orden de compra'], ['33', '33 · Factura 
 const DTE_TRASLADOS = [['2', 'Ventas por efectuar'], ['1', 'Operación constituye venta'], ['3', 'Consignaciones'], ['4', 'Entrega gratuita'], ['5', 'Traslados internos'], ['6', 'Otros traslados no venta'], ['7', 'Guía de devolución']];
 const DTE_DESPACHOS = [['1', 'Por cuenta del receptor'], ['2', 'Por cuenta del emisor a instalaciones del cliente'], ['3', 'Por cuenta del emisor a otras instalaciones']];
 const DTE_NOMBRES = { 33: 'factura', 52: 'guía de despacho' };
+// Transporte de las guías: el de siempre, editable en cada guía.
+const DTE_TRANSPORTE = { patente: 'THWG-96', rutTrans: '20337523-9', rutChofer: '20337523-9', nombreChofer: 'Benjamin Yañez' };
 
 const dteEstado = {};
 
@@ -57,7 +59,7 @@ function dteNuevo(tipo) {
     tipo, fchEmis: hoy, fchVenc: dteMasDias(hoy, 30), fmaPago: '2', indTraslado: '2', tipoDespacho: '1',
     rut: '', recepInfo: '', recep: { rzn: '', giro: '', dir: '', cmna: '', ciudad: '' },
     dest: { dir: '', region: '', ciudad: '', cmna: '' },
-    trans: { patente: '', rutTrans: '', rutChofer: '', nombreChofer: '', fchSalida: hoy, hraSalida: dteHora(), fchLlegada: hoy },
+    trans: { ...DTE_TRANSPORTE, fchSalida: hoy, hraSalida: dteHora(), fchLlegada: hoy },
     refs: tipo === 33 ? [dteRefNueva()] : [],
     det: [dteDetNuevo()],
     pago: { medio: 'PE', fchPago: '', glosa: DTE_GLOSA_PAGO },
@@ -72,16 +74,20 @@ function dteInit(tipo) {
   if (!dteEstado[tipo]) {
     const b = dteCargarBorrador(tipo);
     dteEstado[tipo] = b && b.tipo === tipo ? { ...dteNuevo(tipo), ...b } : dteNuevo(tipo);
-    if (tipo === 52 && !dteEstado[tipo].trans.patente) dteTransporteAnterior(tipo);
+    const tr = dteEstado[tipo].trans;
+    if (!tr.patente && !tr.rutTrans && !tr.nombreChofer) Object.assign(tr, DTE_TRANSPORTE);
   }
   dteRender(tipo);
+  // Los nombres facturados se cargan una vez; al llegar se actualiza la lista.
+  if (typeof cargarItemsFacturasVenta === 'function' && !dteCatalogo) {
+    cargarItemsFacturasVenta().then(() => { dteArmarCatalogo(); dteActualizarListaProductos(tipo); }).catch(() => {});
+  }
 }
 
 function dteLimpiar(tipo) {
   if (!confirm(`¿Empezar una ${DTE_NOMBRES[tipo]} nueva? Se borra lo escrito.`)) return;
   dteEstado[tipo] = dteNuevo(tipo);
   dteGuardarBorrador(tipo);
-  if (tipo === 52) dteTransporteAnterior(tipo);
   dteRender(tipo);
 }
 
@@ -127,22 +133,6 @@ async function dteBuscarRut(t, valor) {
   dteRender(t);
 }
 
-// Transporte (patente y chofer) de la última guía emitida, como punto de partida.
-async function dteTransporteAnterior(t) {
-  try {
-    const res = await sb(`documentos_gdexpress?select=xml_completo&tipo_dte=eq.52&xml_completo=not.is.null&order=fecha_emision.desc,folio.desc&limit=1`);
-    const d = res.ok ? (await res.json())[0] : null;
-    if (!d) return;
-    const x = new DOMParser().parseFromString(d.xml_completo, 'application/xml');
-    const tx = tag => (x.getElementsByTagName(tag)[0]?.textContent || '').trim();
-    const s = dteEstado[t];
-    if (s.trans.patente) return;
-    Object.assign(s.trans, { patente: tx('Patente'), rutTrans: tx('RUTTrans'), rutChofer: tx('RUTChofer'), nombreChofer: tx('NombreChofer') });
-    dteGuardarBorrador(t);
-    if (document.getElementById('dte-form-' + t)) dteRender(t);
-  } catch (e) { /* sin transporte previo */ }
-}
-
 function dteBuscarComuna(nombre) {
   const n = dteNorm(nombre);
   if (!n) return null;
@@ -165,20 +155,111 @@ function dteOcsDelRut(rut) {
 // "vence…", "despacho…"); se deja solo el producto (el SII permite 80).
 function dteNombreItem(it) {
   const txt = String(it.especificacionproveedor || it.especificacioncomprador || it.productomp || '').replace(/\s+/g, ' ').trim();
-  const corto = txt.split(/\s(?:debe|elaborado|elaborada|vence|vencimiento|despacho|envasado|envasada|marca)\b|[,;:]/i)[0].trim();
+  const corto = txt.split(/\s(?:debe|elaborado|elaborada|vence|vencimiento|despacho|envasado|envasada|marca|adjuntar|monto|favor|c[oó]digo)\b|[;:[\]]|,\s/i)[0].trim();
   return (corto || txt).slice(0, 60).trim();
 }
 
+// ── Nombres de producto: los de la facturación, no los de la OC ──────────
+// 1) Si la OC ya se facturó, se usan los nombres de esa factura (con su
+//    precio); cada uno se asocia al ítem de la OC de igual precio, para el
+//    aviso de cantidad.
+// 2) Si un ítem de la OC nunca se facturó, se busca entre todo lo facturado
+//    el nombre más parecido (mismo principio activo, forma y concentración).
+// 3) Si no hay nada parecido, queda el texto de la OC para editarlo a mano.
+let dteCatalogo = null;   // { porOC: {codigo: [{nombre, precio}]}, nombres: [{nombre, tokens, veces, precio}] }
+
+const DTE_STOP = new Set(['DE', 'DEL', 'LA', 'LAS', 'EL', 'LOS', 'Y', 'EN', 'CON', 'SIN', 'POR', 'PARA', 'AL', 'A', 'X', 'C', 'S', 'O', 'U', 'E', 'N', 'UNA', 'UN']);
+// Unidades y envases: no definen el producto (sí sus números).
+const DTE_UNIDADES = new Set(['MG', 'ML', 'G', 'GR', 'GRS', 'GRAMO', 'GRAMOS', 'MCG', 'UG', 'UI', 'L', 'LT', 'LTS', 'CC', 'KG', 'KILO', 'UN', 'UND', 'CAP', 'CAPS', 'CP', 'COMP', 'MEQ', 'MM', 'CM',
+  'FCO', 'FC', 'FCOS', 'FRASCO', 'FRASCOS', 'POTE', 'PT', 'SACHET', 'SOBRE', 'SOBRES', 'BOLSA', 'ENVASE', 'CAJA', 'POLVO', 'USP', 'NO']);
+// Abreviaturas y terminaciones que se escriben de distintas formas.
+const DTE_SINONIMOS = { PEG: 'POLIETILENGLICOL', AC: 'ACIDO', SOL: 'SOLUCION', BICARB: 'BICARBONATO', NAC: 'ACETILCISTEINA' };
+const dteRaiz = w => DTE_SINONIMOS[w] || w.replace(/(ICO|ICA)$/, 'IO');
+function dteTokens(texto, soloNumerosDe) {
+  // Fuera códigos de OC/catálogo (10-100-215-231-00, 2150171, $2170002$) y decimales con coma.
+  const limpiar = x => dteNorm(x).replace(/\$[^$]*\$/g, ' ').replace(/\b\d+(?:-\d+){2,}\b/g, ' ').replace(/\b\d{5,}\b/g, ' ').replace(/(\d),(\d)/g, '$1.$2');
+  const partir = x => limpiar(x).replace(/(\d)([A-Z])/g, '$1 $2').replace(/([A-Z])(\d)/g, '$1 $2').split(/[^A-Z0-9.]+/).map(w => w.replace(/^\.+|\.+$/g, '')).filter(Boolean);
+  const nucleo = [], numeros = [];
+  partir(texto).forEach(w => {
+    if (/^[\d.]+$/.test(w)) { if (!soloNumerosDe) numeros.push(String(Number(w))); }
+    else if (!DTE_STOP.has(w) && !DTE_UNIDADES.has(w) && w.length > 1) nucleo.push(dteRaiz(w));
+  });
+  if (soloNumerosDe) partir(soloNumerosDe).forEach(w => { if (/^[\d.]+$/.test(w)) numeros.push(String(Number(w))); });
+  return { nucleo, numeros };
+}
+const dteCoincide = (a, b) => a === b || (a.length >= 5 && b.length >= 5 && (a.startsWith(b) || b.startsWith(a)));
+
+function dteArmarCatalogo() {
+  if (typeof facturaItemsRaw === 'undefined' || typeof documentosGdexpress === 'undefined') return;
+  const ocPorDoc = new Map();
+  documentosGdexpress.forEach(d => {
+    if (d.tipo_dte === '33' && d.orden_compra_ref && (typeof estadoAceptacionFusionado !== 'function' || estadoAceptacionFusionado(d) !== 'N')) ocPorDoc.set(d.id, { oc: d.orden_compra_ref, folio: Number(d.folio) || 0 });
+  });
+  const porOC = {}, nombres = new Map();
+  facturaItemsRaw.forEach(it => {
+    const nombre = String(it.nombre_producto || '').trim();
+    if (!nombre) return;
+    const precio = Number(it.precio_unitario) || 0;
+    const n = nombres.get(nombre) || { nombre, veces: 0, precio: 0, tokens: dteTokens(nombre) };
+    n.veces++; if (precio) n.precio = precio;
+    nombres.set(nombre, n);
+    const ref = ocPorDoc.get(it.documento_id);
+    if (!ref) return;
+    const lista = porOC[ref.oc] || (porOC[ref.oc] = []);
+    const ya = lista.find(x => x.nombre === nombre);
+    if (ya) { if (ref.folio >= ya.folio) { ya.precio = precio || ya.precio; ya.folio = ref.folio; } }
+    else lista.push({ nombre, precio, folio: ref.folio });
+  });
+  dteCatalogo = { porOC, nombres: [...nombres.values()] };
+}
+
+// El nombre facturado más parecido al texto de un ítem de OC, o null.
+// textoOC: todo el texto del ítem (palabras); textoCorto: solo la parte del
+// producto, de donde salen los números (para no confundir la presentación
+// con fechas, plazos o montos de la OC).
+function dteNombreParecido(textoOC, textoCorto) {
+  if (!dteCatalogo) return null;
+  const a = dteTokens(textoOC, textoCorto || textoOC);
+  if (!a.nucleo.length) return null;
+  let mejor = null;
+  dteCatalogo.nombres.forEach(n => {
+    const b = n.tokens;
+    if (!b.nucleo.length) return;
+    // La primera palabra del nombre facturado (el principio activo) tiene que estar.
+    if (!a.nucleo.some(w => dteCoincide(w, b.nucleo[0]))) return;
+    const nucleo = b.nucleo.filter(w => a.nucleo.some(x => dteCoincide(w, x))).length / b.nucleo.length;
+    if (nucleo < 0.6) return;
+    const acierta = b.numeros.filter(x => a.numeros.includes(x)).length;
+    const falla = b.numeros.length - acierta;
+    const nums = b.numeros.length ? acierta / b.numeros.length + 0.08 * acierta - 0.1 * falla : 0.3;
+    const puntaje = nucleo + 0.4 * nums + Math.min(n.veces, 20) / 400;
+    if (!mejor || puntaje > mejor.puntaje) mejor = { nombre: n.nombre, puntaje };
+  });
+  return mejor ? mejor.nombre : null;
+}
+
 function dteProductosRefs(s) {
-  const codigos = s.refs.filter(r => r.tipo === '801' && r.folio).map(r => r.folio.trim());
+  const codigos = [...new Set(s.refs.filter(r => r.tipo === '801' && r.folio).map(r => r.folio.trim()))];
   const lista = [];
+  const agregar = p => { if (p.nombre && !lista.some(x => x.nombre === p.nombre && x.oc === p.oc)) lista.push(p); };
   codigos.forEach(cod => {
-    (typeof items !== 'undefined' ? items : []).filter(i => i.codigooc === cod).forEach(i => {
-      lista.push({ nombre: dteNombreItem(i), qty: Number(i.cantidad) || 0, unidad: i.unidad || '', precio: Number(i.preciounitario) || 0, oc: cod });
+    const itemsOC = (typeof items !== 'undefined' ? items : []).filter(i => i.codigooc === cod);
+    const facturados = (dteCatalogo && dteCatalogo.porOC[cod]) || [];
+    const usados = new Set();
+    facturados.forEach(f => {
+      // Ítem de la OC con el mismo precio (o el único que tenga).
+      let it = itemsOC.find((i, k) => !usados.has(k) && Math.abs((Number(i.preciounitario) || 0) - f.precio) < 0.5);
+      if (!it && itemsOC.length === 1) it = itemsOC[0];
+      if (it) usados.add(itemsOC.indexOf(it));
+      agregar({ nombre: f.nombre, precio: f.precio || (it ? Number(it.preciounitario) : 0), qty: it ? Number(it.cantidad) || null : null, unidad: it ? it.unidad || '' : '', oc: cod, fuente: 'facturada' });
     });
-    // Nombres usados en facturas anteriores de esa misma OC.
-    ((typeof nombresFacturaPorOC !== 'undefined' && nombresFacturaPorOC[cod]) || []).forEach(n => {
-      if (!lista.some(p => p.nombre === n)) lista.push({ nombre: n, qty: null, precio: null, oc: cod, usado: true });
+    itemsOC.forEach((i, k) => {
+      if (usados.has(k)) return;
+      const base = { precio: Number(i.preciounitario) || 0, qty: Number(i.cantidad) || null, unidad: i.unidad || '', oc: cod };
+      const corto = [i.especificacionproveedor, i.especificacioncomprador].map(x => dteNombreItem({ especificacionproveedor: x || '' })).join(' ');
+      const parecido = dteNombreParecido(`${i.especificacionproveedor || ''} ${i.especificacioncomprador || ''} ${i.productomp || ''}`, corto);
+      if (parecido) agregar({ ...base, nombre: parecido, fuente: 'parecido' });
+      agregar({ ...base, nombre: dteNombreItem(i), fuente: 'oc' });
     });
   });
   return lista;
@@ -208,7 +289,8 @@ function dteActualizarListaProductos(t) {
 }
 
 function dteOpcionesProductos(productos) {
-  return productos.map(p => `<option value="${dteAttr(p.nombre)}" label="${dteAttr(p.usado ? 'usado en facturas de la OC ' + p.oc : `OC ${p.oc} · ${p.qty.toLocaleString('es-CL')} ${p.unidad || 'un.'} · ${dteClp(p.precio)}`)}"></option>`).join('');
+  const origen = { facturada: 'facturado en esta OC', parecido: 'parecido a lo facturado antes', oc: 'texto de la OC' };
+  return productos.map(p => `<option value="${dteAttr(p.nombre)}" label="${dteAttr(`${origen[p.fuente]} · OC ${p.oc}${p.qty ? ' · ' + p.qty.toLocaleString('es-CL') + ' ' + (p.unidad || 'un.') : ''}${p.precio ? ' · ' + dteClp(p.precio) : ''}`)}"></option>`).join('');
 }
 
 function dteElegirProducto(t, i, valor) {
@@ -343,10 +425,7 @@ function dteRender(t) {
         ${dteCampo('Dirección', dteInput(t, 'dest.dir', s.dest.dir), true, 2)}
         ${dteGeoSelects(t, 'dest')}
       </div>
-    </section>
-    <section class="dte-card">
-      <h3>Transporte</h3>
-      <div class="dte-grid">
+      <div class="dte-grid" style="margin-top:12px">
         ${dteCampo('Patente', dteInput(t, 'trans.patente', s.trans.patente, 'placeholder="ABCD-12"'), true)}
         ${dteCampo('RUT transportista', dteInput(t, 'trans.rutTrans', s.trans.rutTrans), false)}
         ${dteCampo('RUT chofer', dteInput(t, 'trans.rutChofer', s.trans.rutChofer), false)}
