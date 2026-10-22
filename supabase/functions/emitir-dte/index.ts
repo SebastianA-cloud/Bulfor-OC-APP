@@ -44,7 +44,7 @@ async function usuarioEditor(req: Request): Promise<{ ok: boolean; email?: strin
   });
   if (!r.ok) return { ok: false };
   const u = await r.json();
-  return { ok: u?.user_metadata?.rol === "editor", email: u?.email };
+  return { ok: u?.app_metadata?.rol === "editor", email: u?.email };
 }
 
 async function gdx(ruta: string, metodo: "GET" | "POST", body?: unknown) {
