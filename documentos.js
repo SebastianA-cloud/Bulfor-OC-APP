@@ -573,12 +573,61 @@ function dteVerXml(t) {
 
 function dteEmitir(t) { dteVistaPrevia(t); }
 
-function dteEnviar(t) {
+// Llama a la función del servidor que habla con GDExpress (la llave nunca
+// pasa por el navegador). Devuelve { ok, ambiente, folio, pdfBase64?, pdfUrl?, error? }.
+async function dteFuncion(cuerpo) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/emitir-dte`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${sesionActual?.access_token || SUPABASE_KEY}`, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) { d = { ok: false, error: `El servidor respondió ${r.status}` }; }
+  return d;
+}
+
+// Modo de emisión (homologación o producción) para mostrarlo antes de enviar.
+let dteModoServidor = null;
+async function dteCargarModo() {
+  try { dteModoServidor = await dteFuncion({ accion: 'estado' }); } catch (e) { dteModoServidor = { ok: false }; }
+  const el = document.getElementById('dte-modo');
+  if (el) el.outerHTML = dteModoHtml();
+}
+function dteModoHtml() {
+  const m = dteModoServidor;
+  if (!m) return '<div class="dte-modo" id="dte-modo">Revisando la conexión con GDExpress…</div>';
+  if (!m.ok) return '<div class="dte-modo dte-modo-err" id="dte-modo">No se pudo contactar la función de emisión.</div>';
+  if (!m.configurado) return '<div class="dte-modo dte-modo-err" id="dte-modo">Falta guardar la llave de GDExpress en Supabase: todavía no se puede enviar.</div>';
+  return m.ambiente === 'P'
+    ? '<div class="dte-modo dte-modo-p" id="dte-modo"><b>PRODUCCIÓN</b> · el documento se emite de verdad ante el SII.</div>'
+    : '<div class="dte-modo dte-modo-t" id="dte-modo"><b>HOMOLOGACIÓN (pruebas)</b> · el documento no es real ni va al SII como venta.</div>';
+}
+
+let dteEnviando = false;
+async function dteEnviar(t) {
   const s = dteEstado[t];
-  if (dteValidar(s).length) return;
+  if (dteEnviando || dteValidar(s).length) return;
   if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
-  dteModal(`Emisión pendiente de conectar`, `<p style="font-size:13px;line-height:1.6">La ${DTE_NOMBRES[t]} está completa y su XML está listo, pero la app todavía no está conectada a GDExpress para emitir.
-    Falta crear la función del servidor que guarda la llave de GDExpress y envía el documento (primero en homologación). Cuando esté conectada, al enviar aparecerá el número de folio asignado y el PDF oficial para imprimir.</p>`);
+  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se va a emitir una ${DTE_NOMBRES[t]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
+  dteEnviando = true;
+  const btn = document.querySelector('#dte-modal-overlay .dte-btn-principal');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Enviando…'; }
+  let r;
+  try { r = await dteFuncion({ tipo: t, xml: dteXml(s) }); }
+  catch (e) { r = { ok: false, error: 'No se pudo conectar con el servidor: ' + e.message }; }
+  dteEnviando = false;
+  if (!r.ok || !r.folio) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Enviar'; }
+    dteModal('No se pudo emitir', `<div class="dte-aviso-caja">${dteEsc(r.error || (r.ok ? 'GDExpress aceptó el documento pero no devolvió el folio.' : 'Error desconocido.'))}</div>
+      <p style="font-size:13px;color:var(--text-2)">El borrador sigue guardado: puedes corregirlo y volver a enviarlo.</p>
+      ${r.respuesta ? `<pre class="dte-xml">${dteEsc(JSON.stringify(r.respuesta, null, 2))}</pre>` : ''}`);
+    return;
+  }
+  dteMostrarEmitido(t, r);
+  // Emitido: el formulario parte de nuevo para no enviarlo dos veces.
+  dteEstado[t] = dteNuevo(t);
+  dteGuardarBorrador(t);
+  dteRender(t);
 }
 
 // ── Hoja del documento (vista previa y emitido) ──────────────────────────
@@ -587,14 +636,14 @@ function dteEnviar(t) {
 // vale para imprimir es el PDF oficial de GDExpress (trae el timbre del SII).
 const DTE_EMISOR_HOJA = { giro: 'Farmacia y Droguería', dir: 'Coquimbo - 35, 1 - Santiago', email: 'genoveva@farmaciabulfor.cl', fono: '22 6355809', sii: 'S.I.I. - SANTIAGO CENTRO' };
 const DTE_TITULOS = { 33: 'FACTURA ELECTRONICA', 52: 'GUIA DE DESPACHO ELECTRONICA' };
-const DTE_NOMBRE_REF = Object.fromEntries(DTE_TIPOS_REF.map(([v, l]) => [v, l.replace(/^\S+ · /, '')]));
+const DTE_NOMBRE_REF = { ...Object.fromEntries(DTE_TIPOS_REF.map(([v, l]) => [v, l.replace(/^\S+ · /, '')])), 801: 'Orden de Compra' };
 const DTE_HOJA_CSS = `
 .dh-hoja { position: relative; background: #fff; color: #111; width: 780px; max-width: 100%; margin: 0 auto; padding: 28px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; box-sizing: border-box; }
 .dh-cab { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
 .dh-emisor { display: flex; gap: 12px; align-items: flex-start; }
-.dh-emisor img { width: 64px; height: 64px; border-radius: 12px; }
-.dh-emisor h1 { font-size: 15px; margin: 0 0 4px; line-height: 1.2; }
-.dh-emisor div { font-size: 12px; line-height: 1.4; }
+.dh-emisor img { width: 168px; height: auto; }
+.dh-emisor h1 { font-size: 16px; margin: 0 0 4px; line-height: 1.2; }
+.dh-emisor div { font-size: 13px; line-height: 1.35; }
 .dh-caja { border: 2.5px solid #D0021B; color: #D0021B; text-align: center; padding: 12px 18px; min-width: 250px; font-weight: 700; }
 .dh-caja div { margin: 6px 0; font-size: 14px; }
 .dh-sii { color: #D0021B; text-align: center; font-weight: 700; font-size: 12px; margin-top: 8px; }
@@ -633,8 +682,8 @@ function dteHojaHtml(s, folio) {
   const tot = dteTotales(s);
   const lineas = s.det.filter(d => d.nombre.trim());
   const fila = (k, v) => `<div><b>${k}</b><span>:</span><span>${dteEsc(v || '')}</span></div>`;
-  const forma = (DTE_FORMAS_PAGO.find(f => f[0] === s.fmaPago) || [, ''])[1].toUpperCase();
-  const izquierda = fila('SEÑOR(ES)', s.recep.rzn) + fila('R.U.T.', dteRutPuntos(s.rut)) + fila('DIRECCIÓN', s.recep.dir) + fila('GIRO', s.recep.giro)
+  const forma = dteNorm((DTE_FORMAS_PAGO.find(f => f[0] === s.fmaPago) || [, ''])[1]);
+  const izquierda = fila('SEÑOR(ES)', s.recep.rzn) + fila('R.U.T.', s.rut) + fila('DIRECCIÓN', s.recep.dir) + fila('GIRO', s.recep.giro)
     + (s.tipo === 52 ? fila('TRASLADO', (DTE_TRASLADOS.find(x => x[0] === s.indTraslado) || [, ''])[1].toUpperCase()) : fila('VENDEDOR', ''));
   const derecha = fila('FECHA EMISIÓN', dteFechaLarga(s.fchEmis)) + fila('FECHA VENC.', dteFechaLarga(s.fchVenc)) + fila('COMUNA', s.recep.cmna)
     + (s.tipo === 33 ? fila('FORMA DE PAGO', forma) : fila('DESPACHO', (DTE_DESPACHOS.find(x => x[0] === s.tipoDespacho) || [, ''])[1].toUpperCase())) + fila('CIUDAD', s.recep.ciudad) + fila('CONTACTO', '');
@@ -647,7 +696,7 @@ function dteHojaHtml(s, folio) {
   return `<div class="dh-hoja">
     ${folio ? '' : '<div class="dh-marca">VISTA PREVIA</div>'}
     <div class="dh-cab">
-      <div class="dh-emisor"><img src="icon-192.png" alt="">
+      <div class="dh-emisor"><img src="logo-bulfor.jpg" alt="Farmacia Bulfor">
         <div><h1>SOCIEDAD FARMACEUTICA<br>BULFOR LIMITADA</h1>
           <div>Giro: ${DTE_EMISOR_HOJA.giro}<br>Dirección: ${DTE_EMISOR_HOJA.dir}<br>E-mail: ${DTE_EMISOR_HOJA.email}<br>Teléfono: ${DTE_EMISOR_HOJA.fono}</div></div></div>
       <div><div class="dh-caja"><div>R.U.T.: ${dteRutPuntos(DTE_EMISOR.rut)}</div><div>${DTE_TITULOS[s.tipo]}</div><div>Nº ${folio || 0}</div></div><div class="dh-sii">${DTE_EMISOR_HOJA.sii}</div></div>
@@ -656,7 +705,7 @@ function dteHojaHtml(s, folio) {
     ${transporte}
     ${refs}
     <table class="dh-tabla dh-det"><tr><th style="width:90px">CÓDIGO</th><th>DETALLE</th><th style="width:34px">UM</th><th style="width:70px">CANTIDAD</th><th style="width:76px">PRECIO</th><th style="width:84px">Total</th></tr>
-      ${lineas.map(d => `<tr><td style="text-align:center">${d.cod.trim() ? dteEsc((d.tpoCod || '').trim() + ' - ' + d.cod.trim()) : ''}</td><td>${dteEsc(d.nombre)}${d.dsc && d.dsc.trim() ? '<br>' + dteEsc(d.dsc.trim()) : ''}</td><td style="text-align:center">${dteEsc(d.unidad)}</td><td class="dh-num">${dteNum(d.qty)}</td><td class="dh-num">${dteNum(d.precio)}</td><td class="dh-num">${dteNum(dteMontoLinea(d))}</td></tr>`).join('')}
+      ${lineas.map(d => `<tr><td style="text-align:center">${d.cod.trim() ? dteEsc((d.tpoCod || '').trim() + ' - ' + d.cod.trim()) : ''}</td><td>${dteEsc(d.nombre)}${d.dsc && d.dsc.trim() ? '<br>' + dteEsc(d.dsc.trim()) : ''}</td><td style="text-align:center">${dteEsc(d.unidad)}</td><td class="dh-num">${dteNum(d.qty)}</td><td class="dh-num">${(Number(d.precio) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td class="dh-num">${dteNum(dteMontoLinea(d))}</td></tr>`).join('')}
       <tr class="dh-relleno"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
     </table>
     <div class="dh-pie">
@@ -713,10 +762,12 @@ function dteTab(id, k, el) {
 // Vista previa: lo que se va a enviar, con N° 0, antes de emitir.
 function dteVistaPrevia(t) {
   const s = dteEstado[t];
+  dteCargarModo();
   const err = dteValidar(s);
   dteEstilosHoja();
   const xml = dteXml(s).replace(/></g, '>\n<');
   dteModal(`Vista previa de la ${DTE_NOMBRES[t]}`, `
+    ${dteModoHtml()}
     ${err.length ? `<div class="dte-aviso-caja">Falta completar antes de enviar: ${dteEsc(err.join(', '))}.</div>` : ''}
     ${dteTabs('dtevp', [['det', 'Detalles del documento', dteDetallesHtml(s)], ['doc', 'Ver documento', `<div class="dte-papel">${dteHojaHtml(s, 0)}</div>`], ['xml', 'Ver XML', `<pre class="dte-xml">${dteEsc(xml)}</pre>`]])}`,
     `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(dteHojaHtml(dteEstado[${t}],0))"><i class="ti ti-printer"></i> Imprimir vista previa</button>
@@ -737,7 +788,7 @@ function dteMostrarEmitido(t, resultado) {
   const titulo = `${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '')} N° ${resultado.folio}`;
   window._dteUltimoEmitido = { t, folio: resultado.folio, pdfSrc };
   dteModal(`${titulo} emitida`, `
-    <div class="dte-ok"><i class="ti ti-circle-check"></i> ${titulo} emitida correctamente.</div>
+    <div class="dte-ok"><i class="ti ti-circle-check"></i> ${titulo} emitida correctamente${resultado.ambiente === 'T' ? ' en HOMOLOGACIÓN (prueba, no es un documento real)' : ''}.</div>
     ${pdfSrc
       ? `<iframe class="dte-pdf" src="${dteAttr(pdfSrc)}" title="PDF de GDExpress"></iframe>`
       : `<div class="dte-aviso-caja">GDExpress todavía no entrega el PDF de este documento. Vuelve a abrirlo en unos minutos desde Facturas → Documentos.</div>`}`,
