@@ -51,7 +51,9 @@ function dteRutValido(rut) {
 }
 
 const dteRefNueva = () => ({ tipo: '801', folio: '', fecha: '', razon: 'ORDEN DE COMPRA' });
-const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', venc: '', qty: '', unidad: 'UN', precio: '', ocMax: null, ocCodigo: '' });
+// "Vencimiento" en la app es la Descripción del ítem en GDExpress (DscItem):
+// texto libre que se envía tal cual, ej. "V:30-11-2026".
+const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', qty: '', unidad: 'UN', precio: '', ocMax: null, ocCodigo: '' });
 
 function dteNuevo(tipo) {
   const hoy = fechaLocalISO();
@@ -74,6 +76,8 @@ function dteInit(tipo) {
   if (!dteEstado[tipo]) {
     const b = dteCargarBorrador(tipo);
     dteEstado[tipo] = b && b.tipo === tipo ? { ...dteNuevo(tipo), ...b } : dteNuevo(tipo);
+    // Borradores anteriores guardaban el vencimiento como fecha: pasa a texto.
+    dteEstado[tipo].det.forEach(d => { if (d.venc && !d.dsc) d.dsc = 'V:' + dteDmy(d.venc); delete d.venc; if (d.dsc === undefined) d.dsc = ''; });
     const tr = dteEstado[tipo].trans;
     if (!tr.patente && !tr.rutTrans && !tr.nombreChofer) Object.assign(tr, DTE_TRANSPORTE);
   }
@@ -462,7 +466,7 @@ function dteRender(t) {
           <div>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</div>
           <div><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
             <small class="dte-sub dte-det-oc">${d.ocMax ? `OC ${dteEsc(d.ocCodigo)}: ${d.ocMax.toLocaleString('es-CL')} unidades` : ''}</small></div>
-          <div>${dteFecha(t, `det.${i}.venc`, d.venc)}</div>
+          <div>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="1000" placeholder="V:30-11-2026" title="Se envía como Descripción del producto en GDExpress"')}</div>
           <div><input type="number" min="0" step="any" class="dte-in" value="${dteAttr(d.qty)}" oninput="dteSet(${t},'det.${i}.qty',this.value)"><small class="dte-aviso" id="dte-${t}-aviso-${i}"></small></div>
           <div>${dteInput(t, `det.${i}.unidad`, d.unidad, 'maxlength="4"')}</div>
           <div><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></div>
@@ -540,7 +544,7 @@ function dteXml(s) {
     ? `<TipoDTE>33</TipoDTE><Folio>0</Folio><FchEmis>${s.fchEmis}</FchEmis><TpoTranVenta>1</TpoTranVenta><FmaPago>${s.fmaPago}</FmaPago>${pagoXml}${e('FchVenc', s.fchVenc)}`
     : `<TipoDTE>52</TipoDTE><Folio>0</Folio><FchEmis>${s.fchEmis}</FchEmis><TipoDespacho>${s.tipoDespacho}</TipoDespacho><IndTraslado>${s.indTraslado}</IndTraslado><TpoTranVenta>1</TpoTranVenta>${e('FchVenc', s.fchVenc)}`;
   const transporte = s.tipo !== 52 ? '' : `<Transporte>${e('Patente', s.trans.patente.trim().toUpperCase())}${e('RUTTrans', dteRutLimpio(s.trans.rutTrans))}${s.trans.rutChofer || s.trans.nombreChofer ? `<Chofer>${e('RUTChofer', dteRutLimpio(s.trans.rutChofer))}${e('NombreChofer', s.trans.nombreChofer.trim())}</Chofer>` : ''}${e('DirDest', s.dest.dir.trim())}${e('CmnaDest', s.dest.cmna.toUpperCase())}${e('CiudadDest', s.dest.ciudad)}${e('FchSalida', s.trans.fchSalida)}${e('HraSalida', s.trans.hraSalida)}${e('FchLlegada', s.trans.fchLlegada)}</Transporte>`;
-  const detalle = lineas.map((d, i) => `<Detalle><NroLinDet>${i + 1}</NroLinDet>${d.cod.trim() ? `<CdgItem>${e('TpoCodigo', (d.tpoCod || 'INT').trim())}${e('VlrCodigo', d.cod.trim())}</CdgItem>` : ''}${e('NmbItem', d.nombre.trim())}${d.venc ? `<DscItem>V:${dteDmy(d.venc)}</DscItem>` : ''}<QtyItem>${Number(d.qty)}</QtyItem>${e('UnmdItem', (d.unidad || '').trim())}<PrcItem>${Number(d.precio)}</PrcItem><MontoItem>${dteMontoLinea(d)}</MontoItem></Detalle>`).join('');
+  const detalle = lineas.map((d, i) => `<Detalle><NroLinDet>${i + 1}</NroLinDet>${d.cod.trim() ? `<CdgItem>${e('TpoCodigo', (d.tpoCod || 'INT').trim())}${e('VlrCodigo', d.cod.trim())}</CdgItem>` : ''}${e('NmbItem', d.nombre.trim())}${e('DscItem', (d.dsc || '').trim())}<QtyItem>${Number(d.qty)}</QtyItem>${e('UnmdItem', (d.unidad || '').trim())}<PrcItem>${Number(d.precio)}</PrcItem><MontoItem>${dteMontoLinea(d)}</MontoItem></Detalle>`).join('');
   const refs = s.refs.map((r, i) => `<Referencia><NroLinRef>${i + 1}</NroLinRef>${e('TpoDocRef', r.tipo)}${e('FolioRef', r.folio.trim())}${e('FchRef', r.fecha)}${e('RazonRef', r.razon.trim())}</Referencia>`).join('');
   return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <DTE version="1.0"><Documento ID="T${s.tipo}F0"><Encabezado><IdDoc>${idDoc}</IdDoc><Emisor>${e('RUTEmisor', DTE_EMISOR.rut)}${e('RznSoc', DTE_EMISOR.rzn)}${e('GiroEmis', DTE_EMISOR.giro)}${e('Acteco', DTE_EMISOR.acteco)}${e('Sucursal', DTE_EMISOR.sucursal)}${e('DirOrigen', DTE_EMISOR.dir)}${e('CmnaOrigen', DTE_EMISOR.cmna)}${e('CiudadOrigen', DTE_EMISOR.ciudad)}</Emisor><Receptor>${e('RUTRecep', s.rut)}${e('RznSocRecep', s.recep.rzn.trim().slice(0, 100))}${e('GiroRecep', s.recep.giro.trim().slice(0, 40))}${e('DirRecep', s.recep.dir.trim().slice(0, 70))}${e('CmnaRecep', s.recep.cmna.trim().toUpperCase())}${e('CiudadRecep', s.recep.ciudad.trim())}</Receptor>${transporte}<Totales><MntNeto>${tot.neto}</MntNeto><MntExe>0</MntExe><TasaIVA>19</TasaIVA><IVA>${tot.iva}</IVA><MntTotal>${tot.total}</MntTotal></Totales></Encabezado>${detalle}${refs}</Documento></DTE>`;
