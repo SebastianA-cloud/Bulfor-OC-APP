@@ -921,3 +921,53 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .cc-graf { margin-top: 12px; }
 .cc-graf svg { height: 190px; }
 .cc-leyenda { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); margin-top: 6px; }
+
+/* ═══ Creación de documentos (documentos.js) ═══════════════════════════ */
+.dte-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.dte-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dte-card { background: var(--surface); border: 1px solid #ECEAE4; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 16px 18px; }
+.dte-card h3 { font-size: 12px; font-weight: 650; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); margin-bottom: 12px; }
+.dte-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 12px; }
+.dte-campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dte-campo > span { font-size: 12px; color: var(--text-2); }
+.dte-campo b, .dte-th b { color: var(--red); font-weight: 600; }
+.dte-in { width: 100%; min-width: 0 !important; height: 36px; padding: 6px 10px !important; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; font-family: var(--font); box-sizing: border-box; }
+.dte-in:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.dte-in:disabled { background: var(--bg); color: var(--text-2); }
+.dte-monto { text-align: right; font-variant-numeric: tabular-nums; }
+.dte-info { font-size: 12px; color: var(--text-2); margin-top: 10px; }
+.dte-sub { display: block; font-size: 11px; color: var(--text-3); margin-top: 3px; }
+.dte-aviso { display: block; font-size: 11px; color: var(--red); margin-top: 3px; line-height: 1.3; }
+.dte-aviso:empty { display: none; }
+.dte-tabla { display: grid; gap: 8px; align-items: start; }
+.dte-refs { grid-template-columns: 220px minmax(150px, 1fr) 150px minmax(150px, 1.2fr) 36px; }
+.dte-det { grid-template-columns: 56px 84px minmax(150px, 1fr) 128px 76px 54px 96px 100px 36px; }
+.dte-th { font-size: 12px; color: var(--text-2); }
+.dte-quitar { width: 36px; height: 36px; border: none; background: none; color: var(--red); border-radius: 8px; cursor: pointer; font-size: 17px; }
+.dte-quitar:hover { background: var(--red-light); }
+.dte-agregar { margin-top: 12px; border: 1px dashed var(--border-strong); background: none; color: var(--text-2); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-family: var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.dte-agregar:hover { border-color: var(--accent); color: var(--accent); }
+.dte-aside { position: sticky; top: 50px; }
+.dte-totales { display: flex; flex-direction: column; gap: 8px; }
+.dte-totales > div { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); }
+.dte-totales b { color: var(--text); font-variant-numeric: tabular-nums; }
+.dte-total { border-top: 1px solid var(--border); padding-top: 8px; font-size: 15px !important; }
+.dte-total b { font-size: 18px; }
+.dte-btn-principal, .dte-btn { width: 100%; height: 38px; border-radius: 8px; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.dte-btn-principal { background: var(--accent); color: #fff; border: none; margin-top: 6px; }
+.dte-btn-principal:hover { background: #A93225; }
+.dte-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.dte-btn:hover { border-color: var(--accent); color: var(--accent); }
+.dte-btn-suave { font-weight: 500; color: var(--text-2); }
+.dte-xml { background: #1A1917; color: #E7E3DA; border-radius: var(--radius); padding: 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; max-height: 60vh; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.dte-aviso-caja { background: var(--amber-light); color: var(--amber); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+@media (max-width: 1200px) {
+  .dte-layout { grid-template-columns: 1fr; }
+  .dte-aside { position: static; }
+}
+@media (max-width: 900px) {
+  .dte-tabla { overflow-x: auto; }
+  .dte-refs { grid-template-columns: 200px 160px 140px 180px 36px; }
+  .dte-det { grid-template-columns: 70px 90px 220px 130px 80px 55px 100px 100px 36px; }
+}
+.dte-sub:empty { display: none; }

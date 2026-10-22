@@ -125,6 +125,18 @@
       </div>
     </div>
 
+    <div class="nav-group" data-modulo="documentos">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('documentos', true)" title="Creación de documentos">
+        <span class="nav-icon"><i class="ti ti-file-plus" aria-hidden="true"></i></span><span style="flex:1">Creación de documentos</span>
+        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
+      </div>
+      <div class="nav-subgroup" id="subgroup-documentos">
+        <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('documentos','doc-factura',this)"><span>Factura</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('documentos','doc-guia',this)"><span>Guía de despacho</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('documentos','doc-nc',this)"><span>Nota de crédito</span></div>
+      </div>
+    </div>
+
     <div class="nav-group" data-modulo="fedex">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="Seguimiento FedEx">
         <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span style="flex:1">Seguimiento FedEx</span>
@@ -265,6 +277,7 @@
   <div class="modulos-grupo">Compras y ventas</div>
   <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
   <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="documentos" onclick="mostrarModulo('documentos')"><i class="ti ti-file-plus"></i><span>Creación de documentos</span></div>
   <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>Seguimiento FedEx</span></div>
   <div class="modulos-grupo">Farmacia</div>
   <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
@@ -1354,9 +1367,32 @@
     <input type="file" id="farmacia-conciliacion-file" style="display:none">
   </div>
 
+  <!-- CREACIÓN DE DOCUMENTOS (documentos.js) -->
+  <div class="page" id="page-doc-factura">
+    <div class="page-header">
+      <div class="page-title">Factura</div>
+      <div class="page-sub">Factura electrónica afecta sin despacho</div>
+    </div>
+    <div id="dte-form-33"></div>
+  </div>
+  <div class="page" id="page-doc-guia">
+    <div class="page-header">
+      <div class="page-title">Guía de despacho</div>
+      <div class="page-sub">Guía de despacho electrónica</div>
+    </div>
+    <div id="dte-form-52"></div>
+  </div>
+  <div class="page" id="page-doc-nc">
+    <div class="page-header">
+      <div class="page-title">Nota de crédito</div>
+      <div class="page-sub">Nota de crédito electrónica</div>
+    </div>
+    <div class="table-card"><div class="empty-state"><i class="ti ti-tools"></i><h4>Próximamente</h4><p>Primero dejamos funcionando la factura y la guía de despacho.</p></div></div>
+  </div>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="documentos.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -15000,6 +15036,8 @@ showPage = function(id, el) {
   if (id === 'rec-buscar') recBuscarInit();
   if (id === 'rec-preparados') recPrepInit();
   if (id === 'rec-compras') recCmInit();
+  if (id === 'doc-factura') dteInit(33);
+  if (id === 'doc-guia') dteInit(52);
   if (id === 'rec-alertas') recAlertasInit(false);
   if (id === 'rec-materias') recMatInit();
   if (id === 'rec-costos') recCostosInit();
@@ -15037,6 +15075,11 @@ const SUBMENUS = {
       { icon: '<i class="ti ti-upload"></i>', label: 'Importar Excel', page: 'importar' },
     ],
   },
+  'documentos': { items: [
+    { icon: '<i class="ti ti-file-invoice"></i>', label: 'Factura', page: 'doc-factura' },
+    { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guía de despacho', page: 'doc-guia' },
+    { icon: '<i class="ti ti-receipt-refund"></i>', label: 'Nota de crédito', page: 'doc-nc' },
+  ] },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
     { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'facturas-productos' },
