@@ -1,0 +1,32 @@
+name: Diagnóstico homologación GDExpress
+
+# Diagnóstico de solo lectura: no emite documentos ni escribe en Supabase,
+# por eso solo recibe las credenciales de GDExpress. Se lanza a mano, o solo
+# al subir cambios a este diagnóstico en la rama separar-css.
+on:
+  workflow_dispatch:
+  push:
+    branches: [separar-css]
+    paths:
+      - probar_homologacion.py
+      - .github/workflows/probar_homologacion.yml
+
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Ejecutar diagnóstico
+        env:
+          DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
+          GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+        run: python probar_homologacion.py
