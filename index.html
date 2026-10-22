@@ -5126,6 +5126,24 @@ function actualizarBadgeOEDigitar() {
     badge.textContent = texto;
     badge.style.display = 'flex';
   });
+  ponerAvisoSub('elaboracion', cantidad, { texto, title: `${cantidad} orden${cantidad === 1 ? '' : 'es'} por digitar` });
+}
+
+// Avisos en los submenús: el número del menú grande aparece también al lado
+// de la subpágina que lo origina (como en "Facturas rechazadas").
+const avisosSub = {};   // página → { n, texto, title, azul }
+function ponerAvisoSub(pagina, n, opts = {}) { avisosSub[pagina] = { n, ...opts }; pintarAvisosSub(); }
+function pintarAvisosSub() {
+  Object.entries(avisosSub).forEach(([pagina, a]) => {
+    document.querySelectorAll(`.nav-subitem[data-page="${pagina}"], #nav-submenu .nav-item[data-page="${pagina}"]`).forEach(item => {
+      let el = item.querySelector('.aviso-sub');
+      if (!a.n) { if (el) el.remove(); return; }
+      if (!el) { el = document.createElement('span'); el.className = 'aviso-sub'; item.appendChild(el); }
+      el.textContent = a.texto ?? String(a.n);
+      el.title = a.title || '';
+      el.classList.toggle('aviso-sub-azul', !!a.azul);
+    });
+  });
 }
 
 function renderOE() {
@@ -5199,8 +5217,7 @@ function actualizarBadgeSW() {
   if (el) { el.style.display = n ? 'flex' : 'none'; el.textContent = n > 9 ? '9+' : String(n); }
   const elTab = document.getElementById('badge-sw-nuevas-tab');
   if (elTab) { elTab.style.display = n ? 'flex' : 'none'; elTab.textContent = n > 9 ? '9+' : String(n); }
-  const sub = document.querySelector('.nav-subitem[data-page="solicitudes-web"] span');
-  if (sub) sub.textContent = n ? `Solicitudes Web (${n})` : 'Solicitudes Web';
+  ponerAvisoSub('solicitudes-web', n, { texto: n > 9 ? '9+' : String(n), title: `${n} solicitud${n === 1 ? '' : 'es'} web nueva${n === 1 ? '' : 's'}`, azul: true });
 }
 
 function fechaHoraCL(ts) {
@@ -13017,6 +13034,7 @@ async function cargarRecResumenAhora() {
       const el = document.getElementById(id);
       if (el) { el.textContent = n; el.style.display = n > 0 ? 'inline-flex' : 'none'; }
     });
+    ponerAvisoSub('rec-alertas', n, { title: `${n} RM con lote vencido en los últimos 7 días` });
     if (document.getElementById('page-inicio')?.classList.contains('active')) renderInicio();
   } catch (e) { /* el módulo es opcional: si falla, la app sigue igual */ }
 }
@@ -15257,6 +15275,7 @@ function renderNavSubmenuMobile(modulo, pagina) {
   });
   cont.innerHTML = html;
   actualizarBadgeRechazadas();
+  pintarAvisosSub();
   const activo = cont.querySelector('.nav-item.active');
   if (activo) activo.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
