@@ -27,6 +27,7 @@ Modos (variable MODO):
 """
 
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -92,13 +93,15 @@ def traducir(res):
                 # FedEx entrega la hora local del destino: basta con el día.
                 datos['fecha_entrega'] = f['dateTime'][:10]
         nombre = ((res.get('deliveryDetails') or {}).get('receivedByName') or '').strip()
+        # FedEx antepone la inicial con punto: "J.JAVIER ALTAMIRANO" -> "JAVIER ALTAMIRANO".
+        nombre = re.sub(r'^([A-ZÁÉÍÓÚÑ])\.\s*(?=\1)', '', nombre)
         if nombre:
             datos['recibido_por'] = nombre
     elif codigo == 'DE':
         datos['estado_envio'] = 'Entrega reprogramada'   # intento de entrega fallido
     elif codigo in ('SE', 'DY', 'CD') or atrasado:
         datos['estado_envio'] = 'Retraso'
-    elif codigo in ('PU', 'PX'):
+    elif codigo in ('PU', 'PX', 'HP'):   # HP = "Tenemos su paquete"
         datos['estado_envio'] = 'Recibido por FedEx'
     elif codigo in ('OC', 'CA', ''):
         return None   # solo etiqueta creada / sin movimiento: no se toca
