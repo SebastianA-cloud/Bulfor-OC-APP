@@ -18,7 +18,7 @@ Seba (dueño y Director Técnico) es quien pide los cambios. Trabaja solo desde 
 - `index.html` — la app completa en JavaScript vanilla (~16.000 líneas). Es muy grande: busca con grep y edita solo el bloque necesario; nunca la reescribas entera.
 - `styles.css` — estilos. Color de marca `#C0392B`. Íconos: Tabler Icons (CDN).
 - `documentos.js` — módulo de creación de documentos.
-- `notificar-receta.js` — función serverless de Vercel (aviso por correo con Resend de nuevas Órdenes de Elaboración).
+- `api/notificar-receta.js` — función serverless de Vercel (aviso por correo con Resend de nuevas Órdenes de Elaboración).
 - `supabase/functions/emitir-dte/` — Edge Function que emite facturas (33) y guías (52) vía GDExpress.
 - `*.py` + `.github/workflows/` — sincronizaciones con Mercado Público y GDExpress que corren en GitHub Actions (cada 2 horas). Los `probar_*.py` y `diagnosticar_*.py` son scripts de diagnóstico.
 - `sw.js`, `manifest.json` — solo para poder instalar la app; el service worker no cachea nada.

@@ -1,6 +1,7 @@
 // /api/notificar-receta.js
 //
-// Vercel detecta este archivo solo (no hace falta configurar nada más).
+// Vercel detecta este archivo solo porque está en la carpeta api/ (no hace
+// falta configurar nada más).
 // Supabase le avisa a esta URL cada vez que se crea una nueva Orden de
 // Elaboración (que es el momento exacto en que se sube una receta y queda
 // "Por digitar"), y esta función manda el correo de aviso con Resend.
