@@ -1,0 +1,38 @@
+name: Sincronizar estados de envíos FedEx
+
+on:
+  schedule:
+    - cron: '40 */2 * * *'  # cada 2 horas (a los :40, para no chocar con las otras sincronizaciones)
+  workflow_dispatch:  # permite ejecutarlo manualmente con un botón
+    inputs:
+      modo:
+        description: 'probar = solo mostrar los cambios / escribir = guardarlos'
+        default: 'probar'
+        type: choice
+        options: [probar, escribir]
+  push:  # TEMPORAL: prueba automática (sin escribir) al subir cambios a la rama de desarrollo
+    branches: [fedex-rastreo]
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase
+
+      - name: Ejecutar sincronización
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: el robot necesita escribir
+          FEDEX_API_KEY: ${{ secrets.FEDEX_API_KEY }}
+          FEDEX_SECRET_KEY: ${{ secrets.FEDEX_SECRET_KEY }}
+          # La corrida automática (cada 2 horas) guarda; la manual y la de prueba solo muestran.
+          MODO: ${{ github.event_name == 'schedule' && 'escribir' || inputs.modo || 'probar' }}
+        run: python sincronizar_fedex.py
