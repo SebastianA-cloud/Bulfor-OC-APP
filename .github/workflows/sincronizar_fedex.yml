@@ -10,8 +10,6 @@ on:
         default: 'probar'
         type: choice
         options: [probar, escribir]
-  push:  # TEMPORAL: prueba automática (sin escribir) al subir cambios a la rama de desarrollo
-    branches: [fedex-rastreo]
 
 jobs:
   sincronizar:
