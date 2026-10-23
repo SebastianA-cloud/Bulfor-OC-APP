@@ -4854,11 +4854,15 @@ function filterFedex() {
     const s = `${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.orden_transporte||''} ${f.factura||''} ${f.recibido_por||''}`;
     return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado) && coincideCategoriaFedex(f, fedexCategoriaActiva);
   });
-  // Orden por correlativo de factura (la más alta arriba), sin importar en
-  // qué orden se digitaron los envíos. Si un envío lleva varias facturas
-  // manda la mayor; los que no tienen número quedan al final, por fecha.
+  // Orden: primero por día de ingreso (hora de Chile, el más reciente
+  // arriba) y dentro de cada día por correlativo de factura (la más alta
+  // arriba), sin importar en qué orden se digitaron. Si un envío lleva
+  // varias facturas manda la mayor; las guías (otra serie, números más
+  // bajos) quedan debajo de las facturas de su mismo día.
+  const diaChile = f => f.fecha_ingreso ? new Date(f.fecha_ingreso).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
   const mayorFactura = f => Math.max(0, ...parsearNumerosFactura(f.factura).map(n => parseInt(String(n).replace(/\D/g, ''), 10) || 0));
-  fedexF.sort((a, b) => (mayorFactura(b) - mayorFactura(a)) || String(b.fecha_ingreso || '').localeCompare(String(a.fecha_ingreso || '')));
+  fedexF.sort((a, b) => diaChile(b).localeCompare(diaChile(a)) || (mayorFactura(b) - mayorFactura(a))
+    || String(b.fecha_ingreso || '').localeCompare(String(a.fecha_ingreso || '')));
   fedexPage = 1; renderFedex();
 }
 
