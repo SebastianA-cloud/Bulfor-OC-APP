@@ -4854,6 +4854,11 @@ function filterFedex() {
     const s = `${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.orden_transporte||''} ${f.factura||''} ${f.recibido_por||''}`;
     return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado) && coincideCategoriaFedex(f, fedexCategoriaActiva);
   });
+  // Orden por correlativo de factura (la más alta arriba), sin importar en
+  // qué orden se digitaron los envíos. Si un envío lleva varias facturas
+  // manda la mayor; los que no tienen número quedan al final, por fecha.
+  const mayorFactura = f => Math.max(0, ...parsearNumerosFactura(f.factura).map(n => parseInt(String(n).replace(/\D/g, ''), 10) || 0));
+  fedexF.sort((a, b) => (mayorFactura(b) - mayorFactura(a)) || String(b.fecha_ingreso || '').localeCompare(String(a.fecha_ingreso || '')));
   fedexPage = 1; renderFedex();
 }
 
@@ -11051,9 +11056,8 @@ async function guardarNuevoEnvio(hospital) {
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
     const nuevo = (await res.json())[0];
     fedex.unshift(nuevo);
-    fedexF = [...fedex];
     cerrarFormularioEnvio();
-    renderFedex();
+    filterFedex();   // vuelve a filtrar y ordenar por N° de factura
   } catch(e) {
     toast('No se pudo guardar el envío: ' + e.message + ' (Si el error menciona "duplicate", ese N° de orden de transporte ya existe)', 'err');
   }
