@@ -55,7 +55,7 @@ const dteRefNueva = () => ({ tipo: '801', folio: '', fecha: '', razon: 'ORDEN DE
 // texto libre que se envía tal cual, ej. "V:30-11-2026".
 // "Descripción" (desc2) es texto opcional que va debajo del vencimiento en esa
 // misma Descripción; si no hay vencimiento, ocupa su lugar.
-const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', desc2: '', qty: '', unidad: 'UN', precio: '', ocMax: null, ocCodigo: '' });
+const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', desc2: '', qty: '', unidad: '', precio: '', ocMax: null, ocCodigo: '' });
 
 function dteNuevo(tipo) {
   const hoy = fechaLocalISO();
@@ -751,7 +751,7 @@ function dteRender(t) {
           <div class="dte-prod-n">${i + 1}</div>
           <div class="dte-prod-l1">
             <label class="dte-campo"><span>Tipo cód.</span>${dteInput(t, `det.${i}.tpoCod`, d.tpoCod, 'maxlength="10"')}</label>
-            <label class="dte-campo"><span>Código</span>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</label>
+            <label class="dte-campo"><span>Código</span>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35"')}</label>
           </div>
           <div class="dte-prod-l2">
             <label class="dte-campo"><span>Producto <b>*</b></span><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
@@ -762,8 +762,8 @@ function dteRender(t) {
             <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
           </div>
           <div class="dte-prod-l3">
-            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="500" placeholder="V:30-11-2026" title="Va en la Descripción del producto en GDExpress"')}</label>
-            <label class="dte-campo"><span>Descripción <em>(opcional)</em></span>${dteInput(t, `det.${i}.desc2`, d.desc2 || '', 'maxlength="500" placeholder="Texto que irá debajo del vencimiento" title="Va en la Descripción del producto, debajo del vencimiento"')}</label>
+            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="500"')}</label>
+            <label class="dte-campo"><span>Descripción</span>${dteInput(t, `det.${i}.desc2`, d.desc2 || '', 'maxlength="500"')}</label>
           </div>
           <button class="dte-quitar dte-prod-x" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto">✕</button>
         </div>`).join('')}
