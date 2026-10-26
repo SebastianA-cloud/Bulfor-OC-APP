@@ -12996,6 +12996,9 @@ function descargarPedidoExcel() {
 let recResumen = null;
 let recBuscarRango = 90, recBuscarData = null;
 let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
+// RM con lote vencido que alguien marcó como revisados (tabla rec_lotes_revisados):
+// se ocultan del historial. Clave "id_rp_detalle|lote".
+let recRevisados = new Set(), recVerRevisados = false, recHistGrupos = [];
 let recMatTab = 'compra', recMatRango = 90, recMatData = null, recMatEdit = {}, recMatParams = null;
 let recVencData = null, recVencFiltro = 'vencidos';
 let recCostosTab = 'ordenes', recCostosMeses = 3, recCostosOE = null, recCostosFormulas = null, recProductosOC = null;
@@ -13239,8 +13242,12 @@ async function recAlertasInit(forzar) {
 
 async function recCargarHistorial() {
   const desde = recHaceDias(recAlertasDias - 1);
-  recHistorial = await fetchAll('rec_lineas', `select=id_rp_detalle,rm,fecha,materia,lote,vence,institucion&lote_vencido=is.true&fecha=gte.${desde}&order=fecha.desc`);
-  if (!Array.isArray(recHistorial)) recHistorial = [];
+  const [hist, rev] = await Promise.all([
+    fetchAll('rec_lineas', `select=id_rp_detalle,rm,fecha,materia,lote,vence,institucion&lote_vencido=is.true&fecha=gte.${desde}&order=fecha.desc`),
+    fetchAll('rec_lotes_revisados', 'select=id_rp_detalle,lote'),
+  ]);
+  recHistorial = Array.isArray(hist) ? hist : [];
+  recRevisados = new Set((Array.isArray(rev) ? rev : []).map(r => `${r.id_rp_detalle}|${r.lote}`));
 }
 
 function recAlertasSetTab(t) { recAlertasTab = t; recAlertasInit(false); }
@@ -13325,26 +13332,37 @@ function recAlertasRender() {
     return;
   }
 
-  // Historial agrupado por materia + lote
+  // Historial agrupado por materia + lote. Los RM marcados como revisados
+  // salen de la lista (se pueden ver aparte con "Ver revisados").
+  const esRevisado = l => recRevisados.has(`${l.id_rp_detalle}|${l.lote}`);
+  const pendientes = (recHistorial || []).filter(l => !esRevisado(l));
+  const nRevisados = new Set((recHistorial || []).filter(esRevisado).map(l => `${l.id_rp_detalle}|${l.lote}`)).size;
+  const fuente = recVerRevisados ? (recHistorial || []).filter(esRevisado) : pendientes;
   const grupos = {};
-  (recHistorial || []).forEach(l => {
+  fuente.forEach(l => {
     const k = `${l.materia}|${l.lote}`;
     if (!grupos[k]) grupos[k] = { materia: l.materia, lote: l.lote, vence: l.vence, rms: [], ultimo: l.fecha, maxDias: 0 };
     const g = grupos[k];
-    if (!g.rms.find(x => x.id === l.id_rp_detalle)) g.rms.push({ id: l.id_rp_detalle, rm: l.rm, fecha: l.fecha });
+    if (!g.rms.find(x => x.id === l.id_rp_detalle)) g.rms.push({ id: l.id_rp_detalle, rm: l.rm, fecha: l.fecha, materia: l.materia });
     if (new Date(l.fecha) > new Date(g.ultimo)) g.ultimo = l.fecha;
     const dias = Math.floor((new Date(l.fecha) - new Date(l.vence + 'T00:00:00')) / 86400000);
     if (dias > g.maxDias) g.maxDias = dias;
   });
   const lista = Object.values(grupos).sort((a, b) => b.rms.length - a.rms.length);
-  const totalRm = new Set((recHistorial || []).map(l => l.id_rp_detalle)).size;
-  if (!lista.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>No hay RM con lote vencido en este período.</p></div></div>`; return; }
+  recHistGrupos = lista;
+  const totalRm = new Set(fuente.map(l => l.id_rp_detalle)).size;
+  const esEditor = sesionActual?.rol === 'editor';
+  const toggleRev = nRevisados || recVerRevisados
+    ? `<a style="cursor:pointer;color:var(--accent);white-space:nowrap" onclick="recVerRevisados=!recVerRevisados;recAlertasRender()">${recVerRevisados ? '← Volver a los pendientes' : `Ver revisados (${nRevisados})`}</a>` : '';
+  if (!lista.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>${recVerRevisados ? 'No hay RM marcados como revisados en este período.' : 'No hay RM con lote vencido pendientes en este período.'}</p>${toggleRev ? `<p>${toggleRev}</p>` : ''}</div></div>`; return; }
   cont.innerHTML = `
-    <div class="rec-nota"><b>${totalRm} RM</b> del período quedaron registrados con al menos un lote vencido. Agrupado por materia prima y lote.</div>
+    <div class="rec-nota" style="display:flex;gap:12px;justify-content:space-between;align-items:baseline;flex-wrap:wrap"><span>${recVerRevisados
+      ? `<b>${totalRm} RM</b> marcados como revisados. No se muestran en el historial; con "Desmarcar" vuelven a aparecer.`
+      : `<b>${totalRm} RM</b> del período quedaron registrados con al menos un lote vencido. Agrupado por materia prima y lote. Si ya lo corregiste en Pharma_RM (y el RM es antiguo, el cambio no vuelve a sincronizarse) o decidiste dejarlo así, usa <b>Marcar revisado</b>.`}</span>${toggleRev}</div>
     <div class="table-card farm-grilla"><table><thead><tr>
-      <th>Materia prima</th><th>Lote</th><th>Venció</th><th style="text-align:right">RM</th><th>Último uso</th><th style="text-align:right">Días vencido (máx.)</th><th>RM afectados</th>
+      <th>Materia prima</th><th>Lote</th><th>Venció</th><th style="text-align:right">RM</th><th>Último uso</th><th style="text-align:right">Días vencido (máx.)</th><th>RM afectados</th>${esEditor ? '<th></th>' : ''}
     </tr></thead><tbody>
-    ${lista.map(g => `<tr>
+    ${lista.map((g, i) => `<tr>
       <td data-label="Materia prima" style="font-weight:500">${escapeHtml(g.materia)}${recEsInterno(g.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
       <td data-label="Lote" class="mono">${escapeHtml(g.lote || '')}</td>
       <td data-label="Venció" style="white-space:nowrap">${fDate(g.vence)}</td>
@@ -13352,8 +13370,34 @@ function recAlertasRender() {
       <td data-label="Último uso" style="white-space:nowrap">${recFechaTs(g.ultimo)}</td>
       <td data-label="Días vencido" style="text-align:right;color:var(--red)">${recNum(g.maxDias)}</td>
       <td data-label="RM afectados" style="font-size:12px">${g.rms.slice(0, 8).map(x => `<a style="cursor:pointer;color:var(--accent);margin-right:6px;white-space:nowrap" onclick="recAbrirRm(${x.id})">${escapeHtml(x.rm || ('#' + x.id))}</a>`).join('')}${g.rms.length > 8 ? `<span style="color:var(--text-3)">+${g.rms.length - 8} más</span>` : ''}</td>
+      ${esEditor ? `<td style="white-space:nowrap;text-align:right"><button class="page-btn" onclick="recMarcarRevisado(${i}, ${!recVerRevisados})">${recVerRevisados ? 'Desmarcar' : '✓ Marcar revisado'}</button></td>` : ''}
     </tr>`).join('')}
     </tbody></table></div>`;
+}
+
+// Marca (o desmarca) como revisados todos los RM de un grupo materia + lote
+// del historial. Solo guarda la marca en rec_lotes_revisados: no toca Pharma_RM.
+async function recMarcarRevisado(i, marcar) {
+  const g = recHistGrupos[i];
+  if (!g) return;
+  if (marcar && !confirm(`¿Marcar como revisados los ${g.rms.length} RM de ${g.materia} (lote ${g.lote})? Dejarán de aparecer en el historial.`)) return;
+  try {
+    let res;
+    if (marcar) {
+      const filas = g.rms.map(x => ({ id_rp_detalle: x.id, lote: g.lote, materia: g.materia, rm: x.rm, revisado_por: sesionActual?.email || null }));
+      res = await sb('rec_lotes_revisados?on_conflict=id_rp_detalle,lote', {
+        method: 'POST', headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(filas) });
+    } else {
+      const lote = encodeURIComponent(`"${String(g.lote).replace(/"/g, '\\"')}"`);
+      res = await sb(`rec_lotes_revisados?lote=eq.${lote}&id_rp_detalle=in.(${g.rms.map(x => x.id).join(',')})`, { method: 'DELETE' });
+    }
+    if (!res.ok) throw new Error(await res.text());
+    g.rms.forEach(x => { const k = `${x.id}|${g.lote}`; marcar ? recRevisados.add(k) : recRevisados.delete(k); });
+    toast(marcar ? 'Marcado como revisado.' : 'Vuelve a aparecer en el historial.');
+    recAlertasRender();
+  } catch (e) {
+    toast('No se pudo guardar: ' + e.message, 'err');
+  }
 }
 
 async function recAbrirRmPorNumero(rm) {
