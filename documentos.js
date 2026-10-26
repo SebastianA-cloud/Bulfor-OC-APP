@@ -1279,12 +1279,6 @@ function dteMultiRetomarHtml() {
 function dteMultiContinuar() { dteMultiRetomado = true; dteMultiRender(); }
 
 // ── Paso 1: cliente y órdenes de compra ─────────────────────────────────
-function dteMultiFoliosDeOC(cod) {
-  const c = String(cod || '').trim().toUpperCase();
-  return (typeof documentosGdexpress !== 'undefined' ? documentosGdexpress : [])
-    .filter(d => String(d.tipo_dte) === '33' && String(d.orden_compra_ref || '').trim().toUpperCase() === c).map(d => d.folio);
-}
-
 function dteMultiElegirHtml() {
   const m = dteMulti, s = m.base, t = DTE_MULTI;
   const conocido = dteListaClientes().find(c => c.rut === s.rut);
@@ -1302,7 +1296,7 @@ function dteMultiElegirHtml() {
     ${rutOk && (s.recep.rzn || conocido) ? `<div class="dte-cliente-ok"><span class="ti ti-building-hospital"></span> <b>${dteEsc(s.recep.rzn || conocido?.nombre || '')}</b></div>` : ''}
     ${s.recepInfo ? `<div class="dte-info">${dteEsc(s.recepInfo)}</div>` : ''}`;
   const ocs = rutOk ? `
-    <div class="dte-mbuscar"><i class="ti ti-search"></i><input type="text" class="dte-in" id="dte-multi-buscar" autocomplete="off" placeholder="Buscar OC por número o nombre" value="${dteAttr(m.buscar)}" oninput="dteMultiBuscar(this.value)" onkeydown="if(event.key==='Enter')dteMultiAgregarManual()"></div>
+    <div class="dte-mbuscar"><i class="ti ti-search"></i><input type="text" class="dte-in" id="dte-multi-buscar" autocomplete="off" placeholder="Buscar OC por número" value="${dteAttr(m.buscar)}" oninput="dteMultiBuscar(this.value)" onkeydown="if(event.key==='Enter')dteMultiAgregarManual()"></div>
     <div id="dte-multi-ocs">${dteMultiOcsHtml()}</div>
     <button class="dte-agregar" onclick="dteMultiAgregarSinOC()"><i class="ti ti-plus"></i> Agregar factura sin OC</button>`
     : '<div class="dte-info">Primero elige el cliente para ver sus órdenes de compra.</div>';
@@ -1330,24 +1324,21 @@ function dteMultiOcsHtml() {
   const m = dteMulti;
   const ocs = dteOcsDelRut(m.base.rut);
   const q = m.buscar.trim();
-  const lista = q ? ocs.filter(o => coincideBusqueda(`${o.codigooc} ${o.nombreoc || ''}`, q)) : ocs;
+  const lista = q ? ocs.filter(o => coincideBusqueda(String(o.codigooc), q)) : ocs;
   const exacta = ocs.some(o => String(o.codigooc).toUpperCase() === q.toUpperCase()) || m.sel.some(x => (x.oc || '').toUpperCase() === q.toUpperCase());
   const manual = q && !exacta ? `<button class="dte-agregar dte-mmanual" onclick="dteMultiAgregarManual()"><i class="ti ti-plus"></i> Agregar “${dteEsc(q)}” como OC a mano</button>` : '';
   if (!lista.length) return `<div class="dte-info">${ocs.length ? 'Ninguna OC de este cliente coincide con la búsqueda.' : 'Este cliente no tiene órdenes de compra en el programa.'}</div>${manual}`;
   const MAX = 60;
   const filas = lista.slice(0, MAX).map(o => {
     const marcada = m.sel.some(x => x.oc === o.codigooc);
-    const folios = dteMultiFoliosDeOC(o.codigooc);
     return `<tr class="dte-borr-fila${marcada ? ' dte-msel-fila' : ''}" onclick="dteMultiMarcar('${dteAttr(o.codigooc)}')">
       <td><input type="checkbox" ${marcada ? 'checked' : ''} tabindex="-1"></td>
       <td><b>${dteEsc(o.codigooc)}</b></td>
       <td>${dteDmy(dteFechaCL(o.fechaoc))}</td>
-      <td style="text-align:right">${dteClp(o.totaloc)}</td>
-      <td class="dte-borr-rzn">${dteEsc(o.nombreoc || '')}</td>
-      <td>${folios.length ? `<span class="dte-mfact">Facturada N° ${dteEsc(folios.join(', '))}</span>` : `<small class="dte-sub">${dteEsc(o.estadooc || '')}</small>`}</td></tr>`;
+      <td style="text-align:right">${dteClp(o.totaloc)}</td></tr>`;
   }).join('');
   return `${manual}<div class="dte-borr-tabla dte-mtabla"><table>
-      <thead><tr><th></th><th>OC</th><th>Fecha</th><th style="text-align:right">Total</th><th>Nombre</th><th>Estado</th></tr></thead>
+      <thead><tr><th></th><th>OC</th><th>Fecha</th><th style="text-align:right">Total</th></tr></thead>
       <tbody>${filas}</tbody></table></div>
     ${lista.length > MAX ? `<div class="dte-info">Se muestran las ${MAX} más recientes de ${lista.length}: usa el buscador para encontrar otras.</div>` : ''}`;
 }
@@ -1365,8 +1356,6 @@ function dteMultiMarcar(cod) {
   if (i >= 0) m.sel.splice(i, 1);
   else {
     const o = dteOcsDelRut(m.base.rut).find(o => o.codigooc === cod);
-    const folios = dteMultiFoliosDeOC(cod);
-    if (folios.length && !confirm(`La OC ${cod} ya tiene la factura N° ${folios.join(', ')}. ¿Agregarla igual?`)) return;
     m.sel.push({ oc: cod, fecha: o ? dteFechaCL(o.fechaoc) : '' });
   }
   dteMultiCambioSel();

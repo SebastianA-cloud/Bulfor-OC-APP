@@ -1101,6 +1101,7 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-mtabla { max-height: 420px; overflow-y: auto; }
 .dte-mtabla th { position: sticky; top: 0; z-index: 1; }
 .dte-mtabla td:first-child { width: 28px; }
+.dte-mtabla td { white-space: nowrap; }
 .dte-mtabla input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); pointer-events: none; }
 .dte-msel-fila td { background: #FBEDEB; }
 .dte-mfact { display: inline-block; font-size: 12px; font-weight: 600; color: var(--green); background: var(--green-light); border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
