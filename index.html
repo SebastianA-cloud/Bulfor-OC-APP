@@ -12998,7 +12998,7 @@ let recBuscarRango = 90, recBuscarData = null;
 let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
 // RM con lote vencido que alguien marcó como revisados (tabla rec_lotes_revisados):
 // se ocultan del historial. Clave "id_rp_detalle|lote".
-let recRevisados = new Set(), recVerRevisados = false, recHistGrupos = [];
+let recRevisados = new Set(), recVerRevisados = false, recHistGrupos = [], recHistAbiertos = new Set();
 let recMatTab = 'compra', recMatRango = 90, recMatData = null, recMatEdit = {}, recMatParams = null;
 let recVencData = null, recVencFiltro = 'vencidos';
 let recCostosTab = 'ordenes', recCostosMeses = 3, recCostosOE = null, recCostosFormulas = null, recProductosOC = null;
@@ -13369,10 +13369,21 @@ function recAlertasRender() {
       <td data-label="RM" style="text-align:right;font-weight:600">${g.rms.length}</td>
       <td data-label="Último uso" style="white-space:nowrap">${recFechaTs(g.ultimo)}</td>
       <td data-label="Días vencido" style="text-align:right;color:var(--red)">${recNum(g.maxDias)}</td>
-      <td data-label="RM afectados" style="font-size:12px">${g.rms.slice(0, 8).map(x => `<a style="cursor:pointer;color:var(--accent);margin-right:6px;white-space:nowrap" onclick="recAbrirRm(${x.id})">${escapeHtml(x.rm || ('#' + x.id))}</a>`).join('')}${g.rms.length > 8 ? `<span style="color:var(--text-3)">+${g.rms.length - 8} más</span>` : ''}</td>
+      <td data-label="RM afectados" style="font-size:12px;white-space:normal;line-height:1.7">${(() => {
+        // Se muestran 8; "+N más" despliega el resto (y "ver menos" los vuelve a ocultar).
+        const k = `${g.materia}|${g.lote}`, abierto = recHistAbiertos.has(k);
+        const rms = abierto ? g.rms : g.rms.slice(0, 8);
+        const toggle = g.rms.length > 8 ? `<a style="cursor:pointer;color:var(--text-2);text-decoration:underline;white-space:nowrap" onclick="recHistToggle('${escapeHtml(k).replace(/'/g, "\\'")}')">${abierto ? 'ver menos' : `+${g.rms.length - 8} más`}</a>` : '';
+        return rms.map(x => `<a style="cursor:pointer;color:var(--accent);margin-right:6px;white-space:nowrap;display:inline-block" onclick="recAbrirRm(${x.id})">${escapeHtml(x.rm || ('#' + x.id))}</a>`).join('') + toggle;
+      })()}</td>
       ${esEditor ? `<td style="white-space:nowrap;text-align:right"><button class="page-btn" onclick="recMarcarRevisado(${i}, ${!recVerRevisados})">${recVerRevisados ? 'Desmarcar' : '✓ Marcar revisado'}</button></td>` : ''}
     </tr>`).join('')}
     </tbody></table></div>`;
+}
+
+function recHistToggle(k) {
+  recHistAbiertos.has(k) ? recHistAbiertos.delete(k) : recHistAbiertos.add(k);
+  recAlertasRender();
 }
 
 // Marca (o desmarca) como revisados todos los RM de un grupo materia + lote
