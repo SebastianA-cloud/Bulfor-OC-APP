@@ -575,7 +575,9 @@ function dteSecciones(t) {
   ];
   if (!esFactura) secs.push({ id: 'desp', nombre: 'Despacho', ok: !!(s.dest.dir.trim() && s.dest.cmna && s.trans.patente.trim()) });
   secs.push({ id: 'oc', nombre: 'Orden de compra', ok: s.refs.every(r => r.tipo && r.folio.trim() && r.fecha) });
-  secs.push({ id: 'prod', nombre: 'Productos', ok: lineas.length > 0 && lineas.every(d => d.nombre.trim() && Number(d.qty) > 0 && Number(d.precio) > 0) });
+  // Productos: listo solo si TODAS las filas están completas (una fila
+  // agregada y vacía también cuenta como pendiente).
+  secs.push({ id: 'prod', nombre: 'Productos', ok: lineas.length > 0 && s.det.every(d => d.nombre.trim() && Number(d.qty) > 0 && Number(d.precio) > 0) });
   if (esFactura) secs.push({ id: 'pago', nombre: 'Pago', ok: !!(s.pago.medio && s.pago.glosa.trim()) });
   return secs;
 }
@@ -817,7 +819,7 @@ function dteValidar(s) {
   s.refs.forEach((r, i) => { if (!r.tipo || !r.folio.trim() || !r.fecha) err.push(`referencia ${i + 1} completa (tipo, folio y fecha)`); });
   const lineas = s.det.filter(d => d.nombre.trim() || Number(d.qty) || Number(d.precio));
   if (!lineas.length) err.push('al menos un producto');
-  lineas.forEach((d, i) => { if (!d.nombre.trim() || !(Number(d.qty) > 0) || !(Number(d.precio) > 0)) err.push(`producto ${i + 1} con nombre, cantidad y precio`); });
+  if (lineas.length) s.det.forEach((d, i) => { if (!d.nombre.trim() || !(Number(d.qty) > 0) || !(Number(d.precio) > 0)) err.push(`producto ${i + 1} con nombre, cantidad y precio (o quítalo con la ✕)`); });
   if (s.tipo === 33 && s.refact?.on && !/^\d+$/.test(String(s.refact.folio || '').trim())) err.push('N° de la factura que se reemplaza');
   if (s.tipo === 52) {
     if (!s.dest.dir.trim() || !s.dest.cmna) err.push('dirección y comuna de despacho');
