@@ -55,7 +55,23 @@ const dteRefNueva = () => ({ tipo: '801', folio: '', fecha: '', razon: 'ORDEN DE
 // texto libre que se envía tal cual, ej. "V:30-11-2026".
 // "Descripción" (desc2) es texto opcional que va debajo del vencimiento en esa
 // misma Descripción; si no hay vencimiento, ocupa su lugar.
-const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', desc2: '', qty: '', unidad: '', precio: '', ocMax: null, ocCodigo: '' });
+// El vencimiento (venc) se guarda como fecha y al emitir se escribe "V:dd-mm-aaaa".
+const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', venc: '', desc2: '', qty: '', unidad: '', precio: '', ocMax: null, ocCodigo: '' });
+
+// Borradores anteriores guardaban el vencimiento como texto en "dsc"
+// ("V:30-11-2026"): pasa a fecha; cualquier otro texto pasa a Descripción.
+function dteMigrarDet(s) {
+  (s.det || []).forEach(d => {
+    if (d.dsc !== undefined) {
+      const m = /^\s*V\s*:?\s*(\d{1,2})[-/](\d{1,2})[-/](\d{4})\s*$/i.exec(d.dsc || '');
+      if (m && !d.venc && Number(m[2]) <= 12 && Number(m[1]) <= 31) d.venc = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      else if ((d.dsc || '').trim() && !d.desc2) d.desc2 = d.dsc.trim();
+      delete d.dsc;
+    }
+    if (d.venc === undefined) d.venc = '';
+    if (d.desc2 === undefined) d.desc2 = '';
+  });
+}
 
 function dteNuevo(tipo) {
   const hoy = fechaLocalISO();
@@ -82,7 +98,7 @@ function dteDiasEntre(desde, hasta) {
 // que se hacía a mano en GDExpress).
 function dteLineas(s) {
   const lineas = s.det.filter(d => d.nombre.trim())
-    .map(d => ({ ...d, dsc: [(d.dsc || '').trim(), (d.desc2 || '').trim()].filter(Boolean).join('\n') }));
+    .map(d => ({ ...d, dsc: [d.venc ? 'V:' + dteDmy(d.venc) : '', (d.desc2 || '').trim()].filter(Boolean).join('\n') }));
   const folio = String(s.refact?.folio || '').trim();
   if (s.tipo === 33 && s.refact?.on && folio && lineas.length) {
     const u = lineas[lineas.length - 1];
@@ -244,7 +260,6 @@ function dteInit(tipo) {
     const b = dteCargarBorrador(tipo);
     dteEstado[tipo] = b && b.tipo === tipo ? { ...dteNuevo(tipo), ...b } : dteNuevo(tipo);
     // Borradores anteriores guardaban el vencimiento como fecha: pasa a texto.
-    dteEstado[tipo].det.forEach(d => { if (d.venc && !d.dsc) d.dsc = 'V:' + dteDmy(d.venc); delete d.venc; if (d.dsc === undefined) d.dsc = ''; if (d.desc2 === undefined) d.desc2 = ''; });
     if (!dteEstado[tipo].refact) dteEstado[tipo].refact = { on: false, folio: '' };
     const tr = dteEstado[tipo].trans;
     if (!tr.patente && !tr.rutTrans && !tr.nombreChofer) Object.assign(tr, DTE_TRANSPORTE);
@@ -674,6 +689,7 @@ function dteRender(t) {
   const cont = document.getElementById('dte-form-' + t);
   if (!cont) return;
   const s = dteEstado[t];
+  dteMigrarDet(s);
   const esFactura = t === 33;
   const ocs = dteOcsDelRut(s.rut);
   const productos = dteProductosRefs(s);
@@ -762,7 +778,7 @@ function dteRender(t) {
             <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
           </div>
           <div class="dte-prod-l3">
-            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="500"')}</label>
+            <label class="dte-campo"><span>Vencimiento</span><input type="date" class="dte-in" value="${dteAttr(d.venc || '')}" onchange="dteSet(${t},'det.${i}.venc',this.value)"></label>
             <label class="dte-campo"><span>Descripción</span>${dteInput(t, `det.${i}.desc2`, d.desc2 || '', 'maxlength="500"')}</label>
           </div>
           <button class="dte-quitar dte-prod-x" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto">✕</button>
