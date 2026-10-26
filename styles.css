@@ -947,7 +947,7 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-quitar:hover { background: var(--red-light); }
 .dte-agregar { margin-top: 12px; border: 1px dashed var(--border-strong); background: none; color: var(--text-2); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-family: var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .dte-agregar:hover { border-color: var(--accent); color: var(--accent); }
-.dte-aside { position: sticky; top: 50px; }
+.dte-aside { position: sticky; top: var(--dte-tope-aside, 50px); }
 .dte-totales { display: flex; flex-direction: column; gap: 8px; }
 .dte-totales > div { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); }
 .dte-totales b { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -1054,7 +1054,7 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-rut-vacio { padding: 10px 12px; font-size: 13px; color: var(--text-3); }
 .dte-cliente-ok { margin-top: 12px; background: var(--green-light); color: var(--green); border-radius: 10px; padding: 9px 12px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
 .dte-cliente-ok b { color: var(--text); }
-.dte-aside { top: 100px; }
+.dte-aside { top: var(--dte-tope-aside, 100px); }
 .dte-tot-tit { font-weight: 700; font-size: 15px; color: var(--text) !important; margin-bottom: 2px; }
 .dte-totales > div { font-size: 14px; }
 .dte-total b { font-size: 24px; }
@@ -1088,6 +1088,7 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-num.ok { background: var(--green); color: #fff; }
 .dte-h-ok { font-size: 12px; font-weight: 600; color: var(--green); background: var(--green-light); border-radius: 20px; padding: 2px 9px; }
 .dte-h-ok[hidden] { display: none; }
-/* Barra de pasos fijada por JavaScript cuando "sticky" no funciona */
-.dte-pasos { position: relative; top: auto; }
-.dte-pasos.fija { position: fixed; top: 40px; z-index: 60; box-shadow: 0 6px 18px rgba(26,25,23,.12); }
+/* Barra de pasos: queda pegada justo bajo la cabecera de la página (el tope lo
+   calcula dteAjustarTopes). La sombra superior color fondo tapa el contenido
+   que pasa por detrás entre la cabecera y la barra. */
+.dte-pasos { position: sticky; top: var(--dte-tope, 36px); z-index: 80; box-shadow: 0 -14px 0 var(--bg), var(--shadow-sm); }

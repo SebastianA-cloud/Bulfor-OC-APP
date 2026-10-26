@@ -613,39 +613,29 @@ function dteSeccion(t, n, id, titulo, ok, cuerpo, nota) {
   return `<section class="dte-card" id="dte-${t}-sec-${id}"><h3 class="dte-h"><span class="dte-num${ok ? ' ok' : ''}" id="dte-${t}-num-${id}">${n}</span>${titulo}<b class="dte-h-ok" id="dte-${t}-ok-${id}"${ok ? '' : ' hidden'}>✓ Listo</b>${nota ? `<small>${nota}</small>` : ''}</h3>${cuerpo}</section>`;
 }
 
-// La barra de pasos debe acompañar al bajar. Se usa "sticky", pero en algunos
-// navegadores no funciona por el overflow del body; por eso, si al bajar la
-// barra se va de la pantalla, se fija arriba con JavaScript (dejando un hueco
-// del mismo alto para que el contenido no salte).
-const DTE_TOPE_PASOS = 40;
-function dteFijarPasos() {
+// La barra de pasos y el resumen acompañan al bajar (position: sticky).
+// Deben quedar justo debajo de la cabecera de la página ("Creación de
+// documentos · Factura"), que también queda fija; si no, quedan tapados por
+// ella. Como el alto de esa cabecera depende de la pantalla, se mide aquí y se
+// guarda en variables CSS del formulario.
+function dteAjustarTopes() {
   document.querySelectorAll('.dte-pasos').forEach(barra => {
-    const hueco = barra.previousElementSibling && barra.previousElementSibling.classList.contains('dte-pasos-hueco') ? barra.previousElementSibling : null;
-    if (!barra.offsetParent && !barra.classList.contains('fija')) return;   // página oculta
-    const ref = hueco || barra;
-    const r = ref.getBoundingClientRect();
-    if (!barra.classList.contains('fija') && r.top < DTE_TOPE_PASOS - 1) {
-      const h = document.createElement('div');
-      h.className = 'dte-pasos-hueco';
-      h.style.height = barra.offsetHeight + 'px';
-      barra.before(h);
-      const caja = h.getBoundingClientRect();
-      barra.classList.add('fija');
-      barra.style.left = caja.left + 'px';
-      barra.style.width = caja.width + 'px';
-    } else if (barra.classList.contains('fija') && hueco && hueco.getBoundingClientRect().top >= DTE_TOPE_PASOS) {
-      hueco.remove();
-      barra.classList.remove('fija');
-      barra.style.left = barra.style.width = '';
-    } else if (barra.classList.contains('fija') && hueco) {
-      const caja = hueco.getBoundingClientRect();
-      barra.style.left = caja.left + 'px';
-      barra.style.width = caja.width + 'px';
+    if (!barra.offsetParent) return;   // página oculta
+    const form = barra.parentElement;
+    const pagina = barra.closest('.page');
+    const cab = pagina && pagina.querySelector(':scope > .page-sticky');
+    const navTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-top')) || 0;
+    const tope = cab && getComputedStyle(cab).position === 'sticky' ? navTop + cab.offsetHeight : navTop;
+    const topeAside = tope + barra.offsetHeight + 14;
+    if (form.dataset.tope !== tope + '/' + topeAside) {
+      form.dataset.tope = tope + '/' + topeAside;
+      form.style.setProperty('--dte-tope', tope + 'px');
+      form.style.setProperty('--dte-tope-aside', topeAside + 'px');
     }
   });
 }
-window.addEventListener('scroll', dteFijarPasos, { passive: true });
-window.addEventListener('resize', dteFijarPasos);
+window.addEventListener('scroll', dteAjustarTopes, { passive: true });
+window.addEventListener('resize', dteAjustarTopes);
 
 // Fechas: emisión, vencimiento y días de vencimiento, que se calculan entre sí.
 function dteSetEmis(t, v) {
@@ -834,7 +824,7 @@ function dteRender(t) {
   const m = dteModoServidor;
   const modo = !m ? '' : !m.ok || !m.configurado
     ? '<div class="dte-modo-mini err">Sin conexión con GDExpress</div>'
-    : m.ambiente === 'P' ? '<div class="dte-modo-mini p">● PRODUCCIÓN: se emite ante el SII</div>' : '<div class="dte-modo-mini t">● PRUEBAS (homologación): no es real</div>';
+    : m.ambiente === 'P' ? '' : '<div class="dte-modo-mini t">● PRUEBAS (homologación): no es real</div>';   // en producción no se avisa: solo se distingue el modo pruebas
 
   cont.innerHTML = `
     <nav class="dte-pasos" id="dte-${t}-pasos">${dtePasosHtml(t)}</nav>
@@ -862,7 +852,7 @@ function dteRender(t) {
       </aside>
     </div>`;
   dteActualizarCalculos(t);
-  dteFijarPasos();
+  dteAjustarTopes();
 }
 
 // ── XML del DTE (formato SII, mismo molde que los documentos ya emitidos) ─
@@ -951,8 +941,10 @@ function dteModoHtml() {
   if (!m) return '<div class="dte-modo" id="dte-modo">Revisando la conexión con GDExpress…</div>';
   if (!m.ok) return '<div class="dte-modo dte-modo-err" id="dte-modo">No se pudo contactar la función de emisión.</div>';
   if (!m.configurado) return '<div class="dte-modo dte-modo-err" id="dte-modo">Falta guardar la llave de GDExpress en Supabase: todavía no se puede enviar.</div>';
+  // En producción no se muestra aviso (queda un marcador oculto para poder
+  // actualizarlo); solo se avisa cuando se está en pruebas.
   return m.ambiente === 'P'
-    ? '<div class="dte-modo dte-modo-p" id="dte-modo"><b>PRODUCCIÓN</b> · el documento se emite de verdad ante el SII.</div>'
+    ? '<div id="dte-modo" hidden></div>'
     : '<div class="dte-modo dte-modo-t" id="dte-modo"><b>HOMOLOGACIÓN (pruebas)</b> · el documento no es real ni va al SII como venta.</div>';
 }
 
