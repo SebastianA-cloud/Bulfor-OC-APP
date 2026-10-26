@@ -13240,11 +13240,21 @@ async function recAlertasSetDias(d) { recAlertasDias = Number(d); recHistorial =
 
 function recAlertasRender() {
   const lotes = recLotesUso || [];
-  const corregir = lotes.filter(l => l.dias_para_vencer !== null && l.dias_para_vencer < 0);
+  // "Vencido" se mide contra la FECHA DEL RM (hora de Chile), igual que la
+  // columna lote_vencido de rec_lineas que usan el historial y el aviso del
+  // menú. dias_para_vencer viene contado contra HOY, así que solo sirve para
+  // saber si el lote ya venció a la fecha actual.
+  const diaRm = f => f ? new Date(f).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+  const vencidoAlUsar = l => !!(l.vence && l.ultimo_uso && String(l.vence).slice(0, 10) < diaRm(l.ultimo_uso));
+  // Corregir: el último RM quedó registrado con un lote que ya estaba vencido ese día.
+  const corregir = lotes.filter(vencidoAlUsar);
+  // Preventivo: el lote estaba vigente cuando se usó, pero ya venció hoy;
+  // hay que desactivarlo en Pharma_RM antes del próximo RM.
+  const desactivar = lotes.filter(l => !vencidoAlUsar(l) && l.dias_para_vencer !== null && l.dias_para_vencer < 0);
   const porVencer = lotes.filter(l => l.dias_para_vencer !== null && l.dias_para_vencer >= 0 && l.dias_para_vencer <= 60)
     .sort((a, b) => a.dias_para_vencer - b.dias_para_vencer);
   const tabs = [
-    { id: 'corregir', label: `Corregir en Pharma_RM (${corregir.length})` },
+    { id: 'corregir', label: `Corregir en Pharma_RM (${corregir.length})` + (desactivar.length ? ` · ${desactivar.length} por desactivar` : '') },
     { id: 'vencer', label: `Por vencer en 60 días (${porVencer.length})` },
     { id: 'historial', label: 'Historial de RM con lote vencido' },
   ];
@@ -13253,21 +13263,37 @@ function recAlertasRender() {
   const cont = document.getElementById('rec-alertas-cont');
 
   if (recAlertasTab === 'corregir') {
-    if (!corregir.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ninguna materia prima se está registrando con un lote vencido.</p></div></div>`; return; }
+    const loteNuevoHtml = l => l.lote_nuevo ? `<span class="mono">${escapeHtml(l.lote_nuevo)}</span> <span style="font-size:11px;color:var(--text-2)">vence ${fDate(l.lote_nuevo_vence)} · comprado ${fDate(l.lote_nuevo_compra)}</span>` : '<span style="color:var(--text-3);font-size:12px">No hay compras recientes registradas</span>';
+    // Aviso preventivo (ámbar): no es un error de registro, solo hay que
+    // desactivar el lote vencido en Pharma_RM y pasar al más nuevo.
+    const preventivo = !desactivar.length ? '' : `
+      <div class="rec-nota" style="background:var(--amber-light);color:var(--amber);margin-top:${corregir.length ? '18px' : '0'}"><b>⚠ Aviso preventivo · desactivar en Pharma_RM.</b> El último lote usado estaba vigente el día del RM, pero <b>ya venció hoy</b>. No hay nada que corregir en los RM: desactiva el lote en Pharma_RM y usa el lote más nuevo en la próxima elaboración.</div>
+      <div class="table-card farm-grilla" style="border:1px solid #E9B949"><table><thead><tr>
+        <th>Materia prima</th><th>Lote a desactivar</th><th>Venció</th><th>Último RM (lote vigente ese día)</th><th>Lote más nuevo comprado</th>
+      </tr></thead><tbody>
+      ${desactivar.map(l => `<tr>
+        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}${recEsInterno(l.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
+        <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
+        <td data-label="Venció" style="color:var(--amber);font-weight:600;white-space:nowrap">${fDate(l.vence)}<div style="font-size:11px;font-weight:400">hace ${recNum(-l.dias_para_vencer)} días</div></td>
+        <td data-label="Último RM" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(l.ultimo_rm || '')}')">${escapeHtml(l.ultimo_rm || '—')}</a><div style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</div></td>
+        <td data-label="Lote nuevo">${loteNuevoHtml(l)}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`;
+    if (!corregir.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ninguna materia prima se está registrando con un lote vencido.</p></div></div>${preventivo}`; return; }
     cont.innerHTML = `
-      <div class="rec-nota">Materias primas cuyo <b>último uso</b> (últimos 120 días) quedó registrado con un lote vencido. Casi siempre es porque Pharma_RM sigue ofreciendo un lote antiguo por defecto: elige el lote correcto al digitar (o desactiva el lote viejo). Si de verdad se usó ese lote, hay que retirarlo.</div>
+      <div class="rec-nota">Materias primas cuyo <b>último uso</b> (últimos 120 días) quedó registrado con un lote que <b>ya estaba vencido el día del RM</b>. Casi siempre es porque Pharma_RM sigue ofreciendo un lote antiguo por defecto: elige el lote correcto al digitar (o desactiva el lote viejo). Si de verdad se usó ese lote, hay que retirarlo.</div>
       <div class="table-card farm-grilla"><table><thead><tr>
-        <th>Materia prima</th><th>Lote que se está registrando</th><th>Venció</th><th>Último RM</th><th style="text-align:right">RM con ese lote</th><th>Lote más nuevo comprado</th>
+        <th>Materia prima</th><th>Lote que se está registrando</th><th>Venció</th><th>Último RM</th><th style="text-align:right" title="RM de esta materia prima (últimos 120 días) registrados con un lote ya vencido el día del RM">RM con lote vencido</th><th>Lote más nuevo comprado</th>
       </tr></thead><tbody>
       ${corregir.map(l => `<tr>
         <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}</td>
         <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
         <td data-label="Venció" style="color:var(--red);font-weight:600;white-space:nowrap">${fDate(l.vence)}<div style="font-size:11px;font-weight:400">hace ${recNum(-l.dias_para_vencer)} días</div></td>
         <td data-label="Último RM" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(l.ultimo_rm || '')}')">${escapeHtml(l.ultimo_rm || '—')}</a><div style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</div></td>
-        <td data-label="RM con ese lote" style="text-align:right">${recNum(l.usos_vencido)} de ${recNum(l.usos)}</td>
-        <td data-label="Lote nuevo">${l.lote_nuevo ? `<span class="mono">${escapeHtml(l.lote_nuevo)}</span> <span style="font-size:11px;color:var(--text-2)">vence ${fDate(l.lote_nuevo_vence)} · comprado ${fDate(l.lote_nuevo_compra)}</span>` : '<span style="color:var(--text-3);font-size:12px">No hay compras recientes registradas</span>'}</td>
+        <td data-label="RM con lote vencido" style="text-align:right">${recNum(l.usos_vencido)} de ${recNum(l.usos)}</td>
+        <td data-label="Lote nuevo">${loteNuevoHtml(l)}</td>
       </tr>`).join('')}
-      </tbody></table></div>`;
+      </tbody></table></div>${preventivo}`;
     return;
   }
 
