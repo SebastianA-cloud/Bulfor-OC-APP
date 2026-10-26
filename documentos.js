@@ -1343,6 +1343,24 @@ function dteMultiOcsHtml() {
     ${lista.length > MAX ? `<div class="dte-info">Se muestran las ${MAX} más recientes de ${lista.length}: usa el buscador para encontrar otras.</div>` : ''}`;
 }
 
+// OC ya facturada completa: lo facturado con esa OC (sin las facturas
+// rechazadas y descontando sus notas de crédito) cubre su total. Se compara
+// por montos porque los nombres de los productos en la factura no siempre
+// calzan con los de la OC.
+function dteMultiOcCompleta(o) {
+  const docs = typeof documentosGdexpress !== 'undefined' ? documentosGdexpress : [];
+  const cod = String(o.codigooc || '').trim().toUpperCase();
+  const monto = d => (d.monto_total != null && d.monto_total !== '') ? Number(d.monto_total) : Number(d.monto || 0);
+  const facturas = docs.filter(d => String(d.tipo_dte) === '33' && String(d.orden_compra_ref || '').trim().toUpperCase() === cod
+    && (typeof estadoAceptacionFusionado !== 'function' || estadoAceptacionFusionado(d) !== 'N'));
+  if (!facturas.length) return null;
+  const folios = new Set(facturas.map(d => String(d.folio).trim()));
+  const ncs = docs.filter(d => String(d.tipo_dte) === '61' && folios.has(String(d.nc_factura_ref || '').trim()));
+  const facturado = facturas.reduce((a, d) => a + monto(d), 0) - ncs.reduce((a, d) => a + monto(d), 0);
+  const total = Number(o.totaloc) || 0;
+  return total > 0 && facturado >= total - 10 ? { facturado, total } : null;
+}
+
 function dteMultiBuscar(v) {
   dteMulti.buscar = v;
   dteMultiGuardar();
@@ -1356,6 +1374,8 @@ function dteMultiMarcar(cod) {
   if (i >= 0) m.sel.splice(i, 1);
   else {
     const o = dteOcsDelRut(m.base.rut).find(o => o.codigooc === cod);
+    const completa = o && dteMultiOcCompleta(o);
+    if (completa && !confirm(`La OC ${cod} ya está facturada completa (${dteClp(completa.facturado)} de ${dteClp(completa.total)}). ¿Agregarla igual?`)) return;
     m.sel.push({ oc: cod, fecha: o ? dteFechaCL(o.fechaoc) : '' });
   }
   dteMultiCambioSel();
