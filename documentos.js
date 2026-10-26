@@ -737,26 +737,26 @@ function dteRender(t) {
       <button class="dte-agregar" onclick="dteAgregarRef(${t})"><i class="ti ti-plus"></i> ${s.refs.length ? 'Agregar otra referencia' : 'Agregar orden de compra'}</button>
       <datalist id="dte-ocs-${t}">${ocs.map(o => `<option value="${dteAttr(o.codigooc)}" label="${dteAttr(dteDmy(dteFechaCL(o.fechaoc)) + ' · ' + dteClp(o.totaloc) + (o.nombreoc ? ' · ' + String(o.nombreoc).slice(0, 40) : ''))}"></option>`).join('')}</datalist>`;
 
-  // Cada producto en un bloque de dos líneas: lo principal arriba (producto,
-  // cantidad, precio, subtotal) y lo complementario abajo (código, vencimiento,
-  // unidad), para que quepa cómodo en un notebook.
+  // Cada producto en un bloque de dos líneas: arriba tipo de código, código y
+  // vencimiento; abajo producto, cantidad, unidad, precio y subtotal, para que
+  // quepa cómodo en un notebook.
   const detalle = `
       <div class="dte-prods">
         ${s.det.map((d, i) => `
         <div class="dte-prod">
           <div class="dte-prod-n">${i + 1}</div>
           <div class="dte-prod-l1">
-            <label class="dte-campo"><span>Producto <b>*</b></span><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
-              <small class="dte-sub dte-det-oc">${d.ocMax ? `OC ${dteEsc(d.ocCodigo)}: ${d.ocMax.toLocaleString('es-CL')} unidades` : ''}</small></label>
-            <label class="dte-campo"><span>Cantidad <b>*</b></span><input type="number" min="0" step="any" class="dte-in" value="${dteAttr(d.qty)}" oninput="dteSet(${t},'det.${i}.qty',this.value)"><small class="dte-aviso" id="dte-${t}-aviso-${i}"></small></label>
-            <label class="dte-campo"><span>Precio unit. <b>*</b></span><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></label>
-            <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
-          </div>
-          <div class="dte-prod-l2">
             <label class="dte-campo"><span>Tipo cód.</span>${dteInput(t, `det.${i}.tpoCod`, d.tpoCod, 'maxlength="10"')}</label>
             <label class="dte-campo"><span>Código</span>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</label>
             <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="1000" placeholder="V:30-11-2026" title="Se envía como Descripción del producto en GDExpress"')}</label>
+          </div>
+          <div class="dte-prod-l2">
+            <label class="dte-campo"><span>Producto <b>*</b></span><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
+              <small class="dte-sub dte-det-oc">${d.ocMax ? `OC ${dteEsc(d.ocCodigo)}: ${d.ocMax.toLocaleString('es-CL')} unidades` : ''}</small></label>
+            <label class="dte-campo"><span>Cantidad <b>*</b></span><input type="number" min="0" step="any" class="dte-in" value="${dteAttr(d.qty)}" oninput="dteSet(${t},'det.${i}.qty',this.value)"><small class="dte-aviso" id="dte-${t}-aviso-${i}"></small></label>
             <label class="dte-campo"><span>Unidad</span>${dteInput(t, `det.${i}.unidad`, d.unidad, 'maxlength="4"')}</label>
+            <label class="dte-campo"><span>Precio unit. <b>*</b></span><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></label>
+            <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
           </div>
           <button class="dte-quitar dte-prod-x" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto">✕</button>
         </div>`).join('')}
