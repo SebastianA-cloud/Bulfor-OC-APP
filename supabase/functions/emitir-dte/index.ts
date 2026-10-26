@@ -59,25 +59,31 @@ async function gdx(ruta: string, metodo: "GET" | "POST", body?: unknown) {
   try { return { http: r.status, data: JSON.parse(texto) }; } catch { return { http: r.status, data: { Result: 1, Description: texto.slice(0, 300) } }; }
 }
 
-// PDF oficial: primero "Recuperar PDF"; si no, el enlace de descarga del listado.
+// PDF oficial: GDExpress publica el documento unos minutos después de
+// emitirlo; la búsqueda paginada trae entonces el enlace de descarga
+// (DownloadCustomerDocumentUrl). Se descarga aquí y se devuelve en base64
+// para que la app lo muestre e imprima sin depender del portal.
 async function pdfDe(ambiente: string, tipo: number, folio: string) {
-  const body = { Environment: ambiente, Group: "E", Rut: RUT_EMISOR, DocType: String(tipo), Folio: String(folio), IsForDistribution: "true" };
-  for (const ruta of ["RecoverPDF_V2", "RecoverPDF"]) {
-    try {
-      const r = await gdx(ruta, "POST", body);
-      if (String(r.data?.Result) === "0" && r.data?.Data) return { pdfBase64: r.data.Data as string };
-    } catch { /* se prueba la siguiente forma */ }
-  }
   try {
     const q = btoa(`(RUTEmisor:${RUT_EMISOR} AND TipoDTE:${tipo} AND Folio:${folio})`);
     const r = await gdx(`PaginatedSearch/${ambiente}/E/${q}/1/5`, "GET");
-    if (r.data?.Data) {
-      const xml = base64Latin1(r.data.Data);
-      const m = /<DownloadCustomerDocumentUrl>([^<]+)<\/DownloadCustomerDocumentUrl>/.exec(xml);
-      if (m) return { pdfUrl: m[1].replace(/&amp;/g, "&") };
-    }
-  } catch { /* sin PDF por ahora */ }
-  return {};
+    if (!r.data?.Data) return {};
+    const xml = base64Latin1(r.data.Data);
+    const m = /<DownloadCustomerDocumentUrl>([^<]+)<\/DownloadCustomerDocumentUrl>/.exec(xml);
+    if (!m) return {};
+    const url = m[1].replace(/&amp;/g, "&");
+    try {
+      const d = await fetch(url);
+      const tipoContenido = d.headers.get("content-type") || "";
+      if (d.ok && tipoContenido.includes("pdf")) {
+        const bytes = new Uint8Array(await d.arrayBuffer());
+        let bin = "";
+        for (let k = 0; k < bytes.length; k += 0x8000) bin += String.fromCharCode(...bytes.subarray(k, k + 0x8000));
+        return { pdfBase64: btoa(bin), pdfUrl: url };
+      }
+    } catch { /* si no se pudo descargar, queda el enlace */ }
+    return { pdfUrl: url };
+  } catch { return {}; }
 }
 
 Deno.serve(async (req) => {
@@ -97,6 +103,15 @@ Deno.serve(async (req) => {
   if (!configurado) return json({ ok: false, error: "Falta configurar la llave de GDExpress en Supabase (DTEBOX_IP y GDEXPRESS_API_KEY)." }, 500);
 
   const tipo = Number(body.tipo);
+
+  // Volver a pedir el PDF de un documento ya emitido (cuando GDExpress aún no lo publicaba).
+  if (body.accion === "pdf") {
+    const folio = String(body.folio || "").replace(/\D/g, "");
+    if (![33, 52].includes(tipo) || !folio) return json({ ok: false, error: "Documento inválido." }, 400);
+    const amb = body.ambiente === "T" || body.ambiente === "P" ? String(body.ambiente) : ambiente;
+    return json({ ok: true, ambiente: amb, folio, ...(await pdfDe(amb, tipo, folio)) });
+  }
+
   let xml = String(body.xml || "");
   if (![33, 52].includes(tipo) || !xml.includes("<DTE")) return json({ ok: false, error: "Documento inválido." }, 400);
   xml = xml.replace(/^\s*<\?xml[^>]*\?>\s*/, ""); // GDExpress espera el <DTE> directo

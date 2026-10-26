@@ -928,21 +928,59 @@ function dteVistaPrevia(t) {
 // resultado = { folio, pdfBase64?, pdfUrl? } (lo devuelve la función del servidor).
 function dteMostrarEmitido(t, resultado) {
   const s = dteEstado[t];
-  let pdfSrc = '';
-  if (resultado.pdfBase64) {
-    const bytes = Uint8Array.from(atob(resultado.pdfBase64), c => c.charCodeAt(0));
-    pdfSrc = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-  } else if (resultado.pdfUrl) pdfSrc = resultado.pdfUrl;
   const titulo = `${DTE_TITULOS[s.tipo].replace(' ELECTRONICA', '')} N° ${resultado.folio}`;
-  window._dteUltimoEmitido = { t, folio: resultado.folio, pdfSrc };
+  window._dteUltimoEmitido = { t, tipo: s.tipo, folio: resultado.folio, ambiente: resultado.ambiente, titulo, pdfSrc: '', pdfUrl: '' };
   dteModal(`${titulo} emitida`, `
     <div class="dte-ok"><i class="ti ti-circle-check"></i> ${titulo} emitida correctamente${resultado.ambiente === 'T' ? ' en HOMOLOGACIÓN (prueba, no es un documento real)' : ''}.</div>
-    ${pdfSrc
-      ? `<iframe class="dte-pdf" src="${dteAttr(pdfSrc)}" title="PDF de GDExpress"></iframe>`
-      : `<div class="dte-aviso-caja">GDExpress todavía no entrega el PDF de este documento. Vuelve a abrirlo en unos minutos desde Facturas → Documentos.</div>`}`,
-    `${pdfSrc ? `<button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" onclick="dteImprimirPdf()"><i class="ti ti-printer"></i> Imprimir</button>
-     <a class="dte-btn" style="width:auto;padding:0 16px;text-decoration:none" href="${dteAttr(pdfSrc)}" download="${s.tipo === 33 ? 'Factura' : 'Guia'}_${resultado.folio}.pdf"><i class="ti ti-download"></i> Descargar PDF</a>` : ''}
-     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cerrar</button>`);
+    <div id="dte-emitido-pdf"></div>`,
+    `<span id="dte-emitido-botones" style="display:contents"></span>
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteCerrarEmitido()">Cerrar</button>`);
+  dteMostrarPdf(resultado);
+  // GDExpress publica el documento unos minutos después de emitirlo: si el
+  // PDF todavía no está, se vuelve a pedir solo cada 20 segundos (hasta 6 min).
+  if (!resultado.pdfBase64 && !resultado.pdfUrl) dteEsperarPdf(0);
+}
+
+let dteEsperaPdf = null;
+function dteCerrarEmitido() { clearTimeout(dteEsperaPdf); document.getElementById('dte-modal-overlay')?.remove(); }
+
+function dteMostrarPdf(r) {
+  const u = window._dteUltimoEmitido;
+  const caja = document.getElementById('dte-emitido-pdf'), botones = document.getElementById('dte-emitido-botones');
+  if (!u || !caja) return false;
+  if (r.pdfBase64) {
+    const bytes = Uint8Array.from(atob(r.pdfBase64), c => c.charCodeAt(0));
+    u.pdfSrc = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  }
+  if (r.pdfUrl) u.pdfUrl = r.pdfUrl;
+  if (u.pdfSrc) {
+    caja.innerHTML = `<iframe class="dte-pdf" src="${dteAttr(u.pdfSrc)}" title="PDF de GDExpress"></iframe>`;
+    botones.innerHTML = `<button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" onclick="dteImprimirPdf()"><i class="ti ti-printer"></i> Imprimir</button>
+      <a class="dte-btn" style="width:auto;padding:0 16px;text-decoration:none" href="${dteAttr(u.pdfSrc)}" download="${u.tipo === 33 ? 'Factura' : 'Guia'}_${u.folio}.pdf"><i class="ti ti-download"></i> Descargar PDF</a>`;
+    return true;
+  }
+  if (u.pdfUrl) {
+    // GDExpress dio el enlace pero no se pudo traer el archivo: se abre en su portal.
+    caja.innerHTML = `<div class="dte-aviso-caja" style="background:var(--green-light,#E8F5EE);color:var(--green,#2D6A4F)">El PDF oficial ya está disponible en GDExpress.</div>`;
+    botones.innerHTML = `<a class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0;text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="${dteAttr(u.pdfUrl)}" target="_blank" rel="noopener"><i class="ti ti-file-type-pdf"></i> Abrir PDF para imprimir</a>`;
+    return true;
+  }
+  caja.innerHTML = `<div class="dte-aviso-caja" style="display:flex;align-items:center;gap:10px"><span class="spinner" style="width:16px;height:16px;flex-shrink:0"></span>
+    <span>GDExpress está preparando el PDF oficial (suele tardar unos minutos). Se mostrará aquí solo; puedes dejar esta ventana abierta.</span></div>`;
+  botones.innerHTML = `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteEsperarPdf(0)"><i class="ti ti-refresh"></i> Buscar ahora</button>`;
+  return false;
+}
+
+async function dteEsperarPdf(intento) {
+  clearTimeout(dteEsperaPdf);
+  const u = window._dteUltimoEmitido;
+  if (!u || !document.getElementById('dte-emitido-pdf')) return;
+  let r = {};
+  try { r = await dteFuncion({ accion: 'pdf', tipo: u.tipo, folio: u.folio, ambiente: u.ambiente }); } catch (e) { /* se reintenta */ }
+  if (dteMostrarPdf(r || {})) return;
+  if (intento < 18) { dteEsperaPdf = setTimeout(() => dteEsperarPdf(intento + 1), 20000); return; }
+  const caja = document.getElementById('dte-emitido-pdf');
+  if (caja) caja.innerHTML = `<div class="dte-aviso-caja">GDExpress todavía no publica este documento. Revísalo más tarde en Facturas → Documentos, o en el portal de GDExpress (folio ${dteEsc(u.folio)}).</div>`;
 }
 
 function dteImprimirPdf() {
