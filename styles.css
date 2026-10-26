@@ -1082,3 +1082,9 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 @media (max-width: 760px) {
   .dte-prod-l1, .dte-prod-l2, .dte-prod-l3 { grid-template-columns: 1fr 1fr; }
 }
+/* Pasos listos: se mantiene el número (en verde) y el ✓ va al lado del nombre */
+.dte-paso.ok i { background: var(--green); border-color: var(--green); color: #fff; }
+.dte-paso-ok { color: var(--green); font-size: 13px; margin-left: 2px; }
+.dte-num.ok { background: var(--green); color: #fff; }
+.dte-h-ok { font-size: 12px; font-weight: 600; color: var(--green); background: var(--green-light); border-radius: 20px; padding: 2px 9px; }
+.dte-h-ok[hidden] { display: none; }

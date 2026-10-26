@@ -530,7 +530,9 @@ function dteActualizarCalculos(t) {
   if (pasos) pasos.innerHTML = dtePasosHtml(t);
   dteSecciones(t).forEach((x, i) => {
     const num = document.getElementById(`dte-${t}-num-${x.id}`);
-    if (num) { num.classList.toggle('ok', x.ok); num.textContent = x.ok ? '✓' : String(i + 1); }
+    if (num) num.classList.toggle('ok', x.ok);
+    const listo = document.getElementById(`dte-${t}-ok-${x.id}`);
+    if (listo) listo.hidden = !x.ok;
   });
 }
 
@@ -603,12 +605,12 @@ function dteSecciones(t) {
 function dtePasosHtml(t) {
   const secs = dteSecciones(t);
   const actual = secs.findIndex(x => !x.ok);
-  return secs.map((x, i) => `${i ? '<span class="dte-paso-lin"></span>' : ''}<a class="dte-paso${x.ok ? ' ok' : i === actual ? ' act' : ''}" onclick="document.getElementById('dte-${t}-sec-${x.id}').scrollIntoView({behavior:'smooth',block:'start'})"><i>${x.ok ? '✓' : i + 1}</i>${x.nombre}</a>`).join('')
+  return secs.map((x, i) => `${i ? '<span class="dte-paso-lin"></span>' : ''}<a class="dte-paso${x.ok ? ' ok' : i === actual ? ' act' : ''}" onclick="document.getElementById('dte-${t}-sec-${x.id}').scrollIntoView({behavior:'smooth',block:'start'})"><i>${i + 1}</i>${x.nombre}${x.ok ? '<b class="dte-paso-ok">✓</b>' : ''}</a>`).join('')
     + `<span class="dte-paso-lin"></span><span class="dte-paso${actual === -1 ? ' act' : ''}"><i>${secs.length + 1}</i>Revisar y emitir</span>`;
 }
 
 function dteSeccion(t, n, id, titulo, ok, cuerpo, nota) {
-  return `<section class="dte-card" id="dte-${t}-sec-${id}"><h3 class="dte-h"><span class="dte-num${ok ? ' ok' : ''}" id="dte-${t}-num-${id}">${ok ? '✓' : n}</span>${titulo}${nota ? `<small>${nota}</small>` : ''}</h3>${cuerpo}</section>`;
+  return `<section class="dte-card" id="dte-${t}-sec-${id}"><h3 class="dte-h"><span class="dte-num${ok ? ' ok' : ''}" id="dte-${t}-num-${id}">${n}</span>${titulo}<b class="dte-h-ok" id="dte-${t}-ok-${id}"${ok ? '' : ' hidden'}>✓ Listo</b>${nota ? `<small>${nota}</small>` : ''}</h3>${cuerpo}</section>`;
 }
 
 // Fechas: emisión, vencimiento y días de vencimiento, que se calculan entre sí.
