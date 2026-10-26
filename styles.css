@@ -1088,3 +1088,6 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-num.ok { background: var(--green); color: #fff; }
 .dte-h-ok { font-size: 12px; font-weight: 600; color: var(--green); background: var(--green-light); border-radius: 20px; padding: 2px 9px; }
 .dte-h-ok[hidden] { display: none; }
+/* Barra de pasos fijada por JavaScript cuando "sticky" no funciona */
+.dte-pasos { position: relative; top: auto; }
+.dte-pasos.fija { position: fixed; top: 40px; z-index: 60; box-shadow: 0 6px 18px rgba(26,25,23,.12); }

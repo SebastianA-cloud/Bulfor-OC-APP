@@ -613,6 +613,40 @@ function dteSeccion(t, n, id, titulo, ok, cuerpo, nota) {
   return `<section class="dte-card" id="dte-${t}-sec-${id}"><h3 class="dte-h"><span class="dte-num${ok ? ' ok' : ''}" id="dte-${t}-num-${id}">${n}</span>${titulo}<b class="dte-h-ok" id="dte-${t}-ok-${id}"${ok ? '' : ' hidden'}>✓ Listo</b>${nota ? `<small>${nota}</small>` : ''}</h3>${cuerpo}</section>`;
 }
 
+// La barra de pasos debe acompañar al bajar. Se usa "sticky", pero en algunos
+// navegadores no funciona por el overflow del body; por eso, si al bajar la
+// barra se va de la pantalla, se fija arriba con JavaScript (dejando un hueco
+// del mismo alto para que el contenido no salte).
+const DTE_TOPE_PASOS = 40;
+function dteFijarPasos() {
+  document.querySelectorAll('.dte-pasos').forEach(barra => {
+    const hueco = barra.previousElementSibling && barra.previousElementSibling.classList.contains('dte-pasos-hueco') ? barra.previousElementSibling : null;
+    if (!barra.offsetParent && !barra.classList.contains('fija')) return;   // página oculta
+    const ref = hueco || barra;
+    const r = ref.getBoundingClientRect();
+    if (!barra.classList.contains('fija') && r.top < DTE_TOPE_PASOS - 1) {
+      const h = document.createElement('div');
+      h.className = 'dte-pasos-hueco';
+      h.style.height = barra.offsetHeight + 'px';
+      barra.before(h);
+      const caja = h.getBoundingClientRect();
+      barra.classList.add('fija');
+      barra.style.left = caja.left + 'px';
+      barra.style.width = caja.width + 'px';
+    } else if (barra.classList.contains('fija') && hueco && hueco.getBoundingClientRect().top >= DTE_TOPE_PASOS) {
+      hueco.remove();
+      barra.classList.remove('fija');
+      barra.style.left = barra.style.width = '';
+    } else if (barra.classList.contains('fija') && hueco) {
+      const caja = hueco.getBoundingClientRect();
+      barra.style.left = caja.left + 'px';
+      barra.style.width = caja.width + 'px';
+    }
+  });
+}
+window.addEventListener('scroll', dteFijarPasos, { passive: true });
+window.addEventListener('resize', dteFijarPasos);
+
 // Fechas: emisión, vencimiento y días de vencimiento, que se calculan entre sí.
 function dteSetEmis(t, v) {
   const s = dteEstado[t];
@@ -828,6 +862,7 @@ function dteRender(t) {
       </aside>
     </div>`;
   dteActualizarCalculos(t);
+  dteFijarPasos();
 }
 
 // ── XML del DTE (formato SII, mismo molde que los documentos ya emitidos) ─
