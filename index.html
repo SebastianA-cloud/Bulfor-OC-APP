@@ -903,6 +903,7 @@
         <option value="variacion:-1">Orden: mayor alza de precio</option>
         <option value="variacion:1">Orden: mayor baja de precio</option>
         <option value="compras:-1">Orden: más compras</option>
+        <option value="vence:1">Orden: último lote vence antes</option>
       </select>
     </div>
     <div class="chips-filtros" id="rec-cm-chips" style="display:none"></div>
@@ -13954,7 +13955,7 @@ let recCmExtra = '';
 // Orden actual: campo y dirección (1 ascendente, -1 descendente). Se cambia
 // desde el selector "Orden" o haciendo clic en el encabezado de la columna.
 let recCmOrden = { campo: 'nombre', dir: 1 };
-const REC_CM_DIR_INICIAL = { nombre: 1, costo: -1, ultima: -1, precio: -1, variacion: -1, compras: -1 };
+const REC_CM_DIR_INICIAL = { nombre: 1, costo: -1, ultima: -1, precio: -1, vence: 1, variacion: -1, compras: -1 };
 const REC_CM_POR_PAGINA = 100;
 const REC_CM_ALZA = 0.10;           // alza que se considera "para revisar"
 const REC_CM_ALZA_DIAS = 90;        // solo cuenta si la última compra es reciente
@@ -14027,11 +14028,15 @@ async function recCmCargar() {
   document.getElementById('rec-cm-kpis').innerHTML = '<div class="kpi-grid">' + '<div class="kpi skeleton" style="height:92px"></div>'.repeat(4) + '</div>';
   document.getElementById('rec-cm-cont').innerHTML = `<div class="table-card"><div class="empty-state"><div class="spinner"></div><p style="margin-top:10px">Cargando materias primas y compras…</p></div></div>`;
   try {
-    const [materias, ingresos, proveedores] = await Promise.all([
+    const [materias, ingresos, proveedores, lotes] = await Promise.all([
       fetchAll('rec_materias', 'select=id_producto,nombre,unidad_stock,precio_costo,activo,sinonimo'),
-      fetchAll('rec_ingresos', 'select=fecha,guia,id_proveedor,id_producto,cantidad,precio_compra&order=fecha.desc,id_detalle.desc'),
+      fetchAll('rec_ingresos', 'select=fecha,guia,id_proveedor,id_producto,id_lote,cantidad,precio_compra&order=fecha.desc,id_detalle.desc'),
       recProveedoresRec ? Promise.resolve(recProveedoresRec) : fetchAll('rec_proveedores', 'select=id_proveedor,nombre,razon_social'),
+      fetchAll('rec_lotes', 'select=id_lote,id_producto,lote,vence,activo'),
     ]);
+    // Lotes de Pharma_RM, para mostrar el último lote de cada materia y su vencimiento.
+    const lotePorId = {}, lotesPorMateria = {};
+    (lotes || []).forEach(l => { lotePorId[l.id_lote] = l; (lotesPorMateria[l.id_producto] ||= []).push(l); });
     recProveedoresRec = proveedores;
     recCmIngresos = ingresos || [];
     recCmComprasPorMateria = {};
@@ -14044,7 +14049,15 @@ async function recCmCargar() {
         const compras = recCmComprasPorMateria[m.id_producto] || [];
         const ult = compras[0], prev = compras[1];
         const variacion = ult && prev && Number(prev.precio_compra) ? (Number(ult.precio_compra) - Number(prev.precio_compra)) / Number(prev.precio_compra) : null;
-        return { ...m, _ult: ult || null, _variacion: variacion, _nCompras: compras.length, _provs: new Set(compras.map(c => c.id_proveedor)), _insumo: recCmEsInsumo(m) };
+        // Último lote: el de la compra más reciente. Si nunca se compró (bases
+        // internas RO/RM), el lote activo que vence más tarde.
+        let lote = ult && lotePorId[ult.id_lote] ? { ...lotePorId[ult.id_lote], origen: 'compra' } : null;
+        if (!lote) {
+          const propios = (lotesPorMateria[m.id_producto] || []).filter(l => l.vence)
+            .sort((a, b) => (b.activo - a.activo) || String(b.vence).localeCompare(String(a.vence)));
+          if (propios[0]) lote = { ...propios[0], origen: 'registrado' };
+        }
+        return { ...m, _ult: ult || null, _lote: lote, _variacion: variacion, _nCompras: compras.length, _provs: new Set(compras.map(c => c.id_proveedor)), _insumo: recCmEsInsumo(m) };
       });
     recCmInsumoPorId = {};
     (materias || []).forEach(m => { recCmInsumoPorId[m.id_producto] = recCmEsInsumo(m); });
@@ -14195,6 +14208,7 @@ function recCmOrdenar() {
     costo: Number(m.precio_costo) || null,
     ultima: m._ult ? String(m._ult.fecha).slice(0, 10) : null,
     precio: m._ult ? Number(m._ult.precio_compra) : null,
+    vence: m._lote && m._lote.vence ? String(m._lote.vence).slice(0, 10) : null,
     variacion: m._variacion,
     compras: m._nCompras,
   })[campo];
@@ -14266,7 +14280,7 @@ function recCmRender() {
   cont.innerHTML = `
     <div class="table-card">
       <table>
-        <thead><tr>${th('nombre', recCmGrupo === 'ins' ? 'Envase o insumo' : 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}</tr></thead>
+        <thead><tr>${th('nombre', recCmGrupo === 'ins' ? 'Envase o insumo' : 'Materia prima')}${th('costo', 'Costo actual', true)}${th('ultima', 'Última compra')}${th('precio', 'Último precio', true)}${th('vence', 'Último lote')}</tr></thead>
         <tbody>
           ${pagina.map(m => {
             const ult = m._ult;
@@ -14281,6 +14295,7 @@ function recCmRender() {
               <td data-label="Costo actual" style="text-align:right;white-space:nowrap">${Number(m.precio_costo) ? `<div class="celda"><div class="celda-pri">${recClpDec(m.precio_costo)}</div><div class="celda-sec">${u ? 'por ' + m.unidad_stock : ''}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
               <td data-label="Última compra" style="white-space:nowrap">${ult ? `<div class="celda"><div>${fDate(ult.fecha)}</div><div class="celda-sec">${recCmDiasDesde(ult.fecha)}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
               <td data-label="Último precio" style="text-align:right;white-space:nowrap">${ult ? `<div class="celda"><div class="celda-pri">${recClpDec(ult.precio_compra)}${u}</div><div class="celda-sec">${recCmVariacionHtml(m._variacion) || 'primera compra'}</div></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+              <td data-label="Último lote" style="white-space:nowrap">${recCmLoteHtml(m._lote)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -14295,6 +14310,19 @@ function recCmRender() {
     </div>
     ${abierta ? recCmPanelHtml(abierta) : ''}`;
   if (abierta) { recCmActivarGrafico(); recCmActivarGraficoCC(); recCmCargarConsumo(abierta.id_producto); }
+}
+
+// Vencimiento con color: rojo si ya venció, ámbar si vence en 60 días o menos.
+function recCmVenceHtml(vence) {
+  const dias = Math.round((new Date(String(vence).slice(0, 10) + 'T12:00:00') - new Date(fechaLocalISO() + 'T12:00:00')) / 86400000);
+  const color = dias < 0 ? 'var(--red)' : dias <= 60 ? 'var(--amber)' : 'var(--text)';
+  const texto = dias < 0 ? `vencido hace ${recNum(-dias)} días` : dias === 0 ? 'vence hoy' : `en ${recNum(dias)} días`;
+  return `<span style="color:${color};font-weight:${dias <= 60 ? 600 : 400}">${fDate(vence)}</span> <span style="font-size:11px;color:${dias <= 60 ? color : 'var(--text-3)'}">· ${texto}</span>`;
+}
+function recCmLoteHtml(l) {
+  if (!l) return '<span style="color:var(--text-3)">—</span>';
+  return `<div class="celda"><div class="celda-pri mono" style="font-size:12.5px">${escapeHtml(l.lote || '—')}${l.activo === false ? ' <span class="badge badge-gray" title="Desactivado en Pharma_RM">inactivo</span>' : ''}</div>`
+    + `<div class="celda-sec">${l.vence ? 'vence ' + recCmVenceHtml(l.vence) : 'sin vencimiento'}</div></div>`;
 }
 
 // Panel lateral de una materia: datos clave, historia de precios y últimas compras.
@@ -14472,6 +14500,8 @@ function recCmPanelHtml(m) {
           ${dato('Promedio 12 meses', prom12 !== null ? recClpDec(prom12) + u : '—')}
           ${dato('Última compra', ult ? recCmDiasDesde(ult.fecha) : '—')}
           ${dato('Proveedores', recNum(m._provs.size))}
+          ${dato('Último lote', m._lote ? `<span class="mono">${escapeHtml(m._lote.lote || '—')}</span>` : '—')}
+          ${dato('Vence', m._lote && m._lote.vence ? recCmVenceHtml(m._lote.vence) : '—')}
         </div>
         <div class="drawer-seccion cc-cab">Compras vs consumo
           <div class="fpp-status-tabs cc-tabs">${REC_CM_PERIODOS.map(pr => `<button class="fpp-status-tab${pr.id === recCmPeriodo ? ' active' : ''}" onclick="recCmSetPeriodo('${pr.id}')">${pr.label}</button>`).join('')}</div>
