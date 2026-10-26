@@ -53,7 +53,9 @@ function dteRutValido(rut) {
 const dteRefNueva = () => ({ tipo: '801', folio: '', fecha: '', razon: 'ORDEN DE COMPRA' });
 // "Vencimiento" en la app es la Descripción del ítem en GDExpress (DscItem):
 // texto libre que se envía tal cual, ej. "V:30-11-2026".
-const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', qty: '', unidad: 'UN', precio: '', ocMax: null, ocCodigo: '' });
+// "Descripción" (desc2) es texto opcional que va debajo del vencimiento en esa
+// misma Descripción; si no hay vencimiento, ocupa su lugar.
+const dteDetNuevo = () => ({ tpoCod: 'RM', cod: '', nombre: '', dsc: '', desc2: '', qty: '', unidad: 'UN', precio: '', ocMax: null, ocCodigo: '' });
 
 function dteNuevo(tipo) {
   const hoy = fechaLocalISO();
@@ -79,7 +81,8 @@ function dteDiasEntre(desde, hasta) {
 // del último producto, un guion y "ESTA FACTURA REEMPLAZA A LA N° X" (igual
 // que se hacía a mano en GDExpress).
 function dteLineas(s) {
-  const lineas = s.det.filter(d => d.nombre.trim()).map(d => ({ ...d }));
+  const lineas = s.det.filter(d => d.nombre.trim())
+    .map(d => ({ ...d, dsc: [(d.dsc || '').trim(), (d.desc2 || '').trim()].filter(Boolean).join('\n') }));
   const folio = String(s.refact?.folio || '').trim();
   if (s.tipo === 33 && s.refact?.on && folio && lineas.length) {
     const u = lineas[lineas.length - 1];
@@ -241,7 +244,7 @@ function dteInit(tipo) {
     const b = dteCargarBorrador(tipo);
     dteEstado[tipo] = b && b.tipo === tipo ? { ...dteNuevo(tipo), ...b } : dteNuevo(tipo);
     // Borradores anteriores guardaban el vencimiento como fecha: pasa a texto.
-    dteEstado[tipo].det.forEach(d => { if (d.venc && !d.dsc) d.dsc = 'V:' + dteDmy(d.venc); delete d.venc; if (d.dsc === undefined) d.dsc = ''; });
+    dteEstado[tipo].det.forEach(d => { if (d.venc && !d.dsc) d.dsc = 'V:' + dteDmy(d.venc); delete d.venc; if (d.dsc === undefined) d.dsc = ''; if (d.desc2 === undefined) d.desc2 = ''; });
     if (!dteEstado[tipo].refact) dteEstado[tipo].refact = { on: false, folio: '' };
     const tr = dteEstado[tipo].trans;
     if (!tr.patente && !tr.rutTrans && !tr.nombreChofer) Object.assign(tr, DTE_TRANSPORTE);
@@ -739,9 +742,8 @@ function dteRender(t) {
       <button class="dte-agregar" onclick="dteAgregarRef(${t})"><i class="ti ti-plus"></i> ${s.refs.length ? 'Agregar otra referencia' : 'Agregar orden de compra'}</button>
       <datalist id="dte-ocs-${t}">${ocs.map(o => `<option value="${dteAttr(o.codigooc)}" label="${dteAttr(dteDmy(dteFechaCL(o.fechaoc)) + ' · ' + dteClp(o.totaloc) + (o.nombreoc ? ' · ' + String(o.nombreoc).slice(0, 40) : ''))}"></option>`).join('')}</datalist>`;
 
-  // Cada producto en un bloque de dos líneas: arriba tipo de código, código y
-  // vencimiento; abajo producto, cantidad, unidad, precio y subtotal, para que
-  // quepa cómodo en un notebook.
+  // Cada producto en un bloque de tres líneas: tipo de código y código;
+  // producto, cantidad, unidad, precio y subtotal; vencimiento y descripción.
   const detalle = `
       <div class="dte-prods">
         ${s.det.map((d, i) => `
@@ -750,7 +752,6 @@ function dteRender(t) {
           <div class="dte-prod-l1">
             <label class="dte-campo"><span>Tipo cód.</span>${dteInput(t, `det.${i}.tpoCod`, d.tpoCod, 'maxlength="10"')}</label>
             <label class="dte-campo"><span>Código</span>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</label>
-            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="1000" placeholder="V:30-11-2026" title="Se envía como Descripción del producto en GDExpress"')}</label>
           </div>
           <div class="dte-prod-l2">
             <label class="dte-campo"><span>Producto <b>*</b></span><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
@@ -759,6 +760,10 @@ function dteRender(t) {
             <label class="dte-campo"><span>Unidad</span>${dteInput(t, `det.${i}.unidad`, d.unidad, 'maxlength="4"')}</label>
             <label class="dte-campo"><span>Precio unit. <b>*</b></span><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></label>
             <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
+          </div>
+          <div class="dte-prod-l3">
+            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="500" placeholder="V:30-11-2026" title="Va en la Descripción del producto en GDExpress"')}</label>
+            <label class="dte-campo"><span>Descripción <em>(opcional)</em></span>${dteInput(t, `det.${i}.desc2`, d.desc2 || '', 'maxlength="500" placeholder="Texto que irá debajo del vencimiento" title="Va en la Descripción del producto, debajo del vencimiento"')}</label>
           </div>
           <button class="dte-quitar dte-prod-x" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto">✕</button>
         </div>`).join('')}
