@@ -66,5 +66,21 @@ def main():
         print(f"  no se pudo leer Data: {e}")
 
 
+def listar_homologacion():
+    # Qué documentos de prueba (T) SÍ muestra la plataforma, para comparar.
+    import re
+    q = base64.b64encode(f'(RUTEmisor:{RUT})'.encode()).decode()
+    r = requests.get(f"{BASE}/PaginatedSearch/{AMB}/E/{q}/1/50", headers=H, timeout=60)
+    d = r.json()
+    print(f"\nDocumentos emitidos visibles en ambiente {AMB}: {d.get('TotalDocuments')}")
+    xml = base64.b64decode(d.get('Data') or '').decode('latin-1')
+    for doc in re.findall(r'<document>(.*?)</document>', xml, re.S)[:50]:
+        campos = {k: (re.search(f'<{k}>([^<]*)</{k}>', doc) or [None, ''])[1] for k in ('TipoDTE', 'Folio', 'FchEmis', 'FechaEmision', 'RznSocRecep', 'Estado', 'EstadoSII')}
+        print('  ' + ' · '.join(f'{k}={v}' for k, v in campos.items() if v))
+    if not re.findall(r'<document>', xml):
+        print('  (XML) ' + xml[:600])
+
+
 if __name__ == '__main__':
+    listar_homologacion()
     main()
