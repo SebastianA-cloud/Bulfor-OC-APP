@@ -1,0 +1,25 @@
+name: Diagnóstico PDF documento emitido
+
+# Diagnóstico de solo lectura: no emite documentos ni escribe en Supabase.
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix-pdf-dte]
+    paths:
+      - probar_pdf_dte.py
+      - .github/workflows/probar_pdf_dte.yml
+
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Ejecutar diagnóstico
+        env:
+          DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
+          GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+        run: python probar_pdf_dte.py
