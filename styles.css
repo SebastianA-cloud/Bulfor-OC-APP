@@ -1143,3 +1143,15 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .dte-mfin tr.dte-msalt td { color: var(--text-3); }
 .dte-mprep { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
 .dte-mprep .spinner { width: 13px; height: 13px; }
+/* Facturas preparadas (listas para emitir) y con error */
+.dte-mchip.lista { background: #E6F1FB; border-color: transparent; }
+.dte-mchip.lista b { background: #185FA5; border-color: #185FA5; color: #fff; }
+.dte-mchip.lista small { color: #185FA5; font-weight: 600; }
+.dte-mchip.err { border-color: var(--amber); }
+.dte-mchip.err small { color: var(--amber); font-weight: 600; }
+.dte-mlista { display: inline-block; font-size: 12px; font-weight: 600; color: #185FA5; background: #E6F1FB; border-radius: 20px; padding: 2px 9px; }
+.dte-merr { display: inline-block; font-size: 12px; font-weight: 600; color: var(--amber); background: var(--amber-light); border-radius: 20px; padding: 2px 9px; }
+.dte-merr-txt { display: block; max-width: 320px; white-space: normal; font-size: 11.5px; color: var(--amber); margin-top: 3px; }
+.dte-mfin td .dte-btn + .dte-btn { margin-left: 4px; }
+.dte-mrev-pie { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; font-size: 14px; }
+.dte-mrev-pie .dte-btn, .dte-mrev-pie .dte-btn-principal { width: auto; padding: 0 18px; margin: 0; }

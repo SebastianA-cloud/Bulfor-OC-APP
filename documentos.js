@@ -854,7 +854,7 @@ function dteRender(t) {
           <div><span>Neto</span><b id="dte-${t}-neto">${dteClp(tot.neto)}</b></div>
           <div><span>IVA 19%</span><b id="dte-${t}-iva">${dteClp(tot.iva)}</b></div>
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
-          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> Revisar y emitir</button>
+          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> ${multi ? dteMultiTextoSiguiente(false) : 'Revisar y emitir'}</button>
           ${multi ? dteMultiBotonesAside() : `<button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
           <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>`}
           ${modo}
@@ -963,7 +963,6 @@ let dteEnviando = false;
 async function dteEnviar(t) {
   const s = dteEstado[t];
   if (dteEnviando || dteValidar(s).length) return;
-  if (t === DTE_MULTI && !dteMultiPuedeEnviar()) return;   // nunca se emite dos veces la misma factura del flujo
   if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
   if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se va a emitir una ${DTE_NOMBRES[s.tipo]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
   dteEnviando = true;
@@ -974,16 +973,13 @@ async function dteEnviar(t) {
   catch (e) { r = { ok: false, error: 'No se pudo conectar con el servidor: ' + e.message }; }
   dteEnviando = false;
   if (!r.ok || !r.folio) {
-    if (btn) { btn.disabled = false; btn.innerHTML = `<i class="ti ti-send"></i> ${t === DTE_MULTI ? 'Enviar y seguir' : 'Enviar'}`; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Enviar'; }
     dteModal('No se pudo emitir', `<div class="dte-aviso-caja">${dteEsc(r.error || (r.ok ? 'GDExpress aceptó el documento pero no devolvió el folio.' : 'Error desconocido.'))}</div>
       ${/foliado/i.test(r.error || '') ? '<p style="font-size:13px">No es un error del documento: GDExpress tiene que habilitar en su sistema la asignación automática de folios (punto de foliado local) para el RUT de Bulfor. Hay que pedírselo a su soporte. No se emitió nada ni se usó ningún folio.</p>' : ''}
-      <p style="font-size:13px;color:var(--text-2)">${t === DTE_MULTI ? 'Lo cargado en esta factura sigue guardado' : 'El borrador sigue guardado'}: puedes corregirlo y volver a enviarlo.</p>
+      <p style="font-size:13px;color:var(--text-2)">El borrador sigue guardado: puedes corregirlo y volver a enviarlo.</p>
       ${r.respuesta ? `<pre class="dte-xml">${dteEsc(JSON.stringify(r.respuesta, null, 2))}</pre>` : ''}`);
     return;
   }
-  // Flujo múltiple: se anota el folio y se pasa directo a la siguiente OC,
-  // sin detenerse a imprimir (los PDF se imprimen todos al final).
-  if (t === DTE_MULTI) { dteMultiEmitida(r); return; }
   dteMostrarEmitido(t, r);
   // Emitido: el formulario parte de nuevo para no enviarlo dos veces,
   // y su borrador sale del listado.
@@ -1135,7 +1131,7 @@ function dteVistaPrevia(t) {
     ${dteTabs('dtevp', [['det', 'Detalles del documento', dteDetallesHtml(s)], ['doc', 'Ver documento', `<div class="dte-papel">${dteHojaHtml(s, 0)}</div>`], ['xml', 'Ver XML', `<pre class="dte-xml">${dteEsc(xml)}</pre>`]])}`,
     `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(dteHojaHtml(dteEstado[${t}],0))"><i class="ti ti-printer"></i> Imprimir vista previa</button>
      <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cancelar</button>
-     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="dteEnviar(${t})"><i class="ti ti-send"></i> ${t === DTE_MULTI ? 'Enviar y seguir' : 'Enviar'}</button>`);
+     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="${t === DTE_MULTI ? 'dteMultiMarcarLista()' : `dteEnviar(${t})`}">${t === DTE_MULTI ? dteMultiTextoSiguiente(true) : '<i class="ti ti-send"></i> Enviar'}</button>`);
 }
 
 // Documento ya emitido: se muestra e imprime el PDF de GDExpress tal cual
@@ -1211,16 +1207,18 @@ function dteImprimirPdf() {
 // Varias facturas para un mismo cliente, una por orden de compra:
 //  1) se elige el cliente (RUT) y se marcan sus OC; también se puede agregar
 //     una OC a mano (si no aparece en la lista) o una factura sin OC;
-//  2) se emiten una por una con el mismo formulario de Factura. "Saltar esta
-//     OC" la deja fuera sin guardar lo cargado. Al emitir se pasa directo a la
-//     siguiente, sin detenerse a imprimir;
-//  3) al final, la lista con los folios y sus PDF: Imprimir por cada una o
-//     "Imprimir todas" (se juntan en un solo PDF).
+//  2) se preparan una por una con el mismo formulario de Factura: "Revisar y
+//     pasar a la siguiente" la deja lista sin emitirla; "Saltar esta OC" la
+//     deja fuera sin guardar lo cargado;
+//  3) revisión final con todas y "Enviar y emitir todas"; si alguna falla, se
+//     sigue con las demás y queda marcada para corregirla y reintentar;
+//  4) la lista con los folios y sus PDF: Imprimir por cada una o "Imprimir
+//     todas" (se juntan en un solo PDF).
 // El avance se guarda en este navegador: si se cierra la pestaña o se corta
 // internet, al volver se ofrece continuar donde quedó.
 const DTE_MULTI = 330;          // clave del formulario del flujo (las facturas son tipo 33)
 const DTE_MULTI_CLAVE = 'bulfor_dte_multi';
-let dteMulti = null;            // { paso: 'elegir'|'emitir'|'fin', base, sel, buscar, facturas, actual }
+let dteMulti = null;            // { paso: 'elegir'|'emitir'|'revisar'|'fin', base, sel, buscar, facturas, actual }
 let dteMultiRetomado = false;   // en esta visita ya se eligió "Continuar"
 const dteMultiPdfs = {};        // folio → { src, bytes, url } (solo en memoria)
 let dteMultiEspera = null, dteMultiBuscando = false;
@@ -1251,13 +1249,14 @@ function dteMultiRender() {
   const cont = document.getElementById('dte-multi');
   if (!cont || !dteMulti) return;
   const m = dteMulti;
-  if (m.paso === 'emitir' && !dteMultiRetomado) { cont.innerHTML = dteMultiRetomarHtml(); return; }
+  if ((m.paso === 'emitir' || m.paso === 'revisar') && !dteMultiRetomado) { cont.innerHTML = dteMultiRetomarHtml(); return; }
   if (m.paso === 'elegir') { cont.innerHTML = dteMultiElegirHtml(); dteAjustarTopes(); return; }
   if (m.paso === 'emitir') {
     cont.innerHTML = `${dteMultiProgresoHtml()}<div class="dte-form" id="dte-form-${DTE_MULTI}"></div>`;
     dteRender(DTE_MULTI);
     return;
   }
+  if (m.paso === 'revisar') { cont.innerHTML = dteMultiRevisarHtml(); return; }
   cont.innerHTML = dteMultiFinHtml();
   if (!dteMultiEspera && !dteMultiBuscando) dteMultiBuscarPdfs(0);
 }
@@ -1265,7 +1264,7 @@ function dteMultiRender() {
 // ── Si el flujo quedó a medias (pestaña cerrada, corte de internet) ─────
 function dteMultiRetomarHtml() {
   const m = dteMulti;
-  const faltan = m.facturas.filter(f => f.estado === 'pendiente').length;
+  const faltan = m.facturas.filter(f => f.estado !== 'emitida' && f.estado !== 'saltada').length;
   const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
   return `<div class="dte-card dte-mretomar">
     <i class="ti ti-player-play"></i>
@@ -1420,36 +1419,46 @@ function dteMultiComenzar() {
   window.scrollTo(0, 0);
 }
 
-// ── Paso 2: una por una ─────────────────────────────────────────────────
+// ── Paso 2: se preparan una por una (sin emitir) ────────────────────────
+// Estados de cada factura: pendiente → lista (revisada) → emitida; también
+// saltada, o error si GDExpress la rechazó al emitir.
+const DTE_MULTI_ESTADOS = { pendiente: 'Pendiente', lista: 'Lista', saltada: 'Saltada', emitida: 'Emitida', error: 'Con error' };
+
 function dteMultiProgresoHtml() {
   const m = dteMulti;
-  const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
+  const listas = m.facturas.filter(f => f.estado === 'lista').length;
   const chips = m.facturas.map((f, i) => {
-    const actual = i === m.actual;
-    const cls = f.estado === 'emitida' ? ' ok' : f.estado === 'saltada' ? ' salt' : actual ? ' act' : '';
-    const det = f.estado === 'emitida' ? `N° ${dteEsc(f.folio)}` : f.estado === 'saltada' ? 'Saltada' : actual ? 'En curso' : 'Pendiente';
-    const accion = f.estado === 'pendiente' && !actual ? `onclick="dteMultiIr(${i})" title="Ir a esta factura"`
-      : f.estado === 'saltada' ? `onclick="dteMultiRecuperar(${i})" title="Volver a incluirla"` : 'disabled';
-    return `<button class="dte-mchip${cls}" ${accion}><b>${f.estado === 'emitida' ? '✓' : i + 1}</b><span>${dteEsc(f.oc ? 'OC ' + f.oc : 'Sin OC')}</span><small>${det}</small></button>`;
+    const actual = i === m.actual && m.paso === 'emitir';
+    const cls = f.estado === 'emitida' ? ' ok' : f.estado === 'lista' ? ' lista' : f.estado === 'saltada' ? ' salt' : f.estado === 'error' ? ' err' : '';
+    const det = f.estado === 'emitida' ? `N° ${dteEsc(f.folio)}` : actual ? 'En curso' : DTE_MULTI_ESTADOS[f.estado];
+    const accion = f.estado === 'emitida' || actual ? 'disabled'
+      : f.estado === 'saltada' ? `onclick="dteMultiRecuperar(${i})" title="Volver a incluirla"` : `onclick="dteMultiIr(${i})" title="Ir a esta factura"`;
+    return `<button class="dte-mchip${cls}${actual ? ' act' : ''}" ${accion}><b>${f.estado === 'emitida' || f.estado === 'lista' ? '✓' : i + 1}</b><span>${dteEsc(f.oc ? 'OC ' + f.oc : 'Sin OC')}</span><small>${det}</small></button>`;
   }).join('');
   return `<div class="dte-card dte-mprog">
-    <div class="dte-mprog-tit"><span><b>${dteEsc(m.base.recep.rzn || m.base.rut)}</b> · Factura ${m.actual + 1} de ${m.facturas.length}</span><small>${emitidas} emitida${emitidas === 1 ? '' : 's'}</small></div>
+    <div class="dte-mprog-tit"><span><b>${dteEsc(m.base.recep.rzn || m.base.rut)}</b> · Factura ${m.actual + 1} de ${m.facturas.length}</span><small>${listas} lista${listas === 1 ? '' : 's'} para emitir</small></div>
     <div class="dte-mchips">${chips}</div></div>`;
+}
+
+// ¿Quedan otras por preparar además de la actual?
+const dteMultiQuedanOtras = () => dteMulti.facturas.some((f, i) => i !== dteMulti.actual && (f.estado === 'pendiente' || f.estado === 'error'));
+function dteMultiTextoSiguiente(enModal) {
+  if (!dteMulti) return '';
+  if (enModal) return dteMultiQuedanOtras() ? '<i class="ti ti-arrow-right"></i> Lista: pasar a la siguiente' : '<i class="ti ti-checks"></i> Lista: ir a emitir todas';
+  return dteMultiQuedanOtras() ? 'Revisar y pasar a la siguiente' : 'Revisar y terminar';
 }
 
 function dteMultiBotonesAside() {
   const f = dteMulti && dteMulti.facturas[dteMulti.actual];
   if (!f) return '';
+  const listas = dteMulti.facturas.filter(x => x.estado === 'lista').length;
   return `<button class="dte-btn" onclick="dteMultiSaltar()"><i class="ti ti-player-skip-forward"></i> Saltar esta ${f.oc ? 'OC' : 'factura'}</button>
+    ${listas ? `<button class="dte-btn" onclick="dteMultiIrARevisar()"><i class="ti ti-checks"></i> Ir a emitir (${listas} lista${listas === 1 ? '' : 's'})</button>` : ''}
     <button class="dte-btn dte-btn-suave" onclick="dteMultiTerminar()"><i class="ti ti-x"></i> Terminar facturación múltiple</button>`;
 }
 
-function dteMultiPuedeEnviar() {
-  const m = dteMulti;
-  return !!(m && m.paso === 'emitir' && m.facturas[m.actual] && m.facturas[m.actual].estado === 'pendiente');
-}
-
 function dteMultiIr(i) {
+  dteMulti.paso = 'emitir';
   dteMulti.actual = i;
   dteMultiEnlazar();
   dteMultiGuardar();
@@ -1464,19 +1473,36 @@ function dteMultiRecuperar(i) {
   dteMultiIr(i);
 }
 
-// Pasa a la siguiente pendiente (en orden, y si no, desde el principio);
-// si ya no quedan, va a la pantalla final.
+// Pasa a la siguiente por preparar (en orden, y si no, desde el principio);
+// si ya no quedan, va a la revisión final para emitir todas.
 function dteMultiSiguiente() {
   const m = dteMulti;
   const n = m.facturas.length;
   let sig = -1;
-  for (let k = 1; k <= n; k++) { const i = (m.actual + k) % n; if (m.facturas[i].estado === 'pendiente') { sig = i; break; } }
-  if (sig === -1) m.paso = 'fin';
+  for (let k = 1; k <= n; k++) { const i = (m.actual + k) % n; if (m.facturas[i].estado === 'pendiente' || m.facturas[i].estado === 'error') { sig = i; break; } }
+  if (sig === -1) m.paso = m.facturas.some(f => f.estado === 'lista') ? 'revisar' : m.facturas.some(f => f.estado === 'emitida') ? 'fin' : 'revisar';
   else m.actual = sig;
   dteMultiEnlazar();
   dteMultiGuardar();
   dteMultiRender();
   window.scrollTo(0, 0);
+}
+function dteMultiIrARevisar() { dteMulti.paso = 'revisar'; dteMultiGuardar(); dteMultiRender(); window.scrollTo(0, 0); }
+
+// Desde la vista previa: la factura queda lista (no se emite todavía).
+function dteMultiMarcarLista() {
+  const m = dteMulti;
+  const f = m.facturas[m.actual];
+  if (dteValidar(f.form).length) return;
+  f.estado = 'lista';
+  delete f.error;
+  // Si los datos del cliente se completaron o corrigieron en esta factura,
+  // pasan a las que faltan (que todavía no los tienen).
+  m.base.rut = f.form.rut;
+  m.base.recep = { ...f.form.recep };
+  m.facturas.forEach(p => { if (p.estado === 'pendiente' && !p.form.recep.rzn.trim()) { p.form.rut = f.form.rut; p.form.recep = { ...f.form.recep }; } });
+  document.getElementById('dte-modal-overlay')?.remove();
+  dteMultiSiguiente();
 }
 
 function dteMultiSaltar() {
@@ -1487,35 +1513,105 @@ function dteMultiSaltar() {
   dteMultiSiguiente();
 }
 
-function dteMultiEmitida(r) {
+// ── Revisión final y emisión de todas ───────────────────────────────────
+let dteMultiEmitiendo = -1;   // índice de la factura que se está enviando
+function dteMultiRevisarHtml() {
   const m = dteMulti;
-  const f = m.facturas[m.actual];
-  f.estado = 'emitida';
-  f.folio = r.folio;
-  f.ambiente = r.ambiente || '';
-  f.total = dteTotales(f.form).total;
-  dteMultiGuardarPdf(f.folio, r);
-  // Si los datos del cliente se completaron o corrigieron en esta factura,
-  // pasan a las que faltan (que todavía no los tienen).
-  const s = f.form;
-  m.base.rut = s.rut;
-  m.base.recep = { ...s.recep };
-  m.facturas.forEach(p => { if (p.estado === 'pendiente' && !p.form.recep.rzn.trim()) { p.form.rut = s.rut; p.form.recep = { ...s.recep }; } });
-  document.getElementById('dte-modal-overlay')?.remove();
-  toast(`Factura N° ${r.folio} emitida${r.ambiente === 'T' ? ' (prueba, no es real)' : ''}.`);
-  dteMultiSiguiente();
+  const porEmitir = m.facturas.filter(f => f.estado === 'lista' || f.estado === 'error');
+  const total = porEmitir.reduce((a, f) => a + dteTotales(f.form).total, 0);
+  const enviando = dteMultiEmitiendo >= 0;
+  const filas = m.facturas.map((f, i) => {
+    const lineas = f.form.det.filter(d => d.nombre.trim()).length;
+    let estado = `<small class="dte-sub">${DTE_MULTI_ESTADOS[f.estado]}</small>`;
+    if (i === dteMultiEmitiendo) estado = '<span class="dte-mprep"><span class="spinner"></span> Emitiendo…</span>';
+    else if (f.estado === 'emitida') estado = `<span class="dte-mfact">N° ${dteEsc(f.folio)}</span>`;
+    else if (f.estado === 'lista') estado = '<span class="dte-mlista">Lista</span>';
+    else if (f.estado === 'error') estado = `<span class="dte-merr" title="${dteAttr(f.error || '')}">Con error</span><small class="dte-merr-txt">${dteEsc(f.error || '')}</small>`;
+    const acciones = f.estado === 'saltada' ? `<button class="dte-btn" onclick="dteMultiRecuperar(${i})" ${enviando ? 'disabled' : ''}>Incluir</button>`
+      : f.estado === 'emitida' ? '' : `<button class="dte-btn" onclick="dteMultiVer(${i})" ${enviando ? 'disabled' : ''}><i class="ti ti-eye"></i> Ver</button>
+        <button class="dte-btn" onclick="dteMultiIr(${i})" ${enviando ? 'disabled' : ''}><i class="ti ti-pencil"></i> Editar</button>`;
+    return `<tr${f.estado === 'saltada' ? ' class="dte-msalt"' : ''}><td>${i + 1}</td><td>${dteEsc(f.oc || 'Sin OC')}</td>
+      <td>${f.estado === 'saltada' ? '' : `${lineas} producto${lineas === 1 ? '' : 's'}`}</td>
+      <td style="text-align:right">${f.estado === 'saltada' ? '' : dteClp(f.estado === 'emitida' ? f.total : dteTotales(f.form).total)}</td>
+      <td>${estado}</td><td class="dte-borr-acc">${acciones}</td></tr>`;
+  }).join('');
+  const conError = m.facturas.filter(f => f.estado === 'error').length;
+  return `<div class="dte-card">
+    <h3 class="dte-h">Revisar y emitir · ${dteEsc(m.base.recep.rzn || m.base.rut)}</h3>
+    ${dteModoServidor && dteModoServidor.ambiente !== 'P' ? '<div class="dte-modo dte-modo-t"><b>HOMOLOGACIÓN (pruebas)</b> · los documentos no son reales.</div>' : ''}
+    ${conError && !enviando ? `<div class="dte-aviso-caja">${conError} factura${conError === 1 ? '' : 's'} no se pudo emitir. Revisa el motivo, corrígela con “Editar” y vuelve a apretar “Enviar y emitir”.</div>` : ''}
+    <div class="dte-borr-tabla dte-mfin"><table>
+      <thead><tr><th>#</th><th>OC</th><th>Detalle</th><th style="text-align:right">Total</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    <div class="dte-mrev-pie">
+      <div>${porEmitir.length ? `Se van a emitir <b>${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'}</b> por <b>${dteClp(total)}</b>.` : 'No quedan facturas por emitir.'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="dte-btn dte-btn-suave" onclick="dteMultiTerminar()" ${enviando ? 'disabled' : ''}>Terminar</button>
+        <button class="dte-btn-principal" onclick="dteMultiEmitirTodas()" ${porEmitir.length && !enviando ? '' : 'disabled'}>${enviando ? '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Emitiendo…' : `<i class="ti ti-send"></i> Enviar y emitir${porEmitir.length > 1 ? ' todas' : ''}`}</button>
+      </div>
+    </div></div>`;
 }
 
-// Sale del flujo. Si ya hay facturas emitidas, las pendientes quedan como
-// saltadas y se va a la pantalla final para imprimir lo emitido.
+function dteMultiVer(i) {
+  const f = dteMulti.facturas[i];
+  dteEstilosHoja();
+  const err = dteValidar(f.form);
+  dteModal(`${dteMultiEtiqueta(f)} · vista previa`, `${err.length ? `<div class="dte-aviso-caja">Falta completar: ${dteEsc(err.join(', '))}.</div>` : ''}<div class="dte-papel">${dteHojaHtml(f.form, 0)}</div>`,
+    `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteMultiIr(${i});document.getElementById('dte-modal-overlay').remove()"><i class="ti ti-pencil"></i> Editar</button>
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cerrar</button>`);
+}
+
+// Emite una tras otra. Si alguna falla, se marca con su motivo y se sigue
+// con las demás; nunca se vuelve a enviar una que ya tiene folio.
+async function dteMultiEmitirTodas() {
+  const m = dteMulti;
+  if (dteMultiEmitiendo >= 0) return;
+  const porEmitir = m.facturas.filter(f => f.estado === 'lista' || f.estado === 'error');
+  if (!porEmitir.length) return;
+  const total = porEmitir.reduce((a, f) => a + dteTotales(f.form).total, 0);
+  if (porEmitir.some(f => f.form.det.some(d => d.ocMax && Number(d.qty) > d.ocMax)) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
+  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se van a emitir ${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'} REAL${porEmitir.length === 1 ? '' : 'ES'} ante el SII por ${dteClp(total)} en total. ¿Confirmas?`)) return;
+  const cont = () => { const c = document.getElementById('dte-multi'); if (c && dteMulti === m && m.paso === 'revisar') c.innerHTML = dteMultiRevisarHtml(); };
+  for (let i = 0; i < m.facturas.length; i++) {
+    const f = m.facturas[i];
+    if (f.estado !== 'lista' && f.estado !== 'error') continue;
+    const err = dteValidar(f.form);
+    if (err.length) { f.estado = 'error'; f.error = 'Falta completar: ' + err.join(', '); dteMultiGuardar(); continue; }
+    dteMultiEmitiendo = i;
+    cont();
+    let r;
+    try { r = await dteFuncion({ tipo: 33, xml: dteXml(f.form) }); }
+    catch (e) { r = { ok: false, error: 'No se pudo conectar con el servidor: ' + e.message }; }
+    if (r.ok && r.folio) {
+      f.estado = 'emitida';
+      f.folio = r.folio;
+      f.ambiente = r.ambiente || '';
+      f.total = dteTotales(f.form).total;
+      delete f.error;
+      dteMultiGuardarPdf(f.folio, r);
+    } else {
+      f.estado = 'error';
+      f.error = r.error || (r.ok ? 'GDExpress aceptó el documento pero no devolvió el folio.' : 'Error desconocido.');
+    }
+    dteMultiGuardar();
+  }
+  dteMultiEmitiendo = -1;
+  const errores = m.facturas.filter(f => f.estado === 'error').length;
+  const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
+  if (!errores) { m.paso = 'fin'; dteMultiGuardar(); dteMultiRender(); window.scrollTo(0, 0); toast(`${emitidas} factura${emitidas === 1 ? '' : 's'} emitida${emitidas === 1 ? '' : 's'}.`); }
+  else { cont(); toast(`${errores} factura${errores === 1 ? '' : 's'} no se pudo emitir: revisa el motivo.`, 'err'); }
+}
+
+// Sale del flujo. Si ya hay facturas emitidas, lo que no se emitió queda
+// como saltado y se va a la pantalla final para imprimir lo emitido.
 function dteMultiTerminar() {
   const m = dteMulti;
   const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
-  const pendientes = m.facturas.filter(f => f.estado === 'pendiente').length;
-  if (pendientes && !confirm(`Quedan ${pendientes} factura${pendientes === 1 ? '' : 's'} sin emitir, que no se guardarán. ¿Terminar igual?`)) return;
+  const sinEmitir = m.facturas.filter(f => f.estado !== 'emitida' && f.estado !== 'saltada').length;
+  if (sinEmitir && !confirm(`Quedan ${sinEmitir} factura${sinEmitir === 1 ? '' : 's'} sin emitir, que no se guardarán. ¿Terminar igual?`)) return;
   dteMultiRetomado = true;
   if (emitidas) {
-    m.facturas.forEach(f => { if (f.estado === 'pendiente') { f.estado = 'saltada'; f.form = dteMultiFormDe(f); } });
+    m.facturas.forEach(f => { if (f.estado !== 'emitida' && f.estado !== 'saltada') { f.estado = 'saltada'; f.form = dteMultiFormDe(f); } });
     m.paso = 'fin';
   } else {
     dteMulti = dteMultiNuevo();
