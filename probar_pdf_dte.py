@@ -82,5 +82,6 @@ def listar_homologacion():
 
 
 if __name__ == '__main__':
-    listar_homologacion()
+    if AMB == 'T':
+        listar_homologacion()
     main()

@@ -22,4 +22,7 @@ jobs:
         env:
           DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
           GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+          AMB: P
+          TIPO: '33'
+          FOLIO: '23350'
         run: python probar_pdf_dte.py
