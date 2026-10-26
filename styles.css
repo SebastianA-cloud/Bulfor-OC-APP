@@ -1007,3 +1007,78 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 /* Aviso numérico al lado de la subpágina que lo origina */
 .aviso-sub { display: inline-flex; line-height: 1; margin-left: auto; flex-shrink: 0; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; align-items: center; justify-content: center; padding: 0 5px; }
 .aviso-sub-azul { background: #1E40AF; }
+
+/* ═══ Creación de documentos · diseño 2 (más claro para quien no lo conoce) ═══
+   Indicador de pasos, secciones numeradas que se marcan en verde, campos más
+   altos y legibles en notebook, y el resumen fijo a la derecha. */
+.dte-pasos { display: flex; align-items: center; background: var(--surface); border: 1px solid #ECEAE4; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 10px 16px; margin-bottom: 14px; position: sticky; top: 36px; z-index: 5; overflow-x: auto; }
+.dte-paso { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-3); white-space: nowrap; cursor: pointer; text-decoration: none; }
+.dte-paso i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.dte-paso.ok { color: var(--green); }
+.dte-paso.ok i { background: var(--green); border-color: var(--green); color: #fff; }
+.dte-paso.act { color: var(--accent); font-weight: 600; }
+.dte-paso.act i { border-color: var(--accent); color: var(--accent); }
+.dte-paso-lin { flex: 1 1 18px; min-width: 14px; height: 2px; background: var(--border); margin: 0 10px; }
+.dte-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+.dte-card { padding: 18px 20px; scroll-margin-top: 100px; }
+.dte-card h3.dte-h { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); margin-bottom: 14px; }
+.dte-card h3.dte-h small { margin-left: auto; font-size: 12.5px; font-weight: 400; color: var(--text-3); }
+.dte-num { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-light); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.dte-num.ok { background: var(--green-light); color: var(--green); }
+.dte-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 14px; }
+.dte-grid-doc { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.dte-campo > span { font-size: 12.5px; font-weight: 600; color: #5E5952; }
+.dte-in { height: 40px; font-size: 14px; border-radius: 9px; }
+.dte-th { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); }
+.dte-det { grid-template-columns: 62px 88px minmax(170px, 1fr) 128px 78px 58px 100px 96px 36px; }
+.dte-subtotal { height: 40px; display: flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+.dte-quitar { height: 40px; }
+.dte-agregar { font-size: 13px; padding: 8px 14px; }
+.dte-info { font-size: 13px; }
+.dte-sep { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); margin: 16px 0 10px; }
+.dte-refact { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 24px; }
+.dte-refact-campo { min-width: 240px; flex: 1; max-width: 420px; }
+.dte-switch { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; padding-top: 8px; }
+.dte-switch input { display: none; }
+.dte-switch span { width: 38px; height: 22px; border-radius: 11px; background: var(--border-strong); position: relative; transition: background .15s; flex-shrink: 0; }
+.dte-switch span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.dte-switch input:checked + span { background: var(--accent); }
+.dte-switch input:checked + span::after { left: 19px; }
+.dte-rut-wrap { position: relative; }
+.dte-rut { font-family: var(--mono); letter-spacing: .3px; }
+.dte-rut-lista { display: none; position: absolute; left: 0; right: -40%; top: 66px; z-index: 20; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 12px 28px rgba(26,25,23,.16); overflow: hidden; max-height: 320px; overflow-y: auto; }
+.dte-rut-op { padding: 9px 12px; font-size: 13.5px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; }
+.dte-rut-op:last-child { border-bottom: 0; }
+.dte-rut-op b { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+.dte-rut-op:hover, .dte-rut-op.sel { background: var(--accent-light); }
+.dte-rut-vacio { padding: 10px 12px; font-size: 13px; color: var(--text-3); }
+.dte-cliente-ok { margin-top: 12px; background: var(--green-light); color: var(--green); border-radius: 10px; padding: 9px 12px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+.dte-cliente-ok b { color: var(--text); }
+.dte-aside { top: 100px; }
+.dte-tot-tit { font-weight: 700; font-size: 15px; color: var(--text) !important; margin-bottom: 2px; }
+.dte-totales > div { font-size: 14px; }
+.dte-total b { font-size: 24px; }
+.dte-btn-principal { height: 46px; font-size: 15px; border-radius: 10px; margin-top: 10px; }
+.dte-btn { height: 40px; font-size: 14px; border-radius: 10px; }
+.dte-btn-suave { border: none; color: var(--text-3); }
+.dte-modo-mini { font-size: 12.5px; font-weight: 600; margin-top: 6px; }
+.dte-modo-mini.p { color: var(--red); }
+.dte-modo-mini.t { color: #185FA5; }
+.dte-modo-mini.err { color: var(--amber); }
+@media (max-width: 1100px) {
+  .dte-layout { grid-template-columns: 1fr; }
+  .dte-aside { position: static; }
+  .dte-pasos { top: 0; }
+}
+.dte-prods { display: flex; flex-direction: column; gap: 10px; }
+.dte-prod { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) 34px; grid-template-areas: "n l1 x" "n l2 x"; gap: 8px 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px 12px 12px; background: #FDFCFA; }
+.dte-prod-n { grid-area: n; width: 26px; height: 26px; border-radius: 50%; background: var(--bg); color: var(--text-2); font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 22px; }
+.dte-prod-l1 { grid-area: l1; display: grid; grid-template-columns: minmax(0, 1fr) 96px 120px 110px; gap: 10px; }
+.dte-prod-l2 { grid-area: l2; display: grid; grid-template-columns: 90px 130px minmax(0, 1fr) 90px; gap: 10px; }
+.dte-prod-l2 .dte-in { height: 36px; font-size: 13px; }
+.dte-prod-l2 .dte-campo > span { font-size: 11.5px; font-weight: 500; color: var(--text-3); }
+.dte-prod-x { grid-area: x; align-self: start; margin-top: 22px; font-size: 15px; }
+.dte-prod .dte-subtotal { justify-content: flex-start; padding-left: 2px; }
+@media (max-width: 760px) {
+  .dte-prod-l1, .dte-prod-l2 { grid-template-columns: 1fr 1fr; }
+}

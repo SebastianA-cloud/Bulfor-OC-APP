@@ -65,7 +65,27 @@ function dteNuevo(tipo) {
     refs: tipo === 33 ? [dteRefNueva()] : [],
     det: [dteDetNuevo()],
     pago: { medio: 'PE', fchPago: '', glosa: DTE_GLOSA_PAGO },
+    refact: { on: false, folio: '' },
   };
+}
+
+// Días entre dos fechas ISO (días corridos).
+function dteDiasEntre(desde, hasta) {
+  if (!desde || !hasta) return '';
+  return Math.round((new Date(hasta + 'T12:00:00') - new Date(desde + 'T12:00:00')) / 86400000);
+}
+
+// Líneas que se emiten. En una refacturación se agrega, en la descripción
+// del último producto, un guion y "ESTA FACTURA REEMPLAZA A LA N° X" (igual
+// que se hacía a mano en GDExpress).
+function dteLineas(s) {
+  const lineas = s.det.filter(d => d.nombre.trim()).map(d => ({ ...d }));
+  const folio = String(s.refact?.folio || '').trim();
+  if (s.tipo === 33 && s.refact?.on && folio && lineas.length) {
+    const u = lineas[lineas.length - 1];
+    u.dsc = [(u.dsc || '').trim(), '-', `ESTA FACTURA REEMPLAZA A LA N° ${folio}`].filter(Boolean).join('\n');
+  }
+  return lineas;
 }
 
 // Borrador por tipo: se guarda en este navegador para no perder lo escrito.
@@ -222,10 +242,12 @@ function dteInit(tipo) {
     dteEstado[tipo] = b && b.tipo === tipo ? { ...dteNuevo(tipo), ...b } : dteNuevo(tipo);
     // Borradores anteriores guardaban el vencimiento como fecha: pasa a texto.
     dteEstado[tipo].det.forEach(d => { if (d.venc && !d.dsc) d.dsc = 'V:' + dteDmy(d.venc); delete d.venc; if (d.dsc === undefined) d.dsc = ''; });
+    if (!dteEstado[tipo].refact) dteEstado[tipo].refact = { on: false, folio: '' };
     const tr = dteEstado[tipo].trans;
     if (!tr.patente && !tr.rutTrans && !tr.nombreChofer) Object.assign(tr, DTE_TRANSPORTE);
   }
   dteRender(tipo);
+  if (!dteModoServidor) dteCargarModo().then(() => dteRender(tipo));
   // Los nombres facturados se cargan una vez; al llegar se actualiza la lista.
   if (typeof cargarItemsFacturasVenta === 'function' && !dteCatalogo) {
     cargarItemsFacturasVenta().then(() => { dteArmarCatalogo(); dteActualizarListaProductos(tipo); }).catch(() => {});
@@ -254,6 +276,7 @@ function dteSet(t, ruta, valor, redibujar) {
 // emitida en GDExpress (razón social, giro, dirección, comuna, ciudad).
 async function dteBuscarRut(t, valor) {
   const s = dteEstado[t];
+  if (dteRutLimpio(valor) === s.rut && s.recep.rzn) return;   // ya cargado
   s.rut = dteRutLimpio(valor);
   if (!s.rut) { s.recepInfo = ''; dteRender(t); return; }
   if (!dteRutValido(s.rut)) { s.recepInfo = 'El RUT no es válido (revisa el dígito verificador).'; dteRender(t); return; }
@@ -472,7 +495,7 @@ function dteActualizarCalculos(t) {
   const tot = dteTotales(s);
   s.det.forEach((d, i) => {
     const m = document.getElementById(`dte-${t}-monto-${i}`);
-    if (m) m.value = dteClp(dteMontoLinea(d));
+    if (m) m.textContent = dteClp(dteMontoLinea(d));
     const w = document.getElementById(`dte-${t}-aviso-${i}`);
     if (w) w.textContent = d.ocMax && Number(d.qty) > d.ocMax ? 'No hay suficiente stock para facturar esta cantidad de productos' : '';
   });
@@ -484,6 +507,13 @@ function dteActualizarCalculos(t) {
   if (mp) mp.value = dteClp(tot.total);
   const fp = document.getElementById(`dte-${t}-fchpago`);
   if (fp && !s.pago.fchPago) fp.value = s.fchVenc;
+  // Indicador de pasos y números de sección: verde cuando la sección está completa.
+  const pasos = document.getElementById(`dte-${t}-pasos`);
+  if (pasos) pasos.innerHTML = dtePasosHtml(t);
+  dteSecciones(t).forEach((x, i) => {
+    const num = document.getElementById(`dte-${t}-num-${x.id}`);
+    if (num) { num.classList.toggle('ok', x.ok); num.textContent = x.ok ? '✓' : String(i + 1); }
+  });
 }
 
 // ── Controles ────────────────────────────────────────────────────────────
@@ -533,6 +563,108 @@ function dteAgregarDet(t) { dteEstado[t].det.push(dteDetNuevo()); dteGuardarBorr
 function dteQuitarDet(t, i) { const s = dteEstado[t]; s.det.splice(i, 1); if (!s.det.length) s.det.push(dteDetNuevo()); dteGuardarBorrador(t); dteRender(t); }
 
 // ── Formulario ───────────────────────────────────────────────────────────
+// Una sola página con secciones numeradas y un indicador de pasos arriba que
+// se marca en verde a medida que cada sección queda completa.
+function dteSecciones(t) {
+  const s = dteEstado[t];
+  const esFactura = t === 33;
+  const lineas = s.det.filter(d => d.nombre.trim() || Number(d.qty) || Number(d.precio));
+  const secs = [
+    { id: 'doc', nombre: 'Documento', ok: !!s.fchEmis && (!esFactura || !!s.fchVenc) && (!s.refact?.on || /^\d+$/.test(String(s.refact.folio || '').trim())) },
+    { id: 'cli', nombre: 'Cliente', ok: dteRutValido(s.rut) && !!(s.recep.rzn.trim() && s.recep.giro.trim() && s.recep.dir.trim() && s.recep.cmna.trim()) },
+  ];
+  if (!esFactura) secs.push({ id: 'desp', nombre: 'Despacho', ok: !!(s.dest.dir.trim() && s.dest.cmna && s.trans.patente.trim()) });
+  secs.push({ id: 'oc', nombre: 'Orden de compra', ok: s.refs.every(r => r.tipo && r.folio.trim() && r.fecha) });
+  secs.push({ id: 'prod', nombre: 'Productos', ok: lineas.length > 0 && lineas.every(d => d.nombre.trim() && Number(d.qty) > 0 && Number(d.precio) > 0) });
+  if (esFactura) secs.push({ id: 'pago', nombre: 'Pago', ok: !!(s.pago.medio && s.pago.glosa.trim()) });
+  return secs;
+}
+
+function dtePasosHtml(t) {
+  const secs = dteSecciones(t);
+  const actual = secs.findIndex(x => !x.ok);
+  return secs.map((x, i) => `${i ? '<span class="dte-paso-lin"></span>' : ''}<a class="dte-paso${x.ok ? ' ok' : i === actual ? ' act' : ''}" onclick="document.getElementById('dte-${t}-sec-${x.id}').scrollIntoView({behavior:'smooth',block:'start'})"><i>${x.ok ? '✓' : i + 1}</i>${x.nombre}</a>`).join('')
+    + `<span class="dte-paso-lin"></span><span class="dte-paso${actual === -1 ? ' act' : ''}"><i>${secs.length + 1}</i>Revisar y emitir</span>`;
+}
+
+function dteSeccion(t, n, id, titulo, ok, cuerpo, nota) {
+  return `<section class="dte-card" id="dte-${t}-sec-${id}"><h3 class="dte-h"><span class="dte-num${ok ? ' ok' : ''}" id="dte-${t}-num-${id}">${ok ? '✓' : n}</span>${titulo}${nota ? `<small>${nota}</small>` : ''}</h3>${cuerpo}</section>`;
+}
+
+// Fechas: emisión, vencimiento y días de vencimiento, que se calculan entre sí.
+function dteSetEmis(t, v) {
+  const s = dteEstado[t];
+  const dias = dteDiasEntre(s.fchEmis, s.fchVenc);
+  s.fchEmis = v;
+  if (v && dias !== '') s.fchVenc = dteMasDias(v, dias);
+  dteGuardarBorrador(t); dteRender(t);
+}
+function dteSetDias(t, v) {
+  const s = dteEstado[t];
+  const n = parseInt(v, 10);
+  if (!isNaN(n) && n >= 0 && s.fchEmis) {
+    s.fchVenc = dteMasDias(s.fchEmis, n);
+    const f = document.getElementById(`dte-${t}-venc`);
+    if (f) f.value = s.fchVenc;
+    dteGuardarBorrador(t); dteActualizarCalculos(t);
+  }
+}
+function dteSetVenc(t, v) {
+  const s = dteEstado[t];
+  s.fchVenc = v;
+  const d = document.getElementById(`dte-${t}-dias`);
+  if (d) d.value = dteDiasEntre(s.fchEmis, v);
+  dteGuardarBorrador(t); dteActualizarCalculos(t);
+}
+function dteSetRefact(t, on) { dteEstado[t].refact.on = on; dteGuardarBorrador(t); dteRender(t); }
+
+// ── Cliente: lista desplegable de RUT conocidos mientras se escribe ─────
+let dteClientes = null;
+function dteListaClientes() {
+  if (dteClientes && dteClientes.length) return dteClientes;
+  const mapa = {};
+  const agregar = (rut, nombre, fecha) => {
+    const r = dteRutLimpio(rut);
+    if (!r || !nombre) return;
+    if (!mapa[r] || (fecha && fecha > (mapa[r].fecha || ''))) mapa[r] = { rut: r, nombre: String(nombre).trim(), fecha: fecha || mapa[r]?.fecha || '' };
+  };
+  if (typeof hospitalesMaestro !== 'undefined') hospitalesMaestro.forEach(h => agregar(h.rut, h.nombre_estandar || h.nombre_original));
+  if (typeof documentosGdexpress !== 'undefined') documentosGdexpress.forEach(d => agregar(d.rut_hospital, d.hospital, d.fecha_emision));
+  dteClientes = Object.values(mapa);
+  return dteClientes;
+}
+const dteRutClave = r => String(r || '').toUpperCase().replace(/[^0-9K]/g, '');
+function dteRutSugerir(t, valor) {
+  const caja = document.getElementById(`dte-${t}-rut-lista`);
+  if (!caja) return;
+  const q = dteRutClave(valor);
+  if (q.length < 2) { caja.innerHTML = ''; caja.style.display = 'none'; return; }
+  const hits = dteListaClientes().filter(c => dteRutClave(c.rut).startsWith(q)).slice(0, 8);
+  caja.innerHTML = hits.length
+    ? hits.map((c, i) => `<div class="dte-rut-op${i === 0 ? ' sel' : ''}" onmousedown="event.preventDefault();dteElegirCliente(${t},'${dteAttr(c.rut)}')"><b>${dteEsc(c.rut)}</b>${dteEsc(c.nombre)}</div>`).join('')
+    : '<div class="dte-rut-vacio">Ningún cliente conocido con ese RUT: al terminar de escribirlo, completa los datos a mano.</div>';
+  caja.style.display = 'block';
+}
+function dteRutTecla(t, ev) {
+  if (ev.key === 'Enter') {
+    const primera = document.querySelector(`#dte-${t}-rut-lista .dte-rut-op`);
+    if (primera) { ev.preventDefault(); primera.dispatchEvent(new MouseEvent('mousedown')); }
+    else ev.target.blur();
+  }
+  if (ev.key === 'Escape') dteRutCerrar(t);
+}
+function dteRutCerrar(t) { const c = document.getElementById(`dte-${t}-rut-lista`); if (c) c.style.display = 'none'; }
+function dteElegirCliente(t, rut) {
+  dteRutCerrar(t);
+  // Se deja el RUT completo en el campo antes de buscar, para que el "change"
+  // del campo (al perder el foco) no vuelva a buscar con lo escrito a medias.
+  const inp = document.getElementById(`dte-${t}-rut`);
+  if (inp) inp.value = rut;
+  const s = dteEstado[t];
+  if (dteRutLimpio(rut) === s.rut && s.recep.rzn) return;
+  dteBuscarRut(t, rut);
+}
+
 function dteRender(t) {
   const cont = document.getElementById('dte-form-' + t);
   if (!cont) return;
@@ -541,39 +673,48 @@ function dteRender(t) {
   const ocs = dteOcsDelRut(s.rut);
   const productos = dteProductosRefs(s);
   const tot = dteTotales(s);
+  const secs = dteSecciones(t);
+  const ok = id => (secs.find(x => x.id === id) || {}).ok;
+  let n = 0;
 
-  const docCampos = esFactura
-    ? dteCampo('Tipo de documento', `<input class="dte-in" value="Factura afecta sin despacho (33)" disabled>`, false, 2)
-      + dteCampo('Fecha emisión', dteFecha(t, 'fchEmis', s.fchEmis), true)
-      + dteCampo('Fecha vencimiento', dteFecha(t, 'fchVenc', s.fchVenc), true)
-      + dteCampo('Forma de pago', dteSelect(t, 'fmaPago', s.fmaPago, DTE_FORMAS_PAGO), true)
-      + dteCampo('Tipo venta', `<input class="dte-in" value="Ventas del giro" disabled>`)
-    : dteCampo('Tipo de documento', `<input class="dte-in" value="Guía de despacho electrónica (52)" disabled>`, false, 2)
-      + dteCampo('Fecha emisión', dteFecha(t, 'fchEmis', s.fchEmis), true)
-      + dteCampo('Fecha vencimiento', dteFecha(t, 'fchVenc', s.fchVenc), false)
-      + dteCampo('Tipo de traslado', dteSelect(t, 'indTraslado', s.indTraslado, DTE_TRASLADOS), true)
-      + dteCampo('Tipo de despacho', dteSelect(t, 'tipoDespacho', s.tipoDespacho, DTE_DESPACHOS), true);
+  const dias = dteDiasEntre(s.fchEmis, s.fchVenc);
+  const documento = `
+    <div class="dte-grid dte-grid-doc">
+      ${dteCampo('Tipo de documento', `<input class="dte-in" value="${esFactura ? 'Factura Afecta (33)' : 'Guía de despacho (52)'}" disabled>`)}
+      ${dteCampo('Fecha de emisión', `<input type="date" class="dte-in" value="${dteAttr(s.fchEmis)}" onchange="dteSetEmis(${t},this.value)">`, true)}
+      ${dteCampo('Días de vencimiento', `<input type="number" min="0" step="1" class="dte-in" id="dte-${t}-dias" value="${dteAttr(dias)}" oninput="dteSetDias(${t},this.value)" placeholder="30">`)}
+      ${dteCampo('Fecha de vencimiento', `<input type="date" class="dte-in" id="dte-${t}-venc" value="${dteAttr(s.fchVenc)}" onchange="dteSetVenc(${t},this.value)">`, esFactura)}
+      ${esFactura
+        ? dteCampo('Forma de pago', dteSelect(t, 'fmaPago', s.fmaPago, DTE_FORMAS_PAGO), true)
+        : dteCampo('Tipo de traslado', dteSelect(t, 'indTraslado', s.indTraslado, DTE_TRASLADOS), true) + dteCampo('Tipo de despacho', dteSelect(t, 'tipoDespacho', s.tipoDespacho, DTE_DESPACHOS), true)}
+    </div>
+    ${esFactura ? `<div class="dte-refact">
+      <label class="dte-switch"><input type="checkbox" ${s.refact.on ? 'checked' : ''} onchange="dteSetRefact(${t},this.checked)"><span></span> ¿Es refacturación?</label>
+      ${s.refact.on ? `<div class="dte-refact-campo">${dteCampo('N° de la factura que reemplaza', `<input type="text" inputmode="numeric" class="dte-in" value="${dteAttr(s.refact.folio)}" placeholder="22354" oninput="dteSet(${t},'refact.folio',this.value.replace(/\\D/g,''))">`, true)}
+        <small class="dte-sub">Se agregará en la descripción del último producto: “- ESTA FACTURA REEMPLAZA A LA N° ${dteEsc(s.refact.folio || '…')}”.</small></div>` : ''}
+    </div>` : ''}`;
 
-  const receptor = `
-    <div class="dte-grid">
-      ${dteCampo('RUT', `<input type="text" class="dte-in" placeholder="61602248-2" value="${dteAttr(s.rut)}" onchange="dteBuscarRut(${t},this.value)">`, true)}
+  const conocido = dteListaClientes().find(c => c.rut === s.rut);
+  const cliente = `
+    <div class="dte-grid dte-grid-cli">
+      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
+        <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
       ${dteCampo('Razón social', dteInput(t, 'recep.rzn', s.recep.rzn), true, 2)}
       ${dteCampo('Giro', dteInput(t, 'recep.giro', s.recep.giro, 'maxlength="40"'), true)}
       ${dteCampo('Dirección', dteInput(t, 'recep.dir', s.recep.dir), true, 2)}
       ${dteCampo('Comuna', dteInput(t, 'recep.cmna', s.recep.cmna), true)}
       ${dteCampo('Ciudad', dteInput(t, 'recep.ciudad', s.recep.ciudad), false)}
     </div>
-    ${s.recepInfo ? `<div class="dte-info">${dteEsc(s.recepInfo)}</div>` : ''}
-    ${s.rut && dteRutValido(s.rut) ? `<div class="dte-info">${ocs.length ? `${ocs.length} orden${ocs.length === 1 ? '' : 'es'} de compra de este RUT en el programa.` : 'No hay órdenes de compra de este RUT en el programa.'}</div>` : ''}`;
+    ${s.rut && dteRutValido(s.rut) && (s.recep.rzn || conocido) ? `<div class="dte-cliente-ok"><span class="ti ti-building-hospital"></span> <b>${dteEsc(s.recep.rzn || conocido?.nombre || '')}</b>${ocs.length ? ` · ${ocs.length} orden${ocs.length === 1 ? '' : 'es'} de compra en el programa` : ''}</div>` : ''}
+    ${s.recepInfo ? `<div class="dte-info">${dteEsc(s.recepInfo)}</div>` : ''}`;
 
   const despacho = esFactura ? '' : `
-    <section class="dte-card">
-      <h3>Dirección de despacho</h3>
       <div class="dte-grid">
-        ${dteCampo('Dirección', dteInput(t, 'dest.dir', s.dest.dir), true, 2)}
+        ${dteCampo('Dirección de despacho', dteInput(t, 'dest.dir', s.dest.dir), true, 2)}
         ${dteGeoSelects(t, 'dest')}
       </div>
-      <div class="dte-grid" style="margin-top:12px">
+      <div class="dte-sep">Transporte</div>
+      <div class="dte-grid">
         ${dteCampo('Patente', dteInput(t, 'trans.patente', s.trans.patente, 'placeholder="ABCD-12"'), true)}
         ${dteCampo('RUT transportista', dteInput(t, 'trans.rutTrans', s.trans.rutTrans), false)}
         ${dteCampo('RUT chofer', dteInput(t, 'trans.rutChofer', s.trans.rutChofer), false)}
@@ -581,76 +722,82 @@ function dteRender(t) {
         ${dteCampo('Fecha salida', dteFecha(t, 'trans.fchSalida', s.trans.fchSalida), false)}
         ${dteCampo('Hora salida', `<input type="time" step="1" class="dte-in" value="${dteAttr(s.trans.hraSalida)}" onchange="dteSet(${t},'trans.hraSalida',this.value)">`, false)}
         ${dteCampo('Fecha llegada', dteFecha(t, 'trans.fchLlegada', s.trans.fchLlegada), false)}
-      </div>
-    </section>`;
+      </div>`;
 
   const refs = `
-    <section class="dte-card">
-      <h3>Referencias</h3>
       ${s.refs.length ? `<div class="dte-tabla dte-refs">
-        <div class="dte-th">Tipo doc. <b>*</b></div><div class="dte-th">Folio <b>*</b></div><div class="dte-th">Fecha <b>*</b></div><div class="dte-th">Razón de referencia</div><div></div>
+        <div class="dte-th">Tipo de documento <b>*</b></div><div class="dte-th">N° / Folio <b>*</b></div><div class="dte-th">Fecha <b>*</b></div><div class="dte-th">Razón</div><div></div>
         ${s.refs.map((r, i) => `
           <div>${dteSelect(t, `refs.${i}.tipo`, r.tipo, DTE_TIPOS_REF, true)}</div>
-          <div><input type="text" class="dte-in" list="dte-ocs-${t}" value="${dteAttr(r.folio)}" placeholder="${r.tipo === '801' ? (ocs.length ? 'Elige la OC' : 'Ingresa el RUT para ver sus OC') : ''}" onchange="dteElegirOC(${t},${i},this.value)"></div>
+          <div><input type="text" class="dte-in" list="dte-ocs-${t}" value="${dteAttr(r.folio)}" placeholder="${r.tipo === '801' ? (ocs.length ? 'Elige la OC de la lista' : 'Primero ingresa el RUT del cliente') : ''}" onchange="dteElegirOC(${t},${i},this.value)"></div>
           <div><input type="date" class="dte-in dte-ref-fecha" value="${dteAttr(r.fecha)}" onchange="dteSet(${t},'refs.${i}.fecha',this.value)"></div>
           <div><input type="text" class="dte-in dte-ref-razon" maxlength="90" value="${dteAttr(r.razon)}" oninput="dteSet(${t},'refs.${i}.razon',this.value)"></div>
-          <div><button class="dte-quitar" onclick="dteQuitarRef(${t},${i})" title="Quitar referencia" aria-label="Quitar referencia"><i class="ti ti-trash"></i></button></div>`).join('')}
-      </div>` : `<div class="dte-info">${esFactura ? 'Sin referencias: la factura no hará referencia a ningún documento.' : 'Sin referencias. Agrega una si la guía corresponde a una orden de compra.'}</div>`}
-      <button class="dte-agregar" onclick="dteAgregarRef(${t})"><i class="ti ti-plus"></i> Agregar referencia</button>
-      <datalist id="dte-ocs-${t}">${ocs.map(o => `<option value="${dteAttr(o.codigooc)}" label="${dteAttr(dteDmy(dteFechaCL(o.fechaoc)) + ' · ' + dteClp(o.totaloc) + (o.nombreoc ? ' · ' + String(o.nombreoc).slice(0, 40) : ''))}"></option>`).join('')}</datalist>
-    </section>`;
+          <div><button class="dte-quitar" onclick="dteQuitarRef(${t},${i})" title="Quitar" aria-label="Quitar referencia"><i class="ti ti-trash"></i></button></div>`).join('')}
+      </div>` : `<div class="dte-info">${esFactura ? 'Sin orden de compra: la factura no hará referencia a ningún documento.' : 'Sin referencias. Agrega una si la guía corresponde a una orden de compra.'}</div>`}
+      <button class="dte-agregar" onclick="dteAgregarRef(${t})"><i class="ti ti-plus"></i> ${s.refs.length ? 'Agregar otra referencia' : 'Agregar orden de compra'}</button>
+      <datalist id="dte-ocs-${t}">${ocs.map(o => `<option value="${dteAttr(o.codigooc)}" label="${dteAttr(dteDmy(dteFechaCL(o.fechaoc)) + ' · ' + dteClp(o.totaloc) + (o.nombreoc ? ' · ' + String(o.nombreoc).slice(0, 40) : ''))}"></option>`).join('')}</datalist>`;
 
+  // Cada producto en un bloque de dos líneas: lo principal arriba (producto,
+  // cantidad, precio, subtotal) y lo complementario abajo (código, vencimiento,
+  // unidad), para que quepa cómodo en un notebook.
   const detalle = `
-    <section class="dte-card">
-      <h3>Detalle</h3>
-      <div class="dte-tabla dte-det">
-        <div class="dte-th">Tipo código</div><div class="dte-th">Código</div><div class="dte-th">Nombre del producto <b>*</b></div><div class="dte-th">Vencimiento</div><div class="dte-th">Cantidad <b>*</b></div><div class="dte-th">Unidad</div><div class="dte-th">Precio unitario <b>*</b></div><div class="dte-th">Monto ítem</div><div></div>
+      <div class="dte-prods">
         ${s.det.map((d, i) => `
-          <div>${dteInput(t, `det.${i}.tpoCod`, d.tpoCod, 'maxlength="10"')}</div>
-          <div>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</div>
-          <div><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
-            <small class="dte-sub dte-det-oc">${d.ocMax ? `OC ${dteEsc(d.ocCodigo)}: ${d.ocMax.toLocaleString('es-CL')} unidades` : ''}</small></div>
-          <div>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="1000" placeholder="V:30-11-2026" title="Se envía como Descripción del producto en GDExpress"')}</div>
-          <div><input type="number" min="0" step="any" class="dte-in" value="${dteAttr(d.qty)}" oninput="dteSet(${t},'det.${i}.qty',this.value)"><small class="dte-aviso" id="dte-${t}-aviso-${i}"></small></div>
-          <div>${dteInput(t, `det.${i}.unidad`, d.unidad, 'maxlength="4"')}</div>
-          <div><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></div>
-          <div><input class="dte-in dte-monto" id="dte-${t}-monto-${i}" value="${dteClp(dteMontoLinea(d))}" disabled></div>
-          <div><button class="dte-quitar" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto"><i class="ti ti-trash"></i></button></div>`).join('')}
+        <div class="dte-prod">
+          <div class="dte-prod-n">${i + 1}</div>
+          <div class="dte-prod-l1">
+            <label class="dte-campo"><span>Producto <b>*</b></span><input type="text" class="dte-in" list="dte-prod-${t}" maxlength="80" value="${dteAttr(d.nombre)}" placeholder="${productos.length ? 'Elige un producto de la OC o escribe' : 'Nombre del producto'}" oninput="dteSet(${t},'det.${i}.nombre',this.value)" onchange="dteElegirProducto(${t},${i},this.value)">
+              <small class="dte-sub dte-det-oc">${d.ocMax ? `OC ${dteEsc(d.ocCodigo)}: ${d.ocMax.toLocaleString('es-CL')} unidades` : ''}</small></label>
+            <label class="dte-campo"><span>Cantidad <b>*</b></span><input type="number" min="0" step="any" class="dte-in" value="${dteAttr(d.qty)}" oninput="dteSet(${t},'det.${i}.qty',this.value)"><small class="dte-aviso" id="dte-${t}-aviso-${i}"></small></label>
+            <label class="dte-campo"><span>Precio unit. <b>*</b></span><input type="number" min="0" step="any" class="dte-in dte-det-precio" value="${dteAttr(d.precio)}" oninput="dteSet(${t},'det.${i}.precio',this.value)"></label>
+            <div class="dte-campo"><span>Subtotal</span><div class="dte-subtotal" id="dte-${t}-monto-${i}">${dteClp(dteMontoLinea(d))}</div></div>
+          </div>
+          <div class="dte-prod-l2">
+            <label class="dte-campo"><span>Tipo cód.</span>${dteInput(t, `det.${i}.tpoCod`, d.tpoCod, 'maxlength="10"')}</label>
+            <label class="dte-campo"><span>Código</span>${dteInput(t, `det.${i}.cod`, d.cod, 'maxlength="35" placeholder="7236/26"')}</label>
+            <label class="dte-campo"><span>Vencimiento</span>${dteInput(t, `det.${i}.dsc`, d.dsc, 'maxlength="1000" placeholder="V:30-11-2026" title="Se envía como Descripción del producto en GDExpress"')}</label>
+            <label class="dte-campo"><span>Unidad</span>${dteInput(t, `det.${i}.unidad`, d.unidad, 'maxlength="4"')}</label>
+          </div>
+          <button class="dte-quitar dte-prod-x" onclick="dteQuitarDet(${t},${i})" title="Quitar producto" aria-label="Quitar producto">✕</button>
+        </div>`).join('')}
       </div>
       <button class="dte-agregar" onclick="dteAgregarDet(${t})"><i class="ti ti-plus"></i> Agregar producto</button>
-      <datalist id="dte-prod-${t}">${dteOpcionesProductos(productos)}</datalist>
-    </section>`;
+      <datalist id="dte-prod-${t}">${dteOpcionesProductos(productos)}</datalist>`;
 
   const pago = !esFactura ? '' : `
-    <section class="dte-card">
-      <h3>Medio de pago</h3>
       <div class="dte-grid">
         ${dteCampo('Medio de pago', dteSelect(t, 'pago.medio', s.pago.medio, DTE_MEDIOS_PAGO), true)}
         ${dteCampo('Fecha de pago', `<input type="date" class="dte-in" id="dte-${t}-fchpago" value="${dteAttr(s.pago.fchPago || s.fchVenc)}" onchange="dteSet(${t},'pago.fchPago',this.value)">`, true)}
         ${dteCampo('Monto', `<input class="dte-in" id="dte-${t}-mntpago" value="${dteClp(tot.total)}" disabled>`, true)}
-        ${dteCampo('Glosa de pago', dteInput(t, 'pago.glosa', s.pago.glosa, 'maxlength="100"'), false, 2)}
-      </div>
-    </section>`;
+        ${dteCampo('Glosa de pago', dteInput(t, 'pago.glosa', s.pago.glosa, 'maxlength="100"'), false, 3)}
+      </div>`;
+
+  const m = dteModoServidor;
+  const modo = !m ? '' : !m.ok || !m.configurado
+    ? '<div class="dte-modo-mini err">Sin conexión con GDExpress</div>'
+    : m.ambiente === 'P' ? '<div class="dte-modo-mini p">● PRODUCCIÓN: se emite ante el SII</div>' : '<div class="dte-modo-mini t">● PRUEBAS (homologación): no es real</div>';
 
   cont.innerHTML = `
+    <nav class="dte-pasos" id="dte-${t}-pasos">${dtePasosHtml(t)}</nav>
     <div class="dte-layout">
       <div class="dte-main">
-        <section class="dte-card"><h3>Documento</h3><div class="dte-grid">${docCampos}</div></section>
-        <section class="dte-card"><h3>Receptor</h3>${receptor}</section>
-        ${despacho}
-        ${refs}
-        ${detalle}
-        ${pago}
+        ${dteSeccion(t, ++n, 'doc', 'Documento', ok('doc'), documento)}
+        ${dteSeccion(t, ++n, 'cli', 'Cliente', ok('cli'), cliente, 'Escribe el RUT y elige el cliente de la lista')}
+        ${esFactura ? '' : dteSeccion(t, ++n, 'desp', 'Despacho', ok('desp'), despacho, 'Parte con la dirección del cliente; se puede cambiar')}
+        ${dteSeccion(t, ++n, 'oc', 'Orden de compra', ok('oc'), refs)}
+        ${dteSeccion(t, ++n, 'prod', 'Productos', ok('prod'), detalle, productos.length ? 'De la orden de compra elegida' : '')}
+        ${esFactura ? dteSeccion(t, ++n, 'pago', 'Pago', ok('pago'), pago) : ''}
       </div>
       <aside class="dte-aside">
         <div class="dte-card dte-totales">
+          <div class="dte-tot-tit">Resumen</div>
           <div><span>Neto</span><b id="dte-${t}-neto">${dteClp(tot.neto)}</b></div>
           <div><span>IVA 19%</span><b id="dte-${t}-iva">${dteClp(tot.iva)}</b></div>
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
-          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-send"></i> Emitir ${DTE_NOMBRES[t]}</button>
-          <button class="dte-btn" onclick="dteVistaPrevia(${t})"><i class="ti ti-eye"></i> Vista previa</button>
+          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> Revisar y emitir</button>
           <button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
           <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>
+          ${modo}
           <small class="dte-sub">${s.borradorId ? '<i class="ti ti-file-pencil"></i> Está en Borradores. Si cambias algo, vuelve a apretar “Guardar borrador”.' : ''}</small>
         </div>
       </aside>
@@ -671,6 +818,7 @@ function dteValidar(s) {
   const lineas = s.det.filter(d => d.nombre.trim() || Number(d.qty) || Number(d.precio));
   if (!lineas.length) err.push('al menos un producto');
   lineas.forEach((d, i) => { if (!d.nombre.trim() || !(Number(d.qty) > 0) || !(Number(d.precio) > 0)) err.push(`producto ${i + 1} con nombre, cantidad y precio`); });
+  if (s.tipo === 33 && s.refact?.on && !/^\d+$/.test(String(s.refact.folio || '').trim())) err.push('N° de la factura que se reemplaza');
   if (s.tipo === 52) {
     if (!s.dest.dir.trim() || !s.dest.cmna) err.push('dirección y comuna de despacho');
     if (!s.trans.patente.trim()) err.push('patente');
@@ -681,7 +829,7 @@ function dteValidar(s) {
 function dteXml(s) {
   const tot = dteTotales(s);
   const e = (tag, v) => (v === '' || v === null || v === undefined) ? '' : `<${tag}>${dteEsc(v)}</${tag}>`;
-  const lineas = s.det.filter(d => d.nombre.trim());
+  const lineas = dteLineas(s);
   const pagoXml = s.tipo === 33
     ? `<MntPagos><FchPago>${s.pago.fchPago || s.fchVenc}</FchPago><MntPago>${tot.total}</MntPago>${e('GlosaPagos', s.pago.glosa.trim())}</MntPagos>${e('MedioPago', s.pago.medio)}`
     : '';
@@ -828,7 +976,7 @@ const dteNum = n => (Number(n) || 0).toLocaleString('es-CL', { maximumFractionDi
 
 function dteHojaHtml(s, folio) {
   const tot = dteTotales(s);
-  const lineas = s.det.filter(d => d.nombre.trim());
+  const lineas = dteLineas(s);
   const fila = (k, v) => `<div><b>${k}</b><span>:</span><span>${dteEsc(v || '')}</span></div>`;
   const forma = dteNorm((DTE_FORMAS_PAGO.find(f => f[0] === s.fmaPago) || [, ''])[1]);
   const izquierda = fila('SEÑOR(ES)', s.recep.rzn) + fila('R.U.T.', s.rut) + fila('DIRECCIÓN', s.recep.dir) + fila('GIRO', s.recep.giro)
@@ -853,7 +1001,7 @@ function dteHojaHtml(s, folio) {
     ${transporte}
     ${refs}
     <table class="dh-tabla dh-det"><tr><th style="width:90px">CÓDIGO</th><th>DETALLE</th><th style="width:34px">UM</th><th style="width:70px">CANTIDAD</th><th style="width:76px">PRECIO</th><th style="width:84px">Total</th></tr>
-      ${lineas.map(d => `<tr><td style="text-align:center">${d.cod.trim() ? dteEsc((d.tpoCod || '').trim() + ' - ' + d.cod.trim()) : ''}</td><td>${dteEsc(d.nombre)}${d.dsc && d.dsc.trim() ? '<br>' + dteEsc(d.dsc.trim()) : ''}</td><td style="text-align:center">${dteEsc(d.unidad)}</td><td class="dh-num">${dteNum(d.qty)}</td><td class="dh-num">${(Number(d.precio) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td class="dh-num">${dteNum(dteMontoLinea(d))}</td></tr>`).join('')}
+      ${lineas.map(d => `<tr><td style="text-align:center">${d.cod.trim() ? dteEsc((d.tpoCod || '').trim() + ' - ' + d.cod.trim()) : ''}</td><td>${dteEsc(d.nombre)}${d.dsc && d.dsc.trim() ? '<br>' + dteEsc(d.dsc.trim()).replace(/\n/g, '<br>') : ''}</td><td style="text-align:center">${dteEsc(d.unidad)}</td><td class="dh-num">${dteNum(d.qty)}</td><td class="dh-num">${(Number(d.precio) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td class="dh-num">${dteNum(dteMontoLinea(d))}</td></tr>`).join('')}
       <tr class="dh-relleno"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
     </table>
     <div class="dh-pie">
