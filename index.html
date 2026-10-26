@@ -132,6 +132,7 @@
       </div>
       <div class="nav-subgroup" id="subgroup-documentos">
         <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('documentos','doc-factura',this)"><span>Factura</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-multiple" onclick="seleccionarSubpagina('documentos','doc-multiple',this)"><span>Facturación múltiple</span></div>
         <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('documentos','doc-guia',this)"><span>Guía de despacho</span></div>
         <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('documentos','doc-nc',this)"><span>Nota de crédito</span></div>
         <div class="nav-item nav-subitem" data-page="doc-borradores" onclick="seleccionarSubpagina('documentos','doc-borradores',this)" style="display:none"><span>Borradores</span></div>
@@ -1376,6 +1377,13 @@
     </div>
     <!-- Con clase, para que el script de cabeceras fijas no lo meta en la cabecera -->
     <div class="dte-form" id="dte-form-33"></div>
+  </div>
+  <div class="page" id="page-doc-multiple">
+    <div class="page-header">
+      <div class="page-title">Facturación múltiple</div>
+      <div class="page-sub">Varias facturas para un mismo cliente, una por orden de compra</div>
+    </div>
+    <div class="dte-form" id="dte-multi"></div>
   </div>
   <div class="page" id="page-doc-guia">
     <div class="page-header">
@@ -15162,6 +15170,7 @@ showPage = function(id, el) {
   if (id === 'rec-preparados') recPrepInit();
   if (id === 'rec-compras') recCmInit();
   if (id === 'doc-factura') dteInit(33);
+  if (id === 'doc-multiple') dteMultiInit();
   if (id === 'doc-guia') dteInit(52);
   if (id === 'doc-borradores') dteBorradoresInit();
   if (typeof dteFabActualizar === 'function') dteFabActualizar(id);
@@ -15204,6 +15213,7 @@ const SUBMENUS = {
   },
   'documentos': { items: [
     { icon: '<i class="ti ti-file-invoice"></i>', label: 'Factura', page: 'doc-factura' },
+    { icon: '<i class="ti ti-files"></i>', label: 'Facturación múltiple', page: 'doc-multiple' },
     { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guía de despacho', page: 'doc-guia' },
     { icon: '<i class="ti ti-receipt-refund"></i>', label: 'Nota de crédito', page: 'doc-nc' },
   ] },

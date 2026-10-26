@@ -108,7 +108,10 @@ function dteLineas(s) {
 }
 
 // Borrador por tipo: se guarda en este navegador para no perder lo escrito.
-function dteGuardarBorrador(t) { try { localStorage.setItem('bulfor_dte_' + t, JSON.stringify(dteEstado[t])); } catch (e) { /* sin almacenamiento */ } }
+function dteGuardarBorrador(t) {
+  if (t === DTE_MULTI) { dteMultiGuardar(); return; }   // la factura del flujo múltiple se guarda con todo el flujo
+  try { localStorage.setItem('bulfor_dte_' + t, JSON.stringify(dteEstado[t])); } catch (e) { /* sin almacenamiento */ }
+}
 function dteCargarBorrador(t) { try { const s = localStorage.getItem('bulfor_dte_' + t); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
 // ── Borradores guardados: listado aparte, como en GDExpress, en la tabla
@@ -292,13 +295,18 @@ function dteSet(t, ruta, valor, redibujar) {
 
 // ── Receptor: al poner el RUT se traen los datos de su última factura o guía
 // emitida en GDExpress (razón social, giro, dirección, comuna, ciudad).
+const dteBuscandoRut = {};   // t → RUT que se está buscando
 async function dteBuscarRut(t, valor) {
   const s = dteEstado[t];
   if (dteRutLimpio(valor) === s.rut && s.recep.rzn) return;   // ya cargado
+  // Al redibujar, el campo RUT pierde el foco y vuelve a avisar el mismo
+  // cambio: si ese RUT ya se está buscando, no se busca dos veces.
+  if (dteRutLimpio(valor) && dteBuscandoRut[t] === dteRutLimpio(valor)) return;
   s.rut = dteRutLimpio(valor);
   if (!s.rut) { s.recepInfo = ''; dteRender(t); return; }
   if (!dteRutValido(s.rut)) { s.recepInfo = 'El RUT no es válido (revisa el dígito verificador).'; dteRender(t); return; }
   s.recepInfo = 'Buscando datos del receptor…';
+  dteBuscandoRut[t] = s.rut;
   dteRender(t);
   try {
     const res = await sb(`documentos_gdexpress?select=tipo_dte,fecha_emision,xml_completo&rut_hospital=eq.${encodeURIComponent(s.rut)}&xml_completo=not.is.null&order=fecha_emision.desc&limit=5`);
@@ -318,6 +326,7 @@ async function dteBuscarRut(t, valor) {
   } catch (e) {
     s.recepInfo = 'No se pudieron traer los datos: ' + e.message;
   }
+  delete dteBuscandoRut[t];
   dteGuardarBorrador(t);
   dteRender(t);
 }
@@ -587,7 +596,7 @@ function dteQuitarDet(t, i) { const s = dteEstado[t]; s.det.splice(i, 1); if (!s
 // se marca en verde a medida que cada sección queda completa.
 function dteSecciones(t) {
   const s = dteEstado[t];
-  const esFactura = t === 33;
+  const esFactura = s.tipo === 33;
   const lineas = s.det.filter(d => d.nombre.trim() || Number(d.qty) || Number(d.precio));
   const secs = [
     { id: 'doc', nombre: 'Documento', ok: !!s.fchEmis && (!esFactura || !!s.fchVenc) && (!s.refact?.on || /^\d+$/.test(String(s.refact.folio || '').trim())) },
@@ -619,14 +628,15 @@ function dteSeccion(t, n, id, titulo, ok, cuerpo, nota) {
 // ella. Como el alto de esa cabecera depende de la pantalla, se mide aquí y se
 // guarda en variables CSS del formulario.
 function dteAjustarTopes() {
-  document.querySelectorAll('.dte-pasos').forEach(barra => {
-    if (!barra.offsetParent) return;   // página oculta
-    const form = barra.parentElement;
-    const pagina = barra.closest('.page');
+  document.querySelectorAll('.dte-layout').forEach(layout => {
+    if (!layout.offsetParent) return;   // página oculta
+    const form = layout.parentElement;
+    const barra = form.querySelector(':scope > .dte-pasos');   // Facturación múltiple al elegir OC no tiene barra
+    const pagina = form.closest('.page');
     const cab = pagina && pagina.querySelector(':scope > .page-sticky');
     const navTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-top')) || 0;
     const tope = cab && getComputedStyle(cab).position === 'sticky' ? navTop + cab.offsetHeight : navTop;
-    const topeAside = tope + barra.offsetHeight + 14;
+    const topeAside = tope + (barra ? barra.offsetHeight : 0) + 14;
     if (form.dataset.tope !== tope + '/' + topeAside) {
       form.dataset.tope = tope + '/' + topeAside;
       form.style.setProperty('--dte-tope', tope + 'px');
@@ -713,10 +723,11 @@ function dteElegirCliente(t, rut) {
 
 function dteRender(t) {
   const cont = document.getElementById('dte-form-' + t);
-  if (!cont) return;
+  if (!cont) { if (t === DTE_MULTI) dteMultiRender(); return; }   // flujo múltiple aún eligiendo las OC
   const s = dteEstado[t];
   dteMigrarDet(s);
-  const esFactura = t === 33;
+  const esFactura = s.tipo === 33;
+  const multi = t === DTE_MULTI;
   const ocs = dteOcsDelRut(s.rut);
   const productos = dteProductosRefs(s);
   const tot = dteTotales(s);
@@ -844,8 +855,8 @@ function dteRender(t) {
           <div><span>IVA 19%</span><b id="dte-${t}-iva">${dteClp(tot.iva)}</b></div>
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
           <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> Revisar y emitir</button>
-          <button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
-          <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>
+          ${multi ? dteMultiBotonesAside() : `<button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
+          <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>`}
           ${modo}
           <small class="dte-sub">${s.borradorId ? '<i class="ti ti-file-pencil"></i> Está en Borradores. Si cambias algo, vuelve a apretar “Guardar borrador”.' : ''}</small>
         </div>
@@ -910,7 +921,7 @@ function dteVerXml(t) {
   const s = dteEstado[t];
   const err = dteValidar(s);
   const xml = dteXml(s).replace(/></g, '>\n<');
-  dteModal(`XML de la ${DTE_NOMBRES[t]}`, `${err.length ? `<div class="dte-aviso-caja">Falta completar: ${dteEsc(err.join(', '))}.</div>` : ''}
+  dteModal(`XML de la ${DTE_NOMBRES[s.tipo]}`, `${err.length ? `<div class="dte-aviso-caja">Falta completar: ${dteEsc(err.join(', '))}.</div>` : ''}
     <pre class="dte-xml">${dteEsc(xml)}</pre>`);
 }
 
@@ -952,23 +963,27 @@ let dteEnviando = false;
 async function dteEnviar(t) {
   const s = dteEstado[t];
   if (dteEnviando || dteValidar(s).length) return;
+  if (t === DTE_MULTI && !dteMultiPuedeEnviar()) return;   // nunca se emite dos veces la misma factura del flujo
   if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
-  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se va a emitir una ${DTE_NOMBRES[t]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
+  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se va a emitir una ${DTE_NOMBRES[s.tipo]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
   dteEnviando = true;
   const btn = document.querySelector('#dte-modal-overlay .dte-btn-principal');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Enviando…'; }
   let r;
-  try { r = await dteFuncion({ tipo: t, xml: dteXml(s) }); }
+  try { r = await dteFuncion({ tipo: s.tipo, xml: dteXml(s) }); }
   catch (e) { r = { ok: false, error: 'No se pudo conectar con el servidor: ' + e.message }; }
   dteEnviando = false;
   if (!r.ok || !r.folio) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Enviar'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = `<i class="ti ti-send"></i> ${t === DTE_MULTI ? 'Enviar y seguir' : 'Enviar'}`; }
     dteModal('No se pudo emitir', `<div class="dte-aviso-caja">${dteEsc(r.error || (r.ok ? 'GDExpress aceptó el documento pero no devolvió el folio.' : 'Error desconocido.'))}</div>
       ${/foliado/i.test(r.error || '') ? '<p style="font-size:13px">No es un error del documento: GDExpress tiene que habilitar en su sistema la asignación automática de folios (punto de foliado local) para el RUT de Bulfor. Hay que pedírselo a su soporte. No se emitió nada ni se usó ningún folio.</p>' : ''}
-      <p style="font-size:13px;color:var(--text-2)">El borrador sigue guardado: puedes corregirlo y volver a enviarlo.</p>
+      <p style="font-size:13px;color:var(--text-2)">${t === DTE_MULTI ? 'Lo cargado en esta factura sigue guardado' : 'El borrador sigue guardado'}: puedes corregirlo y volver a enviarlo.</p>
       ${r.respuesta ? `<pre class="dte-xml">${dteEsc(JSON.stringify(r.respuesta, null, 2))}</pre>` : ''}`);
     return;
   }
+  // Flujo múltiple: se anota el folio y se pasa directo a la siguiente OC,
+  // sin detenerse a imprimir (los PDF se imprimen todos al final).
+  if (t === DTE_MULTI) { dteMultiEmitida(r); return; }
   dteMostrarEmitido(t, r);
   // Emitido: el formulario parte de nuevo para no enviarlo dos veces,
   // y su borrador sale del listado.
@@ -1114,13 +1129,13 @@ function dteVistaPrevia(t) {
   const err = dteValidar(s);
   dteEstilosHoja();
   const xml = dteXml(s).replace(/></g, '>\n<');
-  dteModal(`Vista previa de la ${DTE_NOMBRES[t]}`, `
+  dteModal(`Vista previa de la ${DTE_NOMBRES[s.tipo]}`, `
     ${dteModoHtml()}
     ${err.length ? `<div class="dte-aviso-caja">Falta completar antes de enviar: ${dteEsc(err.join(', '))}.</div>` : ''}
     ${dteTabs('dtevp', [['det', 'Detalles del documento', dteDetallesHtml(s)], ['doc', 'Ver documento', `<div class="dte-papel">${dteHojaHtml(s, 0)}</div>`], ['xml', 'Ver XML', `<pre class="dte-xml">${dteEsc(xml)}</pre>`]])}`,
     `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(dteHojaHtml(dteEstado[${t}],0))"><i class="ti ti-printer"></i> Imprimir vista previa</button>
      <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cancelar</button>
-     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="dteEnviar(${t})"><i class="ti ti-send"></i> Enviar</button>`);
+     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="dteEnviar(${t})"><i class="ti ti-send"></i> ${t === DTE_MULTI ? 'Enviar y seguir' : 'Enviar'}</button>`);
 }
 
 // Documento ya emitido: se muestra e imprime el PDF de GDExpress tal cual
@@ -1189,4 +1204,437 @@ function dteImprimirPdf() {
   const f = document.querySelector('#dte-modal-overlay iframe.dte-pdf');
   try { f.contentWindow.focus(); f.contentWindow.print(); }
   catch (e) { window.open(u.pdfSrc, '_blank'); }   // si el visor no deja imprimir desde aquí, se abre en otra pestaña
+}
+
+
+// ═══ Facturación múltiple ═══════════════════════════════════════════════
+// Varias facturas para un mismo cliente, una por orden de compra:
+//  1) se elige el cliente (RUT) y se marcan sus OC; también se puede agregar
+//     una OC a mano (si no aparece en la lista) o una factura sin OC;
+//  2) se emiten una por una con el mismo formulario de Factura. "Saltar esta
+//     OC" la deja fuera sin guardar lo cargado. Al emitir se pasa directo a la
+//     siguiente, sin detenerse a imprimir;
+//  3) al final, la lista con los folios y sus PDF: Imprimir por cada una o
+//     "Imprimir todas" (se juntan en un solo PDF).
+// El avance se guarda en este navegador: si se cierra la pestaña o se corta
+// internet, al volver se ofrece continuar donde quedó.
+const DTE_MULTI = 330;          // clave del formulario del flujo (las facturas son tipo 33)
+const DTE_MULTI_CLAVE = 'bulfor_dte_multi';
+let dteMulti = null;            // { paso: 'elegir'|'emitir'|'fin', base, sel, buscar, facturas, actual }
+let dteMultiRetomado = false;   // en esta visita ya se eligió "Continuar"
+const dteMultiPdfs = {};        // folio → { src, bytes, url } (solo en memoria)
+let dteMultiEspera = null, dteMultiBuscando = false;
+
+const dteMultiNuevo = () => ({ paso: 'elegir', base: dteNuevo(33), sel: [], buscar: '', facturas: [], actual: 0 });
+function dteMultiGuardar() { try { localStorage.setItem(DTE_MULTI_CLAVE, JSON.stringify(dteMulti)); } catch (e) { /* sin almacenamiento */ } }
+function dteMultiCargar() { try { const x = localStorage.getItem(DTE_MULTI_CLAVE); return x ? JSON.parse(x) : null; } catch (e) { return null; } }
+const dteMultiEtiqueta = f => f.oc ? `OC ${f.oc}` : 'Factura sin OC';
+
+// El formulario que se ve (dteEstado[DTE_MULTI]) es el mismo objeto que se
+// guarda en el flujo: los datos del cliente al elegir, o la factura en curso.
+function dteMultiEnlazar() {
+  if (dteMulti.paso === 'elegir') dteEstado[DTE_MULTI] = dteMulti.base;
+  else if (dteMulti.paso === 'emitir') dteEstado[DTE_MULTI] = dteMulti.facturas[dteMulti.actual].form;
+}
+
+function dteMultiInit() {
+  if (!dteMulti) dteMulti = dteMultiCargar() || dteMultiNuevo();
+  dteMultiEnlazar();
+  dteMultiRender();
+  if (!dteModoServidor) dteCargarModo().then(() => dteMultiRender());
+  if (typeof cargarItemsFacturasVenta === 'function' && !dteCatalogo) {
+    cargarItemsFacturasVenta().then(() => { dteArmarCatalogo(); dteActualizarListaProductos(DTE_MULTI); }).catch(() => {});
+  }
+}
+
+function dteMultiRender() {
+  const cont = document.getElementById('dte-multi');
+  if (!cont || !dteMulti) return;
+  const m = dteMulti;
+  if (m.paso === 'emitir' && !dteMultiRetomado) { cont.innerHTML = dteMultiRetomarHtml(); return; }
+  if (m.paso === 'elegir') { cont.innerHTML = dteMultiElegirHtml(); dteAjustarTopes(); return; }
+  if (m.paso === 'emitir') {
+    cont.innerHTML = `${dteMultiProgresoHtml()}<div class="dte-form" id="dte-form-${DTE_MULTI}"></div>`;
+    dteRender(DTE_MULTI);
+    return;
+  }
+  cont.innerHTML = dteMultiFinHtml();
+  if (!dteMultiEspera && !dteMultiBuscando) dteMultiBuscarPdfs(0);
+}
+
+// ── Si el flujo quedó a medias (pestaña cerrada, corte de internet) ─────
+function dteMultiRetomarHtml() {
+  const m = dteMulti;
+  const faltan = m.facturas.filter(f => f.estado === 'pendiente').length;
+  const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
+  return `<div class="dte-card dte-mretomar">
+    <i class="ti ti-player-play"></i>
+    <div><h4>Continuar facturación múltiple de ${dteEsc(m.base.recep.rzn || m.base.rut)}</h4>
+      <p>Faltan <b>${faltan}</b> de ${m.facturas.length} facturas${emitidas ? ` · ${emitidas} ya emitida${emitidas === 1 ? '' : 's'}` : ''}. Lo que alcanzaste a cargar está guardado.</p></div>
+    <div class="dte-mretomar-btns">
+      <button class="dte-btn-principal" onclick="dteMultiContinuar()"><i class="ti ti-player-play"></i> Continuar</button>
+      <button class="dte-btn" onclick="dteMultiTerminar()">Descartar lo pendiente</button>
+    </div></div>`;
+}
+function dteMultiContinuar() { dteMultiRetomado = true; dteMultiRender(); }
+
+// ── Paso 1: cliente y órdenes de compra ─────────────────────────────────
+function dteMultiFoliosDeOC(cod) {
+  const c = String(cod || '').trim().toUpperCase();
+  return (typeof documentosGdexpress !== 'undefined' ? documentosGdexpress : [])
+    .filter(d => String(d.tipo_dte) === '33' && String(d.orden_compra_ref || '').trim().toUpperCase() === c).map(d => d.folio);
+}
+
+function dteMultiElegirHtml() {
+  const m = dteMulti, s = m.base, t = DTE_MULTI;
+  const conocido = dteListaClientes().find(c => c.rut === s.rut);
+  const rutOk = dteRutValido(s.rut);
+  const cliente = `
+    <div class="dte-grid dte-grid-cli">
+      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
+        <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
+      ${dteCampo('Razón social', dteInput(t, 'recep.rzn', s.recep.rzn), true, 2)}
+      ${dteCampo('Giro', dteInput(t, 'recep.giro', s.recep.giro, 'maxlength="40"'), true)}
+      ${dteCampo('Dirección', dteInput(t, 'recep.dir', s.recep.dir), true, 2)}
+      ${dteCampo('Comuna', dteInput(t, 'recep.cmna', s.recep.cmna), true)}
+      ${dteCampo('Ciudad', dteInput(t, 'recep.ciudad', s.recep.ciudad), false)}
+    </div>
+    ${rutOk && (s.recep.rzn || conocido) ? `<div class="dte-cliente-ok"><span class="ti ti-building-hospital"></span> <b>${dteEsc(s.recep.rzn || conocido?.nombre || '')}</b></div>` : ''}
+    ${s.recepInfo ? `<div class="dte-info">${dteEsc(s.recepInfo)}</div>` : ''}`;
+  const ocs = rutOk ? `
+    <div class="dte-mbuscar"><i class="ti ti-search"></i><input type="text" class="dte-in" id="dte-multi-buscar" autocomplete="off" placeholder="Buscar OC por número o nombre" value="${dteAttr(m.buscar)}" oninput="dteMultiBuscar(this.value)" onkeydown="if(event.key==='Enter')dteMultiAgregarManual()"></div>
+    <div id="dte-multi-ocs">${dteMultiOcsHtml()}</div>
+    <button class="dte-agregar" onclick="dteMultiAgregarSinOC()"><i class="ti ti-plus"></i> Agregar factura sin OC</button>`
+    : '<div class="dte-info">Primero elige el cliente para ver sus órdenes de compra.</div>';
+  const n = m.sel.length;
+  const elegidas = m.sel.map((x, i) => `<div class="dte-msel"><span><b>${i + 1}.</b> ${dteEsc(dteMultiEtiqueta(x))}${x.manual ? ' <small>(a mano)</small>' : ''}</span><button class="dte-icono dte-icono-rojo" title="Quitar" onclick="dteMultiQuitar(${i})"><i class="ti ti-x"></i></button></div>`).join('');
+  return `<div class="dte-layout">
+      <div class="dte-main">
+        ${dteSeccion(t, 1, 'mcli', 'Cliente', rutOk && !!s.recep.rzn.trim(), cliente, 'Se usa en todas las facturas')}
+        ${dteSeccion(t, 2, 'mocs', 'Órdenes de compra', n > 0, ocs, 'Marca las que vas a facturar: una factura por OC')}
+      </div>
+      <aside class="dte-aside">
+        <div class="dte-card dte-totales">
+          <div class="dte-tot-tit">Facturas a emitir</div>
+          <div class="dte-msel-lista" id="dte-multi-sel">${elegidas || '<small class="dte-sub">Aún no eliges ninguna.</small>'}</div>
+          <div class="dte-total"><span>Vas a hacer</span><b>${n} factura${n === 1 ? '' : 's'}</b></div>
+          <button class="dte-btn-principal" onclick="dteMultiComenzar()" ${n && rutOk ? '' : 'disabled'}><i class="ti ti-player-play"></i> Comenzar</button>
+          ${n ? '<button class="dte-btn dte-btn-suave" onclick="dteMultiLimpiarSel()"><i class="ti ti-eraser"></i> Quitar todas</button>' : ''}
+          <small class="dte-sub">Después cargas los productos de cada factura y la emites; al final imprimes todas juntas.</small>
+        </div>
+      </aside>
+    </div>`;
+}
+
+function dteMultiOcsHtml() {
+  const m = dteMulti;
+  const ocs = dteOcsDelRut(m.base.rut);
+  const q = m.buscar.trim();
+  const lista = q ? ocs.filter(o => coincideBusqueda(`${o.codigooc} ${o.nombreoc || ''}`, q)) : ocs;
+  const exacta = ocs.some(o => String(o.codigooc).toUpperCase() === q.toUpperCase()) || m.sel.some(x => (x.oc || '').toUpperCase() === q.toUpperCase());
+  const manual = q && !exacta ? `<button class="dte-agregar dte-mmanual" onclick="dteMultiAgregarManual()"><i class="ti ti-plus"></i> Agregar “${dteEsc(q)}” como OC a mano</button>` : '';
+  if (!lista.length) return `<div class="dte-info">${ocs.length ? 'Ninguna OC de este cliente coincide con la búsqueda.' : 'Este cliente no tiene órdenes de compra en el programa.'}</div>${manual}`;
+  const MAX = 60;
+  const filas = lista.slice(0, MAX).map(o => {
+    const marcada = m.sel.some(x => x.oc === o.codigooc);
+    const folios = dteMultiFoliosDeOC(o.codigooc);
+    return `<tr class="dte-borr-fila${marcada ? ' dte-msel-fila' : ''}" onclick="dteMultiMarcar('${dteAttr(o.codigooc)}')">
+      <td><input type="checkbox" ${marcada ? 'checked' : ''} tabindex="-1"></td>
+      <td><b>${dteEsc(o.codigooc)}</b></td>
+      <td>${dteDmy(dteFechaCL(o.fechaoc))}</td>
+      <td style="text-align:right">${dteClp(o.totaloc)}</td>
+      <td class="dte-borr-rzn">${dteEsc(o.nombreoc || '')}</td>
+      <td>${folios.length ? `<span class="dte-mfact">Facturada N° ${dteEsc(folios.join(', '))}</span>` : `<small class="dte-sub">${dteEsc(o.estadooc || '')}</small>`}</td></tr>`;
+  }).join('');
+  return `${manual}<div class="dte-borr-tabla dte-mtabla"><table>
+      <thead><tr><th></th><th>OC</th><th>Fecha</th><th style="text-align:right">Total</th><th>Nombre</th><th>Estado</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    ${lista.length > MAX ? `<div class="dte-info">Se muestran las ${MAX} más recientes de ${lista.length}: usa el buscador para encontrar otras.</div>` : ''}`;
+}
+
+function dteMultiBuscar(v) {
+  dteMulti.buscar = v;
+  dteMultiGuardar();
+  const c = document.getElementById('dte-multi-ocs');
+  if (c) c.innerHTML = dteMultiOcsHtml();
+}
+function dteMultiCambioSel() { dteMultiGuardar(); dteMultiRender(); }
+function dteMultiMarcar(cod) {
+  const m = dteMulti;
+  const i = m.sel.findIndex(x => x.oc === cod);
+  if (i >= 0) m.sel.splice(i, 1);
+  else {
+    const o = dteOcsDelRut(m.base.rut).find(o => o.codigooc === cod);
+    const folios = dteMultiFoliosDeOC(cod);
+    if (folios.length && !confirm(`La OC ${cod} ya tiene la factura N° ${folios.join(', ')}. ¿Agregarla igual?`)) return;
+    m.sel.push({ oc: cod, fecha: o ? dteFechaCL(o.fechaoc) : '' });
+  }
+  dteMultiCambioSel();
+}
+function dteMultiAgregarManual() {
+  const m = dteMulti;
+  const q = m.buscar.trim().toUpperCase();
+  if (!q) return;
+  const o = dteOcsDelRut(m.base.rut).find(o => String(o.codigooc).toUpperCase() === q);
+  if (o) { if (!m.sel.some(x => x.oc === o.codigooc)) dteMultiMarcar(o.codigooc); return; }
+  if (m.sel.some(x => (x.oc || '').toUpperCase() === q)) return;
+  m.sel.push({ oc: q, fecha: '', manual: true });
+  m.buscar = '';
+  dteMultiCambioSel();
+  document.getElementById('dte-multi-buscar')?.focus();
+}
+function dteMultiAgregarSinOC() { dteMulti.sel.push({ oc: '', fecha: '' }); dteMultiCambioSel(); }
+function dteMultiQuitar(i) { dteMulti.sel.splice(i, 1); dteMultiCambioSel(); }
+function dteMultiLimpiarSel() { if (confirm('¿Quitar todas las facturas de la lista?')) { dteMulti.sel = []; dteMultiCambioSel(); } }
+
+// Formulario de una factura del flujo: los datos del cliente y la OC; los
+// productos parten vacíos (se eligen de la lista de esa OC, como en Factura).
+function dteMultiFormDe(x) {
+  const form = JSON.parse(JSON.stringify(dteMulti.base));
+  form.det = [dteDetNuevo()];
+  form.refs = x.oc ? [{ ...dteRefNueva(), folio: x.oc, fecha: x.fecha || '' }] : [];
+  delete form.borradorId;
+  return form;
+}
+
+function dteMultiComenzar() {
+  const m = dteMulti;
+  if (!dteRutValido(m.base.rut)) { toast('Primero elige el cliente.', 'err'); return; }
+  if (!m.sel.length) { toast('Marca al menos una OC, o agrega una factura sin OC.', 'err'); return; }
+  m.facturas = m.sel.map(x => ({ oc: x.oc, fecha: x.fecha, manual: !!x.manual, estado: 'pendiente', folio: null, ambiente: '', total: 0, form: dteMultiFormDe(x) }));
+  m.paso = 'emitir';
+  m.actual = 0;
+  dteMultiRetomado = true;
+  dteMultiEnlazar();
+  dteMultiGuardar();
+  dteMultiRender();
+  window.scrollTo(0, 0);
+}
+
+// ── Paso 2: una por una ─────────────────────────────────────────────────
+function dteMultiProgresoHtml() {
+  const m = dteMulti;
+  const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
+  const chips = m.facturas.map((f, i) => {
+    const actual = i === m.actual;
+    const cls = f.estado === 'emitida' ? ' ok' : f.estado === 'saltada' ? ' salt' : actual ? ' act' : '';
+    const det = f.estado === 'emitida' ? `N° ${dteEsc(f.folio)}` : f.estado === 'saltada' ? 'Saltada' : actual ? 'En curso' : 'Pendiente';
+    const accion = f.estado === 'pendiente' && !actual ? `onclick="dteMultiIr(${i})" title="Ir a esta factura"`
+      : f.estado === 'saltada' ? `onclick="dteMultiRecuperar(${i})" title="Volver a incluirla"` : 'disabled';
+    return `<button class="dte-mchip${cls}" ${accion}><b>${f.estado === 'emitida' ? '✓' : i + 1}</b><span>${dteEsc(f.oc ? 'OC ' + f.oc : 'Sin OC')}</span><small>${det}</small></button>`;
+  }).join('');
+  return `<div class="dte-card dte-mprog">
+    <div class="dte-mprog-tit"><span><b>${dteEsc(m.base.recep.rzn || m.base.rut)}</b> · Factura ${m.actual + 1} de ${m.facturas.length}</span><small>${emitidas} emitida${emitidas === 1 ? '' : 's'}</small></div>
+    <div class="dte-mchips">${chips}</div></div>`;
+}
+
+function dteMultiBotonesAside() {
+  const f = dteMulti && dteMulti.facturas[dteMulti.actual];
+  if (!f) return '';
+  return `<button class="dte-btn" onclick="dteMultiSaltar()"><i class="ti ti-player-skip-forward"></i> Saltar esta ${f.oc ? 'OC' : 'factura'}</button>
+    <button class="dte-btn dte-btn-suave" onclick="dteMultiTerminar()"><i class="ti ti-x"></i> Terminar facturación múltiple</button>`;
+}
+
+function dteMultiPuedeEnviar() {
+  const m = dteMulti;
+  return !!(m && m.paso === 'emitir' && m.facturas[m.actual] && m.facturas[m.actual].estado === 'pendiente');
+}
+
+function dteMultiIr(i) {
+  dteMulti.actual = i;
+  dteMultiEnlazar();
+  dteMultiGuardar();
+  dteMultiRender();
+  window.scrollTo(0, 0);
+}
+function dteMultiRecuperar(i) {
+  const f = dteMulti.facturas[i];
+  if (!confirm(`¿Volver a incluir ${dteMultiEtiqueta(f)}?`)) return;
+  f.estado = 'pendiente';
+  f.form = dteMultiFormDe(f);
+  dteMultiIr(i);
+}
+
+// Pasa a la siguiente pendiente (en orden, y si no, desde el principio);
+// si ya no quedan, va a la pantalla final.
+function dteMultiSiguiente() {
+  const m = dteMulti;
+  const n = m.facturas.length;
+  let sig = -1;
+  for (let k = 1; k <= n; k++) { const i = (m.actual + k) % n; if (m.facturas[i].estado === 'pendiente') { sig = i; break; } }
+  if (sig === -1) m.paso = 'fin';
+  else m.actual = sig;
+  dteMultiEnlazar();
+  dteMultiGuardar();
+  dteMultiRender();
+  window.scrollTo(0, 0);
+}
+
+function dteMultiSaltar() {
+  const f = dteMulti.facturas[dteMulti.actual];
+  if (!confirm(`¿Saltar ${dteMultiEtiqueta(f)}? Lo que cargaste en esta factura no se guarda.`)) return;
+  f.estado = 'saltada';
+  f.form = dteMultiFormDe(f);
+  dteMultiSiguiente();
+}
+
+function dteMultiEmitida(r) {
+  const m = dteMulti;
+  const f = m.facturas[m.actual];
+  f.estado = 'emitida';
+  f.folio = r.folio;
+  f.ambiente = r.ambiente || '';
+  f.total = dteTotales(f.form).total;
+  dteMultiGuardarPdf(f.folio, r);
+  // Si los datos del cliente se completaron o corrigieron en esta factura,
+  // pasan a las que faltan (que todavía no los tienen).
+  const s = f.form;
+  m.base.rut = s.rut;
+  m.base.recep = { ...s.recep };
+  m.facturas.forEach(p => { if (p.estado === 'pendiente' && !p.form.recep.rzn.trim()) { p.form.rut = s.rut; p.form.recep = { ...s.recep }; } });
+  document.getElementById('dte-modal-overlay')?.remove();
+  toast(`Factura N° ${r.folio} emitida${r.ambiente === 'T' ? ' (prueba, no es real)' : ''}.`);
+  dteMultiSiguiente();
+}
+
+// Sale del flujo. Si ya hay facturas emitidas, las pendientes quedan como
+// saltadas y se va a la pantalla final para imprimir lo emitido.
+function dteMultiTerminar() {
+  const m = dteMulti;
+  const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
+  const pendientes = m.facturas.filter(f => f.estado === 'pendiente').length;
+  if (pendientes && !confirm(`Quedan ${pendientes} factura${pendientes === 1 ? '' : 's'} sin emitir, que no se guardarán. ¿Terminar igual?`)) return;
+  dteMultiRetomado = true;
+  if (emitidas) {
+    m.facturas.forEach(f => { if (f.estado === 'pendiente') { f.estado = 'saltada'; f.form = dteMultiFormDe(f); } });
+    m.paso = 'fin';
+  } else {
+    dteMulti = dteMultiNuevo();
+  }
+  dteMultiEnlazar();
+  dteMultiGuardar();
+  dteMultiRender();
+  window.scrollTo(0, 0);
+}
+
+// ── Paso 3: lista final para imprimir ───────────────────────────────────
+function dteMultiGuardarPdf(folio, r) {
+  if (!r || (!r.pdfBase64 && !r.pdfUrl)) return false;
+  const p = dteMultiPdfs[folio] || (dteMultiPdfs[folio] = {});
+  if (r.pdfBase64 && !p.src) {
+    p.bytes = Uint8Array.from(atob(r.pdfBase64), c => c.charCodeAt(0));
+    p.src = URL.createObjectURL(new Blob([p.bytes], { type: 'application/pdf' }));
+  }
+  if (r.pdfUrl) p.url = r.pdfUrl;
+  return !!p.src;
+}
+
+function dteMultiFinHtml() {
+  const m = dteMulti;
+  const emitidas = m.facturas.filter(f => f.estado === 'emitida');
+  const saltadas = m.facturas.length - emitidas.length;
+  const listas = emitidas.filter(f => dteMultiPdfs[f.folio]?.src).length;
+  const filas = m.facturas.map((f, i) => {
+    const p = dteMultiPdfs[f.folio] || {};
+    let pdf = '', accion = '';
+    if (f.estado !== 'emitida') pdf = '<small class="dte-sub">Saltada: no se emitió</small>';
+    else if (p.src) { pdf = '<span class="dte-mfact">Listo</span>'; accion = `<button class="dte-btn" onclick="dteMultiImprimir('${dteAttr(f.folio)}')"><i class="ti ti-printer"></i> Imprimir</button>`; }
+    else if (p.url) { pdf = '<span class="dte-mfact">En GDExpress</span>'; accion = `<a class="dte-btn" href="${dteAttr(p.url)}" target="_blank" rel="noopener"><i class="ti ti-file-type-pdf"></i> Abrir</a>`; }
+    else pdf = '<span class="dte-mprep"><span class="spinner"></span> Preparando PDF…</span>';
+    return `<tr${f.estado !== 'emitida' ? ' class="dte-msalt"' : ''}><td>${i + 1}</td><td>${dteEsc(f.oc || 'Sin OC')}</td>
+      <td>${f.estado === 'emitida' ? `<b>N° ${dteEsc(f.folio)}</b>${f.ambiente === 'T' ? ' <small class="dte-sub">(prueba)</small>' : ''}` : '—'}</td>
+      <td style="text-align:right">${f.estado === 'emitida' ? dteClp(f.total) : ''}</td><td>${pdf}</td><td class="dte-borr-acc">${accion}</td></tr>`;
+  }).join('');
+  return `<div class="dte-card">
+    <div class="dte-ok"><i class="ti ti-circle-check"></i> ${emitidas.length} factura${emitidas.length === 1 ? '' : 's'} emitida${emitidas.length === 1 ? '' : 's'} para ${dteEsc(m.base.recep.rzn || m.base.rut)}${saltadas ? ` · ${saltadas} saltada${saltadas === 1 ? '' : 's'}` : ''}.</div>
+    <div class="dte-borr-barra">
+      <small class="dte-sub"><i class="ti ti-info-circle"></i> GDExpress tarda unos minutos en publicar cada PDF: los que están “Preparando” se activan solos.</small>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="dte-btn" onclick="dteMultiBuscarAhora()"><i class="ti ti-refresh"></i> Buscar PDF ahora</button>
+        <button class="dte-btn-principal" style="width:auto;padding:0 16px;margin:0" onclick="dteMultiImprimirTodas()" ${listas ? '' : 'disabled'}><i class="ti ti-printer"></i> Imprimir todas${listas ? ` (${listas})` : ''}</button>
+        <button class="dte-btn" onclick="dteMultiFinalizar()"><i class="ti ti-check"></i> Terminar</button>
+      </div>
+    </div>
+    <div class="dte-borr-tabla dte-mfin"><table>
+      <thead><tr><th>#</th><th>OC</th><th>Folio</th><th style="text-align:right">Total</th><th>PDF</th><th></th></tr></thead>
+      <tbody>${filas}</tbody></table></div></div>`;
+}
+
+// Pide a GDExpress los PDF que faltan, cada 20 segundos (hasta 10 minutos).
+async function dteMultiBuscarPdfs(intento) {
+  clearTimeout(dteMultiEspera);
+  dteMultiEspera = null;
+  const m = dteMulti;
+  if (!m || m.paso !== 'fin' || dteMultiBuscando) return;
+  const faltan = m.facturas.filter(f => f.estado === 'emitida' && !dteMultiPdfs[f.folio]?.src);
+  if (!faltan.length) return;
+  dteMultiBuscando = true;
+  for (const f of faltan) {
+    try { dteMultiGuardarPdf(f.folio, await dteFuncion({ accion: 'pdf', tipo: 33, folio: f.folio, ambiente: f.ambiente })); } catch (e) { /* se reintenta */ }
+  }
+  dteMultiBuscando = false;
+  if (dteMulti !== m || m.paso !== 'fin') return;
+  const cont = document.getElementById('dte-multi');
+  if (cont) cont.innerHTML = dteMultiFinHtml();
+  if (intento < 30 && m.facturas.some(f => f.estado === 'emitida' && !dteMultiPdfs[f.folio]?.src)) dteMultiEspera = setTimeout(() => dteMultiBuscarPdfs(intento + 1), 20000);
+}
+function dteMultiBuscarAhora() { if (!dteMultiBuscando) dteMultiBuscarPdfs(0); }
+
+// Imprime un PDF en un iframe aparte (sin el resto de la app).
+function dteImprimirPdfSrc(src) {
+  document.querySelectorAll('iframe.dte-print-pdf').forEach(f => f.remove());
+  const f = document.createElement('iframe');
+  f.className = 'dte-print-pdf';
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(src, '_blank'); } };
+  f.src = src;
+  document.body.appendChild(f);
+}
+function dteMultiImprimir(folio) { const p = dteMultiPdfs[folio]; if (p && p.src) dteImprimirPdfSrc(p.src); }
+
+// "Imprimir todas": junta los PDF listos en uno solo (con pdf-lib, que se
+// carga solo la primera vez) y lo manda a imprimir de una vez.
+let dtePdfLib = null;
+function dteCargarPdfLib() {
+  if (window.PDFLib) return Promise.resolve();
+  const fuentes = ['https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js', 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'];
+  const cargar = i => new Promise((ok, mal) => {
+    const sc = document.createElement('script');
+    sc.src = fuentes[i];
+    sc.onload = ok;
+    sc.onerror = () => (i + 1 < fuentes.length ? cargar(i + 1).then(ok, mal) : mal(new Error('no se pudo cargar la herramienta para juntar los PDF')));
+    document.head.appendChild(sc);
+  });
+  if (!dtePdfLib) dtePdfLib = cargar(0).catch(e => { dtePdfLib = null; throw e; });
+  return dtePdfLib;
+}
+async function dteMultiImprimirTodas() {
+  const emitidas = dteMulti.facturas.filter(f => f.estado === 'emitida');
+  const listas = emitidas.filter(f => dteMultiPdfs[f.folio]?.bytes);
+  if (!listas.length) return;
+  const faltan = emitidas.length - listas.length;
+  if (faltan && !confirm(`${faltan} factura${faltan === 1 ? '' : 's'} todavía no tiene${faltan === 1 ? '' : 'n'} su PDF listo. ¿Imprimir igual las ${listas.length} que ya están?`)) return;
+  if (listas.length === 1) { dteMultiImprimir(listas[0].folio); return; }
+  try {
+    await dteCargarPdfLib();
+    const junto = await PDFLib.PDFDocument.create();
+    for (const f of listas) {
+      const doc = await PDFLib.PDFDocument.load(dteMultiPdfs[f.folio].bytes);
+      (await junto.copyPages(doc, doc.getPageIndices())).forEach(pg => junto.addPage(pg));
+    }
+    const bytes = await junto.save();
+    dteImprimirPdfSrc(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })));
+  } catch (e) {
+    toast('No se pudieron juntar los PDF (' + e.message + '). Imprímelos uno por uno.', 'err');
+  }
+}
+
+function dteMultiFinalizar() {
+  if (!confirm('¿Terminar? Las facturas ya quedaron emitidas; después puedes ver sus PDF en Facturas → Documentos.')) return;
+  clearTimeout(dteMultiEspera);
+  dteMultiEspera = null;
+  dteMulti = dteMultiNuevo();
+  dteMultiEnlazar();
+  dteMultiGuardar();
+  dteMultiRender();
 }
