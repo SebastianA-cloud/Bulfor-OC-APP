@@ -3458,6 +3458,16 @@ function cargarItemsFacturasVenta() {
   return cargaItemsFacturasPromesa;
 }
 
+// Nombre de grupo de un producto vendido (lo arma cargarItemsFacturasVentaUnaVez).
+// Todo lo que filtra ventas "por producto" compara con este nombre, así el
+// detalle, el historial y Por cliente muestran todas las variantes juntas.
+let grupoProductosVenta = new Map();
+function productoVentaDe(nombreFactura) {
+  const n = (nombreFactura || 'Sin nombre').trim();
+  const g = grupoProductosVenta.get(n);
+  return g ? g.nombre : n;
+}
+
 async function cargarItemsFacturasVentaUnaVez() {
   if (facturaItemsCargados) return;
   const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
@@ -3469,12 +3479,19 @@ async function cargarItemsFacturasVentaUnaVez() {
   // viene NETO (cantidad × precio_unitario = monto_item, y la suma de los
   // monto_item es el neto del documento), así que se muestra tal cual, sin
   // descontarle IVA.
+  // Los nombres parecidos de un mismo producto ("A. CITRICO 20% BIDON 5LT",
+  // "A CITRICO 20%, 5LT"…) se juntan en uno, con la misma regla que la ficha
+  // de hospital (ver agruparNombresProducto y productoVentaDe).
+  const pesos = new Map();
+  facturaItemsRaw.forEach(it => { const n = (it.nombre_producto || 'Sin nombre').trim(); pesos.set(n, (pesos.get(n) || 0) + 1); });
+  grupoProductosVenta = agruparNombresProducto(pesos).grupoDe;
   const map = new Map();
   facturaItemsRaw.forEach(it => {
-    const key = (it.nombre_producto || 'Sin nombre').trim();
-    if (!map.has(key)) map.set(key, { nombre: key, docs: new Set(), totalFacturado: 0,
+    const key = productoVentaDe(it.nombre_producto);
+    if (!map.has(key)) map.set(key, { nombre: key, docs: new Set(), totalFacturado: 0, alias: new Set(),
       precioMin: null, precioMax: null, ultimoPrecio: null, ultimaFecha: null, ultimaUnidad: null });
     const entry = map.get(key);
+    entry.alias.add((it.nombre_producto || 'Sin nombre').trim());   // nombres que se juntaron aquí
     entry.docs.add(it.documento_id);
     entry.totalFacturado += Number(it.monto_item || 0);
     const pr = Number(it.precio_unitario);
@@ -3513,7 +3530,8 @@ async function cargarProductosFacturas() {
 
 function filterFacturaItems() {
   const q = document.getElementById('fp-items-search').value;
-  facturaProductosUnicosF = facturaProductosUnicos.filter(p => coincideBusqueda(p.nombre, q));
+  // Busca también en los nombres que se juntaron en cada producto.
+  facturaProductosUnicosF = facturaProductosUnicos.filter(p => coincideBusqueda(`${p.nombre} ${p.alias ? [...p.alias].join(' ') : ''}`, q));
   facturaItemsPage = 1;
   renderFacturaItems();
 }
@@ -3543,7 +3561,7 @@ function renderFacturaItems() {
   const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td>`;
   renderTablaAlfabetica('fp-items-body', 'fp-items-jump', facturaProductosUnicosF, p => p.nombre,
     (p, idx) => `<tr onclick="navReset();openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx}].nombre)" style="cursor:pointer">
-      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
@@ -3569,7 +3587,7 @@ function botonNavProductoFacturaHtml(nombreActual) {
 
 function openProductoFacturaDetail(nombreProducto) {
   cerrarTodosLosModales();
-  const ventas = facturaItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
+  const ventas = facturaItemsRaw.filter(it => productoVentaDe(it.nombre_producto) === nombreProducto);
   if (!ventas.length) return;
 
   const totalFacturado = ventas.reduce((s, v) => s + Number(v.monto_item || 0), 0);
@@ -3702,7 +3720,7 @@ function construirClientesFacturados() {
     }
     const e = porCliente.get(nombre);
     if (!e.rut && doc.rut_hospital) e.rut = doc.rut_hospital;
-    e.productos.add((it.nombre_producto || 'Sin nombre').trim());
+    e.productos.add(productoVentaDe(it.nombre_producto));
     e.facturas.add(doc.id);
     e.total += Number(it.monto_item || 0);
   });
@@ -3803,7 +3821,7 @@ function productosDeCliente(clienteNombre) {
     const doc = docPorId(it.documento_id);
     if (!doc) return;
     if ((nombreHosp(doc.hospital) || doc.hospital || 'Sin cliente') !== clienteNombre) return;
-    const key = (it.nombre_producto || 'Sin nombre').trim();
+    const key = productoVentaDe(it.nombre_producto);
     if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, total: 0, ultima: null });
     const e = map.get(key);
     e.facturas += 1;
@@ -3871,7 +3889,7 @@ function openClienteFacturaDetailDebounce(valor) {
 function abrirHistorialVentaProducto(nombreProducto, clienteNombre) {
   cerrarTodosLosModales();
   const ventas = facturaItemsRaw
-    .filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto)
+    .filter(it => productoVentaDe(it.nombre_producto) === nombreProducto)
     .map(it => {
       const doc = docPorId(it.documento_id);
       return doc ? { doc, item: it } : null;
@@ -4064,13 +4082,13 @@ async function cargarEquivalenciasCosto() {
 }
 
 function equivalenciaGuardada(nombreVenta, nombreProveedor) {
-  return equivalenciasCosto.find(e => e.producto_venta === nombreVenta && e.producto_proveedor === nombreProveedor);
+  return equivalenciasCosto.find(e => productoVentaDe(e.producto_venta) === productoVentaDe(nombreVenta) && e.producto_proveedor === nombreProveedor);
 }
 
 function destacadosDe(nombreVenta) {
   const mapa = mapaProductosProveedor();
   return equivalenciasCosto
-    .filter(e => e.producto_venta === nombreVenta)
+    .filter(e => productoVentaDe(e.producto_venta) === productoVentaDe(nombreVenta))
     .map(e => mapa.get(e.producto_proveedor) || { nombre: e.producto_proveedor, compras: 0, ultima: null, ultimoPrecio: null, ultimaUnidad: null, proveedor: null })
     .sort((a, b) => (b.ultima || '').localeCompare(a.ultima || ''));
 }
@@ -4327,7 +4345,7 @@ function renderFacturaProvItems() {
   const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos de facturas de proveedor.'}</p></div></td>`;
   renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', facturaProvProductosUnicosF, p => p.nombre,
     (p, idx) => `<tr onclick="navReset();openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx}].nombre)" style="cursor:pointer">
-      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗</td>
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
     </tr>`, 3, mensajeVacio);
@@ -11768,50 +11786,97 @@ function hospNombreCorto(nombre) {
   return t.replace(/[\s,.;:-]+$/, '').trim() || String(nombre || '').trim();
 }
 
+// Junta nombres de producto que son el mismo producto escrito distinto. La
+// usan la ficha de hospital y Precios, para que agrupen con la misma regla:
+//  * se comparan las palabras importantes (sin relleno, ver hospPalabrasProducto)
+//    y basta que casi todas las del nombre más corto estén en el otro;
+//  * la medida o dosis tiene que ser la misma (25 mg no se junta con 50 mg);
+//  * un nombre al que le falta una medida ("Á. cítrico bidón 5 L", sin el 20%)
+//    se suma a otro que sí la tiene solo si hay uno solo posible;
+//  * dos nombres unificados distintos nunca se juntan.
+// pesos: Map nombre -> cuántas veces aparece. unificadoDe(nombre) dice si ese
+// nombre es un nombre unificado (manda como nombre del grupo).
+// Devuelve { grupos: [{ nombre, nombres: {nombre: veces} }], grupoDe: Map nombre -> grupo }.
+function agruparNombresProducto(pesos, unificadoDe) {
+  const esUnif = n => (unificadoDe ? unificadoDe(n) : null);
+  const lista = [...pesos.keys()].sort((a, b) => (esUnif(b) ? 1 : 0) - (esUnif(a) ? 1 : 0) || pesos.get(b) - pesos.get(a));
+  const parecido = (A, B) => {
+    if (!A.size || !B.size) return 0;
+    const comunes = [...A].filter(w => B.has(w)).length;
+    return comunes ? comunes / Math.min(A.size, B.size) : 0;
+  };
+  const grupos = [];
+  lista.forEach(n => {
+    const unificado = esUnif(n);
+    const palabras = hospPalabrasProducto(n);
+    const medidasSet = [...palabras].filter(w => /\d/.test(w)).sort();
+    const medidas = medidasSet.join(' ');
+    let g = unificado ? grupos.find(x => x.unificado === unificado) : null;
+    if (!g && palabras.size) {
+      let mejor = 0;
+      grupos.forEach(x => {
+        if (unificado && x.unificado !== unificado) return;
+        if (x.medidas !== medidas) return;
+        const p = parecido(palabras, x.palabras);
+        if (p >= 0.8 && p > mejor) { mejor = p; g = x; }
+      });
+    }
+    if (!g) {
+      g = { unificado: unificado || null, palabras, medidas, medidasSet,
+            sinMedidas: new Set([...palabras].filter(w => !/\d/.test(w))), nombres: {} };
+      grupos.push(g);
+    }
+    g.nombres[n] = (g.nombres[n] || 0) + pesos.get(n);
+  });
+  // Segunda vuelta: un grupo al que le falta alguna medida se suma al único
+  // grupo compatible que la tiene completa (si hay dos posibles, no se adivina).
+  grupos.slice().sort((a, b) => a.medidasSet.length - b.medidasSet.length).forEach(g => {
+    if (g.unificado || g.absorbido) return;
+    const posibles = grupos.filter(h => h !== g && !h.absorbido && h.medidasSet.length > g.medidasSet.length
+      && g.medidasSet.every(m => h.medidasSet.includes(m)) && parecido(g.sinMedidas, h.sinMedidas) >= 0.8);
+    if (posibles.length !== 1) return;
+    const h = posibles[0];
+    Object.entries(g.nombres).forEach(([n, v]) => { h.nombres[n] = (h.nombres[n] || 0) + v; });
+    g.absorbido = true;
+  });
+  const finales = grupos.filter(g => !g.absorbido);
+  const grupoDe = new Map();
+  finales.forEach(g => {
+    // Nombre del grupo: el unificado, o el que más se repite (si empatan, el más corto).
+    g.nombre = g.unificado || hospNombreCorto(Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0]);
+    g.variantes = Object.keys(g.nombres).length;
+    Object.keys(g.nombres).forEach(n => grupoDe.set(n, g));
+  });
+  return { grupos: finales, grupoDe };
+}
+
 function hospAgruparProductos(ocsHospital) {
   const codigos = new Set(ocsHospital.map(r => r.codigooc));
   const fechaOC = {};
   ocsHospital.forEach(r => { fechaOC[r.codigooc] = String(r.fechaenvio || r.fechaoc || '').slice(0, 10); });
-  const grupos = [];
-  // Primero los productos con nombre unificado, para que los demás puedan
-  // juntarse con ellos aunque aparezcan antes en la lista.
-  const lineas = items.filter(it => codigos.has(it.codigooc))
-    .sort((a, b) => (diccionarioNormalizacion[textoOriginalDe(b)] ? 1 : 0) - (diccionarioNormalizacion[textoOriginalDe(a)] ? 1 : 0));
+  // Nombre de cada línea: el unificado si existe; si no, el de la OC (Esp. Proveedor).
+  const lineas = items.filter(it => codigos.has(it.codigooc));
+  const unificados = new Set();
+  const nombreDe = it => {
+    const u = diccionarioNormalizacion[textoOriginalDe(it)];
+    if (u) unificados.add(u);
+    return u || ocNombreProducto(it);
+  };
+  const pesos = new Map();
+  lineas.forEach(it => { const n = nombreDe(it); pesos.set(n, (pesos.get(n) || 0) + 1); });
+  const { grupos, grupoDe } = agruparNombresProducto(pesos, n => (unificados.has(n) ? n : null));
+  grupos.forEach(g => { g.ocs = new Set(); g.precios = {}; g.cantidad = 0; });
   lineas.forEach(it => {
-    const original = textoOriginalDe(it);
-    const unificado = diccionarioNormalizacion[original];
-    const nombre = unificado || ocNombreProducto(it);
-    const palabras = hospPalabrasProducto(nombre);   // de un unificado, sus palabras salen del nombre unificado
-    const medidas = [...palabras].filter(w => /\d/.test(w)).sort().join(' ');
-    let g = null;
-    if (unificado) g = grupos.find(x => x.unificado === unificado);
-    if (!g && palabras.size) {
-      let mejor = 0;
-      grupos.forEach(x => {
-        // Dos nombres unificados distintos nunca se juntan; uno sin unificar sí
-        // puede sumarse a un grupo unificado si se parece.
-        if (unificado && x.unificado !== unificado) return;
-        // La dosis o medida tiene que ser la misma (25 mg no se junta con 50 mg,
-        // ni con uno que no dice dosis).
-        if (x.medidas !== medidas) return;
-        const comunes = [...palabras].filter(w => x.palabras.has(w)).length;
-        const parecido = comunes / Math.min(palabras.size, x.palabras.size);
-        if (comunes >= 1 && parecido >= 0.8 && parecido > mejor) { mejor = parecido; g = x; }
-      });
-    }
-    if (!g) { g = { unificado: unificado || null, palabras, medidas, nombres: {}, ocs: new Set(), cantidad: 0, precios: {} }; grupos.push(g); }
-    g.nombres[nombre] = (g.nombres[nombre] || 0) + 1;
+    const g = grupoDe.get(nombreDe(it));
+    if (!g) return;
     g.ocs.add(it.codigooc);
     // Precio unitario (neto) de este producto en cada OC.
     (g.precios[it.codigooc] = g.precios[it.codigooc] || []).push(Number(it.preciounitario) || 0);
     g.cantidad += Number(it.cantidad) || 0;
   });
   grupos.forEach(g => {
-    // Nombre que se muestra: el unificado, o el que más se repite (si empatan, el más corto).
-    g.nombre = g.unificado || hospNombreCorto(Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0]);
     g.listaOC = [...g.ocs].sort((a, b) => fechaOC[b].localeCompare(fechaOC[a]));
     g.ultima = fechaOC[g.listaOC[0]] || '';
-    g.variantes = Object.keys(g.nombres).length;
   });
   return grupos.sort((a, b) => b.listaOC.length - a.listaOC.length || b.ultima.localeCompare(a.ultima));
 }
