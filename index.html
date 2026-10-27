@@ -2104,6 +2104,18 @@ function botonVerEnMPHtml(codigoOC) {
   return `<a href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;text-decoration:none;white-space:nowrap" title="Abrir la ficha oficial en mercadopublico.cl para verla o guardarla como PDF"><span>📄</span> Ver en Mercado Público</a>`;
 }
 
+// Historial completo de documentos de una OC, del más nuevo al más antiguo:
+// sus facturas (también las anuladas), las notas de crédito que anulan esas
+// facturas y las guías de despacho que traen esa OC.
+function historialDocumentosOC(codigoOC) {
+  const cod = (codigoOC || '').trim();
+  if (!cod) return [];
+  const propios = documentosGdexpress.filter(d => ['33', '52', '61'].includes(d.tipo_dte) && (d.orden_compra_ref || '').trim() === cod);
+  const folios = new Set(propios.filter(d => d.tipo_dte === '33').map(d => String(d.folio).trim()));
+  const notas = documentosGdexpress.filter(d => d.tipo_dte === '61' && d.nc_factura_ref && folios.has(String(d.nc_factura_ref).trim()) && !propios.includes(d));
+  return [...propios, ...notas].sort((a, b) => String(b.fecha_emision || '').localeCompare(String(a.fecha_emision || '')) || Number(b.folio) - Number(a.folio));
+}
+
 function facturasAsociadasA(codigoOC) {
   const cod = (codigoOC || '').trim();
   if (!cod) return [];
@@ -2340,7 +2352,6 @@ function fichaOC(codigoOC) {
   const origen = ocOrigen(r);
   const fact = ocFacturacion(r);
   const relacionados = items.filter(it => it.codigooc === codigoOC);
-  const facturas = facturasAsociadasA(codigoOC).slice().sort((x, y) => String(y.fecha_emision || '').localeCompare(String(x.fecha_emision || '')));
   const facturado = ocFacturadoPorOC()[codigoOC.trim()] || 0;
   window.__ocItemsTextos = relacionados.map(it => ({ textoOriginal: textoOriginalDe(it), nombreFinal: nombreFinalDe(it) }));
   const productos = relacionados.length ? `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
@@ -2365,16 +2376,18 @@ function fichaOC(codigoOC) {
     sub: `${nombreHosp(r.hospital) || r.hospital || ''} · ${fDate(r.fechaenvio || r.fechaoc)}`,
     destacado: clp(r.totaloc),
     etiquetas: `${tipoBadge(r.tipooc)} ${OC_FACT_BADGE[fact]}${facturado > 0 && fact !== 'completa' ? ` <span class="badge badge-gray">Facturado ${clp(facturado)}</span>` : ''}`,
-    resumen: `<div class="panel-datos">${datoOrigen}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}${dato('Forma de pago', r.formapago)}</div>`,
+    resumen: `<div class="panel-datos">${datoOrigen}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}</div>`,
     acciones: `<a class="page-btn" href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener">Ver OC en Mercado Público ↗</a>`
       + (origen ? `<a class="page-btn" href="${origen.url}" target="_blank" rel="noopener">Ver ${origen.tipo === 'COT' ? 'compra ágil' : 'licitación'} ↗</a>` : '')
       + (fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri" onclick="ocFacturar('${cod}')">Facturar</button>` : ''),
     cuerpo: `<div class="panel-h">Productos</div>${productos}
       ${r.nombreoc ? `<div class="panel-h">Nombre en Mercado Público</div><div style="font-size:12.5px;color:var(--text-2)">${escapeHtml(r.nombreoc)}</div>` : ''}`,
-    relacionado: facturas.map(d => ({
-      icono: 'ti-file-invoice',
-      titulo: `Factura N° ${d.folio}`,
-      resumen: `${clp(montoTotalDoc(d))} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''}${estadoAceptacionFusionado(d) === 'N' ? ' · ANULADA' : ''}`,
+    relacionado: historialDocumentosOC(codigoOC).map(d => ({
+      icono: d.tipo_dte === '61' ? 'ti-receipt-refund' : d.tipo_dte === '52' ? 'ti-truck-delivery' : 'ti-file-invoice',
+      titulo: `${TIPOS_DTE_INFO[d.tipo_dte]?.singular || 'Documento'} N° ${d.folio}`,
+      resumen: [clp(montoTotalDoc(d)), d.fecha_emision ? fDate(d.fecha_emision) : '',
+        d.tipo_dte === '61' && d.nc_factura_ref ? `anula la factura N° ${d.nc_factura_ref}` : '',
+        d.tipo_dte === '33' && estadoAceptacionFusionado(d) === 'N' ? 'ANULADA' : ''].filter(Boolean).join(' · '),
       abrir: () => fichaDocumento(d.id),
     })),
     navegacion: idx === -1 ? null : {
