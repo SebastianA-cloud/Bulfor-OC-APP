@@ -289,6 +289,22 @@ function dteFacturarOC(o) {
   if (o.rut) dteBuscarRut(33, o.rut);
 }
 
+// "Refacturar" desde Facturas rechazadas: factura nueva con "¿Es refacturación?"
+// activado, el N° que reemplaza, el cliente y la OC de la factura rechazada.
+function dteRefacturar(o) {
+  const actual = dteEstado[33] || dteCargarBorrador(33);
+  if (actual && dteTieneDatos(actual) && !actual.borradorId
+      && !confirm('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por la refacturación?')) return;
+  const s = dteNuevo(33);
+  s.refact = { on: true, folio: String(o.folio || '') };
+  const ordenOC = o.oc && typeof oc !== 'undefined' ? oc.find(x => x.codigooc === String(o.oc).trim()) : null;
+  s.refs = o.oc ? [{ ...dteRefNueva(), folio: String(o.oc).trim(), fecha: ordenOC ? dteFechaCL(ordenOC.fechaoc) : '' }] : [];
+  dteEstado[33] = s;
+  dteGuardarBorrador(33);
+  irAModuloPagina('documentos', 'doc-factura');
+  if (o.rut) dteBuscarRut(33, o.rut);
+}
+
 function dteLimpiar(tipo) {
   if (!confirm(`¿Empezar una ${DTE_NOMBRES[tipo]} nueva? Se borra lo escrito.`)) return;
   dteEstado[tipo] = dteNuevo(tipo);

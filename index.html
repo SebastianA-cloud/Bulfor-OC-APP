@@ -1049,10 +1049,15 @@
 
   <div class="page" id="page-pagos">
     <div class="page-header">
-      <div class="page-title">Cobranza</div>
+      <div class="page-title">Cobranza <span class="info-tip" tabindex="0" role="note" data-tip="Por cliente: cada hospital con facturas impagas, su deuda vencida y el atraso. Al abrir uno ves sus facturas, descargas el estado de cuenta en Excel, le escribes y anotas tus gestiones. Por factura: la lista de siempre, por mes.">i</span></div>
+      <div class="page-sub" id="pagos-linea"></div>
     </div>
     <div class="fpp-toolbar-top">
-      <div class="fpp-period">
+      <div class="vista-switch" role="group" aria-label="Vista">
+        <button id="pagos-vista-cliente" class="active" onclick="pagosSetVista('cliente')">Por cliente</button>
+        <button id="pagos-vista-factura" onclick="pagosSetVista('factura')">Por factura</button>
+      </div>
+      <div class="fpp-period" id="pagos-periodo" style="display:none">
         <button class="fpp-period-btn" onclick="pagosCambiarMes(-1)" title="Mes anterior">‹</button>
         <select id="pagos-select-mes" onchange="pagosSeleccionarPeriodo()" aria-label="Mes"></select>
         <select id="pagos-select-anio" onchange="pagosSeleccionarPeriodo()" aria-label="Año"></select>
@@ -1060,16 +1065,10 @@
       </div>
       <div class="fpp-status-tabs" id="pagos-status-tabs"></div>
     </div>
-    <div id="pagos-resumen" class="fpp-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="pagos-search" placeholder="Buscar por N° factura, RUT, hospital, estado…" oninput="filtrarPagosBusqueda(this.value)">
-      </div>
-      <div class="scope-toggle" id="scope-pagos" role="group" aria-label="Alcance de la búsqueda">
-        <button data-alcance="mes" class="active" onclick="setAlcance('pagos','mes')">Este mes</button>
-        <button data-alcance="anio" onclick="setAlcance('pagos','anio')">Año</button>
-        <button data-alcance="todo" onclick="setAlcance('pagos','todo')">Todo</button>
+        <input type="text" id="pagos-search" placeholder="Buscar hospital, RUT o N° de factura…" oninput="filtrarPagosBusqueda(this.value)">
       </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
@@ -1091,28 +1090,16 @@
 
   <div class="page" id="page-facturas-rechazadas">
     <div class="page-header">
-      <div class="page-title">Facturas rechazadas</div>
-      <div class="page-sub">Bandeja de gestión — qué requiere que hagas algo, qué ya está en proceso, y qué quedó regularizado</div>
+      <div class="page-title">Facturas rechazadas <span class="info-tip" tabindex="0" role="note" data-tip="Cada caso muestra la cadena completa: la factura rechazada, su nota de crédito y la factura que la reemplaza. Rojo: rechazada · morado: nota de crédito · verde: aceptada · punteado: lo que falta. Se actualiza solo al emitir la NC o la refactura.">i</span></div>
+      <div class="page-sub" id="rechazadas-resumen"></div>
     </div>
     <div class="fpp-toolbar-top">
-      <div class="fpp-period">
-        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(-1)" title="Mes anterior">‹</button>
-        <select id="rechazadas-select-mes" onchange="rechazadasSeleccionarPeriodo()" aria-label="Mes"></select>
-        <select id="rechazadas-select-anio" onchange="rechazadasSeleccionarPeriodo()" aria-label="Año"></select>
-        <button class="fpp-period-btn" onclick="rechazadasCambiarMes(1)" title="Mes siguiente">›</button>
-      </div>
       <div class="fpp-status-tabs" id="rechazadas-tabs"></div>
     </div>
-    <div id="rechazadas-resumen" class="rechazadas-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="rechazadas-search" placeholder="Buscar por N° factura, RUT, hospital…" oninput="filtrarRechazadas(this.value)">
-      </div>
-      <div class="scope-toggle" id="scope-rechazadas" role="group" aria-label="Alcance de la búsqueda">
-        <button data-alcance="mes" class="active" onclick="setAlcance('rechazadas','mes')">Este mes</button>
-        <button data-alcance="anio" onclick="setAlcance('rechazadas','anio')">Año</button>
-        <button data-alcance="todo" onclick="setAlcance('rechazadas','todo')">Todo</button>
+        <input type="text" id="rechazadas-search" placeholder="Buscar cualquier N° de factura o NC de la cadena, o el hospital…" oninput="filtrarRechazadas(this.value)">
       </div>
     </div>
     <div id="rechazadas-contenido"></div>
@@ -5968,6 +5955,7 @@ function calcularResumenPagos(lista) {
 }
 
 function renderPagosVista(soloTabla) {
+  if (pagosVista === 'cliente') { renderCobranzaClientes(soloTabla); return; }
   const delPeriodo = pagosListaDelPeriodo();
   const validas = delPeriodo.filter(f => estadoFusionadoPago(f) !== 'N');
   const cuenta = {
@@ -5987,11 +5975,7 @@ function renderPagosVista(soloTabla) {
   ).join('');
 
   const r = calcularResumenPagos(delPeriodo);
-  document.getElementById('pagos-resumen').innerHTML = `
-    <div class="stat destacado" title="Facturas del período menos notas de crédito, igual que el Buscador de documentos y que el Registro de Ventas del SII.${r.sinRespaldo ? ' ' + r.sinRespaldo + ' factura(s) del listado no están en GDExpress (folios anteriores al 17236, cargados desde el Excel de pagos) y no entran en este total.' : ''}"><div class="stat-label">Total facturado${r.sinRespaldo ? ' <span style="color:var(--amber)" title="Hay facturas del listado sin documento en GDExpress">⚠</span>' : ''}</div><div class="stat-val" style="font-size:20px">${clp(r.totalFacturado)}</div></div>
-    <div class="stat"><div class="stat-label">Total pagado</div><div class="stat-val" style="font-size:16px;color:var(--green)">${clp(r.totalPagado)}</div></div>
-    <div class="stat"><div class="stat-label">% pagado</div><div class="stat-val" style="font-size:16px">${r.pct.toFixed(0)}%</div></div>
-    <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val" style="font-size:16px;color:${r.pendientesCount?'var(--red)':'var(--green)'}">${r.pendientesCount}</div></div>`;
+  document.getElementById('pagos-linea').textContent = `${nombrePeriodoAlcance('pagos', pagosPeriodo)} · facturado ${clp(r.totalFacturado)} · pagado ${clp(r.totalPagado)} (${r.pct.toFixed(0)}%) · ${r.pendientesCount} pendiente${r.pendientesCount === 1 ? '' : 's'}`;
 
   let lista = pagosEstadoFiltro === 'all' ? delPeriodo : delPeriodo.filter(f => categoriaPago(f) === pagosEstadoFiltro);
   lista = aplicarFiltroPagos(lista).sort(compararPorFolio);
@@ -6016,6 +6000,191 @@ function renderPagosVista(soloTabla) {
   pagosF = lista;
   cont.innerHTML = construirTablaFacturasHtml(lista, '');
   if (soloTabla) { const inp = document.getElementById('pagos-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+}
+
+// ─── Cobranza por cliente ─────────────────────────────────────────────────
+// Una fila por hospital con facturas impagas: deuda vencida, cuántas
+// facturas y el atraso más largo. Al abrir uno, el panel muestra sus
+// facturas impagas, el estado de cuenta en Excel, un correo ya redactado y
+// las gestiones de cobro (llamadas, compromisos de pago).
+let pagosVista = 'cliente';
+let cobAtajo = 'vencida';
+let cobClientesF = [];
+let cobGestiones = null;   // gestiones de cobranza leídas de Supabase
+
+function pagosSetVista(v) {
+  pagosVista = v;
+  document.getElementById('pagos-vista-cliente').classList.toggle('active', v === 'cliente');
+  document.getElementById('pagos-vista-factura').classList.toggle('active', v === 'factura');
+  document.getElementById('pagos-periodo').style.display = v === 'factura' ? '' : 'none';
+  panelCerrar();
+  renderPagosVista();
+}
+
+const diasEntreHoy = fecha => { const h = new Date(); h.setHours(0, 0, 0, 0); return Math.round((h - fecha) / 864e5); };
+
+function cobranzaPorCliente() {
+  const grupos = {};
+  facturasPago.forEach(f => {
+    if (!esPendienteReal(f)) return;
+    const nombre = nombreHosp(f.hospital) || f.hospital || 'Sin hospital';
+    const clave = (f.rut_hospital || '').trim() || nombre;
+    const g = grupos[clave] || (grupos[clave] = { clave, nombre, rut: (f.rut_hospital || '').trim(), vencidas: [], porVencer: [], vencido: 0, porVencerMonto: 0, atrasoMax: 0 });
+    const venc = calcularVencimientoFactura(f, nombre);
+    const atraso = venc ? diasEntreHoy(venc) : 0;
+    const monto = montoConIVAPago(f);
+    if (venc && atraso > 0) { g.vencidas.push({ f, venc, atraso, monto }); g.vencido += monto; g.atrasoMax = Math.max(g.atrasoMax, atraso); }
+    else { g.porVencer.push({ f, venc, atraso, monto }); g.porVencerMonto += monto; }
+  });
+  return Object.values(grupos);
+}
+
+function cobColorAtraso(d) { return d > 60 ? 'badge-red' : d > 30 ? 'badge-amber' : 'badge-gray'; }
+
+function cobProximaGestion(clave) {
+  const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const g = (cobGestiones || []).filter(x => x.cliente === clave && x.recordar_el && !x.resuelta).sort((a, b) => a.recordar_el.localeCompare(b.recordar_el))[0];
+  if (!g) return '';
+  return g.recordar_el <= hoy ? `<b style="color:var(--accent)">Hoy</b> · ${escapeHtml(g.nota.slice(0, 40))}` : `${fDate(g.recordar_el)} · ${escapeHtml(g.nota.slice(0, 40))}`;
+}
+
+async function cobCargarGestiones() {
+  try {
+    const r = await sb('cobranza_gestiones?select=*&order=fecha.desc,created_at.desc');
+    cobGestiones = r.ok ? await r.json() : [];
+  } catch (e) { cobGestiones = []; }
+}
+
+function renderCobranzaClientes(soloTabla) {
+  if (cobGestiones === null) { cobGestiones = []; cobCargarGestiones().then(() => { if (pagosVista === 'cliente') renderCobranzaClientes(); }); }
+  const todos = cobranzaPorCliente();
+  const q = pagosBusqueda.trim();
+  const base = q ? todos.filter(g => coincideBusqueda(`${g.nombre} ${g.rut} ${g.vencidas.concat(g.porVencer).map(x => x.f.factura).join(' ')}`, q)) : todos;
+  const cuenta = { vencida: base.filter(g => g.vencidas.length).length, porvencer: base.filter(g => !g.vencidas.length).length, todos: base.length };
+  const tabs = [['vencida', 'Con deuda vencida'], ['porvencer', 'Solo por vencer'], ['todos', 'Todos']];
+  document.getElementById('pagos-status-tabs').innerHTML = tabs.map(([k, l]) =>
+    `<button class="fpp-status-tab${cobAtajo === k ? ' active' : ''}" onclick="cobAtajo='${k}';renderCobranzaClientes()">${l} <b>${cuenta[k]}</b></button>`).join('');
+  const totalVencido = todos.reduce((t, g) => t + g.vencido, 0);
+  const totalPorVencer = todos.reduce((t, g) => t + g.porVencerMonto, 0);
+  document.getElementById('pagos-linea').textContent = `Vencido total ${clp(totalVencido)} · por vencer ${clp(totalPorVencer)}`;
+
+  let lista = cobAtajo === 'vencida' ? base.filter(g => g.vencidas.length) : cobAtajo === 'porvencer' ? base.filter(g => !g.vencidas.length) : base;
+  lista = lista.slice().sort((a, b) => b.vencido - a.vencido || b.porVencerMonto - a.porVencerMonto);
+  cobClientesF = lista;
+  const cont = document.getElementById('pagos-contenido');
+  if (!lista.length) {
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : cobAtajo === 'vencida' ? 'Ningún cliente tiene facturas vencidas. 🎉' : 'No hay clientes en esta lista.'}</p></div></div>`;
+    return;
+  }
+  const abierto = panelPila[0]?.cobClave;
+  cont.innerHTML = `<div class="table-card"><table>
+    <thead><tr><th>Hospital</th><th style="text-align:right">Deuda vencida</th><th style="text-align:right">Facturas</th><th>Atraso</th><th class="col-sec" style="text-align:right">Por vencer</th><th class="col-sec">Próxima gestión</th></tr></thead>
+    <tbody>${lista.map((g, i) => `
+      <tr class="oc-fila${abierto === g.clave ? ' fila-abierta' : ''}" onclick="cobAbrir(${i})">
+        <td class="oc-hosp"><span>${escapeHtml(g.nombre)}</span><small>${escapeHtml(g.rut)}</small></td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap">${g.vencido ? clp(g.vencido) : '—'}</td>
+        <td style="text-align:right">${g.vencidas.length || ''}</td>
+        <td>${g.vencidas.length ? `<span class="badge ${cobColorAtraso(g.atrasoMax)}">${g.atrasoMax} días</span>` : ''}</td>
+        <td class="col-sec" style="text-align:right;white-space:nowrap;color:var(--text-2)">${g.porVencerMonto ? clp(g.porVencerMonto) : ''}</td>
+        <td class="col-sec" style="font-size:12px;color:var(--text-2)">${cobProximaGestion(g.clave)}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  if (soloTabla) { const inp = document.getElementById('pagos-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+}
+
+function cobAbrir(i) {
+  const g = cobClientesF[i];
+  if (!g) return;
+  panelAbrir(fichaCobranzaCliente(g, i));
+  renderCobranzaClientes();
+}
+
+function fichaCobranzaCliente(g, i) {
+  const filas = g.vencidas.slice().sort((a, b) => b.atraso - a.atraso);
+  const gestiones = (cobGestiones || []).filter(x => x.cliente === g.clave);
+  const ultima = gestiones[0];
+  window.__cobActual = g;
+  return {
+    cobClave: g.clave,
+    titulo: g.nombre,
+    sub: g.rut ? `RUT ${g.rut}` : '',
+    destacado: g.vencido ? `${clp(g.vencido)} vencido` : `${clp(g.porVencerMonto)} por vencer`,
+    etiquetas: g.vencidas.length ? `<span class="badge ${cobColorAtraso(g.atrasoMax)}">${g.vencidas.length} factura${g.vencidas.length === 1 ? '' : 's'} vencida${g.vencidas.length === 1 ? '' : 's'} · hasta ${g.atrasoMax} días</span>` : '',
+    acciones: `<button class="page-btn page-btn-pri" onclick="cobEstadoCuentaExcel()">⬇ Estado de cuenta (Excel)</button>
+      <button class="page-btn" onclick="cobEscribirCorreo()">✉ Escribir correo</button>
+      <button class="page-btn" onclick="cobAnotarGestion()">＋ Anotar gestión</button>`,
+    cuerpo: `${filas.length ? `<div class="panel-h">Facturas vencidas</div><table class="panel-tabla"><thead><tr><th>N°</th><th>Vencimiento</th><th>Atraso</th><th style="text-align:right">Monto</th></tr></thead><tbody>
+        ${filas.map(x => `<tr><td><span class="panel-link mono" onclick="cobVerFactura('${String(x.f.factura).replace(/'/g, "\\'")}')">${escapeHtml(String(x.f.factura))}</span></td><td>${fDate(x.venc)}</td><td><span class="badge ${cobColorAtraso(x.atraso)}">${x.atraso} d</span></td><td style="text-align:right">${clp(x.monto)}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${g.porVencer.length ? `<details class="panel-plegable"><summary>Además ${g.porVencer.length} factura${g.porVencer.length === 1 ? '' : 's'} por vencer (${clp(g.porVencerMonto)})</summary>
+        <table class="panel-tabla"><tbody>${g.porVencer.map(x => `<tr><td><span class="panel-link mono" onclick="cobVerFactura('${String(x.f.factura).replace(/'/g, "\\'")}')">${escapeHtml(String(x.f.factura))}</span></td><td>${x.venc ? 'vence ' + fDate(x.venc) : ''}</td><td style="text-align:right">${clp(x.monto)}</td></tr>`).join('')}</tbody></table></details>` : ''}
+      <div class="panel-h">Gestiones de cobro</div>
+      ${ultima ? `<div class="panel-gestion"><b>${fDate(ultima.fecha)} · ${escapeHtml(ultima.nota)}</b>${ultima.recordar_el ? `<small>Recordar el ${fDate(ultima.recordar_el)}</small>` : ''}</div>
+        ${gestiones.length > 1 ? `<details class="panel-plegable"><summary>Ver todas (${gestiones.length})</summary>${gestiones.slice(1).map(x => `<div class="panel-gestion"><b>${fDate(x.fecha)} · ${escapeHtml(x.nota)}</b>${x.creado_por ? `<small>${escapeHtml(x.creado_por)}</small>` : ''}</div>`).join('')}</details>` : ''}`
+        : '<div class="panel-vacio">Todavía no hay gestiones anotadas para este cliente.</div>'}`,
+    navegacion: {
+      texto: `Cliente ${i + 1} de ${cobClientesF.length}`,
+      anterior: i > 0 ? () => cobAbrir(i - 1) : null,
+      siguiente: i < cobClientesF.length - 1 ? () => cobAbrir(i + 1) : null,
+    },
+    alCerrar: () => { if (document.getElementById('page-pagos')?.classList.contains('active') && pagosVista === 'cliente') renderCobranzaClientes(); },
+  };
+}
+
+function cobVerFactura(folio) {
+  const d = documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === String(folio));
+  if (!d) { toast('Esa factura todavía no está sincronizada desde GDExpress.', 'err'); return; }
+  panelAbrir(fichaDocumento(d.id, []), true);
+}
+
+function cobEstadoCuentaExcel() {
+  const g = window.__cobActual;
+  if (!g) return;
+  const todas = g.vencidas.concat(g.porVencer).sort((a, b) => (a.venc || 0) - (b.venc || 0));
+  const filas = todas.map(x => ({
+    'N° Factura': x.f.factura,
+    'Fecha emisión': x.f.fecha_emision ? fDate(x.f.fecha_emision) : '',
+    'Vencimiento': x.venc ? fDate(x.venc) : '',
+    'Días de atraso': x.atraso > 0 ? x.atraso : '',
+    'Monto': x.monto,
+  }));
+  filas.push({ 'N° Factura': 'TOTAL', 'Monto': todas.reduce((t, x) => t + x.monto, 0) });
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  hoja['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Estado de cuenta');
+  const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  XLSX.writeFile(libro, `Estado de cuenta ${g.nombre.slice(0, 40)} ${hoy}.xlsx`);
+}
+
+function cobEscribirCorreo() {
+  const g = window.__cobActual;
+  if (!g) return;
+  const lineas = g.vencidas.slice().sort((a, b) => b.atraso - a.atraso).map(x => `- Factura N° ${x.f.factura}, vencida el ${fDate(x.venc)}: ${clp(x.monto)}`);
+  const asunto = `Facturas pendientes de pago - Farmacia Bulfor`;
+  const cuerpo = `Estimados ${g.nombre}:\n\nJunto con saludar, les escribimos para recordar que las siguientes facturas se encuentran vencidas y pendientes de pago:\n\n${lineas.join('\n')}\n\nTotal adeudado: ${clp(g.vencido)}\n\nAdjuntamos el estado de cuenta. Agradeceremos confirmar la fecha de pago.\n\nSaludos cordiales,\nSociedad Farmacéutica Bulfor Ltda.`;
+  location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+}
+
+async function cobAnotarGestion() {
+  const g = window.__cobActual;
+  if (!g) return;
+  const nota = prompt(`Gestión de cobro con ${g.nombre}\n(ej. "Llamé a Juan de finanzas, pagan el 15-11")`);
+  if (!nota || !nota.trim()) return;
+  const rec = prompt('¿Quieres que te lo recuerde? Escribe la fecha (dd-mm-aaaa) o deja vacío.') || '';
+  const m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(rec.trim());
+  const fila = { cliente: g.clave, hospital: g.nombre, nota: nota.trim(), fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
+    recordar_el: m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null, creado_por: sesionActual?.email || null };
+  try {
+    const r = await sb('cobranza_gestiones', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(fila) });
+    if (!r.ok) throw new Error('error ' + r.status);
+    const [nueva] = await r.json();
+    cobGestiones = [nueva].concat(cobGestiones || []);
+    toast('Gestión anotada.');
+    panelAbrir(fichaCobranzaCliente(g, cobClientesF.indexOf(g)));
+    renderCobranzaClientes();
+  } catch (e) {
+    toast('No se pudo guardar la gestión (' + e.message + ').', 'err');
+  }
 }
 
 function pagosAniosDisponibles() {
@@ -8825,9 +8994,9 @@ function rechazadasAniosDisponibles() {
 function rechazadasInit() {
   const hoy = new Date();
   rechazadasPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
-  rechazadasPoblarSelectores();
   renderRechazadas();
   inicializarAvisoRechazadas();
+  rzCargarReemplazos();
 }
 
 function rechazadasPoblarSelectores() {
@@ -9470,98 +9639,153 @@ function badgeGestionRechazada(f) {
   return `<span class="badge-estado ${info.badge}">${info.label}${detalle}</span>`;
 }
 
-function renderRechazadas(soloTabla) {
-  // Todo lo que se ve en pantalla —pestañas, contadores, resumen y tabla—
-  // corresponde SOLO al mes/año seleccionado. Nunca se mezclan totales
-  // históricos con la vista de un mes.
-  let todas = rechazadasListaDelPeriodo();
+// ─── Casos de facturas rechazadas ─────────────────────────────────────────
+// Cada caso es una cadena: factura rechazada → nota de crédito → factura que
+// la reemplaza (que a su vez puede volver a ser rechazada). La refactura se
+// reconoce por la frase "ESTA FACTURA REEMPLAZA A LA N° X" que va en la
+// descripción del último producto (o por el reemplazo anotado a mano).
+let rechazadasCasoAbierto = null;
+let rzReemplazaA = null;   // folio nuevo → folio que reemplaza (leído del XML)
 
-  // Resumen y pestañas se calculan sobre todas las del período (sin aplicar
-  // el buscador), para que los contadores no salten al escribir.
-  const cuenta = { todas: todas.length, requiere_gestion: 0, en_proceso: 0, regularizada: 0 };
-  todas.forEach(f => cuenta[estadoGestionRechazada(f)]++);
+async function rzCargarReemplazos() {
+  if (rzReemplazaA) return;
+  rzReemplazaA = {};
+  try {
+    const filas = await fetchAll('documentos_gdexpress', 'select=folio,xml_completo&tipo_dte=eq.33&xml_completo=ilike.*REEMPLAZA*');
+    filas.forEach(r => {
+      const m = /REEMPLAZA\s+A\s+LA\s+N?[°º.]?\s*(\d+)/i.exec(r.xml_completo || '');
+      if (!m) return;
+      let viejo = m[1];
+      const doble = /^(\d+)\1$/.exec(viejo);   // número escrito dos veces por error (ej. 2225122251)
+      if (doble) viejo = doble[1];
+      rzReemplazaA[String(r.folio)] = viejo;
+    });
+  } catch (e) { /* sin reemplazos detectados: quedan los anotados a mano */ }
+  if (document.getElementById('page-facturas-rechazadas')?.classList.contains('active')) renderRechazadas();
+}
 
-  const tabs = [
-    { id: 'todas', label: 'Todas' },
-    { id: 'requiere_gestion', label: 'Requiere gestión' },
-    { id: 'en_proceso', label: 'En proceso' },
-    { id: 'regularizada', label: 'Regularizadas' },
-  ];
-  document.getElementById('rechazadas-tabs').innerHTML = tabs.map(t =>
-    `<button class="fpp-status-tab${rechazadasEstadoActivo===t.id?' active':''}" onclick="filtrarRechazadasPorEstado('${t.id}')">${t.label} (${cuenta[t.id]||0})</button>`
-  ).join('');
+function rzDoc(folio) { return documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(folio)) || null; }
 
-  // Resumen compacto, en una línea, siempre del período seleccionado. Lo
-  // único destacado es lo que requiere gestión; el resto es contexto.
-  const nombrePeriodoResumen = nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
-  document.getElementById('rechazadas-resumen').innerHTML = cuenta.todas === 0
-    ? `<span class="rz-dato">Sin facturas rechazadas en ${nombrePeriodoResumen}.</span>`
-    : `<span class="rz-total">${cuenta.todas} rechazada${cuenta.todas===1?'':'s'}</span>
-       <span class="rz-dato">en ${nombrePeriodoResumen}</span>
-       <span class="rz-sep">·</span>
-       ${cuenta.requiere_gestion > 0
-         ? `<span class="rz-gestion">${cuenta.requiere_gestion} requiere${cuenta.requiere_gestion===1?'':'n'} gestión</span>`
-         : `<span class="rz-dato rz-ok">✓ nada pendiente de gestión</span>`}
-       <span class="rz-sep">·</span>
-       <span class="rz-dato"><strong>${cuenta.en_proceso}</strong> en proceso</span>
-       <span class="rz-sep">·</span>
-       <span class="rz-dato"><strong class="rz-ok">${cuenta.regularizada}</strong> regularizada${cuenta.regularizada===1?'':'s'}</span>`;
-
-  let lista = rechazadasEstadoActivo === 'todas' ? todas : todas.filter(f => estadoGestionRechazada(f) === rechazadasEstadoActivo);
-  if (rechazadasBusqueda) {
-    lista = lista.filter(f => coincideBusqueda(
-      `${f.factura} ${f.rut_hospital||''} ${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.factura_reemplazo||''} ${f.nota_credito_asociada||''}`,
-      rechazadasBusqueda
-    ));
-  }
-  // Prioridad: primero lo que requiere gestión, después en proceso, al final
-  // regularizadas — y dentro de "pendientes" (las dos primeras), las más
-  // antiguas arriba (llevan más tiempo esperando).
-  const prioridad = { requiere_gestion: 0, en_proceso: 1, regularizada: 2 };
-  lista = lista.slice().sort((a, b) => {
-    const pa = prioridad[estadoGestionRechazada(a)], pb = prioridad[estadoGestionRechazada(b)];
-    if (pa !== pb) return pa - pb;
-    return (a.fecha_emision||'').localeCompare(b.fecha_emision||''); // más antigua primero, dentro del mismo estado
+function rechazadasCasos() {
+  const rech = {};
+  facturasRechazadas().forEach(f => { rech[String(f.factura)] = f; });
+  const reemplazoDe = {};   // viejo → nuevo
+  Object.entries(rzReemplazaA || {}).forEach(([nuevo, viejo]) => { reemplazoDe[viejo] = nuevo; });
+  Object.values(rech).forEach(f => { if (f.factura_reemplazo) reemplazoDe[String(f.factura)] = String(f.factura_reemplazo).trim(); });
+  const esReemplazoDeRechazada = new Set(Object.entries(reemplazoDe).filter(([viejo]) => rech[viejo]).map(([, nuevo]) => nuevo));
+  const casos = [];
+  Object.keys(rech).filter(folio => !esReemplazoDeRechazada.has(folio)).forEach(raiz => {
+    const nodos = [], motivos = [];
+    let folio = raiz, estado = 'resuelta', vueltas = 0, ultimaRech = null;
+    while (vueltas++ < 10) {
+      const f = rech[folio];
+      if (!f) {   // la factura nueva no está rechazada: caso cerrado
+        const d = rzDoc(folio);
+        nodos.push({ tipo: 'ok', folio, doc: d, monto: d ? montoTotalDoc(d) : null, fecha: d?.fecha_emision });
+        break;
+      }
+      ultimaRech = f;
+      const d = rzDoc(folio);
+      nodos.push({ tipo: 'rech', folio, doc: d, monto: montoConIVAPago(f), fecha: f.fecha_emision, reclamo: f._reclamo });
+      const motivo = f.anulada_motivo || f._reclamo;
+      if (motivo) motivos.push({ folio, motivo });
+      const nc = f.nota_credito_asociada || f._ncAutoDetectada;
+      const nuevo = reemplazoDe[folio];
+      if (nc) nodos.push({ tipo: 'nc', folio: String(nc), doc: documentosGdexpress.find(x => x.tipo_dte === '61' && String(x.folio) === String(nc)) || null });
+      else { nodos.push({ tipo: 'falta', texto: 'Nota de crédito' }); estado = 'falta_nc'; }
+      if (!nuevo) { nodos.push({ tipo: 'falta', texto: 'Refactura' }); if (estado === 'resuelta') estado = 'falta_refact'; break; }
+      folio = nuevo;
+    }
+    const final = nodos[nodos.length - 1];
+    const intentos = nodos.filter(n => n.tipo === 'rech' || n.tipo === 'ok').length;
+    casos.push({ raiz, nodos, motivos, estado, ultimaRech, intentos,
+      hospital: nombreHosp(ultimaRech?.hospital) || ultimaRech?.hospital || '',
+      fecha: rech[raiz]?.fecha_emision || '', fechaFin: final.tipo === 'ok' ? (final.fecha || '') : '' });
   });
+  return casos;
+}
 
-  window.__rechazadasVisibles = lista;
+function rzNodoHtml(n, ci, ni) {
+  if (n.tipo === 'falta') return `<div class="rz-nodo falta"><b>${n.texto}</b><small>pendiente</small></div>`;
+  const clic = n.doc ? `onclick="event.stopPropagation();rzVerNodo(${ci},${ni})"` : '';
+  if (n.tipo === 'nc') return `<div class="rz-nodo nc" ${clic}><b>NC ${escapeHtml(n.folio)}</b><small>Anula la factura anterior</small></div>`;
+  if (n.tipo === 'ok') return `<div class="rz-nodo ok" ${clic}><b>${escapeHtml(n.folio)}</b><small>✓ Aceptada${n.monto ? ' · ' + clp(n.monto) : ''}</small></div>`;
+  return `<div class="rz-nodo rech" ${clic}><b>${escapeHtml(n.folio)}</b><small>✕ ${n.reclamo ? 'Reclamada' : 'Rechazada'}${n.fecha ? ' · ' + fDate(n.fecha) : ''}${n.monto ? ' · ' + clp(n.monto) : ''}</small></div>`;
+}
+
+function renderRechazadas(soloTabla) {
+  const casos = rechazadasCasos();
+  const q = (rechazadasBusqueda || '').trim();
+  const base = q ? casos.filter(c => coincideBusqueda(`${c.hospital} ${c.nodos.map(n => n.folio || '').join(' ')} ${c.ultimaRech?.rut_hospital || ''}`, q)) : casos;
+  const porResolver = base.filter(c => c.estado !== 'resuelta');
+  const resueltas = base.filter(c => c.estado === 'resuelta');
+  if (!['por_resolver', 'resueltas', 'todas'].includes(rechazadasEstadoActivo)) rechazadasEstadoActivo = 'por_resolver';
+  const tabs = [['por_resolver', 'Por resolver', porResolver.length], ['resueltas', 'Resueltas', resueltas.length], ['todas', 'Todas', base.length]];
+  document.getElementById('rechazadas-tabs').innerHTML = tabs.map(([k, l, n]) =>
+    `<button class="fpp-status-tab${rechazadasEstadoActivo === k ? ' active' : ''}" onclick="filtrarRechazadasPorEstado('${k}')">${l} <b>${n}</b></button>`).join('');
+  document.getElementById('rechazadas-resumen').textContent = porResolver.length
+    ? `${porResolver.length} caso${porResolver.length === 1 ? '' : 's'} por resolver · ${casos.filter(c => c.estado === 'falta_nc').length} sin nota de crédito · ${casos.filter(c => c.estado === 'falta_refact').length} sin refacturar`
+    : 'Nada pendiente: todos los rechazos están resueltos.';
+
   const cont = document.getElementById('rechazadas-contenido');
-  if (!lista.length) {
-    const nombrePeriodo = nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
-    const mensajes = {
-      todas: `No hay facturas rechazadas/anuladas en ${nombrePeriodo}.`,
-      requiere_gestion: `No hay facturas que requieran gestión en ${nombrePeriodo} — todo está en proceso o regularizado.`,
-      en_proceso: `No hay facturas en proceso de regularización en ${nombrePeriodo}.`,
-      regularizada: `Todavía no hay facturas regularizadas en ${nombrePeriodo}.`,
-    };
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${rechazadasBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[rechazadasEstadoActivo]}</p></div></div>`;
-    return;
-  }
-  cont.innerHTML = `
-    <div class="table-card">
-      <table>
-        <thead><tr>
-          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Monto</th><th>Reemplazada por</th><th>N° Nota de crédito</th><th>Estado</th>
-        </tr></thead>
-        <tbody>
-          ${lista.map((f, idx) => `
-            <tr style="cursor:pointer" onclick="abrirDetalleRechazada(${idx})">
-              <td data-label="Factura" class="mono">${f.factura}${f._reclamo ? ` <span class="badge-estado err" style="font-size:10px;padding:1px 6px" title="${f._reclamo}">Reclamada</span>` : ''}${f._sinRegistroPagos ? ' <span style="font-size:10px;color:var(--text-3);font-weight:600" title="No hay una fila de esta factura en Seguimiento de pago">⚠</span>' : ''}</td>
-              <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
-              <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-              <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-              <td data-label="Reemplazada por" style="font-size:12px">${f.factura_reemplazo || '—'}</td>
-              <td data-label="N° Nota de crédito" style="font-size:12px">${f.nota_credito_asociada || f._ncAutoDetectada || '—'}</td>
-              <td data-label="Estado">${badgeGestionRechazada(f)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+  window.__rzCasos = [];
+  const pendientesHtml = (rechazadasEstadoActivo === 'resueltas' ? [] : porResolver.slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))).map(c => {
+    const ci = window.__rzCasos.push(c) - 1;
+    const etiqueta = c.estado === 'falta_nc' ? 'Falta nota de crédito' : 'Falta refacturar';
+    return `<div class="rz-caso pend">
+      <div class="rz-cab"><div><b>${escapeHtml(c.hospital)}</b><span class="rz-mut">${c.fecha ? 'rechazada el ' + fDate(c.fecha) : ''}${c.intentos > 1 ? ` · primera factura: ${escapeHtml(c.raiz)} · ${c.intentos} intentos` : ''}</span></div><span class="badge badge-amber">${etiqueta}</span></div>
+      ${c.motivos.length ? `<div class="rz-motivo"><b>Motivo:</b> ${c.motivos.map(m => `${c.motivos.length > 1 ? escapeHtml(m.folio) + ': ' : ''}“${escapeHtml(m.motivo)}”`).join(' · ')}</div>` : ''}
+      <div class="rz-cadena">${c.nodos.map((n, ni) => (ni ? '<span class="rz-flecha">→</span>' : '') + rzNodoHtml(n, ci, ni)).join('')}</div>
+      <div class="rz-acc">${c.estado === 'falta_refact' ? `<button class="page-btn page-btn-pri" onclick="rzRefacturar(${ci})">Refacturar</button>` : ''}
+        <button class="page-btn" onclick="rzAnotarAMano(${ci})">Anotar NC o reemplazo a mano</button></div>
     </div>`;
+  }).join('');
 
-  if (soloTabla) {
-    const inp = document.getElementById('rechazadas-search');
-    if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+  let resueltasHtml = '';
+  if (rechazadasEstadoActivo !== 'por_resolver') {
+    const orden = resueltas.slice().sort((a, b) => (b.fechaFin || b.fecha || '').localeCompare(a.fechaFin || a.fecha || ''));
+    let mesAnterior = '';
+    resueltasHtml = orden.map(c => {
+      const ci = window.__rzCasos.push(c) - 1;
+      const f = c.fechaFin || c.fecha || '';
+      const mes = f ? `${MESES_NOMBRE[Number(f.slice(5, 7)) - 1]} ${f.slice(0, 4)}` : 'Sin fecha';
+      const cab = mes !== mesAnterior ? `<div class="rz-mes">${mes}</div>` : '';
+      mesAnterior = mes;
+      const mini = c.nodos.filter(n => n.tipo === 'rech' || n.tipo === 'ok').map(n => n.tipo === 'ok' ? `<span class="rz-okt">${escapeHtml(n.folio)} ✓</span>` : `<span class="rz-rx">${escapeHtml(n.folio)}</span>`).join('<span class="rz-flecha">→</span>');
+      const abierto = rechazadasCasoAbierto === c.raiz;
+      return `${cab}<div class="rz-fila${abierto ? ' abierta' : ''}" onclick="rechazadasCasoAbierto=${abierto ? 'null' : `'${String(c.raiz).replace(/'/g, "\\'")}'`};renderRechazadas()">
+        <div class="rz-fila-top"><span class="rz-hosp">${escapeHtml(c.hospital)}</span><span class="rz-mini">${mini}</span><span class="rz-mut">${c.intentos} intentos${f ? ' · ' + fDate(f) : ''}</span><span class="badge badge-green">✓ Resuelta</span><span class="rz-chev">${abierto ? '⌄' : '›'}</span></div>
+        ${abierto ? `<div class="rz-cadena">${c.nodos.map((n, ni) => (ni ? '<span class="rz-flecha">→</span>' : '') + rzNodoHtml(n, ci, ni)).join('')}</div>
+          ${c.motivos.length ? `<div class="rz-motivo"><b>Motivos:</b> ${c.motivos.map(m => `${escapeHtml(m.folio)}: “${escapeHtml(m.motivo)}”`).join(' · ')}</div>` : ''}` : ''}
+      </div>`;
+    }).join('');
   }
+
+  cont.innerHTML = (pendientesHtml || resueltasHtml)
+    ? `<div class="rz-lista">${pendientesHtml}${resueltasHtml}</div>`
+    : `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'resueltas' ? 'Todavía no hay casos resueltos.' : 'No hay rechazos por resolver. 🎉'}</p></div></div>`;
+  if (soloTabla) { const inp = document.getElementById('rechazadas-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+}
+
+function rzVerNodo(ci, ni) {
+  const n = window.__rzCasos[ci]?.nodos[ni];
+  if (n && n.doc) panelAbrir(fichaDocumento(n.doc.id, []));
+}
+
+// Abre una factura nueva con "¿Es refacturación?" activado y los datos de la rechazada.
+function rzRefacturar(ci) {
+  const c = window.__rzCasos[ci];
+  if (!c || !c.ultimaRech) return;
+  const d = rzDoc(c.ultimaRech.factura);
+  if (typeof dteRefacturar === 'function') dteRefacturar({ folio: String(c.ultimaRech.factura), rut: d?.rut_hospital || c.ultimaRech.rut_hospital || '', oc: d?.orden_compra_ref || '' });
+}
+
+// Para anotar a mano la NC o la factura de reemplazo (casos antiguos).
+function rzAnotarAMano(ci) {
+  const c = window.__rzCasos[ci];
+  if (!c || !c.ultimaRech) return;
+  window.__rechazadasVisibles = [c.ultimaRech];
+  abrirDetalleRechazada(0);
 }
 
 function verNotaCreditoDesdeRechazadas(folioNC) {

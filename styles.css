@@ -1237,3 +1237,43 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
    importante (N°, hospital, total y estado) no se corte. */
 body.con-panel .col-sec { display: none; }
 .panel-tabla td[style*="text-align:right"] { white-space: nowrap; }
+
+/* Selector de vista (ej. Cobranza: Por cliente / Por factura) */
+.vista-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); height: var(--control-h, 40px); flex-shrink: 0; }
+.vista-switch button { border: 0; background: none; padding: 0 14px; font: 600 13px var(--font); color: var(--text-2); cursor: pointer; }
+.vista-switch button + button { border-left: 1px solid var(--border); }
+.vista-switch button.active { background: #1A1917; color: #fff; }
+/* Partes del panel que se despliegan con un clic */
+.panel-plegable summary { cursor: pointer; font-size: 12.5px; color: #185FA5; font-weight: 600; padding: 4px 0; }
+.panel-plegable[open] summary { margin-bottom: 6px; }
+.panel-gestion { border: 1px solid #ECEAE4; border-radius: 10px; padding: 8px 12px; font-size: 12.5px; margin-bottom: 6px; }
+.panel-gestion b { display: block; font-weight: 600; }
+.panel-gestion small { color: var(--text-2); }
+
+/* Facturas rechazadas: casos con la cadena factura → NC → refactura */
+.rz-lista { display: flex; flex-direction: column; gap: 10px; }
+.rz-caso { background: var(--surface); border: 1px solid #ECEAE4; border-left: 4px solid #D97706; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.rz-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.rz-cab b { font-size: 14px; }
+.rz-mut { color: var(--text-3); font-size: 12px; margin-left: 8px; }
+.rz-motivo { font-size: 12.5px; color: var(--text-2); }
+.rz-cadena { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rz-flecha { color: var(--border-strong); font-size: 15px; }
+.rz-nodo { border: 1px solid var(--border); border-radius: 10px; padding: 6px 11px; min-width: 120px; background: var(--bg); font-size: 12px; cursor: pointer; }
+.rz-nodo b { display: block; font-family: var(--mono); font-size: 13px; }
+.rz-nodo small { font-size: 11px; }
+.rz-nodo.rech { background: #FDECEA; border-color: #F5C6C0; } .rz-nodo.rech small { color: var(--accent); font-weight: 600; }
+.rz-nodo.nc { background: #F3EEFB; border-color: #DCCFF2; } .rz-nodo.nc small { color: #6B46C1; font-weight: 600; }
+.rz-nodo.ok { background: #E8F5EE; border-color: #BFE3CC; } .rz-nodo.ok small { color: var(--green); font-weight: 600; }
+.rz-nodo.falta { border-style: dashed; background: var(--surface); color: #B45309; cursor: default; } .rz-nodo.falta b { font-family: var(--font); } .rz-nodo.falta small { color: #B45309; font-weight: 600; }
+.rz-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+.rz-mes { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); font-weight: 700; margin: 8px 2px 0; }
+.rz-fila { background: var(--surface); border: 1px solid #ECEAE4; border-radius: 12px; padding: 10px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 10px; }
+.rz-fila:hover, .rz-fila.abierta { border-color: var(--accent); }
+.rz-fila-top { display: flex; align-items: center; gap: 14px; font-size: 12.5px; }
+.rz-hosp { width: 230px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rz-mini { flex: 1; display: flex; align-items: center; gap: 6px; font-family: var(--mono); }
+.rz-rx { color: var(--accent); text-decoration: line-through; }
+.rz-okt { color: var(--green); font-weight: 700; }
+.rz-chev { color: var(--text-3); }
+@media (max-width: 760px) { .rz-fila-top { flex-wrap: wrap; } .rz-hosp { width: auto; } }
