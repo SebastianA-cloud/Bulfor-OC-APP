@@ -1810,6 +1810,7 @@ function populateFilters() {
 // con la abreviatura y el nombre completo, en mayúsculas y sin tildes.
 const SINONIMOS_PRODUCTO = [
   ['PEG', 'POLIETILENGLICOL'],
+  ['AC', 'ACIDO'],
 ];
 
 function coincideBusqueda(texto, query) {
@@ -3559,8 +3560,15 @@ function renderFacturaItems() {
 
   const hayFiltro = document.getElementById('fp-items-search').value;
   const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td>`;
-  renderTablaAlfabetica('fp-items-body', 'fp-items-jump', facturaProductosUnicosF, p => p.nombre,
-    (p, idx) => `<tr onclick="navReset();openProductoFacturaDetail(window.__alfabeticoOrden['fp-items-body'][${idx}].nombre)" style="cursor:pointer">
+  // Una fila por producto base ("ACIDO ACETICO"); sus presentaciones (3%,
+  // 5% 250 ml, glacial…) se ven al abrirlo. Si tiene una sola, la fila es ella.
+  renderTablaAlfabetica('fp-items-body', 'fp-items-jump', sustanciasDePrecios(facturaProductosUnicosF), p => p.nombre,
+    (p, idx) => p.presentaciones ? `<tr onclick="navReset();abrirFilaPrecios(${idx})" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗ <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.presentaciones.length} presentaciones</small></td>
+      <td style="text-align:right">${p.facturas}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-3);white-space:nowrap">Ver presentaciones ›</td>
+    </tr>` : `<tr onclick="navReset();abrirFilaPrecios(${idx})" style="cursor:pointer">
       <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
@@ -3569,6 +3577,91 @@ function renderFacturaItems() {
         ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
       </td>
     </tr>`, 4, mensajeVacio);
+}
+
+// ─── Precios: productos base ────────────────────────────────────────────────
+// Palabras que no son el producto sino su envase o forma: se quitan para
+// encontrar el producto base ("AC. ACETICO 5% 250ML" → ACIDO ACETICO).
+const PRECIOS_PALABRAS_FORMA = new Set(('BIDON BIDONES SOLUCION USP POTE POTES FCO FRASCO FRASCOS ENVASE ' +
+  'LT LTS L ML CC G GR GRS KG MG UN UND UNIDAD LITRO LITROS').split(' '));
+
+function precioBaseDe(nombre) {
+  const palabras = [...hospPalabrasProducto(nombre)].filter(w => !/\d/.test(w) && !PRECIOS_PALABRAS_FORMA.has(w));
+  return new Set(palabras);
+}
+
+// Agrupa los productos de la lista en productos base. Un producto se junta con
+// otro si sus palabras base son las mismas, o si tiene a lo más una palabra
+// más ("ACIDO ACETICO GLACIAL" va con "ACIDO ACETICO").
+function sustanciasDePrecios(productos) {
+  const conBase = productos.map(p => ({ p, base: precioBaseDe(p.nombre) }))
+    .sort((a, b) => a.base.size - b.base.size);
+  const grupos = [];
+  conBase.forEach(({ p, base }) => {
+    let g = null;
+    if (base.size) {
+      g = grupos.find(x => x.base.size && [...x.base].every(w => base.has(w)) && base.size - x.base.size <= 1);
+    }
+    if (!g) { g = { base, productos: [] }; grupos.push(g); }
+    g.productos.push(p);
+  });
+  return grupos.map(g => {
+    if (g.productos.length === 1) return g.productos[0];
+    // Nombre del producto base, con las palabras en el orden en que se escriben.
+    const muestra = g.productos.slice().sort((a, b) => a.nombre.length - b.nombre.length)[0].nombre;
+    const orden = String(muestra).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').split(/[^A-Z0-9]+/)
+      .map(w => (SINONIMOS_PRODUCTO.find(f => f.includes(w)) || [w]).slice(-1)[0]);
+    const nombre = [...new Set(orden.filter(w => g.base.has(w)))].join(' ') || muestra;
+    const docs = new Set();
+    g.productos.forEach(x => x.docs && x.docs.forEach(d => docs.add(d)));
+    return {
+      nombre, presentaciones: g.productos.slice().sort((a, b) => (b.ultimaFecha || '').localeCompare(a.ultimaFecha || '')),
+      facturas: docs.size,
+      ultimaFecha: g.productos.reduce((m, x) => (x.ultimaFecha || '') > m ? x.ultimaFecha : m, ''),
+      totalFacturado: g.productos.reduce((t, x) => t + (x.totalFacturado || 0), 0),
+    };
+  });
+}
+
+// Abre la fila N de la lista: el producto base (con sus presentaciones) o,
+// si tiene una sola, directo la ficha del producto.
+function abrirFilaPrecios(idx) {
+  const fila = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body'] || [])[idx];
+  if (!fila) return;
+  cerrarTodosLosModales();
+  const f = fila.presentaciones ? fichaSustanciaPrecios(idx) : fichaProductoVenta(fila.nombre);
+  if (f) panelAbrir(f);
+}
+
+function navegacionPrecios(idx) {
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body']) || [];
+  if (idx < 0 || idx >= lista.length) return null;
+  return {
+    texto: `${idx + 1} de ${lista.length}`,
+    anterior: idx > 0 ? () => abrirFilaPrecios(idx - 1) : null,
+    siguiente: idx < lista.length - 1 ? () => abrirFilaPrecios(idx + 1) : null,
+  };
+}
+
+function fichaSustanciaPrecios(idx) {
+  const s = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body'] || [])[idx];
+  if (!s || !s.presentaciones) return null;
+  window.__pvPresentaciones = s.presentaciones;
+  return {
+    antetitulo: 'Producto',
+    titulo: s.nombre,
+    sub: `${s.presentaciones.length} presentaciones · ${s.facturas.toLocaleString('es-CL')} facturas · ${clp(s.totalFacturado)} neto`,
+    cuerpo: `<div class="panel-h">Presentaciones — clic para ver clientes y precios</div>
+      <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Presentación</th><th style="text-align:right">Facturas</th><th>Última venta</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Rango</th></tr></thead><tbody>
+        ${s.presentaciones.map((p, i) => `<tr class="pv-fila" onclick="panelAbrir(fichaProductoVenta(window.__pvPresentaciones[${i}].nombre), true)">
+          <td><span class="panel-link">${escapeHtml(p.nombre)}</span>${p.alias && p.alias.size > 1 ? ' ' + infoTip('Nombres que se juntaron aquí: ' + [...p.alias].join(' · ')) : ''}</td>
+          <td style="text-align:right">${p.facturas}</td><td>${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+          <td class="oc-monto">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <small class="pv-unidad">/ ${escapeHtml(p.ultimaUnidad)}</small>` : ''}</td>
+          <td class="oc-monto" style="font-weight:400;color:var(--text-2)">${p.precioMin != null && p.precioMin !== p.precioMax ? `${clp(p.precioMin)} – ${clp(p.precioMax)}` : '—'}</td></tr>`).join('')}
+      </tbody></table>`,
+    navegacion: navegacionPrecios(idx),
+  };
 }
 
 function botonNavProductoFacturaHtml(nombreActual) {
@@ -3811,8 +3904,8 @@ function fichaProductoVenta(nombreProducto) {
   });
   const clientes = [...porCliente.values()].sort((a, b) => b.ultima.localeCompare(a.ultima));
   window.__pvClientes = clientes;
-  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body']) || facturaProductosUnicosF;
-  const idx = lista.findIndex(p => p.nombre === nombreProducto);
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body']) || [];
+  const idx = lista.findIndex(p => p.nombre === nombreProducto && !p.presentaciones);
   const alias = prod.alias && prod.alias.size > 1 ? [...prod.alias] : null;
   return {
     antetitulo: 'Producto',
@@ -3832,11 +3925,7 @@ function fichaProductoVenta(nombreProducto) {
           <td><span class="panel-link">${escapeHtml(c.cliente)}</span></td><td style="text-align:right">${c.docs.size}</td><td>${fDate(c.ultima)}</td>
           <td class="oc-monto">${c.precio != null ? clp(c.precio) : '—'}${c.unidad ? ` <small class="pv-unidad">/ ${escapeHtml(c.unidad)}</small>` : ''}</td><td class="oc-monto" style="font-weight:500">${clp(c.total)}</td></tr>`).join('')}
       </tbody></table>`,
-    navegacion: idx === -1 ? null : {
-      texto: `Producto ${idx + 1} de ${lista.length}`,
-      anterior: idx > 0 ? () => openProductoFacturaDetail(lista[idx - 1].nombre) : null,
-      siguiente: idx < lista.length - 1 ? () => openProductoFacturaDetail(lista[idx + 1].nombre) : null,
-    },
+    navegacion: idx === -1 ? null : navegacionPrecios(idx),
   };
 }
 
@@ -11730,17 +11819,25 @@ const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X
   'PEDIDO SEGUN FARMACIA PREPARADO PREPARADA ENTREGA INMEDIATA URGENTE COD CODIGO FORMULA SE REQUIERE ' +
   'CADA VIGENCIA MINIMA ANO ANOS FICHA TECNICA STOCK DISPONIBILIDAD OCTUBRE NOVIEMBRE DICIEMBRE ENERO ' +
   'FEBRERO MARZO ABRIL MAYO JUNIO JULIO AGOSTO SEPTIEMBRE UNIDAD UNIDADES UN UND ' +
-  'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO').split(' '));
+  'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO ' +
+  'BIDON BIDONES ENVASE POTE POTES FCO USP').split(' '));
 
 function hospPalabrasProducto(nombre) {
   let t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // "A. CITRICO" y "A CITRICO" son "ACIDO CITRICO" (la abreviatura de una
+  // letra se perdería).
+  t = t.replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ');
   // El envase ("1x60", "2 FRASCO X 30") no es parte del producto: se quita.
   t = t.replace(/\d+\s*X\s*\d+/g, ' ');
   // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
   t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
+  // Decimales en medidas: "2,5LT" es 2,5 litros (no "2" y "5L").
+  t = t.replace(/(\d+)[.,](\d+)(?=\s*(LITROS?|LTS?|L|MLS?|CC|GRAMOS?|GRS?|G|MG|MCG|KG)\b)/g, '$1P$2');
   // Medidas pegadas al número: "3 LTS" = "3LTS" = "3L".
   t = t.replace(/(\d)\s*(LITROS?|LTS?|L)\b/g, '$1L').replace(/(\d)\s*(MLS?|CC)\b/g, '$1ML')
        .replace(/(\d)\s*(GRAMOS?|GRS?|G)\b/g, '$1G').replace(/(\d)\s*(MG|MCG|UI|KG)\b/g, '$1$2');
+  // "LT" o "KG" sueltos, sin número delante, son 1 litro o 1 kilo ("90% , LT").
+  t = t.replace(/(^|[^A-Z0-9])(LITROS?|LTS?)(?![A-Z0-9])/g, '$1 1L').replace(/(^|[^A-Z0-9])KG(?![A-Z0-9])/g, '$1 1KG');
   // Equivalencias (PEG = POLIETILENGLICOL): todas cuentan como la misma palabra.
   const equivalente = w => { const f = SINONIMOS_PRODUCTO.find(x => x.includes(w)); return f ? f[f.length - 1] : w; };
   return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente));
@@ -11768,11 +11865,18 @@ function hospNombreCorto(nombre) {
 function agruparNombresProducto(pesos, unificadoDe) {
   const esUnif = n => (unificadoDe ? unificadoDe(n) : null);
   const lista = [...pesos.keys()].sort((a, b) => (esUnif(b) ? 1 : 0) - (esUnif(a) ? 1 : 0) || pesos.get(b) - pesos.get(a));
+  // Casi todas las palabras del nombre más corto tienen que estar en el otro,
+  // y entre los dos tienen que compartir más de la mitad de las del más largo
+  // (así "ACIDO CITRICO, CITRATO POTASIO" no cae dentro de "ACIDO CITRICO").
   const parecido = (A, B) => {
     if (!A.size || !B.size) return 0;
     const comunes = [...A].filter(w => B.has(w)).length;
-    return comunes ? comunes / Math.min(A.size, B.size) : 0;
+    if (!comunes || comunes / Math.max(A.size, B.size) <= 0.5) return 0;
+    return comunes / Math.min(A.size, B.size);
   };
+  // Para sumar un nombre al que le falta la medida: sus palabras tienen que
+  // estar (casi) todas en el otro grupo.
+  const cabeEn = (A, B) => (A.size ? [...A].filter(w => B.has(w)).length / A.size : 0);
   const grupos = [];
   lista.forEach(n => {
     const unificado = esUnif(n);
@@ -11800,9 +11904,15 @@ function agruparNombresProducto(pesos, unificadoDe) {
   // grupo compatible que la tiene completa (si hay dos posibles, no se adivina).
   grupos.slice().sort((a, b) => a.medidasSet.length - b.medidasSet.length).forEach(g => {
     if (g.unificado || g.absorbido) return;
-    const posibles = grupos.filter(h => h !== g && !h.absorbido && h.medidasSet.length > g.medidasSet.length
-      && g.medidasSet.every(m => h.medidasSet.includes(m)) && parecido(g.sinMedidas, h.sinMedidas) >= 0.8);
-    if (posibles.length !== 1) return;
+    const conMedida = grupos.filter(h => h !== g && !h.absorbido && h.medidasSet.length > g.medidasSet.length
+      && g.medidasSet.every(m => h.medidasSet.includes(m)));
+    // Si se parece (aunque sea poco) a más de un grupo, no se adivina.
+    const parecidos = conMedida.filter(h => {
+      const comunes = [...g.sinMedidas].filter(w => h.sinMedidas.has(w)).length;
+      return comunes && comunes / Math.min(g.sinMedidas.size, h.sinMedidas.size) >= 0.8;
+    });
+    const posibles = parecidos.filter(h => cabeEn(g.sinMedidas, h.sinMedidas) >= 0.8);
+    if (parecidos.length !== 1 || posibles.length !== 1) return;
     const h = posibles[0];
     Object.entries(g.nombres).forEach(([n, v]) => { h.nombres[n] = (h.nombres[n] || 0) + v; });
     g.absorbido = true;
