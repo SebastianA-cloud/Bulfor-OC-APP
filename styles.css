@@ -1387,3 +1387,5 @@ body.con-panel .col-sec { display: none; }
 .panel-tabla-cuadros th, .panel-tabla-cuadros td { border: 1px solid var(--border); }
 .panel-tabla-cuadros tr:last-child td { border-bottom: 1px solid var(--border); }
 .panel-tabla-cuadros tbody tr:nth-child(even) td { background: #FBFAF8; }
+.panel-h-accion { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.panel-h-accion .page-btn { text-transform: none; letter-spacing: 0; font-weight: 500; }

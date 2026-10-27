@@ -61,6 +61,35 @@ async function copiarTexto(valor, boton) {
   }
 }
 
+// Copia una tabla para pegarla en un correo (Gmail, Outlook) como tabla con
+// sus casillas, o en Excel/texto como columnas.
+async function copiarTabla(html, texto, boton) {
+  let ok = false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([texto], { type: 'text/plain' }),
+    })]);
+    ok = true;
+  } catch (e) {
+    // Navegadores sin ese permiso: se copia la tabla seleccionándola en pantalla.
+    const div = document.createElement('div');
+    div.contentEditable = 'true';
+    div.style.cssText = 'position:fixed;left:-9999px;top:0';
+    div.innerHTML = html;
+    document.body.appendChild(div);
+    const rango = document.createRange(); rango.selectNodeContents(div);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rango);
+    try { ok = document.execCommand('copy'); } catch (e2) { /* sin copia */ }
+    sel.removeAllRanges(); div.remove();
+  }
+  if (boton) {
+    const antes = boton.innerHTML;
+    boton.innerHTML = ok ? '<i class="ti ti-check"></i> Copiada' : 'No se pudo copiar';
+    setTimeout(() => { boton.innerHTML = antes; }, 1600);
+  }
+}
+
 // Abre una ficha. Si viene de "Relacionado" (desde=true) se apila para volver.
 function panelAbrir(ficha, desde) {
   if (!ficha) return;

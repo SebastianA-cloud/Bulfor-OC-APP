@@ -2354,11 +2354,16 @@ function fichaOC(codigoOC) {
   const relacionados = items.filter(it => it.codigooc === codigoOC);
   const facturado = ocFacturadoPorOC()[codigoOC.trim()] || 0;
   window.__ocItemsTextos = relacionados.map(it => ({ textoOriginal: textoOriginalDe(it), nombreFinal: nombreFinalDe(it) }));
+  // Si la OC ya tiene facturas, el nombre de cada producto se reemplaza por el
+  // que sale en la factura (se busca después, ver ocNombresDesdeFactura).
+  const idProd = `oc-prod-${Date.now()}`;
+  const facturasVigentes = historialDocumentosOC(codigoOC).filter(d => d.tipo_dte === '33' && estadoAceptacionFusionado(d) !== 'N' && !notaCreditoQueAnula(d.folio));
+  if (relacionados.length && facturasVigentes.length) setTimeout(() => ocNombresDesdeFactura(relacionados, facturasVigentes, idProd), 0);
   const productos = relacionados.length ? `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
       ${relacionados.map((it, i) => {
         const original = textoOriginalDe(it);
         const nombre = diccionarioNormalizacion[original] || original;
-        return `<tr><td><span class="panel-link" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para unificar el nombre de este producto">${escapeHtml(nombre)}</span></td>
+        return `<tr><td id="${idProd}-${i}"><span class="panel-link" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para unificar el nombre de este producto">${escapeHtml(nombre)}</span></td>
           <td style="text-align:right;white-space:nowrap">${it.cantidad||'—'} ${escapeHtml(it.unidad||'')}</td>
           <td style="text-align:right">${clp(it.preciounitario)}</td>
           <td style="text-align:right;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td></tr>`;
@@ -2381,6 +2386,7 @@ function fichaOC(codigoOC) {
       + (origen ? `<a class="page-btn" href="${origen.url}" target="_blank" rel="noopener">Ver ${origen.tipo === 'COT' ? 'compra ágil' : 'licitación'} ↗</a>` : '')
       + (fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri" onclick="ocFacturar('${cod}')">Facturar</button>` : ''),
     cuerpo: `<div class="panel-h">Productos</div>${productos}
+      ${ocTablaFacturasHtml(codigoOC, facturasVigentes)}
       ${r.nombreoc ? `<div class="panel-h">Nombre en Mercado Público</div><div style="font-size:12.5px;color:var(--text-2)">${escapeHtml(r.nombreoc)}</div>` : ''}`,
     relacionado: historialDocumentosOC(codigoOC).map(d => ({
       icono: d.tipo_dte === '61' ? 'ti-receipt-refund' : d.tipo_dte === '52' ? 'ti-truck-delivery' : 'ti-file-invoice',
@@ -2397,6 +2403,63 @@ function fichaOC(codigoOC) {
     },
     alCerrar: () => { if (document.getElementById('page-oc')?.classList.contains('active')) renderOC(); },
   };
+}
+
+// Nombres de los productos según la factura: a cada línea de la OC se le
+// busca la línea de factura con el mismo precio unitario (y, si hay empate, la
+// misma cantidad). Si la OC y la factura tienen las mismas líneas y no calza
+// ningún precio, se emparejan en orden. Solo cambia lo que se ve: la OC
+// original queda escrita debajo, más chica.
+async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
+  let its;
+  try { its = await fetchAll('documentos_gdexpress_items', `select=documento_id,nombre_producto,cantidad,precio_unitario&documento_id=in.(${facturas.map(d => d.id).join(',')})`); }
+  catch (e) { return; }
+  if (!Array.isArray(its) || !its.length || !document.getElementById(`${idProd}-0`)) return;
+  const usados = new Set();
+  const parecido = (a, b) => a && b && Math.abs(Number(a) - Number(b)) <= Math.max(1, Number(b) * 0.01);
+  lineasOC.forEach((it, i) => {
+    let mejor = -1, puntos = 0;
+    its.forEach((f, j) => {
+      if (usados.has(j) || !f.nombre_producto) return;
+      const p = (parecido(f.precio_unitario, it.preciounitario) ? 2 : 0) + (parecido(f.cantidad, it.cantidad) ? 1 : 0);
+      if (p > puntos) { puntos = p; mejor = j; }
+    });
+    if (mejor === -1 && lineasOC.length === its.length && !usados.has(i)) mejor = i;   // mismas líneas: en orden
+    if (mejor === -1) return;
+    const nombreFactura = its[mejor].nombre_producto;
+    // Si en otra factura de la OC el mismo producto se repite, no se vuelve a usar.
+    its.forEach((f, j) => { if (f.nombre_producto === nombreFactura && parecido(f.precio_unitario, its[mejor].precio_unitario)) usados.add(j); });
+    const celda = document.getElementById(`${idProd}-${i}`);
+    if (!celda) return;
+    const original = celda.innerHTML;
+    celda.innerHTML = `<b>${escapeHtml(nombreFactura)}</b><small class="panel-muted">En la OC: ${original}</small>`;
+  });
+}
+
+// Cuadro de las facturas de la OC (sin las anuladas), con botón para copiarlo
+// y pegarlo en un correo como tabla.
+function ocTablaFacturasHtml(codigoOC, facturas) {
+  if (!facturas.length) return '';
+  const lista = facturas.slice().sort((a, b) => String(a.fecha_emision || '').localeCompare(String(b.fecha_emision || '')) || Number(a.folio) - Number(b.folio));
+  const total = lista.reduce((t, d) => t + montoTotalDoc(d), 0);
+  window.__ocTablaCopiar = { codigo: codigoOC, filas: lista.map(d => [String(d.folio), d.fecha_emision ? fDate(d.fecha_emision) : '', clp(montoTotalDoc(d))]), total: clp(total) };
+  return `<div class="panel-h panel-h-accion"><span>Facturas de esta OC</span>
+      <button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="ocCopiarTablaFacturas(this)"><i class="ti ti-copy"></i> Copiar tabla</button></div>
+    <table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Monto</th></tr></thead><tbody>
+      ${window.__ocTablaCopiar.filas.map(f => `<tr><td class="mono">${escapeHtml(f[0])}</td><td>${f[1]}</td><td style="text-align:right">${f[2]}</td></tr>`).join('')}
+      ${lista.length > 1 ? `<tr><td colspan="2" style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">${clp(total)}</td></tr>` : ''}
+    </tbody></table>`;
+}
+
+function ocCopiarTablaFacturas(boton) {
+  const t = window.__ocTablaCopiar;
+  if (!t) return;
+  const celda = 'border:1px solid #999;padding:4px 10px;font-family:Arial,sans-serif;font-size:13px';
+  const filas = t.filas.map(f => `<tr><td style="${celda}">${escapeHtml(f[0])}</td><td style="${celda}">${f[1]}</td><td style="${celda};text-align:right">${f[2]}</td></tr>`).join('')
+    + (t.filas.length > 1 ? `<tr><td style="${celda};font-weight:bold" colspan="2">Total</td><td style="${celda};text-align:right;font-weight:bold">${t.total}</td></tr>` : '');
+  const html = `<table style="border-collapse:collapse"><thead><tr><th style="${celda};background:#eee">N° factura</th><th style="${celda};background:#eee">Fecha de emisión</th><th style="${celda};background:#eee">Monto</th></tr></thead><tbody>${filas}</tbody></table>`;
+  const texto = ['N° factura\tFecha de emisión\tMonto', ...t.filas.map(f => f.join('\t')), ...(t.filas.length > 1 ? [`Total\t\t${t.total}`] : [])].join('\n');
+  copiarTabla(html, texto, boton);
 }
 
 // "Facturar": abre Creación de documentos → Factura con el cliente y la OC.
