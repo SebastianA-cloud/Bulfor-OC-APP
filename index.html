@@ -11830,6 +11830,57 @@ const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X
   'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO ' +
   'BIDON BIDONES ENVASE POTE POTES FCO USP CP CPS CAP CAPS COMP COMPRIMIDO COMPRIMIDOS TAB TABS').split(' '));
 
+// ─── Errores de tipeo ─────────────────────────────────────────────────────
+// Palabra mal escrita → palabra bien escrita ("ACETILCITEINA" → "ACETILCISTEINA").
+// Se arma sola al agrupar (ver aprenderCorrecciones): una palabra que aparece
+// menos que otra y se diferencia en una letra (dos si es larga) se toma como
+// error de tipeo de la más usada. Solo palabras largas, para no confundir
+// productos distintos ("SULFATO"/"SULFITO" no se tocan).
+const PALABRAS_CORREGIDAS = new Map();
+
+// Diferencia entre dos palabras (letras cambiadas, de más, de menos o dos
+// vecinas al revés), cortando apenas pasa del máximo.
+function distanciaPalabras(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const ant2 = [], ant = [], fila = [];
+  for (let j = 0; j <= b.length; j++) ant[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    fila[0] = i;
+    let menor = i;
+    for (let j = 1; j <= b.length; j++) {
+      const c = a[i - 1] === b[j - 1] ? 0 : 1;
+      fila[j] = Math.min(ant[j] + 1, fila[j - 1] + 1, ant[j - 1] + c);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) fila[j] = Math.min(fila[j], ant2[j - 2] + 1);
+      if (fila[j] < menor) menor = fila[j];
+    }
+    if (menor > max) return max + 1;
+    ant2.splice(0, ant2.length, ...ant);
+    ant.splice(0, ant.length, ...fila);
+  }
+  return ant[b.length];
+}
+
+// Revisa las palabras de una lista de nombres y anota las que parecen mal escritas.
+function aprenderCorrecciones(nombres) {
+  const cuenta = new Map();
+  nombres.forEach(n => hospPalabrasProducto(n).forEach(w => {
+    if (/\d/.test(w) || w.length < 8) return;
+    cuenta.set(w, (cuenta.get(w) || 0) + 1);
+  }));
+  const palabras = [...cuenta.keys()].sort((a, b) => cuenta.get(b) - cuenta.get(a));
+  palabras.forEach((rara, i) => {
+    // Un error de tipeo aparece muy pocas veces; una palabra que se repite es
+    // una palabra real (ej. POLIETILENO no es POLIESTIRENO mal escrito).
+    if (PALABRAS_CORREGIDAS.has(rara) || cuenta.get(rara) > 2) return;
+    const max = rara.length >= 11 ? 2 : 1;
+    for (let k = 0; k < i; k++) {
+      const buena = palabras[k];
+      if (cuenta.get(buena) < 3 * cuenta.get(rara) || buena[0] !== rara[0] || PALABRAS_CORREGIDAS.has(buena)) continue;
+      if (distanciaPalabras(rara, buena, max) <= max) { PALABRAS_CORREGIDAS.set(rara, buena); break; }
+    }
+  });
+}
+
 // porUnidad: el producto se vende por cápsula/comprimido (precio "/ CP"):
 // entonces cuántas trae cada frasco no cambia el producto.
 function hospPalabrasProducto(nombre, porUnidad) {
@@ -11863,7 +11914,8 @@ function hospPalabrasProducto(nombre, porUnidad) {
   t = t.replace(/(^|[^A-Z0-9])(LITROS?|LTS?)(?![A-Z0-9])/g, '$1 1L').replace(/(^|[^A-Z0-9])KG(?![A-Z0-9])/g, '$1 1KG');
   // Equivalencias (PEG = POLIETILENGLICOL): todas cuentan como la misma palabra.
   const equivalente = w => { const f = SINONIMOS_PRODUCTO.find(x => x.includes(w)); return f ? f[f.length - 1] : w; };
-  let palabras = t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente);
+  let palabras = t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w))
+    .map(w => PALABRAS_CORREGIDAS.get(w) || w).map(equivalente);
   // Si trae varias cantidades distintas ("20 FRASCO X 30 CAPSULAS, 13 FRASCO
   // X 60 CAPSULAS…") es un detalle de entregas, no el tamaño del envase: no cuentan.
   // Lo mismo si se vende por cápsula: el precio es por unidad y cuántas trae
@@ -11879,7 +11931,7 @@ function hospNombreCorto(nombre) {
   let t = String(nombre || '').split(/[\r\n]+/).map(x => x.trim()).filter(Boolean)[0] || String(nombre || '');
   t = t.replace(/[,.\s]*(ELABORADO|ELABORADA|DESPACHO|VENCIMIENTO|VIGENCIA|MONTO MINIMO)\b.*$/i, '');
   // Sin la cantidad de frascos pedida: "84FCO X 30CP" → "30CP".
-  t = t.replace(/\d+\s*(FCOS?|FRASCOS?)\s*X\s*/gi, '').replace(/\(\s*([^()]*?)\s*\)/g, ' $1').replace(/\s*,\s*/g, ', ').replace(/\s{2,}/g, ' ');
+  t = t.replace(/\d+\s*(FCOS?|FRASCOS?)\s*X\s*/gi, '').replace(/\(\s*([^()]*?)\s*\)/g, ' $1').replace(/\s+,/g, ',').replace(/,(?=[^\s\d])/g, ', ').replace(/\s{2,}/g, ' ');
   return t.replace(/[\s,.;:-]+$/, '').trim() || String(nombre || '').trim();
 }
 
@@ -11896,6 +11948,7 @@ function hospNombreCorto(nombre) {
 // Devuelve { grupos: [{ nombre, nombres: {nombre: veces} }], grupoDe: Map nombre -> grupo }.
 // porUnidad(nombre): true si ese producto se vende por cápsula/comprimido.
 function agruparNombresProducto(pesos, unificadoDe, porUnidad) {
+  aprenderCorrecciones([...pesos.keys()]);
   const esUnif = n => (unificadoDe ? unificadoDe(n) : null);
   const lista = [...pesos.keys()].sort((a, b) => (esUnif(b) ? 1 : 0) - (esUnif(a) ? 1 : 0) || pesos.get(b) - pesos.get(a));
   // Casi todas las palabras del nombre más corto tienen que estar en el otro,
