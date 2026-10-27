@@ -16404,7 +16404,8 @@ async function instalarApp() {
 </script>
 <script>
 // Escritorio: el submenú aparece al pasar el mouse por un módulo, junto a él, y se oculta al salir.
-// Hacer clic en un módulo no navega: el submenú se elige desde el mismo lugar.
+// Hacer clic en un módulo con varias páginas no navega: el submenú se elige
+// desde el mismo lugar. Los módulos de una sola página entran directo al clic.
 (function () {
   const escritorio = window.matchMedia('(min-width: 901px)');
   const nav = document.getElementById('nav-submenu');
@@ -16422,9 +16423,11 @@ async function instalarApp() {
     clearTimeout(timer);
     timer = setTimeout(ocultar, 180);
   }
+  // Un menú de una sola página (Precios, FedEx…) no muestra submenú: se entra al tiro con el clic.
+  const conSubmenu = modulo => !!SUBMENUS[modulo] && SUBMENUS[modulo].items.length > 1;
   function mostrar(tab) {
     const modulo = tab.dataset.modulo;
-    if (!modulo || !SUBMENUS[modulo]) { ocultar(); return; }
+    if (!modulo || !conSubmenu(modulo)) { ocultar(); return; }
     clearTimeout(timer);
     if (moduloMostrado !== modulo) {
       renderNavSubmenuMobile(modulo, paginaActual());
@@ -16445,7 +16448,7 @@ async function instalarApp() {
   document.addEventListener('click', function (e) {
     if (!escritorio.matches || !e.target.closest) return;
     const tab = e.target.closest('.modulo-tab');
-    if (tab && SUBMENUS[tab.dataset.modulo]) { e.stopPropagation(); e.preventDefault(); }
+    if (tab && conSubmenu(tab.dataset.modulo)) { e.stopPropagation(); e.preventDefault(); }
   }, true);
   // Al elegir una página, el submenú se cierra.
   document.addEventListener('click', function (e) {
