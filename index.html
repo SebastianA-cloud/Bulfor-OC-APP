@@ -2469,18 +2469,13 @@ function ocTablaFacturasHtml(codigoOC, facturas) {
   const lista = facturas.slice().sort((a, b) => String(a.fecha_emision || '').localeCompare(String(b.fecha_emision || '')) || Number(a.folio) - Number(b.folio));
   const total = lista.reduce((t, d) => t + montoTotalDoc(d), 0);
   window.__ocTablaCopiar = { codigo: codigoOC, filas: lista.map(d => [String(d.folio), d.fecha_emision ? fDate(d.fecha_emision) : '', clp(montoTotalDoc(d))]), total: clp(total) };
-  const pago = d => {
-    const p = pagoDeFolio(d.folio);
-    if (!p) return '<span class="badge badge-gray">Sin registro</span>';
-    return p.estado_pago === 'Pagado' || p.fecha_pago ? `<span class="badge badge-green">Pagada${p.fecha_pago ? ' ' + fDate(p.fecha_pago) : ''}</span>` : `<span class="badge badge-amber">Por cobrar</span>`;
-  };
   return `<div class="oc-facturas">
     <div class="oc-facturas-cab"><span><i class="ti ti-file-invoice"></i> Facturas de esta OC <b>${lista.length}</b></span>
       <button class="btn-copiar-tabla" onclick="ocCopiarTablaFacturas(this)" title="Copia N°, fecha y monto para pegarlos en un correo"><i class="ti ti-copy"></i> Copiar tabla</button></div>
-    <table class="oc-facturas-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th>Pago</th><th style="text-align:right">Monto</th></tr></thead><tbody>
+    <table class="oc-facturas-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Monto</th></tr></thead><tbody>
       ${lista.map((d, i) => `<tr><td><button class="oc-folio" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))} ›</button></td>
-        <td>${window.__ocTablaCopiar.filas[i][1]}</td><td>${pago(d)}</td><td class="oc-monto">${window.__ocTablaCopiar.filas[i][2]}</td></tr>`).join('')}
-    </tbody>${lista.length > 1 ? `<tfoot><tr><td colspan="3">Total facturado</td><td class="oc-monto">${clp(total)}</td></tr></tfoot>` : ''}</table>
+        <td>${window.__ocTablaCopiar.filas[i][1]}</td><td class="oc-monto">${window.__ocTablaCopiar.filas[i][2]}</td></tr>`).join('')}
+    </tbody>${lista.length > 1 ? `<tfoot><tr><td colspan="2">Total facturado</td><td class="oc-monto">${clp(total)}</td></tr></tfoot>` : ''}</table>
   </div>`;
 }
 
