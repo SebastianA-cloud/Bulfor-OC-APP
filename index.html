@@ -2410,8 +2410,8 @@ function fichaOC(codigoOC) {
 // Nombres de los productos según la factura: a cada línea de la OC se le
 // busca la línea de factura con el mismo precio unitario (y, si hay empate, la
 // misma cantidad). Si la OC y la factura tienen las mismas líneas y no calza
-// ningún precio, se emparejan en orden. Solo cambia lo que se ve: la OC
-// original queda escrita debajo, más chica.
+// ningún precio, se emparejan en orden. Solo cambia lo que se ve: el texto
+// original de la OC se ve en la "i" junto al nombre.
 async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   let its;
   try { its = await fetchAll('documentos_gdexpress_items', `select=documento_id,nombre_producto,cantidad,precio_unitario&documento_id=in.(${facturas.map(d => d.id).join(',')})`); }
@@ -2433,8 +2433,12 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
     its.forEach((f, j) => { if (f.nombre_producto === nombreFactura && parecido(f.precio_unitario, its[mejor].precio_unitario)) usados.add(j); });
     const celda = document.getElementById(`${idProd}-${i}`);
     if (!celda) return;
-    const original = celda.innerHTML;
-    celda.innerHTML = `<b>${escapeHtml(nombreFactura)}</b><small class="panel-muted">En la OC: ${original}</small>`;
+    // El nombre de la factura sigue abriendo "Unificar nombre" (como antes) y
+    // el texto original de la OC queda en la "i", para no llenar el cuadro.
+    const link = celda.querySelector('.panel-link');
+    const original = link ? link.textContent : celda.textContent;
+    if (link) link.textContent = nombreFactura; else celda.textContent = nombreFactura;
+    celda.insertAdjacentHTML('beforeend', ' ' + infoTip('En la OC: ' + original));
   });
 }
 
