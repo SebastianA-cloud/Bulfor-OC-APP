@@ -30,6 +30,7 @@
 //     relacionado: [
 //       { icono: 'ti-truck', titulo: 'Envío FedEx', resumen: 'Entregado 17-10', abrir: () => ficha },
 //     ],
+//     pie: '<details>…</details>',            // va al final, después de Relacionado
 //     navegacion: { texto: 'Factura 3 de 85', anterior: fn, siguiente: fn },  // flechas ↑ ↓
 //     alCerrar: fn,
 //   }
@@ -203,6 +204,7 @@ function panelPintar() {
       ${f.acciones ? `<div class="panel-acciones">${f.acciones}</div>` : ''}
       ${f.cuerpo || ''}
       ${rel ? `<div class="panel-h">Relacionado</div><div class="panel-rels">${rel}</div>` : ''}
+      ${f.pie || ''}
     </div>`;
   el.querySelector('.panel-cuerpo').scrollTop = 0;
   document.body.classList.add('con-panel');

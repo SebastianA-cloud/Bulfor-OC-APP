@@ -1488,3 +1488,15 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .panel-lateral { bottom: auto; max-height: calc(100vh - 48px); }
 .panel-cuerpo { flex: 0 1 auto; }
 @media (max-width: 640px) { .panel-lateral { bottom: 0; max-height: none; } .panel-cuerpo { flex: 1 1 auto; } }
+/* Cuadro de facturas a todo el ancho (como la tabla de productos) */
+.oc-facturas { width: auto; align-self: stretch; }
+.oc-facturas-tabla { width: 100%; }
+/* "Saldo pendiente" al final, como barra que se despliega */
+.oc-saldo { align-self: stretch; }
+.oc-saldo summary { list-style: none; cursor: pointer; border-bottom: 0; }
+.oc-saldo summary::-webkit-details-marker { display: none; }
+.oc-saldo summary:hover { background: #F3F1EC; }
+.oc-saldo details[open] summary { border-bottom: 1px solid var(--border); }
+.oc-saldo-flecha { transition: transform .15s; color: var(--text-3); }
+.oc-saldo details[open] .oc-saldo-flecha { transform: rotate(90deg); }
+.panel-cuerpo > .oc-saldo, .panel-cuerpo > .oc-facturas { flex: 0 0 auto; }

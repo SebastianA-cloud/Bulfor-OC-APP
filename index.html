@@ -2362,8 +2362,8 @@ function fichaOC(codigoOC) {
   const productos = relacionados.length ? `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
       ${relacionados.map((it, i) => {
         const original = textoOriginalDe(it);
-        const nombre = diccionarioNormalizacion[original] || original;
-        return `<tr><td id="${idProd}-${i}"><span class="panel-link" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para unificar el nombre de este producto">${escapeHtml(nombre)}</span></td>
+        const nombre = ocNombreProducto(it);
+        return `<tr><td id="${idProd}-${i}"><span class="panel-link" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para unificar el nombre de este producto">${escapeHtml(nombre)}</span>${nombre !== original ? ' ' + infoTip('En la OC: ' + original) : ''}</td>
           <td style="text-align:right;white-space:nowrap">${it.cantidad||'—'} ${escapeHtml(it.unidad||'')}</td>
           <td style="text-align:right">${clp(it.preciounitario)}</td>
           <td style="text-align:right;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td></tr>`;
@@ -2399,8 +2399,10 @@ function fichaOC(codigoOC) {
     sub: `${lugar} · ${fDate(r.fechaenvio || r.fechaoc)}`,
     resumen: `<div class="oc-arriba">${infoOC}${facturacion}</div>`,
     cuerpo: `<div class="panel-h">Productos</div>${productos}
-      ${facturasVigentes.length ? `<div class="oc-fact-fila">${ocTablaFacturasHtml(codigoOC, facturasVigentes)}
-        ${relacionados.length ? `<div class="oc-saldo" id="${idProd}-saldo"><div class="skeleton" style="height:120px"></div></div>` : ''}</div>` : ''}`,
+      ${ocTablaFacturasHtml(codigoOC, facturasVigentes)}`,
+    // "Saldo pendiente" va al final, plegado: se arma al cargar los productos
+    // de las facturas y solo aparece si la OC se está facturando por partes.
+    pie: facturasVigentes.length && relacionados.length ? `<div id="${idProd}-saldo" style="display:none"></div>` : '',
     // Las facturas vigentes ya están en el cuadro (con link): aquí solo queda
     // el resto del historial (anuladas, notas de crédito y guías).
     relacionado: historialDocumentosOC(codigoOC).filter(d => !facturasVigentes.includes(d)).map(d => ({
@@ -2418,6 +2420,18 @@ function fichaOC(codigoOC) {
     },
     alCerrar: () => { if (document.getElementById('page-oc')?.classList.contains('active')) renderOC(); },
   };
+}
+
+// Nombre de un producto en la ficha de la OC: el unificado si existe; si no,
+// la "Esp. Proveedor" (lo que nosotros ofertamos, que trae el nombre real del
+// producto) antes que la "Esp. Comprador" (que a veces son solo condiciones,
+// como "Resolución sanitaria vigencia mínima…"). Solo afecta lo que se ve en
+// la ficha: Precios y "Unificar nombre" siguen usando el mismo texto de antes.
+function ocNombreProducto(it) {
+  const original = textoOriginalDe(it);
+  if (diccionarioNormalizacion[original]) return diccionarioNormalizacion[original];
+  if (it.especificacionproveedor && !esRuido(it.especificacionproveedor)) return it.especificacionproveedor;
+  return original;
 }
 
 // Productos de las facturas de la OC, emparejados con las líneas de la OC.
@@ -2465,9 +2479,9 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
     if (!celda || !lista.length) return;
     const nombreFactura = lista[0].nombre_producto;
     const link = celda.querySelector('.panel-link');
-    const original = link ? link.textContent : celda.textContent;
+    const original = textoOriginalDe(lineasOC[i]);
     if (link) link.textContent = nombreFactura; else celda.textContent = nombreFactura;
-    celda.insertAdjacentHTML('beforeend', ' ' + infoTip('En la OC: ' + original));
+    if (!celda.querySelector('.info-tip')) celda.insertAdjacentHTML('beforeend', ' ' + infoTip('En la OC: ' + original));
   });
 
   // 2) Cuadro "Por facturar por producto".
@@ -2475,7 +2489,7 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   const filas = lineasOC.map((it, i) => {
     const pedidos = Number(it.cantidad) || 0;
     const facturados = asignados[i].reduce((t, f) => t + (Number(f.cantidad) || 0), 0);
-    const nombre = asignados[i][0]?.nombre_producto || nombreFinalDe(it) || textoOriginalDe(it);
+    const nombre = asignados[i][0]?.nombre_producto || ocNombreProducto(it);
     return { nombre, pedidos, facturados, faltan: Math.max(0, pedidos - facturados) };
   });
   const pendientes = filas.filter(f => f.faltan > 0).length;
@@ -2483,14 +2497,16 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   // no aporta: solo sirve cuando la OC se va facturando por partes.
   if (!pendientes && facturas.length <= 1 && !sinPareja.length) { cajaSaldo.remove(); return; }
   const num = n => Number(n).toLocaleString('es-CL');
-  cajaSaldo.innerHTML = `
-    <div class="oc-saldo-cab"><span><i class="ti ti-list-check"></i> Saldo pendiente ${infoTip('Lo que queda disponible de cada producto de la OC: lo pedido menos lo que ya se facturó.')}</span>
-      ${pendientes ? `<span class="badge badge-amber">${pendientes} con saldo</span>` : '<span class="badge badge-green">Todo facturado ✓</span>'}</div>
+  cajaSaldo.className = 'oc-saldo';
+  cajaSaldo.style.display = '';
+  cajaSaldo.innerHTML = `<details>
+    <summary class="oc-saldo-cab"><span><i class="ti ti-chevron-right oc-saldo-flecha"></i> Saldo pendiente ${infoTip('Lo que queda disponible de cada producto de la OC: lo pedido menos lo que ya se facturó.')}</span>
+      ${pendientes ? `<span class="badge badge-amber">${pendientes} con saldo</span>` : '<span class="badge badge-green">Todo facturado ✓</span>'}</summary>
     <table class="oc-saldo-tabla"><thead><tr><th>Producto</th><th class="oc-saldo-disp">Disponible</th></tr></thead><tbody>
       ${filas.map(f => `<tr class="${f.faltan ? '' : 'listo'}"><td title="${escapeHtml(f.nombre)}">${escapeHtml(f.nombre)}</td>
         <td class="oc-saldo-disp">${f.faltan ? `<b>${num(f.faltan)}</b> <small>de ${num(f.pedidos)}</small>` : '<span class="oc-sin-saldo">Sin saldo</span>'}</td></tr>`).join('')}
     </tbody></table>
-    ${sinPareja.length ? `<div class="oc-saldo-nota">${sinPareja.length} producto${sinPareja.length === 1 ? '' : 's'} de las facturas no calza${sinPareja.length === 1 ? '' : 'n'} con ninguno de la OC: revisa a mano. ${infoTip('No calzan: ' + [...new Set(sinPareja.map(f => f.nombre_producto))].join(' · '))}</div>` : ''}`;
+    ${sinPareja.length ? `<div class="oc-saldo-nota">${sinPareja.length} producto${sinPareja.length === 1 ? '' : 's'} de las facturas no calza${sinPareja.length === 1 ? '' : 'n'} con ninguno de la OC: revisa a mano. ${infoTip('No calzan: ' + [...new Set(sinPareja.map(f => f.nombre_producto))].join(' · '))}</div>` : ''}</details>`;
 }
 
 // Cuadro de las facturas de la OC (sin las anuladas), con botón para copiarlo
