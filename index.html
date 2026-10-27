@@ -3484,8 +3484,16 @@ async function cargarItemsFacturasVentaUnaVez() {
   // "A CITRICO 20%, 5LT"…) se juntan en uno, con la misma regla que la ficha
   // de hospital (ver agruparNombresProducto y productoVentaDe).
   const pesos = new Map();
-  facturaItemsRaw.forEach(it => { const n = (it.nombre_producto || 'Sin nombre').trim(); pesos.set(n, (pesos.get(n) || 0) + 1); });
-  grupoProductosVenta = agruparNombresProducto(pesos).grupoDe;
+  const porCapsula = new Map();   // nombre -> [ventas por cápsula, ventas en total]
+  facturaItemsRaw.forEach(it => {
+    const n = (it.nombre_producto || 'Sin nombre').trim();
+    pesos.set(n, (pesos.get(n) || 0) + 1);
+    const c = porCapsula.get(n) || [0, 0];
+    if (/^(CP|CPS|CAP|CAPS|CAPSULAS?|COMP|COMPRIMIDOS?|TAB|TABS|TABLETAS?)$/i.test((it.unidad || '').trim().replace(/\.$/, ''))) c[0]++;
+    c[1]++;
+    porCapsula.set(n, c);
+  });
+  grupoProductosVenta = agruparNombresProducto(pesos, null, n => { const c = porCapsula.get(n); return !!c && c[0] * 2 >= c[1]; }).grupoDe;
   const map = new Map();
   facturaItemsRaw.forEach(it => {
     const key = productoVentaDe(it.nombre_producto);
@@ -11822,13 +11830,21 @@ const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X
   'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO ' +
   'BIDON BIDONES ENVASE POTE POTES FCO USP CP CPS CAP CAPS COMP COMPRIMIDO COMPRIMIDOS TAB TABS').split(' '));
 
-function hospPalabrasProducto(nombre) {
+// porUnidad: el producto se vende por cápsula/comprimido (precio "/ CP"):
+// entonces cuántas trae cada frasco no cambia el producto.
+function hospPalabrasProducto(nombre, porUnidad) {
   let t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   // "A. CITRICO" y "A CITRICO" son "ACIDO CITRICO" (la abreviatura de una
   // letra se perdería).
   t = t.replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ');
+  // "600M G" mal escrito es 600 MG.
+  t = t.replace(/(\d)\s*M\s+G\b/g, '$1MG');
+  // La "X" pegada ("27FCOX30CP", "x30 CP") se separa para poder leer cada parte.
+  t = t.replace(/(FCOS?|FRASCOS?)X/g, '$1 X ').replace(/X(\d)/g, ' X $1');
   // El envase ("1x60", "2 FRASCO X 30") no es parte del producto: se quita.
   t = t.replace(/\d+\s*X\s*\d+/g, ' ');
+  // "84 FCO", "17FCOS": cuántos frascos se pidieron, no el producto.
+  t = t.replace(/\d+\s*(FCOS?|FRASCOS?)(?![A-Z0-9])/g, ' ');
   // La cantidad de cápsulas, comprimidos o sobres sí distingue (35 CP no es
   // 30 CP), pero escrita de cualquier forma cuenta igual: "35 CP" = "35CP" =
   // "35 CAPSULAS".
@@ -11850,8 +11866,10 @@ function hospPalabrasProducto(nombre) {
   let palabras = t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente);
   // Si trae varias cantidades distintas ("20 FRASCO X 30 CAPSULAS, 13 FRASCO
   // X 60 CAPSULAS…") es un detalle de entregas, no el tamaño del envase: no cuentan.
+  // Lo mismo si se vende por cápsula: el precio es por unidad y cuántas trae
+  // cada frasco da igual.
   const cantidades = new Set(palabras.filter(w => /^\d+(CAP|COMP|TAB|SOB)$/.test(w)));
-  if (cantidades.size > 1) palabras = palabras.filter(w => !cantidades.has(w));
+  if (cantidades.size > 1 || porUnidad) palabras = palabras.filter(w => !cantidades.has(w));
   return new Set(palabras);
 }
 
@@ -11860,6 +11878,8 @@ function hospPalabrasProducto(nombre) {
 function hospNombreCorto(nombre) {
   let t = String(nombre || '').split(/[\r\n]+/).map(x => x.trim()).filter(Boolean)[0] || String(nombre || '');
   t = t.replace(/[,.\s]*(ELABORADO|ELABORADA|DESPACHO|VENCIMIENTO|VIGENCIA|MONTO MINIMO)\b.*$/i, '');
+  // Sin la cantidad de frascos pedida: "84FCO X 30CP" → "30CP".
+  t = t.replace(/\d+\s*(FCOS?|FRASCOS?)\s*X\s*/gi, '').replace(/\(\s*([^()]*?)\s*\)/g, ' $1').replace(/\s*,\s*/g, ', ').replace(/\s{2,}/g, ' ');
   return t.replace(/[\s,.;:-]+$/, '').trim() || String(nombre || '').trim();
 }
 
@@ -11874,7 +11894,8 @@ function hospNombreCorto(nombre) {
 // pesos: Map nombre -> cuántas veces aparece. unificadoDe(nombre) dice si ese
 // nombre es un nombre unificado (manda como nombre del grupo).
 // Devuelve { grupos: [{ nombre, nombres: {nombre: veces} }], grupoDe: Map nombre -> grupo }.
-function agruparNombresProducto(pesos, unificadoDe) {
+// porUnidad(nombre): true si ese producto se vende por cápsula/comprimido.
+function agruparNombresProducto(pesos, unificadoDe, porUnidad) {
   const esUnif = n => (unificadoDe ? unificadoDe(n) : null);
   const lista = [...pesos.keys()].sort((a, b) => (esUnif(b) ? 1 : 0) - (esUnif(a) ? 1 : 0) || pesos.get(b) - pesos.get(a));
   // Casi todas las palabras del nombre más corto tienen que estar en el otro,
@@ -11892,7 +11913,7 @@ function agruparNombresProducto(pesos, unificadoDe) {
   const grupos = [];
   lista.forEach(n => {
     const unificado = esUnif(n);
-    const palabras = hospPalabrasProducto(n);
+    const palabras = hospPalabrasProducto(n, porUnidad ? porUnidad(n) : false);
     const medidasSet = [...palabras].filter(w => /\d/.test(w)).sort();
     const medidas = medidasSet.join(' ');
     let g = unificado ? grupos.find(x => x.unificado === unificado) : null;
