@@ -1670,15 +1670,17 @@ async function fetchAll(table, query) {
 
 function recalcularProductoPorOC() {
   const productosPorOCSet = {};
+  const textosBusquedaOC = {};
   items.forEach(it => {
-    // Usamos la MISMA lógica que el detalle de la OC (nombreFinalDe): prioriza
-    // la especificación real del producto por sobre el "productomp" genérico
-    // de Mercado Público (que en licitaciones suele ser solo la categoría,
-    // ej. "Farmacias", no el nombre real del producto).
-    const nombre = nombreFinalDe(it);
+    // Usamos la MISMA lógica que la ficha de la OC (ocNombreProducto): el
+    // nombre unificado o, si no hay, la Esp. Proveedor antes que la Esp.
+    // Comprador (que a veces trae solo condiciones, no el producto).
+    const nombre = ocNombreProducto(it);
     if (!nombre || nombre === '—') return;
     if (!productosPorOCSet[it.codigooc]) productosPorOCSet[it.codigooc] = [];
     if (!productosPorOCSet[it.codigooc].includes(nombre)) productosPorOCSet[it.codigooc].push(nombre);
+    // El buscador sigue encontrando la OC también por el texto del comprador.
+    (textosBusquedaOC[it.codigooc] = textosBusquedaOC[it.codigooc] || []).push(nombreFinalDe(it));
   });
   productoPorOC = {};
   productosTextoPorOC = {};
@@ -1696,7 +1698,7 @@ function recalcularProductoPorOC() {
       ? `${nombres[0]} +${nombres.length - 1}`
       : nombres[0];
     // El buscador encuentra la OC tanto por el nombre de la OC como por el de la factura.
-    productosTextoPorOC[codigo] = [...nombresOC, ...nombresFactura].join(' ');
+    productosTextoPorOC[codigo] = [...nombresOC, ...(textosBusquedaOC[codigo] || []), ...nombresFactura].join(' ');
   }
 }
 
