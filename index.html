@@ -1813,9 +1813,11 @@ function coincideBusqueda(texto, query) {
   // Búsqueda flexible: separa la consulta en palabras y exige que TODAS
   // aparezcan en el texto, sin importar el orden ni si hay otras palabras
   // entre medio. Así "padre hurtado" encuentra "HOSPITAL PADRE ALBERTO HURTADO".
+  // Tampoco importan las tildes: "resolucion" encuentra "RESOLUCIÓN" y al revés.
   if (!query) return true;
-  const palabras = query.toLowerCase().trim().split(/\s+/);
-  const textoLower = texto.toLowerCase();
+  const sinTildes = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const palabras = sinTildes(query).trim().split(/\s+/);
+  const textoLower = sinTildes(texto);
   return palabras.every(palabra => textoLower.includes(palabra));
 }
 
