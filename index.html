@@ -2464,29 +2464,44 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
 
 // Cuadro de las facturas de la OC (sin las anuladas), con botón para copiarlo
 // y pegarlo en un correo como tabla.
+// Neto de una factura: el que trae GDExpress o, si falta, el total sin el IVA.
+function netoDoc(d) {
+  const n = Number(d.monto);
+  return n ? n : Math.round(montoTotalDoc(d) / 1.19);
+}
+
 function ocTablaFacturasHtml(codigoOC, facturas) {
   if (!facturas.length) return '';
   const lista = facturas.slice().sort((a, b) => String(a.fecha_emision || '').localeCompare(String(b.fecha_emision || '')) || Number(a.folio) - Number(b.folio));
+  const totalNeto = lista.reduce((t, d) => t + netoDoc(d), 0);
   const total = lista.reduce((t, d) => t + montoTotalDoc(d), 0);
-  window.__ocTablaCopiar = { codigo: codigoOC, filas: lista.map(d => [String(d.folio), d.fecha_emision ? fDate(d.fecha_emision) : '', clp(montoTotalDoc(d))]), total: clp(total) };
+  window.__ocTablaCopiar = {
+    codigo: codigoOC,
+    filas: lista.map(d => [String(d.folio), d.fecha_emision ? fDate(d.fecha_emision) : '', clp(netoDoc(d)), clp(montoTotalDoc(d))]),
+    totalNeto: clp(totalNeto), total: clp(total),
+  };
+  const t = window.__ocTablaCopiar;
   return `<div class="oc-facturas">
     <div class="oc-facturas-cab"><span><i class="ti ti-file-invoice"></i> Facturas de esta OC <b>${lista.length}</b></span>
-      <button class="btn-copiar-tabla" onclick="ocCopiarTablaFacturas(this)" title="Copia N°, fecha y monto para pegarlos en un correo"><i class="ti ti-copy"></i> Copiar tabla</button></div>
-    <table class="oc-facturas-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Monto</th></tr></thead><tbody>
+      <button class="btn-copiar-tabla" onclick="ocCopiarTablaFacturas(this)" title="Copia la tabla para pegarla en un correo"><i class="ti ti-copy"></i> Copiar tabla</button></div>
+    <table class="oc-facturas-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Neto</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
       ${lista.map((d, i) => `<tr><td><button class="oc-folio" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))} ›</button></td>
-        <td>${window.__ocTablaCopiar.filas[i][1]}</td><td class="oc-monto">${window.__ocTablaCopiar.filas[i][2]}</td></tr>`).join('')}
-    </tbody>${lista.length > 1 ? `<tfoot><tr><td colspan="2">Total facturado</td><td class="oc-monto">${clp(total)}</td></tr></tfoot>` : ''}</table>
+        <td>${t.filas[i][1]}</td><td class="oc-monto oc-monto-neto">${t.filas[i][2]}</td><td class="oc-monto">${t.filas[i][3]}</td></tr>`).join('')}
+    </tbody>${lista.length > 1 ? `<tfoot><tr><td colspan="2">Total facturado</td><td class="oc-monto">${t.totalNeto}</td><td class="oc-monto">${t.total}</td></tr></tfoot>` : ''}</table>
   </div>`;
 }
 
 function ocCopiarTablaFacturas(boton) {
   const t = window.__ocTablaCopiar;
   if (!t) return;
+  // Estilos escritos en cada casilla para que el correo mantenga el cuadriculado.
   const celda = 'border:1px solid #999;padding:4px 10px;font-family:Arial,sans-serif;font-size:13px';
-  const filas = t.filas.map(f => `<tr><td style="${celda}">${escapeHtml(f[0])}</td><td style="${celda}">${f[1]}</td><td style="${celda};text-align:right">${f[2]}</td></tr>`).join('')
-    + (t.filas.length > 1 ? `<tr><td style="${celda};font-weight:bold" colspan="2">Total</td><td style="${celda};text-align:right;font-weight:bold">${t.total}</td></tr>` : '');
-  const html = `<table style="border-collapse:collapse"><thead><tr><th style="${celda};background:#eee">N° factura</th><th style="${celda};background:#eee">Fecha de emisión</th><th style="${celda};background:#eee">Monto</th></tr></thead><tbody>${filas}</tbody></table>`;
-  const texto = ['N° factura\tFecha de emisión\tMonto', ...t.filas.map(f => f.join('\t')), ...(t.filas.length > 1 ? [`Total\t\t${t.total}`] : [])].join('\n');
+  const der = `${celda};text-align:right`;
+  const filas = t.filas.map(f => `<tr><td style="${celda}">${escapeHtml(f[0])}</td><td style="${celda}">${f[1]}</td><td style="${der}">${f[2]}</td><td style="${der}">${f[3]}</td></tr>`).join('')
+    + (t.filas.length > 1 ? `<tr><td style="${celda};font-weight:bold" colspan="2">Total</td><td style="${der};font-weight:bold">${t.totalNeto}</td><td style="${der};font-weight:bold">${t.total}</td></tr>` : '');
+  const cab = ['N° factura', 'Fecha de emisión', 'Neto', 'Total con IVA'];
+  const html = `<table style="border-collapse:collapse"><thead><tr>${cab.map(c => `<th style="${celda};background:#eee">${c}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>`;
+  const texto = [cab.join('\t'), ...t.filas.map(f => f.join('\t')), ...(t.filas.length > 1 ? [`Total\t\t${t.totalNeto}\t${t.total}`] : [])].join('\n');
   copiarTabla(html, texto, boton);
 }
 

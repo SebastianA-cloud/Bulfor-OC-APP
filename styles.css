@@ -1441,3 +1441,4 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
    cuadro de facturas se aplastaba hasta desaparecer). */
 .panel-cuerpo { flex: 1; min-height: 0; }
 .panel-cuerpo > * { flex-shrink: 0; }
+.oc-facturas-tabla .oc-monto-neto { font-weight: 500; color: var(--text-2); }
