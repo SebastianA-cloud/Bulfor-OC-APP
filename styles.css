@@ -1430,3 +1430,9 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 /* La línea roja va solo bajo el número, no bajo los botones de al lado */
 .panel-tit-destacado { border-bottom: 0; padding-bottom: 0; flex-wrap: wrap; }
 .panel-tit-destacado > span:first-child { border-bottom: 3px solid var(--accent); padding-bottom: 3px; }
+/* Cuadro de facturas de la OC con casillas, igual que la tabla de productos */
+.oc-facturas-tabla th, .oc-facturas-tabla td { border: 1px solid var(--border); }
+.oc-facturas-tabla tr > :first-child { border-left: 0; }
+.oc-facturas-tabla tr > :last-child { border-right: 0; }
+.oc-facturas-tabla thead th { border-top: 0; }
+.oc-facturas-tabla tbody tr:last-child td, .oc-facturas-tabla tfoot td { border-bottom: 0; }
