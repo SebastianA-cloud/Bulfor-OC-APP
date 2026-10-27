@@ -74,60 +74,34 @@
     <div class="nav-section-label">Compras y ventas</div>
 
     <div class="nav-group" data-modulo="oc-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo')" title="Órdenes de Compra">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo', true)" title="Órdenes de compra">
         <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span>
-        <span style="flex:1">Órdenes de Compra</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de compra</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-oc-modulo">
         <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Listado de OC</span></div>
-        <div class="nav-item nav-subitem" data-page="items" data-page-alt="oc-clientes" onclick="abrirPreciosOC(this)"><span>Precios</span></div>
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
-        <div class="nav-item nav-subitem" data-page="importar" onclick="seleccionarSubpagina('oc-modulo','importar',this)"><span>Importar Excel</span></div>
       </div>
     </div>
 
-    <div class="nav-group" data-modulo="facturas">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas')" title="Facturas">
-        <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas</span>
-        <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
+    <div class="nav-group" data-modulo="precios">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('precios', true)" title="Precios">
+        <span class="nav-icon"><i class="ti ti-tag" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Precios</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
-      <div class="nav-subgroup" id="subgroup-facturas">
-        <div class="nav-subbloque" data-subbloque="facturas-bulfor">
-          <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
-            <span class="nav-icon"><i class="ti ti-building" aria-hidden="true"></i></span>
-            <span style="flex:1">Facturas Bulfor</span>
-            <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
-          </div>
-          <div class="nav-subgroup-nivel2">
-            <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Documentos</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-productos" data-page-alt="facturas-clientes" onclick="abrirPrecios(this)"><span>Precios</span></div>
-            <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Seguimiento pago de facturas</span></div>
-            <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
-          </div>
-        </div>
-        <div class="nav-subbloque" data-subbloque="facturas-proveedor">
-          <div class="nav-item nav-item-subbloque" onclick="toggleSubbloque(this)">
-            <span class="nav-icon"><i class="ti ti-truck-delivery" aria-hidden="true"></i></span>
-            <span style="flex:1">Facturas Proveedor</span>
-            <i class="ti ti-chevron-down nav-chevron-sub" aria-hidden="true"></i>
-          </div>
-          <div class="nav-subgroup-nivel2">
-            <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('facturas','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-prov-productos" onclick="seleccionarSubpagina('facturas','facturas-prov-productos',this)"><span>Productos</span></div>
-            <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('facturas','facturas-prov-graficos',this)"><span>Gráficos de pagos</span></div>
-          </div>
-        </div>
+      <div class="nav-subgroup" id="subgroup-precios">
+        <div class="nav-item nav-subitem" data-page="items" data-page-alt="oc-clientes" onclick="abrirPreciosOC(this)"><span>Precios de OC</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas-productos" data-page-alt="facturas-clientes" onclick="abrirPrecios(this)"><span>Precios facturados</span></div>
       </div>
     </div>
 
     <div class="nav-group" data-modulo="documentos">
       <div class="nav-item nav-item-modulo" onclick="mostrarModulo('documentos', true)" title="Creación de documentos">
-        <span class="nav-icon"><i class="ti ti-file-plus" aria-hidden="true"></i></span><span style="flex:1">Creación de documentos</span>
+        <span class="nav-icon"><i class="ti ti-file-plus" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Creación de documentos</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-documentos">
@@ -139,16 +113,54 @@
       </div>
     </div>
 
-    <div class="nav-group" data-modulo="fedex">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="Seguimiento FedEx">
-        <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span style="flex:1">Seguimiento FedEx</span>
+    <div class="nav-group" data-modulo="facturas">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas de venta">
+        <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas de venta</span>
+        <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
+        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
+      </div>
+      <div class="nav-subgroup" id="subgroup-facturas">
+        <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Documentos</span></div>
+        <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Cobranza</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
+        <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
       </div>
     </div>
 
-    <div class="nav-section-label">Farmacia</div>
+    <div class="nav-group" data-modulo="proveedores">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('proveedores', true)" title="Facturas de proveedores">
+        <span class="nav-icon"><i class="ti ti-receipt" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas de proveedores</span>
+        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
+      </div>
+      <div class="nav-subgroup" id="subgroup-proveedores">
+        <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('proveedores','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas-prov-productos" onclick="seleccionarSubpagina('proveedores','facturas-prov-productos',this)"><span>Productos</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('proveedores','facturas-prov-graficos',this)"><span>Gráficos de pagos</span></div>
+      </div>
+    </div>
+
+    <div class="nav-section-label">Seguimiento de envíos</div>
+
+    <div class="nav-group" data-modulo="fedex">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="FedEx">
+        <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">FedEx</span>
+      </div>
+    </div>
+
+    <div class="nav-group" data-modulo="chilexpress">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('chilexpress')" title="Chilexpress">
+        <span class="nav-icon"><i class="ti ti-package" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Chilexpress</span>
+      </div>
+    </div>
+
+    <div class="nav-section-label">Operaciones</div>
 
     <div class="nav-group" data-modulo="elaboracion">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion')" title="Órdenes de Elaboración">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion', true)" title="Elaboración">
         <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Elaboración</span>
         <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
@@ -159,14 +171,13 @@
         <div class="nav-item nav-subitem" data-page="elaboracion" onclick="seleccionarSubpagina('elaboracion','elaboracion',this)"><span>Órdenes</span></div>
         <div class="nav-item nav-subitem" data-page="pacientes" onclick="seleccionarSubpagina('elaboracion','pacientes',this)"><span>Pacientes</span></div>
         <div class="nav-item nav-subitem" data-page="solicitudes-web" onclick="seleccionarSubpagina('elaboracion','solicitudes-web',this)"><span>Solicitudes Web</span></div>
-        <div class="nav-item nav-subitem" data-page="materias-primas" onclick="seleccionarSubpagina('elaboracion','materias-primas',this)"><span>Materias primas</span></div>
       </div>
     </div>
 
     <div class="nav-group" data-modulo="recetario-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('recetario-modulo', true)" title="Recetario Magistral">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('recetario-modulo', true)" title="Recetario">
         <span class="nav-icon"><i class="ti ti-prescription" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recetario Magistral</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recetario</span>
         <span id="badge-rec-alertas" title="RM con lote vencido en los últimos 7 días" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
@@ -181,31 +192,31 @@
     </div>
 
     <div class="nav-group" data-modulo="farmacia-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo')" title="Control Farmacia">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo', true)" title="Control farmacia">
         <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span>
-        <span style="flex:1">Control Farmacia</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Control farmacia</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-farmacia-modulo">
-        <div class="nav-item nav-subitem" data-page="farmacia-catastro" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-catastro',this)"><span>Catastro de stock</span></div>
+        <div class="nav-item nav-subitem" data-page="farmacia-compras" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-compras',this)"><span>Sugerencia de compra</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-stock" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-stock',this)"><span>Stock actual</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-movimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-movimientos',this)"><span>Movimientos</span></div>
         <div class="nav-item nav-subitem" data-page="farmacia-vencimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-vencimientos',this)"><span>Vencimientos</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-compras" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-compras',this)"><span>Sugerencia de compra</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-conciliacion" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-conciliacion',this)"><span>Conciliación con PC</span></div>
+        <div class="nav-item nav-subitem" data-page="farmacia-catastro" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-catastro',this)"><span>Catastro de stock</span></div>
       </div>
     </div>
 
     <div class="nav-section-label">Personas</div>
 
     <div class="nav-group" data-modulo="rrhh">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh')" title="Recursos Humanos">
-        <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span style="flex:1">Recursos Humanos</span>
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh', true)" title="Recursos humanos">
+        <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recursos humanos</span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-rrhh">
         <div class="nav-item nav-subitem" data-page="rrhh-personal" onclick="seleccionarSubpagina('rrhh','rrhh-personal',this)"><span>Personal</span></div>
-        <div class="nav-item nav-subitem" data-page="rrhh-vacaciones" onclick="seleccionarSubpagina('rrhh','rrhh-vacaciones',this)"><span>Vacaciones Personal</span></div>
+        <div class="nav-item nav-subitem" data-page="rrhh-vacaciones" onclick="seleccionarSubpagina('rrhh','rrhh-vacaciones',this)"><span>Vacaciones</span></div>
       </div>
     </div>
 
@@ -219,12 +230,24 @@
   <div class="tab-item" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')">
     <i class="ti ti-shopping-cart" aria-hidden="true"></i><span>OC</span>
   </div>
+  <div class="tab-item" data-modulo="precios" onclick="mostrarModulo('precios')">
+    <i class="ti ti-tag" aria-hidden="true"></i><span>Precios</span>
+  </div>
+  <div class="tab-item" data-modulo="documentos" onclick="mostrarModulo('documentos')">
+    <i class="ti ti-file-plus" aria-hidden="true"></i><span>Documentos</span>
+  </div>
   <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')" style="position:relative">
-    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
+    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Ventas</span>
     <span id="badge-rechazadas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
+  </div>
+  <div class="tab-item" data-modulo="proveedores" onclick="mostrarModulo('proveedores')">
+    <i class="ti ti-receipt" aria-hidden="true"></i><span>Proveed.</span>
   </div>
   <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex')">
     <i class="ti ti-truck" aria-hidden="true"></i><span>FedEx</span>
+  </div>
+  <div class="tab-item" data-modulo="chilexpress" onclick="mostrarModulo('chilexpress')">
+    <i class="ti ti-package" aria-hidden="true"></i><span>Chilexpress</span>
   </div>
   <div class="tab-item" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')" style="position:relative">
     <i class="ti ti-flask" aria-hidden="true"></i><span>Elaborac.</span>
@@ -278,10 +301,14 @@
   <div class="modulo-tab active" data-modulo="inicio" onclick="irAInicio()"><i class="ti ti-home"></i><span>Inicio</span></div>
   <div class="modulos-grupo">Compras y ventas</div>
   <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
-  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="precios" onclick="mostrarModulo('precios')"><i class="ti ti-tag"></i><span>Precios</span></div>
   <div class="modulo-tab" data-modulo="documentos" onclick="mostrarModulo('documentos')"><i class="ti ti-file-plus"></i><span>Creación de documentos</span></div>
-  <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>Seguimiento FedEx</span></div>
-  <div class="modulos-grupo">Farmacia</div>
+  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas de venta</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="proveedores" onclick="mostrarModulo('proveedores')"><i class="ti ti-receipt"></i><span>Facturas de proveedores</span></div>
+  <div class="modulos-grupo">Seguimiento de envíos</div>
+  <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>FedEx</span></div>
+  <div class="modulo-tab" data-modulo="chilexpress" onclick="mostrarModulo('chilexpress')"><i class="ti ti-package"></i><span>Chilexpress</span></div>
+  <div class="modulos-grupo">Operaciones</div>
   <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')"><i class="ti ti-prescription"></i><span>Recetario</span><span class="tab-badge" id="badge-rec-alertas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
@@ -307,16 +334,16 @@
           <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span><span>Órdenes de compra</span>
         </div>
         <div class="inicio-acceso" onclick="mostrarModulo('facturas')">
-          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas</span>
+          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas de venta</span>
         </div>
         <div class="inicio-acceso" onclick="mostrarModulo('fedex')">
-          <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>Seguimiento FedEx</span>
+          <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>FedEx</span>
         </div>
       </div>
     </div>
 
     <div class="inicio-seccion">
-      <div class="inicio-seccion-titulo">Farmacia</div>
+      <div class="inicio-seccion-titulo">Operaciones</div>
       <div class="inicio-accesos">
         <div class="inicio-acceso" onclick="mostrarModulo('elaboracion')">
           <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de elaboración</span>
@@ -395,7 +422,7 @@
   <!-- ITEMS PAGE -->
   <div class="page" id="page-items">
     <div class="page-header">
-      <div class="page-title">Precios</div>
+      <div class="page-title">Precios de OC</div>
       <div class="page-sub">Precios de Órdenes de Compra: a quién le hemos vendido cada producto</div>
     </div>
     <div class="scope-toggle" id="precios-oc-toggle-producto" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -430,7 +457,7 @@
   <!-- OC: PRECIOS — POR CLIENTE -->
   <div class="page" id="page-oc-clientes">
     <div class="page-header">
-      <div class="page-title">Precios</div>
+      <div class="page-title">Precios de OC</div>
       <div class="page-sub">Precios de Órdenes de Compra: qué le hemos vendido a cada cliente</div>
     </div>
     <div class="scope-toggle" id="precios-oc-toggle-cliente" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -468,7 +495,7 @@
   <!-- PRODUCTOS DE FACTURAS PAGE -->
   <div class="page" id="page-facturas-productos">
     <div class="page-header">
-      <div class="page-title">Precios</div>
+      <div class="page-title">Precios facturados</div>
       <div class="page-sub">A quién le hemos vendido cada producto y a qué precio</div>
     </div>
     <div class="scope-toggle" id="precios-toggle-producto" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -507,7 +534,7 @@
   <!-- PRECIOS — POR CLIENTE -->
   <div class="page" id="page-facturas-clientes">
     <div class="page-header">
-      <div class="page-title">Precios</div>
+      <div class="page-title">Precios facturados</div>
       <div class="page-sub">Qué le hemos vendido a cada cliente y a qué precio</div>
     </div>
     <div class="scope-toggle" id="precios-toggle-cliente" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -634,38 +661,11 @@
     <div id="stats-content"></div>
   </div>
 
-  <!-- IMPORTAR PAGE -->
-  <div class="page" id="page-importar">
-    <div class="page-header">
-      <div class="page-title">Importar Excel</div>
-      <div class="page-sub">Carga tu archivo .xlsm para actualizar la base de datos</div>
-    </div>
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
-         ondragover="event.preventDefault();this.classList.add('drag')"
-         ondragleave="this.classList.remove('drag')"
-         ondrop="handleDrop(event)">
-      <div class="drop-icon">📂</div>
-      <div class="drop-title">Arrastra tu Excel aquí</div>
-      <div class="drop-sub">O haz clic para seleccionar el archivo .xlsm o .xlsx</div>
-      <input type="file" id="fileInput" accept=".xlsx,.xlsm" style="display:none" onchange="handleFile(this.files[0])">
-    </div>
-    <div id="import-area" style="display:none">
-      <div class="progress-wrap">
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)">
-          <span id="import-status">Preparando…</span>
-          <span id="import-pct">0%</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" id="import-bar" style="width:0%"></div></div>
-      </div>
-      <div class="log" id="import-log"></div>
-      <button class="import-btn" id="import-btn" onclick="startImport()" disabled>⬆️ Importar a base de datos</button>
-    </div>
-  </div>
 
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
     <div class="page-header">
-      <div class="page-title">Buscador de documentos</div>
+      <div class="page-title">Documentos</div>
     </div>
     <div class="fpp-toolbar-top">
       <div class="fpp-period">
@@ -692,9 +692,16 @@
     <div id="doc-contenido"></div>
   </div>
 
+  <div class="page" id="page-chilexpress">
+    <div class="page-header">
+      <div class="page-title">Chilexpress</div>
+      <div class="page-sub">Envíos despachados por sucursal de Chilexpress</div>
+    </div>
+    <div class="table-card"><div class="empty-state"><i class="ti ti-tools"></i><h4>Próximamente</h4><p>Aquí se registrarán los envíos de Chilexpress, con su factura y su seguimiento.</p></div></div>
+  </div>
   <div class="page" id="page-fedex">
     <div class="page-header">
-      <div class="page-title">Seguimiento FedEx</div>
+      <div class="page-title">FedEx</div>
       <div class="page-sub">Seguimiento de despachos a hospitales</div>
     </div>
     <div class="fpp-toolbar-top">
@@ -968,24 +975,6 @@
     </div>
   </div>
 
-  <div class="page" id="page-materias-primas">
-    <div class="page-header">
-      <div class="page-title">Materias primas</div>
-      <div class="page-sub">Cuánto entró por compras, cuánto salió por ventas y cuánto queda en stock.</div>
-    </div>
-    <div class="toolbar" style="gap:8px;flex-wrap:wrap">
-      <input type="text" id="mp-search" placeholder="Buscar materia prima…" oninput="renderMateriasPrimas()" style="min-width:220px">
-      <select id="mp-dias" onchange="renderMateriasPrimas()">
-        <option value="30">Últimos 30 días</option>
-        <option value="90" selected>Últimos 90 días</option>
-        <option value="365">Último año</option>
-        <option value="0">Todo el historial</option>
-      </select>
-    </div>
-    <div id="mp-resumen"></div>
-    <div id="mp-tabla"></div>
-    <div id="mp-detalle"></div>
-  </div>
   <div class="page" id="page-solicitudes-web">
     <div class="page-header">
       <div class="page-title">Solicitudes Web</div>
@@ -1061,7 +1050,7 @@
 
   <div class="page" id="page-rrhh-vacaciones">
     <div class="page-header">
-      <div class="page-title">Vacaciones Personal</div>
+      <div class="page-title">Vacaciones</div>
       <div class="page-sub">Saldos por período, historial y programación. El saldo se calcula solo: días asignados menos días usados, nunca se escribe a mano</div>
     </div>
     <div class="fpp-toolbar-top">
@@ -1076,7 +1065,7 @@
 
   <div class="page" id="page-pagos">
     <div class="page-header">
-      <div class="page-title">Seguimiento Pago de Facturas</div>
+      <div class="page-title">Cobranza</div>
     </div>
     <div class="fpp-toolbar-top">
       <div class="fpp-period">
@@ -1338,36 +1327,6 @@
     <div id="farmacia-compras-tabla"></div>
   </div>
 
-  <div class="page" id="page-farmacia-conciliacion">
-    <div class="page-header">
-      <div class="page-title">Conciliación con el PC</div>
-      <div class="page-sub">Compara automáticamente tus lotes con el stock del sistema de ventas <span id="farmacia-conc-sync" style="margin-left:6px"></span></div>
-    </div>
-    <div class="fpp-resumen" id="farmacia-conc-resumen"></div>
-    <div class="toolbar">
-      <div class="fpp-status-tabs" id="farmacia-conc-tabs"></div>
-    </div>
-    <div class="toolbar">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="farmacia-conc-search" placeholder="Código o nombre del producto…" oninput="renderConciliacionERP()" autocomplete="off">
-      </div>
-      <select id="farmacia-conc-origen" onchange="renderConciliacionERP()">
-        <option value="">Todos los orígenes</option>
-        <option value="catastro">Catastro</option>
-        <option value="estimado_compras">Estimados</option>
-        <option value="recontado">Recontados</option>
-        <option value="inicio_sync">Nuevos / sin stock inicial</option>
-      </select>
-      <button class="page-btn" style="white-space:nowrap" onclick="cargarConciliacionERP(true)">↻ Actualizar</button>
-      <button class="page-btn" style="white-space:nowrap" onclick="descargarConciliacionExcel()">⬇️ Excel</button>
-    </div>
-    <div id="farmacia-conc-tabla"></div>
-    <!-- Conciliación antigua por Excel (ya no se usa: ahora es automática) -->
-    <div id="farmacia-conciliacion-log" style="display:none"></div>
-    <div id="farmacia-conciliacion-resultado" style="display:none"></div>
-    <input type="file" id="farmacia-conciliacion-file" style="display:none">
-  </div>
 
   <!-- CREACIÓN DE DOCUMENTOS (documentos.js) -->
   <div class="page" id="page-doc-factura">
@@ -1409,6 +1368,7 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="panel.js"></script>
 <script src="documentos.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
@@ -15140,10 +15100,6 @@ function renderMateriasPrimas() {
 
 showPage = function(id, el) {
   _showPageOriginal(id, el);
-  if (id === 'materias-primas') {
-    renderMateriasPrimas();
-    refrescarDatosFarmacia().then(() => renderMateriasPrimas());
-  }
   if (id === 'farmacia-movimientos') {
     if (!document.getElementById('farmacia-tab-compra').classList.contains('active') &&
         !document.getElementById('farmacia-tab-venta').classList.contains('active') &&
@@ -15159,9 +15115,6 @@ showPage = function(id, el) {
   }
   if (id === 'farmacia-vencimientos') {
     cargarVencimientosERP();
-  }
-  if (id === 'farmacia-conciliacion') {
-    cargarConciliacionERP();
   }
   if (id === 'farmacia-compras') {
     farmComprasInit();
@@ -15202,15 +15155,17 @@ showPage = function(id, el) {
 // propio submenú (ocultando el menú principal). Así el comportamiento es
 // idéntico para todos los botones, aunque algunos solo tengan un ítem.
 const SUBMENUS = {
-  'oc-modulo': {
-    items: [
-      { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Listado de OC', page: 'oc' },
-      { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'items' },
-      { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
-      { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
-      { icon: '<i class="ti ti-upload"></i>', label: 'Importar Excel', page: 'importar' },
-    ],
-  },
+  'oc-modulo': { items: [
+    { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Listado de OC', page: 'oc' },
+    { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
+  ] },
+  // Por ahora reúne los dos precios que existían (de OC y facturados); en la
+  // etapa 3 del rediseño se unen en un solo módulo.
+  'precios': { items: [
+    { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Precios de OC', page: 'items' },
+    { icon: '<i class="ti ti-file-invoice"></i>', label: 'Precios facturados', page: 'facturas-productos' },
+  ] },
   'documentos': { items: [
     { icon: '<i class="ti ti-file-invoice"></i>', label: 'Factura', page: 'doc-factura' },
     { icon: '<i class="ti ti-files"></i>', label: 'Facturación múltiple', page: 'doc-multiple' },
@@ -15219,24 +15174,21 @@ const SUBMENUS = {
   ] },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
-    { icon: '<i class="ti ti-pill"></i>', label: 'Precios', page: 'facturas-productos' },
-    { icon: '<i class="ti ti-cash"></i>', label: 'Seguimiento de pagos', page: 'pagos' },
-    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
+    { icon: '<i class="ti ti-cash"></i>', label: 'Cobranza', page: 'pagos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
+  ] },
+  'proveedores': { items: [
     { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
     { icon: '<i class="ti ti-building-store"></i>', label: 'Productos', page: 'facturas-prov-productos' },
     { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos de pagos', page: 'facturas-prov-graficos' },
   ] },
-  'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'Seguimiento FedEx', page: 'fedex' }] },
+  'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'FedEx', page: 'fedex' }] },
+  'chilexpress': { items: [{ icon: '<i class="ti ti-package"></i>', label: 'Chilexpress', page: 'chilexpress' }] },
   'elaboracion': { items: [
     { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes', page: 'elaboracion' },
     { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
     { icon: '<i class="ti ti-world"></i>', label: 'Solicitudes Web', page: 'solicitudes-web' },
-    { icon: '<i class="ti ti-package"></i>', label: 'Materias primas', page: 'materias-primas' },
-  ] },
-  'rrhh': { items: [
-    { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
-    { icon: '<i class="ti ti-beach"></i>', label: 'Vacaciones Personal', page: 'rrhh-vacaciones' },
   ] },
   'recetario-modulo': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
@@ -15247,14 +15199,27 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Producción', page: 'rec-produccion' },
   ] },
   'farmacia-modulo': { items: [
-    { icon: '<i class="ti ti-clipboard-list"></i>', label: 'Catastro de stock', page: 'farmacia-catastro' },
+    { icon: '<i class="ti ti-shopping-cart-plus"></i>', label: 'Sugerencia de compra', page: 'farmacia-compras' },
     { icon: '<i class="ti ti-package"></i>', label: 'Stock actual', page: 'farmacia-stock' },
     { icon: '<i class="ti ti-refresh"></i>', label: 'Movimientos', page: 'farmacia-movimientos' },
     { icon: '<i class="ti ti-clock-exclamation"></i>', label: 'Vencimientos', page: 'farmacia-vencimientos' },
-    { icon: '<i class="ti ti-shopping-cart-plus"></i>', label: 'Sugerencia de compra', page: 'farmacia-compras' },
-    { icon: '<i class="ti ti-calculator"></i>', label: 'Conciliación con PC', page: 'farmacia-conciliacion' },
+    { icon: '<i class="ti ti-clipboard-list"></i>', label: 'Catastro de stock', page: 'farmacia-catastro' },
+  ] },
+  'rrhh': { items: [
+    { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
+    { icon: '<i class="ti ti-beach"></i>', label: 'Vacaciones', page: 'rrhh-vacaciones' },
   ] },
 };
+
+// Módulo (menú) al que pertenece una página, según el menú lateral. Las
+// páginas con dos vistas (Precios: por producto / por cliente) cuentan las dos.
+function moduloDePagina(pagina) {
+  if (!pagina) return null;
+  for (const [mod, cfg] of Object.entries(SUBMENUS)) {
+    if (cfg.items.some(it => it.page === pagina || ALT_PAGINA[it.page] === pagina)) return mod;
+  }
+  return null;
+}
 
 let ultimaSubpagina = {};   // moduloId -> última subpágina visitada (en memoria; no persiste entre sesiones)
 
@@ -15331,6 +15296,7 @@ function mostrarModulo(modulo, soloExpandir) {
 // un ítem del acordeón de escritorio, o en una pestaña móvil), sin volver
 // a togglear el acordeón — a diferencia de mostrarModulo().
 function seleccionarSubpagina(modulo, pagina, el) {
+  modulo = moduloDePagina(pagina) || modulo;
   ultimaSubpagina[modulo] = pagina;
   showPage(pagina, el);
   marcarModuloActivoEnNav(modulo);
@@ -15341,6 +15307,7 @@ function seleccionarSubpagina(modulo, pagina, el) {
 // última visitada — usada por "Accesos frecuentes" y "Requiere atención"
 // de Inicio para saltar, por ejemplo, directo a Facturas por pagar.
 function irAModuloPagina(modulo, pagina) {
+  modulo = moduloDePagina(pagina) || modulo;
   ultimaSubpagina[modulo] = pagina;
   mostrarModulo(modulo);
 }
@@ -15357,10 +15324,7 @@ function irAInicio() {
 // Pestañas horizontales fijas arriba, solo visibles en celular (≤640px).
 // En escritorio el sidebar usa el acordeón inline de #nav-modulos.
 // Agrupa las páginas de un módulo dentro de la barra de páginas (escritorio).
-const GRUPO_PAGINA = {
-  'facturas': 'Ventas', 'pagos': 'Ventas', 'pagos-graficos': 'Ventas', 'facturas-rechazadas': 'Ventas', 'facturas-productos': 'Ventas',
-  'facturas-por-pagar': 'Proveedores', 'facturas-prov-productos': 'Proveedores', 'facturas-prov-graficos': 'Proveedores',
-};
+const GRUPO_PAGINA = {};
 // Páginas que comparte un mismo ítem (la vista "Por cliente" de Precios).
 const ALT_PAGINA = { 'items': 'oc-clientes', 'facturas-productos': 'facturas-clientes' };
 
