@@ -1277,3 +1277,12 @@ body.con-panel .col-sec { display: none; }
 .rz-okt { color: var(--green); font-weight: 700; }
 .rz-chev { color: var(--text-3); }
 @media (max-width: 760px) { .rz-fila-top { flex-wrap: wrap; } .rz-hosp { width: auto; } }
+
+/* FedEx: historial del envío (lo más reciente arriba, con punto relleno) */
+.fx-hist { list-style: none; margin: 4px 0 0; padding: 0 0 0 4px; }
+.fx-hist li { position: relative; padding: 0 0 14px 22px; border-left: 2px solid var(--border); margin-left: 6px; font-size: 13px; }
+.fx-hist li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.fx-hist li::before { content: ''; position: absolute; left: -8px; top: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface, #fff); border: 2px solid var(--text-3); }
+.fx-hist li.actual::before { background: var(--green); border-color: var(--green); }
+.fx-hist b { display: block; font-weight: 600; }
+.fx-hist small { color: var(--text-3); font-size: 11.5px; }

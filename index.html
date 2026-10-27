@@ -685,37 +685,21 @@
   </div>
   <div class="page" id="page-fedex">
     <div class="page-header">
-      <div class="page-title">FedEx</div>
-      <div class="page-sub">Seguimiento de despachos a hospitales</div>
+      <div class="page-title">FedEx <span class="info-tip" tabindex="0" role="note" data-tip="Envíos despachados por FedEx. El estado se actualiza solo cada 2 horas consultando a FedEx. Haz clic en un envío para copiar la OT, ver qué se envió y quién lo recibió. El buscador busca en todas las fechas, también por producto.">i</span></div>
+      <div class="page-sub" id="fedex-resumen-compacto">Cargando datos…</div>
     </div>
-    <div class="fpp-toolbar-top">
-      <div class="fpp-period">
-        <button class="fpp-period-btn" onclick="fedexCambiarMes(-1)" title="Mes anterior">‹</button>
-        <select id="fedex-select-mes" onchange="fedexSeleccionarPeriodo()" aria-label="Mes"></select>
-        <select id="fedex-select-anio" onchange="fedexSeleccionarPeriodo()" aria-label="Año"></select>
-        <button class="fpp-period-btn" onclick="fedexCambiarMes(1)" title="Mes siguiente">›</button>
-      </div>
-      <div class="fpp-status-tabs" id="fedex-tabs"></div>
-    </div>
-    <div id="fedex-resumen-compacto" style="font-size:13px;color:var(--text-2);margin-bottom:12px"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="fedex-search" placeholder="Buscar por hospital, N° orden, factura…" oninput="filterFedex()">
+        <input type="text" id="fedex-search" placeholder="Buscar por OT, factura, OC, hospital o producto…" oninput="filterFedex(true)">
       </div>
-      <div class="scope-toggle" id="scope-fedex" role="group" aria-label="Alcance de la búsqueda">
-        <button data-alcance="mes" class="active" onclick="setAlcance('fedex','mes')">Este mes</button>
-        <button data-alcance="anio" onclick="setAlcance('fedex','anio')">Año</button>
-        <button data-alcance="todo" onclick="setAlcance('fedex','todo')">Todo</button>
-      </div>
-      <select id="fedex-estado" onchange="fedexCategoriaActiva='todos';renderTabsFedex();filterFedex()"><option value="">Todos los estados</option></select>
+      <div class="fpp-status-tabs" id="fedex-tabs"></div>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
-    <div class="table-card">
+    <div class="table-card oc-tabla">
       <table>
         <thead><tr>
-          <th>Fecha ingreso</th><th>Hospital</th><th>N° Orden transporte</th><th>Factura</th>
-          <th>Estado</th><th>Fecha entrega</th><th>Recibido por</th>
+          <th>Enviado</th><th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th>
         </tr></thead>
         <tbody id="fedex-body"></tbody>
       </table>
@@ -4814,125 +4798,73 @@ function badgeEstadoFedex(estado) {
   return `<span class="badge badge-gray">${estado}</span>`;
 }
 
-function populateFiltersFedex() {
-  const estados = [...new Set(fedex.map(f => f.estado_envio).filter(Boolean))].sort();
-  const el = document.getElementById('fedex-estado');
-  const cur = el.value;
-  el.innerHTML = '<option value="">Todos los estados</option>' + estados.map(e => `<option>${e}</option>`).join('');
-  el.value = cur;
-}
-
-// ─── Período (mes/año) para FedEx — mismo patrón que Órdenes de Compra y
-// Buscador de documentos. null = "todas las fechas" (sin filtrar por período).
-let fedexPeriodo = null;
-
-function fedexInit() {
-  const hoy = new Date();
-  fedexPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
-  fedexPoblarSelectoresPeriodo();
-  filterFedex();
-}
-
-function fedexAniosDisponibles() {
-  const anios = new Set();
-  fedex.forEach(f => { if (f.fecha_ingreso) anios.add(String(f.fecha_ingreso).slice(0,4)); });
-  return Array.from(anios).sort((a,b) => b.localeCompare(a));
-}
-
-function fedexPoblarSelectoresPeriodo() {
-  const selMes = document.getElementById('fedex-select-mes');
-  selMes.innerHTML = MESES_NOMBRE.map((m,i) => `<option value="${i}">${m}</option>`).join('');
-  const selAnio = document.getElementById('fedex-select-anio');
-  const anios = new Set(fedexAniosDisponibles());
-  if (fedexPeriodo) anios.add(fedexPeriodo.anio);
-  const listaAnios = Array.from(anios).sort((a,b) => b.localeCompare(a));
-  selAnio.innerHTML = listaAnios.map(a => `<option value="${a}">${a}</option>`).join('');
-  if (fedexPeriodo) { selMes.value = fedexPeriodo.mes; selAnio.value = fedexPeriodo.anio; }
-}
-
-function fedexSeleccionarPeriodo() {
-  fedexPeriodo = { anio: document.getElementById('fedex-select-anio').value, mes: Number(document.getElementById('fedex-select-mes').value) };
-  filterFedex();
-}
-
-function fedexCambiarMes(delta) {
-  if (!fedexPeriodo) { fedexInit(); return; } // si estaba en "todas las fechas", primero vuelve a un período concreto
-  let a = parseInt(fedexPeriodo.anio, 10), m = fedexPeriodo.mes + delta;
-  if (m < 0) { m = 11; a -= 1; }
-  if (m > 11) { m = 0; a += 1; }
-  fedexPeriodo = { anio: String(a), mes: m };
-  fedexPoblarSelectoresPeriodo();
-  filterFedex();
-}
-
-// Se mantiene por compatibilidad: antes era el botón "📅 Todas las fechas",
-// que ahora quedó unificado en el control de alcance del buscador.
-function fedexVerTodasLasFechas() {
-  setAlcance('fedex', 'todo');
-}
-
-function fedexListaDelPeriodo() {
-  const r = rangoDelAlcance('fedex', fedexPeriodo);
-  if (!r) return fedex;
-  return fedex.filter(f => { const fe = String(f.fecha_ingreso||'').slice(0,10); return fe >= r.desde && fe < r.hasta; });
-}
-
-function updateFedexStats() {
-  const delPeriodo = fedexListaDelPeriodo();
-  const total = delPeriodo.length;
-  const retrasos = delPeriodo.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
-  const nombrePeriodo = nombrePeriodoAlcance('fedex', fedexPeriodo);
-  document.getElementById('fedex-resumen-compacto').innerHTML =
-    `<strong style="color:var(--text)">${total.toLocaleString('es-CL')} envíos en ${nombrePeriodo}</strong>` +
-    (retrasos ? ` · <strong style="color:var(--red)">⚠ ${retrasos} con retraso</strong>` : ` · <span style="color:var(--green)">sin retrasos</span>`);
-}
-
+// ─── FedEx: lista con atajos y panel lateral ───────────────────────────────
+// Un solo buscador, que busca en todas las fechas (OT, factura, OC, hospital
+// o producto), y atajos con contador en vez de mes/año. Al hacer clic en un
+// envío se abre su ficha a la derecha (fichaEnvioFedex) sin tapar la lista.
 let fedexCategoriaActiva = 'todos';
 
 const FEDEX_CATEGORIAS = [
-  { id: 'todos', label: 'Todos' },
+  { id: 'ruta', label: 'En ruta' },
   { id: 'retraso', label: 'Con retraso' },
-  { id: 'transito', label: 'En tránsito' },
   { id: 'entregado', label: 'Entregados' },
+  { id: 'todos', label: 'Todos' },
 ];
 
-function renderTabsFedex() {
-  const delPeriodo = fedexListaDelPeriodo();
-  const cuenta = {
-    todos: delPeriodo.length,
-    entregado: delPeriodo.filter(f => (f.estado_envio||'').toLowerCase() === 'entregado').length,
-    transito: delPeriodo.filter(f => ['en ruta','recibido por fedex'].includes((f.estado_envio||'').toLowerCase())).length,
-    retraso: delPeriodo.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length,
-  };
-  document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
-    `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} (${cuenta[c.id]})</button>`
-  ).join('');
-}
-
-function filtrarPorCategoriaFedex(categoria) {
-  fedexCategoriaActiva = categoria;
-  renderTabsFedex();
-  // Limpiamos el select de estado y la búsqueda para que la categoría se vea clara
-  document.getElementById('fedex-estado').value = '';
+function fedexInit() {
   filterFedex();
 }
 
+// "En ruta" incluye los recién ingresados que FedEx todavía no informa, pero
+// solo los de los últimos 45 días (los mismos que consulta la sincronización):
+// uno antiguo sin estado es un registro viejo, no un envío en camino.
 function coincideCategoriaFedex(f, categoria) {
   const estado = (f.estado_envio||'').toLowerCase();
   if (categoria === 'todos') return true;
   if (categoria === 'entregado') return estado === 'entregado';
-  if (categoria === 'transito') return ['en ruta','recibido por fedex'].includes(estado);
   if (categoria === 'retraso') return ['retraso','entrega reprogramada'].includes(estado);
+  if (categoria === 'ruta') {
+    if (['en ruta','recibido por fedex'].includes(estado)) return true;
+    return !estado && f.fecha_ingreso && (Date.now() - new Date(f.fecha_ingreso)) < 45 * 86400000;
+  }
   return true;
 }
 
-function filterFedex() {
+function filtrarPorCategoriaFedex(categoria) {
+  fedexCategoriaActiva = categoria;
+  filterFedex();
+}
+
+// Facturas (documentos) de un envío: puede llevar más de una.
+function fedexDocsDeEnvio(e) {
+  return parsearNumerosFactura(e.factura)
+    .map(n => documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(n).replace(/\D/g, '')))
+    .filter(Boolean);
+}
+
+// Texto donde busca el buscador: OT, facturas, hospital, quién recibió, las OC
+// de esas facturas y sus productos (se cargan solos la primera vez).
+function fedexTextoBusqueda(e) {
+  const docs = fedexDocsDeEnvio(e);
+  return `${e.hospital||''} ${nombreHosp(e.hospital)||''} ${e.orden_transporte||''} ${e.factura||''} ${e.recibido_por||''} `
+    + docs.map(d => `${d.orden_compra_ref||''} ${docTextoProductos(d.id)}`).join(' ');
+}
+
+function filterFedex(soloTabla) {
   const q = document.getElementById('fedex-search').value;
-  const estado = document.getElementById('fedex-estado').value;
-  fedexF = fedexListaDelPeriodo().filter(f => {
-    const s = `${f.hospital||''} ${nombreHosp(f.hospital)||''} ${f.orden_transporte||''} ${f.factura||''} ${f.recibido_por||''}`;
-    return coincideBusqueda(s, q) && (!estado || f.estado_envio === estado) && coincideCategoriaFedex(f, fedexCategoriaActiva);
-  });
+  const base = q && q.trim() ? fedex.filter(f => coincideBusqueda(fedexTextoBusqueda(f), q)) : fedex;
+  const cuenta = {};
+  FEDEX_CATEGORIAS.forEach(c => { cuenta[c.id] = base.filter(f => coincideCategoriaFedex(f, c.id)).length; });
+  document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
+    `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} <b>${cuenta[c.id]}</b></button>`
+  ).join('');
+  const enCamino = fedex.filter(f => coincideCategoriaFedex(f, 'ruta')).length;
+  const retrasos = fedex.filter(f => coincideCategoriaFedex(f, 'retraso')).length;
+  document.getElementById('fedex-resumen-compacto').innerHTML = q && q.trim()
+    ? `${base.length.toLocaleString('es-CL')} envío${base.length===1?' encontrado':'s encontrados'} en todas las fechas`
+    : `${enCamino} en camino` + (retrasos ? ` · <b style="color:var(--red)">${retrasos} con retraso</b>` : ' · sin retrasos');
+
+  fedexF = base.filter(f => coincideCategoriaFedex(f, fedexCategoriaActiva));
   // Orden: primero por día de ingreso (hora de Chile, el más reciente
   // arriba) y dentro de cada día por correlativo de factura (la más alta
   // arriba), sin importar en qué orden se digitaron. Si un envío lleva
@@ -4945,38 +4877,48 @@ function filterFedex() {
   fedexPage = 1; renderFedex();
 }
 
+// Etiqueta de estado de la lista: lo entregado lleva la fecha de entrega.
+function fedexEtiquetaEstado(f) {
+  if ((f.estado_envio||'').toLowerCase() === 'entregado' && f.fecha_entrega)
+    return `<span class="badge badge-green">Entregado ${fDate(f.fecha_entrega)}</span>`;
+  return badgeEstadoFedex(f.estado_envio);
+}
+
 function renderFedex() {
-  populateFiltersFedex();
-  updateFedexStats();
-  renderTabsFedex();
   const { slice, pages, total } = paginate(fedexF, fedexPage);
   document.getElementById('fedex-info').textContent = `${total.toLocaleString('es-CL')} envíos`;
   renderPages('fedex-pages', total, pages, fedexPage, 'goFedex');
   if (!slice.length) {
-    const nombrePeriodo = nombrePeriodoAlcance('fedex', fedexPeriodo);
+    const buscando = document.getElementById('fedex-search').value.trim();
     const mensajes = {
-      todos: `No encontramos envíos en ${nombrePeriodo}.`,
-      retraso: `✓ No hay envíos con retraso en ${nombrePeriodo}.`,
-      transito: `No hay envíos en tránsito en ${nombrePeriodo}.`,
-      entregado: `No hay envíos entregados en ${nombrePeriodo}.`,
+      todos: 'Todavía no hay envíos registrados.',
+      ruta: 'No hay envíos en camino.',
+      retraso: '✓ No hay envíos con retraso.',
+      entregado: 'No hay envíos entregados.',
     };
-    const hayFiltroActivo = document.getElementById('fedex-search').value || document.getElementById('fedex-estado').value;
-    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!hayFiltroActivo?'✓':'🔍'}</div><p>${hayFiltroActivo ? 'No encontramos envíos con esos criterios.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
+    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="5"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!buscando?'✓':'🔍'}</div><p>${buscando ? 'No encontramos envíos con esa búsqueda.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
     return;
   }
+  const abierto = panelPila[0]?.envioId;
   document.getElementById('fedex-body').innerHTML = slice.map(f => `
-    <tr style="cursor:pointer" onclick="abrirDetalleEnvio(${f.id})">
-      <td data-label="Fecha ingreso" style="font-size:12px;color:var(--text-2);white-space:nowrap">${fDate(f.fecha_ingreso)}</td>
-      <td data-label="Hospital" style="font-weight:500">${nombreHosp(f.hospital)||'—'}</td>
-      <td data-label="N° Orden transporte"><span class="mono">${f.orden_transporte||''}</span> ${f.orden_transporte ? botonCopiar(f.orden_transporte) : ''}</td>
-      <td data-label="Factura" style="font-size:13px" onclick="event.stopPropagation()">${chipsFacturaHtml(f.factura)}</td>
-      <td data-label="Estado">${badgeEstadoFedex(f.estado_envio)}</td>
-      <td data-label="Fecha entrega" style="font-size:12px;color:var(--text-2)">${f.fecha_entrega ? fDate(f.fecha_entrega) : '—'}</td>
-      <td data-label="Recibido por" style="font-size:13px">${f.recibido_por||'—'}</td>
+    <tr class="oc-fila${abierto === f.id ? ' fila-abierta' : ''}" onclick="fedexAbrir(${f.id})">
+      <td data-label="Enviado" style="white-space:nowrap;color:var(--text-2)">${f.fecha_ingreso ? fDate(f.fecha_ingreso) : '—'}</td>
+      <td data-label="Hospital" style="font-weight:500">${escapeHtml(nombreHosp(f.hospital)||f.hospital||'—')}</td>
+      <td data-label="OT" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(f.orden_transporte||'—')}</td>
+      <td data-label="Factura" class="mono" style="font-size:13px">${escapeHtml(f.factura||'—')}</td>
+      <td data-label="Estado" style="white-space:nowrap">${fedexEtiquetaEstado(f)}</td>
     </tr>`).join('');
 }
 
 function goFedex(p) { const {pages}=paginate(fedexF,fedexPage); if(p<1||p>pages) return; fedexPage=p; renderFedex(); }
+
+function fedexAbrir(id) {
+  const f = fichaEnvioFedex(id, fedexF);
+  if (!f) return;
+  f.alCerrar = () => { if (document.getElementById('page-fedex')?.classList.contains('active')) renderFedex(); };
+  panelAbrir(f);
+  renderFedex();
+}
 
 // Un envío de FedEx puede llevar más de una factura. Acepta separarlas por
 // coma ("21549, 21550") o por guion cuando son números puros ("21549-21550")
@@ -6916,7 +6858,7 @@ function docTextoProductos(id) {
       facturaItemsRaw.forEach(it => { docProductosPorId[it.documento_id] = (docProductosPorId[it.documento_id] || '') + ' ' + (it.nombre_producto || ''); });
     } else if (!docCargandoProductos && typeof cargarItemsFacturasVentaUnaVez === 'function') {
       docCargandoProductos = true;
-      cargarItemsFacturasVentaUnaVez().then(() => { docCargandoProductos = false; docProductosPorId = null; renderDocumentosGdexpress(true); }).catch(() => { docCargandoProductos = false; });
+      cargarItemsFacturasVentaUnaVez().then(() => { docCargandoProductos = false; docProductosPorId = null; if (document.getElementById('page-fedex')?.classList.contains('active')) filterFedex(true); else renderDocumentosGdexpress(true); }).catch(() => { docCargandoProductos = false; });
     }
     if (!docProductosPorId) return '';
   }
@@ -7257,19 +7199,99 @@ async function cargarItemsEnPanel(d, contId) {
   }
 }
 
-// Ficha corta de un envío FedEx (el rediseño completo de FedEx usa esta misma).
-function fichaEnvioFedex(id) {
+// Ficha de un envío FedEx en el panel lateral. En vez de "Relacionado" lleva
+// lo que pidió el equipo: la OT para copiar, Factura y OC con "Ver ›", quién
+// recibió (en verde), qué se envió y el historial del envío.
+function fichaEnvioFedex(id, lista) {
   const e = fedex.find(x => x.id === id);
   if (!e) return null;
-  const docs = parsearNumerosFactura(e.factura).map(n => documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(n).replace(/\D/g, ''))).filter(Boolean);
+  const docs = fedexDocsDeEnvio(e);
+  const ocs = [...new Set(docs.map(d => (d.orden_compra_ref || '').trim()).filter(Boolean))];
+  const entregado = (e.estado_envio || '').toLowerCase() === 'entregado';
+  const contItems = `fx-items-${e.id}-${Date.now()}`;
+  if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
+
+  const navLista = lista || fedexF;
+  const idx = navLista.findIndex(x => x.id === e.id);
+  const pdf = docs.find(d => d.doc_url);
   return {
-    titulo: `Envío FedEx · OT ${e.orden_transporte || '—'}`,
-    sub: `${nombreHosp(e.hospital) || e.hospital || ''} · ingresado ${e.fecha_ingreso ? fDate(e.fecha_ingreso) : ''}`,
-    etiquetas: `<span class="badge ${e.estado_envio === 'Entregado' ? 'badge-green' : e.estado_envio === 'Retraso' ? 'badge-amber' : 'badge-blue'}">${escapeHtml(e.estado_envio || 'Sin información')}</span>`,
-    ids: [{ label: 'OT', valor: e.orden_transporte }, ...docs.map(d => ({ label: 'Factura', valor: String(d.folio), ver: () => fichaDocumento(d.id) }))],
-    acciones: e.orden_transporte ? `<a class="page-btn page-btn-pri" href="https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(e.orden_transporte)}" target="_blank" rel="noopener">Ver seguimiento en FedEx ↗</a>` : '',
-    cuerpo: e.estado_envio === 'Entregado' ? `<div class="panel-ok">✓ Entregado${e.fecha_entrega ? ' el ' + fDate(e.fecha_entrega) : ''}${e.recibido_por ? ` · Recibió: <b>${escapeHtml(e.recibido_por)}</b>` : ''}</div>` : '',
+    envioId: e.id,
+    titulo: nombreHosp(e.hospital) || e.hospital || 'Envío FedEx',
+    sub: `Enviado ${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}`,
+    etiquetas: entregado ? '' : badgeEstadoFedex(e.estado_envio),
+    ids: [
+      { label: 'OT', valor: e.orden_transporte },
+      ...(docs.length ? docs.map(d => ({ label: 'Factura', valor: String(d.folio), ver: () => fichaDocumento(d.id) }))
+        : e.factura ? [{ label: 'Factura', valor: e.factura }] : []),
+      ...ocs.map(c => oc.some(o => o.codigooc === c) ? { label: 'OC', valor: c, ver: () => fichaOC(c) } : { label: 'OC', valor: c }),
+    ],
+    acciones: (e.orden_transporte ? `<a class="page-btn page-btn-pri" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener">Ver seguimiento en FedEx ↗</a>` : '')
+      + (pdf ? ` <a class="page-btn" href="${pdf.doc_url}" target="_blank" rel="noopener">Ver PDF factura ↗</a>` : '')
+      + ` <button class="page-btn" onclick="fedexEditar(${e.id})">✎ Editar</button>`,
+    cuerpo: (entregado ? `<div class="panel-ok">✓ Entregado${e.fecha_entrega ? ' el ' + fDate(e.fecha_entrega) : ''}${e.recibido_por ? `<br>Recibió: <b>${escapeHtml(e.recibido_por)}</b>` : ''}</div>` : '')
+      + `<div class="panel-h">Qué se envió</div>`
+      + (docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`
+        : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`)
+      + `<div class="panel-h">Historial del envío</div>${fedexHistorialHtml(e)}`,
+    navegacion: idx === -1 ? null : {
+      texto: `Envío ${idx + 1} de ${navLista.length}`,
+      anterior: idx > 0 ? () => fedexAbrir(navLista[idx - 1].id) : null,
+      siguiente: idx < navLista.length - 1 ? () => fedexAbrir(navLista[idx + 1].id) : null,
+    },
   };
+}
+
+// Productos de las facturas del envío: nombre y cantidad (y el detalle, que
+// suele traer el lote y el vencimiento).
+async function cargarItemsEnvioEnPanel(docs, contId) {
+  try {
+    const ids = docs.map(d => d.id).join(',');
+    const its = await fetchAll('documentos_gdexpress_items', `select=nombre_producto,descripcion,cantidad,unidad&documento_id=in.(${ids})`);
+    const cont = document.getElementById(contId);
+    if (!cont) return;
+    cont.innerHTML = !its.length ? '<div class="panel-vacio">El detalle de la factura se completa en la próxima sincronización.</div>'
+      : `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cant.</th></tr></thead><tbody>
+        ${its.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${it.descripcion ? `<small class="panel-muted">${escapeHtml(it.descripcion)}</small>` : ''}</td>
+          <td style="text-align:right;white-space:nowrap">${it.cantidad || '—'} ${escapeHtml(it.unidad || '')}</td></tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    const cont = document.getElementById(contId);
+    if (cont) cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudo cargar el detalle: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// Historial del envío. Si la sincronización guarda los pasos de FedEx (columna
+// "historial": [{fecha, estado, lugar}]), se muestran todos; mientras tanto se
+// arma con lo que sí tenemos: el ingreso y el estado actual.
+function fedexHistorialHtml(e) {
+  let pasos = Array.isArray(e.historial) && e.historial.length
+    ? e.historial.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))
+    : null;
+  if (!pasos) {
+    pasos = [];
+    const est = e.estado_envio || '';
+    if (est.toLowerCase() === 'entregado') pasos.push({ fecha: e.fecha_entrega, estado: 'Entregado' + (e.recibido_por ? ' · recibió ' + e.recibido_por : ''), soloDia: true });
+    else if (est) pasos.push({ fecha: e.updated_at, estado: est });
+    pasos.push({ fecha: e.fecha_ingreso, estado: 'Ingresado en la app' });
+  }
+  return `<ol class="fx-hist">${pasos.map((p, i) => `<li class="${i === 0 ? 'actual' : ''}"><b>${escapeHtml(p.estado || '')}</b>
+    <small>${p.fecha ? (p.soloDia ? fDate(p.fecha) : fxFechaHora(p.fecha)) : ''}${p.lugar ? ' · ' + escapeHtml(p.lugar) : ''}</small></li>`).join('')}</ol>`;
+}
+
+// Fecha y hora en hora de Chile (dd-mm-aaaa hh:mm).
+function fxFechaHora(d) {
+  const dt = new Date(d);
+  if (isNaN(dt)) return fDate(d);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+    .formatToParts(dt).map(x => [x.type, x.value]));
+  return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}`;
+}
+
+// "Editar" abre el mismo formulario de siempre para corregir a mano.
+function fedexEditar(id) {
+  const f = fedex.find(x => x.id === id);
+  if (!f) return;
+  abrirDetalleEnvio(id);
+  renderDetalleEnvio(f, true);
 }
 
 // ─── FACTURAS RECHAZADAS / ANULADAS ─────────────────────────────────────────
@@ -11654,6 +11676,8 @@ async function guardarEdicionEnvio(id) {
     if (idx !== -1) fedex[idx] = actualizado;
     fedexF = fedexF.map(f => f.id === id ? actualizado : f);
     renderFedex();
+    // Si su ficha está abierta en el panel, se vuelve a pintar con lo nuevo.
+    if (panelPila[0]?.envioId === id) panelAbrir(Object.assign(fichaEnvioFedex(id), { alCerrar: panelPila[0].alCerrar }));
     renderDetalleEnvio(actualizado, false);
     const headerOt = document.getElementById('fedex-detalle-ot-header');
     if (headerOt) headerOt.textContent = actualizado.orden_transporte;
@@ -11677,6 +11701,7 @@ async function eliminarEnvio(id) {
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
     fedex = fedex.filter(f => f.id !== id);
     fedexF = fedexF.filter(f => f.id !== id);
+    if (panelPila[0]?.envioId === id) panelCerrar();
     cerrarDetalleEnvio();
     renderFedex();
   } catch(e) {
