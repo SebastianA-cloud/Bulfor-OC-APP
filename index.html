@@ -1814,6 +1814,7 @@ const SINONIMOS_PRODUCTO = [
   ['PROPANOLOL', 'PROPRANOLOL'],
   ['PODOFILINA', 'PODOFILINO'],
   ['TRAZADONA', 'TRAZODONA'],
+  ['ZIMC', 'ZINC'],
 ];
 
 function coincideBusqueda(texto, query) {
@@ -3504,7 +3505,8 @@ async function cargarItemsFacturasVentaUnaVez() {
   const gruposVenta = [...new Set(grupoDe.values())];
   agruparPorBase(gruposVenta, g => g.nombre).forEach(({ base, items: gs }) => {
     if (gs.length < 2) return;
-    const nombreBase = nombreDeBase(gs.map(g => g.nombre), base);
+    const baseComun = baseMasComun(gs.flatMap(g => Object.keys(g.nombres)));
+    const nombreBase = nombreDeBase(gs.flatMap(g => Object.keys(g.nombres)), baseComun);
     // Cada presentación se nombra igual: producto base + lo que la distingue
     // (una palabra extra como GLACIAL, y la medida): "POLIETILENGLICOL 10 G".
     const porMedida = new Map();
@@ -3512,7 +3514,7 @@ async function cargarItemsFacturasVentaUnaVez() {
       const n0 = Object.keys(g.nombres)[0];
       // Las medidas en el orden en que se escriben ("3% 100 ML"); para comparar, ordenadas.
       const medidas = [...hospPalabrasProducto(g.nombre, vendePorUnidad(n0))].filter(w => /\d/.test(w));
-      const extras = [...precioBaseDe(g.nombre)].filter(w => !base.has(w)).sort();
+      const extras = [...precioBaseDe(g.nombre)].filter(w => !base.has(w) && !baseComun.has(w)).sort();
       const k = extras.join(' ') + '|' + medidas.slice().sort().join(' ');
       if (!porMedida.has(k)) porMedida.set(k, { medidas, extras, gs: [] });
       porMedida.get(k).gs.push(g);
@@ -3645,15 +3647,41 @@ function agruparPorBase(lista, nombreDe) {
   return grupos;
 }
 
-// Nombre del producto base, con sus palabras en el orden en que se escriben
-// (tomado del nombre más corto del grupo).
-function nombreDeBase(nombres, base) {
-  const muestra = nombres.slice().sort((a, b) => a.length - b.length)[0];
-  const orden = String(muestra).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+// Palabras de un nombre en el orden en que vienen (con correcciones y equivalencias).
+function palabrasEnOrden(nombre) {
+  return String(nombre).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ').split(/[^A-Z0-9]+/)
     .map(w => PALABRAS_CORREGIDAS.get(w) || w)
     .map(w => (SINONIMOS_PRODUCTO.find(f => f.includes(w)) || [w]).slice(-1)[0]);
-  return [...new Set(orden.filter(w => base.has(w)))].join(' ') || muestra;
+}
+
+// Las palabras base que más se repiten en el grupo (así "ACIDO ACETICO" le
+// gana a "ACETICO" a secas, que es como lo escriben solo algunas facturas).
+function baseMasComun(nombres) {
+  const cuenta = new Map();
+  nombres.forEach(n => {
+    const b = [...precioBaseDe(n)].sort();
+    if (!b.length) return;
+    const k = b.join(' ');
+    cuenta.set(k, (cuenta.get(k) || 0) + 1);
+  });
+  const mejor = [...cuenta.entries()].sort((a, b) => b[1] - a[1] || b[0].split(' ').length - a[0].split(' ').length)[0];
+  return new Set(mejor ? mejor[0].split(' ') : []);
+}
+
+// Nombre del producto base, con sus palabras en el orden en que se escriben
+// la mayoría de las veces ("ACIDO ACETICO", no "ACETICO ACIDO").
+function nombreDeBase(nombres, base) {
+  const posiciones = new Map();
+  nombres.forEach(n => {
+    const ws = palabrasEnOrden(n).filter(w => base.has(w));
+    ws.forEach((w, i) => { const p = posiciones.get(w) || [0, 0]; p[0] += i / Math.max(1, ws.length - 1); p[1]++; posiciones.set(w, p); });
+  });
+  const palabras = [...base].sort((a, b) => {
+    const pa = posiciones.get(a), pb = posiciones.get(b);
+    return (pa ? pa[0] / pa[1] : 9) - (pb ? pb[0] / pb[1] : 9);
+  });
+  return palabras.join(' ') || nombres[0];
 }
 
 // Medida legible: 10G → 10 G, 2P5L → 2,5 L, 20PC → 20%, 35CAP → 35 CP.
@@ -3669,7 +3697,7 @@ function sustanciasDePrecios(productos) {
     const docs = new Set();
     g.items.forEach(x => x.docs && x.docs.forEach(d => docs.add(d)));
     return {
-      nombre: nombreDeBase(g.items.map(x => x.nombre), g.base),
+      nombre: nombreDeBase(g.items.map(x => x.nombre), baseMasComun(g.items.map(x => x.nombre))),
       presentaciones: g.items.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true })),
       facturas: docs.size,
       ultimaFecha: g.items.reduce((m, x) => (x.ultimaFecha || '') > m ? x.ultimaFecha : m, ''),
@@ -11907,6 +11935,10 @@ function distanciaPalabras(a, b, max) {
 }
 
 // Revisa las palabras de una lista de nombres y anota las que parecen mal escritas.
+// Palabras que parecen error de tipeo pero son otro medicamento: no se corrigen
+// (OCARBAMAZEPINA probablemente es oxcarbazepina, no carbamazepina).
+const PALABRAS_NO_CORREGIR = new Set(['OCARBAMAZEPINA']);
+
 function aprenderCorrecciones(nombres) {
   const cuenta = new Map();
   nombres.forEach(n => hospPalabrasProducto(n).forEach(w => {
@@ -11917,11 +11949,11 @@ function aprenderCorrecciones(nombres) {
   palabras.forEach((rara, i) => {
     // Un error de tipeo aparece muy pocas veces; una palabra que se repite es
     // una palabra real (ej. POLIETILENO no es POLIESTIRENO mal escrito).
-    if (PALABRAS_CORREGIDAS.has(rara) || cuenta.get(rara) > 2) return;
+    if (PALABRAS_CORREGIDAS.has(rara) || PALABRAS_NO_CORREGIR.has(rara) || cuenta.get(rara) > 2) return;
     const max = rara.length >= 11 ? 2 : 1;
     for (let k = 0; k < i; k++) {
       const buena = palabras[k];
-      if (cuenta.get(buena) < 3 * cuenta.get(rara) || buena[0] !== rara[0] || PALABRAS_CORREGIDAS.has(buena)) continue;
+      if (cuenta.get(buena) < 3 * cuenta.get(rara) || PALABRAS_CORREGIDAS.has(buena)) continue;
       if (distanciaPalabras(rara, buena, max) <= max) { PALABRAS_CORREGIDAS.set(rara, buena); break; }
     }
   });
@@ -11950,7 +11982,7 @@ function hospPalabrasProducto(nombre, porUnidad) {
        .replace(/(\d+)\s*(TAB|TABS|TABLETAS?)\b/g, '$1TAB')
        .replace(/(\d+)\s*(SOBRES?|SACHETS?)\b/g, '$1SOB');
   // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
-  t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
+  t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC ').replace(/(\d+)\s*%/g, '$1PC ');
   // Decimales en medidas: "2,5LT" es 2,5 litros (no "2" y "5L").
   t = t.replace(/(\d+)[.,](\d+)(?=\s*(LITROS?|LTS?|L|MLS?|CC|GRAMOS?|GRS?|G|MG|MCG|KG)\b)/g, '$1P$2');
   // Concentraciones como una sola medida: "1 MG/ML" = "1MG/ML" (no "1 MG" y "ML").
