@@ -11748,10 +11748,13 @@ const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X
   'ELABORADO ELABORADA ELABORADOS RECETARIO MAGISTRAL BULFOR DESPACHO DESPACHAR DIA DIAS HABIL HABILES ' +
   'PEDIDO SEGUN FARMACIA PREPARADO PREPARADA ENTREGA INMEDIATA URGENTE COD CODIGO FORMULA SE REQUIERE ' +
   'CADA VIGENCIA MINIMA ANO ANOS FICHA TECNICA STOCK DISPONIBILIDAD OCTUBRE NOVIEMBRE DICIEMBRE ENERO ' +
-  'FEBRERO MARZO ABRIL MAYO JUNIO JULIO AGOSTO SEPTIEMBRE UNIDAD UNIDADES UN UND').split(' '));
+  'FEBRERO MARZO ABRIL MAYO JUNIO JULIO AGOSTO SEPTIEMBRE UNIDAD UNIDADES UN UND ' +
+  'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO').split(' '));
 
 function hospPalabrasProducto(nombre) {
   let t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // El envase ("1x60", "2 FRASCO X 30") no es parte del producto: se quita.
+  t = t.replace(/\d+\s*X\s*\d+/g, ' ');
   // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
   t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
   // Medidas pegadas al número: "3 LTS" = "3LTS" = "3L".
@@ -11762,24 +11765,40 @@ function hospPalabrasProducto(nombre) {
   return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente));
 }
 
+// Nombre para mostrar en la lista: solo la primera línea y sin la cola de
+// relleno ("elaborado en recetario magistral…", "despacho 1 día hábil…").
+function hospNombreCorto(nombre) {
+  let t = String(nombre || '').split(/[\r\n]+/).map(x => x.trim()).filter(Boolean)[0] || String(nombre || '');
+  t = t.replace(/[,.\s]*(ELABORADO|ELABORADA|DESPACHO|VENCIMIENTO|VIGENCIA|MONTO MINIMO)\b.*$/i, '');
+  return t.replace(/[\s,.;:-]+$/, '').trim() || String(nombre || '').trim();
+}
+
 function hospAgruparProductos(ocsHospital) {
   const codigos = new Set(ocsHospital.map(r => r.codigooc));
   const fechaOC = {};
   ocsHospital.forEach(r => { fechaOC[r.codigooc] = String(r.fechaenvio || r.fechaoc || '').slice(0, 10); });
   const grupos = [];
-  items.filter(it => codigos.has(it.codigooc)).forEach(it => {
+  // Primero los productos con nombre unificado, para que los demás puedan
+  // juntarse con ellos aunque aparezcan antes en la lista.
+  const lineas = items.filter(it => codigos.has(it.codigooc))
+    .sort((a, b) => (diccionarioNormalizacion[textoOriginalDe(b)] ? 1 : 0) - (diccionarioNormalizacion[textoOriginalDe(a)] ? 1 : 0));
+  lineas.forEach(it => {
     const original = textoOriginalDe(it);
     const unificado = diccionarioNormalizacion[original];
     const nombre = unificado || ocNombreProducto(it);
-    const palabras = hospPalabrasProducto(nombre);
+    const palabras = hospPalabrasProducto(nombre);   // de un unificado, sus palabras salen del nombre unificado
     const medidas = [...palabras].filter(w => /\d/.test(w)).sort().join(' ');
     let g = null;
     if (unificado) g = grupos.find(x => x.unificado === unificado);
     if (!g && palabras.size) {
       let mejor = 0;
       grupos.forEach(x => {
-        if (x.unificado && x.unificado !== unificado) return;
-        if (x.medidas !== medidas && x.medidas && medidas) return;
+        // Dos nombres unificados distintos nunca se juntan; uno sin unificar sí
+        // puede sumarse a un grupo unificado si se parece.
+        if (unificado && x.unificado !== unificado) return;
+        // La dosis o medida tiene que ser la misma (25 mg no se junta con 50 mg,
+        // ni con uno que no dice dosis).
+        if (x.medidas !== medidas) return;
         const comunes = [...palabras].filter(w => x.palabras.has(w)).length;
         const parecido = comunes / Math.min(palabras.size, x.palabras.size);
         if (comunes >= 1 && parecido >= 0.8 && parecido > mejor) { mejor = parecido; g = x; }
@@ -11792,7 +11811,7 @@ function hospAgruparProductos(ocsHospital) {
   });
   grupos.forEach(g => {
     // Nombre que se muestra: el unificado, o el que más se repite (si empatan, el más corto).
-    g.nombre = g.unificado || Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0];
+    g.nombre = g.unificado || hospNombreCorto(Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0]);
     g.listaOC = [...g.ocs].sort((a, b) => fechaOC[b].localeCompare(fechaOC[a]));
     g.ultima = fechaOC[g.listaOC[0]] || '';
     g.variantes = Object.keys(g.nombres).length;
