@@ -1815,6 +1815,7 @@ const SINONIMOS_PRODUCTO = [
   ['PODOFILINA', 'PODOFILINO'],
   ['TRAZADONA', 'TRAZODONA'],
   ['ZIMC', 'ZINC'],
+  ['PITASIO', 'POTASIO'],
 ];
 
 function coincideBusqueda(texto, query) {
@@ -11936,7 +11937,7 @@ function distanciaPalabras(a, b, max) {
 
 // Revisa las palabras de una lista de nombres y anota las que parecen mal escritas.
 // Palabras que parecen error de tipeo pero son otro medicamento: no se corrigen
-// (OCARBAMAZEPINA probablemente es oxcarbazepina, no carbamazepina).
+// (OCARBAMAZEPINA es oxcarbazepina, no carbamazepina).
 const PALABRAS_NO_CORREGIR = new Set(['OCARBAMAZEPINA']);
 
 function aprenderCorrecciones(nombres) {
