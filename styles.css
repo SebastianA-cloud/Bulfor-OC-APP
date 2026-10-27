@@ -1201,3 +1201,39 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 @media (max-width: 640px) {
   .panel-lateral { top: calc(34px + env(safe-area-inset-top, 0)); right: 0; left: 0; bottom: 0; width: auto; border-radius: 0; }
 }
+
+/* Contenido del panel lateral */
+.panel-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.panel-tabla th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); background: var(--bg); padding: 7px 8px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
+.panel-tabla td { padding: 7px 8px; border-bottom: 1px solid #F1EFEA; vertical-align: top; }
+.panel-tabla tr:last-child td { border-bottom: 0; }
+.panel-tabla small, .panel-muted { display: block; color: var(--text-3); font-size: 11.5px; margin-top: 2px; }
+.panel-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 12.5px; }
+.panel-datos span { display: block; font-size: 11px; color: var(--text-3); }
+.panel-vacio { border: 1px dashed var(--border); border-radius: var(--radius); padding: 12px; text-align: center; font-size: 12.5px; color: var(--text-2); }
+.panel-ok { background: var(--green-light); color: var(--green); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.panel-link { cursor: pointer; }
+.panel-link:hover { color: var(--accent); text-decoration: underline; }
+.page-btn-pri { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+.panel-acciones .page-btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Listado de OC */
+.oc-tabla td { vertical-align: middle; }
+.oc-cod { white-space: nowrap; }
+.oc-origen { display: block; font-size: 11px; color: var(--text-3); white-space: nowrap; margin-top: 2px; }
+.oc-hosp span { display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.oc-hosp small { display: block; font-size: 11.5px; color: var(--text-3); }
+.oc-tabla .oc-desc { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-width: 340px; }
+.oc-acc { white-space: nowrap; text-align: right; }
+.oc-btn-facturar { border: 1px solid var(--accent); color: var(--accent); background: var(--surface); border-radius: 7px; padding: 4px 10px; font: 600 12px var(--font); cursor: pointer; margin-right: 6px; }
+.oc-btn-facturar:hover { background: var(--accent); color: #fff; }
+.oc-flecha { color: var(--text-3); font-size: 16px; vertical-align: middle; }
+.oc-fila { cursor: pointer; }
+.oc-fila:hover td { background: var(--row-hover, #FAF8F4); }
+tr.fila-abierta td { background: var(--accent-light) !important; }
+tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
+.fpp-status-tab b { font-weight: 700; margin-left: 4px; opacity: .8; }
+/* Con el panel abierto se esconden las columnas secundarias para que lo
+   importante (N°, hospital, total y estado) no se corte. */
+body.con-panel .col-sec { display: none; }
+.panel-tabla td[style*="text-align:right"] { white-space: nowrap; }

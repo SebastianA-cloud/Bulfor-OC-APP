@@ -372,7 +372,7 @@
   <!-- OC PAGE -->
   <div class="page" id="page-oc">
     <div class="page-header">
-      <div class="page-title">Órdenes de compra</div>
+      <div class="page-title">Órdenes de compra <span class="info-tip" tabindex="0" role="note" data-tip="Órdenes de compra que llegan desde Mercado Público. Haz clic en una para ver sus productos, sus facturas y de qué compra ágil o licitación viene. El buscador busca en todas las fechas.">i</span></div>
       <div class="page-sub" id="oc-subtitle">Cargando datos…</div>
     </div>
     <div class="fpp-toolbar-top">
@@ -382,33 +382,22 @@
         <select id="oc-select-anio" onchange="ocSeleccionarPeriodo()" aria-label="Año"></select>
         <button class="fpp-period-btn" onclick="ocCambiarMes(1)" title="Mes siguiente">›</button>
       </div>
-    </div>
-    <div class="fpp-resumen" id="oc-stats">
-      <div class="stat destacado"><div class="stat-label">Monto total (con IVA)</div><div class="stat-val" style="font-size:20px" id="s-monto">—</div></div>
-      <div class="stat"><div class="stat-label">Total OC</div><div class="stat-val" style="font-size:16px" id="s-oc">—</div></div>
-      <div class="stat"><div class="stat-label">Hospitales</div><div class="stat-val" style="font-size:16px" id="s-hosp">—</div></div>
-      <div class="stat"><div class="stat-label">Última OC</div><div class="stat-val" style="font-size:16px" id="s-fecha">—</div></div>
+      <div class="fpp-status-tabs" id="oc-atajos"></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="oc-search" placeholder="Buscar por hospital, N° OC, descripción…" oninput="filterOC()">
-      </div>
-      <div class="scope-toggle" id="scope-oc" role="group" aria-label="Alcance de la búsqueda">
-        <button data-alcance="mes" class="active" onclick="setAlcance('oc','mes')">Este mes</button>
-        <button data-alcance="anio" onclick="setAlcance('oc','anio')">Año</button>
-        <button data-alcance="todo" onclick="setAlcance('oc','todo')">Todo</button>
+        <input type="text" id="oc-search" placeholder="Buscar N° OC, COT, hospital, RUT o producto (en todas las fechas)…" oninput="filterOC()">
       </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
-      <select id="oc-estado" onchange="filterOC()"><option value="">Todos los estados</option></select>
-      <select id="oc-tipo" onchange="filterOC()"><option value="">Tipo OC</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
+      <select id="oc-tipo" onchange="filterOC()"><option value="">Compra ágil y licitación</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
       <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
     </div>
-    <div class="table-card">
+    <div class="table-card oc-tabla">
       <table>
         <thead><tr>
-          <th>N° OC</th><th>Tipo</th><th>Descripción</th><th>Fecha</th>
-          <th>Hospital</th><th>Región</th><th style="text-align:right">Total (con IVA)</th>
+          <th>N° OC</th><th class="col-sec">Fecha</th><th>Hospital</th><th class="col-sec">Descripción</th>
+          <th style="text-align:right">Total</th><th>Facturación</th><th class="col-sec"></th>
         </tr></thead>
         <tbody id="oc-body"></tbody>
       </table>
@@ -665,7 +654,8 @@
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
     <div class="page-header">
-      <div class="page-title">Documentos</div>
+      <div class="page-title">Documentos <span class="info-tip" tabindex="0" role="note" data-tip="Facturas, guías de despacho y notas de crédito emitidas. El total facturado es facturas menos notas de crédito del mes, igual que el Registro de Ventas del SII. El buscador busca en todas las fechas, también por producto.">i</span></div>
+      <div class="page-sub" id="doc-resumen"></div>
     </div>
     <div class="fpp-toolbar-top">
       <div class="fpp-period">
@@ -676,16 +666,10 @@
       </div>
       <div class="fpp-status-tabs" id="doc-tipo-filtros"></div>
     </div>
-    <div id="doc-resumen" class="fpp-resumen"></div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="doc-search" placeholder="Buscar por N° documento, RUT, hospital, N° OC…" oninput="filtrarDocumentosGdexpress(this.value)">
-      </div>
-      <div class="scope-toggle" id="scope-doc" role="group" aria-label="Alcance de la búsqueda">
-        <button data-alcance="mes" class="active" onclick="setAlcance('doc','mes')">Este mes</button>
-        <button data-alcance="anio" onclick="setAlcance('doc','anio')">Año</button>
-        <button data-alcance="todo" onclick="setAlcance('doc','todo')">Todo</button>
+        <input type="text" id="doc-search" placeholder="Buscar N° documento, hospital, RUT, OC o producto (en todas las fechas)…" oninput="filtrarDocumentosGdexpress(this.value)">
       </div>
       <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
     </div>
@@ -1856,7 +1840,6 @@ function populateFilters() {
     el.value = cur;
   };
   sel('oc-region', [...new Set(oc.map(r=>r.region).filter(Boolean))].sort());
-  sel('oc-estado', [...new Set(oc.map(r=>r.estadooc).filter(Boolean))].sort());
   sel('items-familia', [...new Set(items.map(r=>r.familia).filter(Boolean))].sort());
   sel('hosp-region', [...new Set(hosp.map(r=>r.region).filter(Boolean))].sort());
 }
@@ -1878,25 +1861,97 @@ function rutDeHospital(nombreCrudo) {
   return mapaRutPorHospital[nombreCrudo] || mapaRutPorHospital[nombreHosp(nombreCrudo)] || '';
 }
 
+// ─── Listado de OC ─────────────────────────────────────────────────────────
+// Sin texto en el buscador se ve el mes elegido; con texto se busca en TODAS
+// las fechas (así nunca hay que acordarse de cambiar a "Todo"). Los atajos de
+// arriba filtran por estado de facturación.
+let ocAtajo = 'todas';
+const OC_ATAJOS = [
+  ['todas', 'Todas'], ['por', 'Por facturar'], ['parcial', 'Facturada parcial'],
+  ['completa', 'Facturada completa'], ['cancelada', 'Cancelada'],
+];
+
+// De qué compra ágil (COT) o licitación viene la OC. El COT no viene en un
+// campo propio: casi siempre el hospital lo escribe en el nombre de la OC.
+function ocOrigen(r) {
+  if (r.codigolicitacion && String(r.codigolicitacion).trim()) {
+    const cod = String(r.codigolicitacion).trim();
+    return { tipo: 'Licitación', codigo: cod, url: `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${encodeURIComponent(cod)}` };
+  }
+  const m = /(\d{3,8}-\d{1,6}-COT\d{2})/i.exec(r.nombreoc || '');
+  if (m) {
+    const cod = m[1].toUpperCase();
+    return { tipo: 'COT', codigo: cod, url: `https://buscador.mercadopublico.cl/ficha?code=${encodeURIComponent(cod)}` };
+  }
+  return null;
+}
+
+// Estado de facturación: lo facturado con esa OC (sin facturas anuladas y
+// descontando sus notas de crédito) contra el total de la OC.
+let ocFactCache = null, ocFactCacheN = -1;
+function ocFacturadoPorOC() {
+  if (ocFactCache && ocFactCacheN === documentosGdexpress.length) return ocFactCache;
+  const porOC = {}, folioOC = {};
+  documentosGdexpress.forEach(d => {
+    if (d.tipo_dte !== '33' || !d.orden_compra_ref || estadoAceptacionFusionado(d) === 'N') return;
+    const cod = d.orden_compra_ref.trim();
+    porOC[cod] = (porOC[cod] || 0) + montoTotalDoc(d);
+    folioOC[String(d.folio).trim()] = cod;
+  });
+  documentosGdexpress.forEach(d => {
+    if (d.tipo_dte !== '61' || !d.nc_factura_ref) return;
+    const cod = folioOC[String(d.nc_factura_ref).trim()];
+    if (cod) porOC[cod] -= montoTotalDoc(d);
+  });
+  ocFactCache = porOC; ocFactCacheN = documentosGdexpress.length;
+  return porOC;
+}
+function ocFacturacion(r) {
+  if (/cancel/i.test(r.estadooc || '') || String(r.estadooc) === '9') return 'cancelada';
+  const fact = ocFacturadoPorOC()[(r.codigooc || '').trim()] || 0;
+  const total = Number(r.totaloc) || 0;
+  if (fact <= 0) return 'por';
+  return total > 0 && fact >= total - 1 ? 'completa' : 'parcial';
+}
+// Códigos de estado de Mercado Público (la sincronización guarda el número).
+const ESTADO_OC_MP = { '4': 'Enviada al proveedor', '5': 'En proceso', '6': 'Aceptada', '9': 'Cancelada', '12': 'Recepción conforme', '13': 'Pendiente de recepcionar', '14': 'Recepcionada parcialmente', '15': 'Recepción conforme incompleta' };
+const nombreEstadoOC = e => ESTADO_OC_MP[String(e)] || e || '';
+const OC_FACT_BADGE = {
+  por: '<span class="badge badge-amber">Por facturar</span>',
+  parcial: '<span class="badge badge-blue">Facturada parcial</span>',
+  completa: '<span class="badge badge-green">Facturada completa</span>',
+  cancelada: '<span class="badge badge-gray">Cancelada</span>',
+};
+
+function ocBaseActual() {
+  const q = document.getElementById('oc-search').value.trim();
+  return q ? oc : ocListaDelPeriodo();
+}
+
 function filterOC() {
   const q = document.getElementById('oc-search').value;
   const reg = document.getElementById('oc-region').value;
-  const est = document.getElementById('oc-estado').value;
   const tipo = document.getElementById('oc-tipo').value;
-  ocF = ocListaDelPeriodo().filter(r => {
-    const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${productosTextoPorOC[r.codigooc]||''}`;
-    return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!est || r.estadooc===est) && (!tipo || r.tipooc===tipo);
+  const base = ocBaseActual().filter(r => {
+    const origen = ocOrigen(r);
+    const s = `${r.codigooc} ${r.nombreoc} ${r.hospital} ${nombreHosp(r.hospital)} ${rutDeHospital(r.hospital)} ${r.rutproveedor} ${origen ? origen.codigo : ''} ${productosTextoPorOC[r.codigooc]||''}`;
+    return coincideBusqueda(s, q) && (!reg || r.region===reg) && (!tipo || r.tipooc===tipo);
   });
-  document.getElementById('oc-limpiar').style.display = (q || reg || est || tipo) ? 'inline-flex' : 'none';
-  updateStats();
+  const conteo = { todas: base.length, por: 0, parcial: 0, completa: 0, cancelada: 0 };
+  base.forEach(r => { conteo[ocFacturacion(r)]++; });
+  document.getElementById('oc-atajos').innerHTML = OC_ATAJOS.map(([k, l]) =>
+    `<button class="fpp-status-tab${ocAtajo === k ? ' active' : ''}" onclick="ocAtajo='${k}';filterOC()">${l} <b>${conteo[k]}</b></button>`).join('');
+  ocF = ocAtajo === 'todas' ? base : base.filter(r => ocFacturacion(r) === ocAtajo);
+  document.getElementById('oc-limpiar').style.display = (q || reg || tipo || ocAtajo !== 'todas') ? 'inline-flex' : 'none';
+  updateStats(base);
   ocPage = 1; renderOC();
 }
 
 function limpiarFiltrosOC() {
   document.getElementById('oc-search').value = '';
   document.getElementById('oc-region').value = '';
-  document.getElementById('oc-estado').value = '';
   document.getElementById('oc-tipo').value = '';
+  ocAtajo = 'todas';
   filterOC();
 }
 
@@ -2289,19 +2344,87 @@ function renderOC() {
     document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos órdenes con estos filtros.' : 'Todavía no hay órdenes registradas.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosOC()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
     return;
   }
+  const abierta = panelPila[0]?.ocCodigo;
   document.getElementById('oc-body').innerHTML = slice.map((r) => {
     const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
+    const origen = ocOrigen(r);
+    const fact = ocFacturacion(r);
+    const cod = (r.codigooc||'').replace(/'/g,"\\'");
+    const region = (r.region||'').replace(/^Región (de la |de los |del |de )?/i, '').replace('Metropolitana de Santiago', 'Metropolitana');
     return `
-    <tr onclick="navReset();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
-      <td data-label="N° OC"><span class="mono">${r.codigooc||''}</span></td>
-      <td data-label="Tipo">${tipoBadge(r.tipooc)}</td>
-      <td data-label="Descripción" title="${descripcion}"><div class="oc-desc">${descripcion}</div></td>
-      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
-      <td data-label="Hospital" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${nombreHosp(r.hospital)||''}">${nombreHosp(r.hospital)||''}</td>
-      <td data-label="Región" style="font-size:12px;color:var(--text-2)">${(r.region||'').replace('Región ','').replace('de ','')}</td>
-      <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
+    <tr class="oc-fila${abierta === r.codigooc ? ' fila-abierta' : ''}" onclick="ocAbrir('${cod}')">
+      <td data-label="N° OC"><span class="mono oc-cod">${escapeHtml(r.codigooc||'')}</span>${origen ? `<small class="oc-origen">${origen.tipo === 'COT' ? 'COT' : 'Lic.'} ${escapeHtml(origen.codigo)}</small>` : ''}</td>
+      <td data-label="Fecha" class="col-sec" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
+      <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(nombreHosp(r.hospital)||'')}</span><small>${escapeHtml(region)}</small></td>
+      <td data-label="Descripción" class="col-sec" title="${escapeHtml(descripcion)}"><div class="oc-desc">${escapeHtml(descripcion)}</div></td>
+      <td data-label="Total" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap">${clp(r.totaloc)}</td>
+      <td data-label="Facturación">${OC_FACT_BADGE[fact]}</td>
+      <td class="oc-acc col-sec">${fact === 'por' || fact === 'parcial' ? `<button class="oc-btn-facturar" onclick="event.stopPropagation();ocFacturar('${cod}')" title="Abrir una factura con este cliente y esta OC">Facturar</button>` : ''}<i class="ti ti-chevron-right oc-flecha" aria-hidden="true"></i></td>
     </tr>`;
   }).join('');
+}
+
+// Ficha de la OC en el panel lateral estándar.
+function ocAbrir(codigoOC) {
+  const f = fichaOC(codigoOC);
+  if (f) panelAbrir(f);
+  renderOC();
+}
+function fichaOC(codigoOC) {
+  const r = oc.find(o => o.codigooc === codigoOC);
+  if (!r) return null;
+  const idx = ocF.findIndex(o => o.codigooc === codigoOC);
+  const origen = ocOrigen(r);
+  const fact = ocFacturacion(r);
+  const relacionados = items.filter(it => it.codigooc === codigoOC);
+  const facturas = facturasAsociadasA(codigoOC).slice().sort((x, y) => String(y.fecha_emision || '').localeCompare(String(x.fecha_emision || '')));
+  const facturado = ocFacturadoPorOC()[codigoOC.trim()] || 0;
+  window.__ocItemsTextos = relacionados.map(it => ({ textoOriginal: textoOriginalDe(it), nombreFinal: nombreFinalDe(it) }));
+  const productos = relacionados.length ? `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
+      ${relacionados.map((it, i) => {
+        const original = textoOriginalDe(it);
+        const nombre = diccionarioNormalizacion[original] || original;
+        return `<tr><td><span class="panel-link" onclick="abrirNormalizacion(window.__ocItemsTextos[${i}].textoOriginal)" title="Clic para unificar el nombre de este producto">${escapeHtml(nombre)}</span></td>
+          <td style="text-align:right;white-space:nowrap">${it.cantidad||'—'} ${escapeHtml(it.unidad||'')}</td>
+          <td style="text-align:right">${clp(it.preciounitario)}</td>
+          <td style="text-align:right;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td></tr>`;
+      }).join('')}</tbody></table>` : '<div class="panel-vacio">No se encontraron productos para esta OC.</div>';
+  const dato = (k, v) => v ? `<div><span>${k}</span>${escapeHtml(v)}</div>` : '';
+  const cod = codigoOC.replace(/'/g, "\\'");
+  return {
+    ocCodigo: codigoOC,
+    titulo: `OC ${codigoOC}`,
+    sub: `${nombreHosp(r.hospital) || r.hospital || ''} · ${fDate(r.fechaenvio || r.fechaoc)}`,
+    destacado: clp(r.totaloc),
+    etiquetas: `${tipoBadge(r.tipooc)} ${OC_FACT_BADGE[fact]}${facturado > 0 && fact !== 'completa' ? ` <span class="badge badge-gray">Facturado ${clp(facturado)}</span>` : ''}`,
+    ids: [{ label: 'OC', valor: codigoOC }, origen ? { label: origen.tipo === 'COT' ? 'COT' : 'Licitación', valor: origen.codigo } : null],
+    acciones: `<a class="page-btn" href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener">Ver OC en Mercado Público ↗</a>`
+      + (origen ? `<a class="page-btn" href="${origen.url}" target="_blank" rel="noopener">Ver ${origen.tipo === 'COT' ? 'compra ágil' : 'licitación'} ↗</a>` : '')
+      + (fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri" onclick="ocFacturar('${cod}')">Facturar</button>` : ''),
+    cuerpo: `<div class="panel-h">Productos</div>${productos}
+      <div class="panel-h">Datos de la OC</div>
+      <div class="panel-datos">${dato('Nombre', r.nombreoc)}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Forma de pago', r.formapago)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}</div>`,
+    relacionado: facturas.map(d => ({
+      icono: 'ti-file-invoice',
+      titulo: `Factura N° ${d.folio}`,
+      resumen: `${clp(montoTotalDoc(d))} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''}${estadoAceptacionFusionado(d) === 'N' ? ' · ANULADA' : ''}`,
+      abrir: () => fichaDocumento(d.id),
+    })),
+    navegacion: idx === -1 ? null : {
+      texto: `OC ${idx + 1} de ${ocF.length}`,
+      anterior: idx > 0 ? () => ocAbrir(ocF[idx - 1].codigooc) : null,
+      siguiente: idx < ocF.length - 1 ? () => ocAbrir(ocF[idx + 1].codigooc) : null,
+    },
+    alCerrar: () => { if (document.getElementById('page-oc')?.classList.contains('active')) renderOC(); },
+  };
+}
+
+// "Facturar": abre Creación de documentos → Factura con el cliente y la OC.
+function ocFacturar(codigoOC) {
+  const r = oc.find(o => o.codigooc === codigoOC);
+  if (!r) return;
+  panelCerrar();
+  if (typeof dteFacturarOC === 'function') dteFacturarOC({ codigo: codigoOC, rut: rutDeHospital(r.hospital), fecha: (r.fechaoc || r.fechaenvio || '') });
 }
 
 // Navega entre OC según la lista filtrada actual (ocF) — respeta lo que
@@ -6593,7 +6716,7 @@ function badgeEstadoDocGdexpress(estado, d) {
 function actualizarLimpiarDoc() {
   const btn = document.getElementById('doc-limpiar');
   if (!btn) return;
-  const hay = !!docBusqueda || !docTiposActivos['33'] || !docTiposActivos['61'] || !docTiposActivos['52'];
+  const hay = !!docBusqueda || (typeof docAtajo !== 'undefined' && docAtajo !== 'todos');
   btn.style.display = hay ? 'inline-flex' : 'none';
 }
 
@@ -6601,102 +6724,125 @@ function actualizarLimpiarDoc() {
 function limpiarFiltrosDoc() {
   document.getElementById('doc-search').value = '';
   docBusqueda = '';
+  docAtajo = 'todos';
   docMostrarTodosLosTipos();
+}
+
+// Atajos de Documentos: uno a la vez (Todos, Facturas, Guías, NC, Rechazadas).
+let docAtajo = 'todos';
+const DOC_ATAJOS = [['todos', 'Todos'], ['33', 'Facturas'], ['52', 'Guías'], ['61', 'Notas de crédito'], ['rechazadas', 'Rechazadas']];
+function docSetAtajo(k) {
+  docAtajo = k;
+  docTiposActivos = { '33': k === 'todos' || k === '33' || k === 'rechazadas', '61': k === 'todos' || k === '61', '52': k === 'todos' || k === '52' };
+  renderDocumentosGdexpress();
+}
+
+// Productos de cada factura, para poder buscar "bicarbonato" y encontrar las
+// facturas que lo incluyen. Se cargan una sola vez, al buscar por primera vez.
+let docProductosPorId = null, docCargandoProductos = false;
+function docTextoProductos(id) {
+  if (!docProductosPorId) {
+    if (facturaItemsCargados && !docCargandoProductos) {
+      docProductosPorId = {};
+      facturaItemsRaw.forEach(it => { docProductosPorId[it.documento_id] = (docProductosPorId[it.documento_id] || '') + ' ' + (it.nombre_producto || ''); });
+    } else if (!docCargandoProductos && typeof cargarItemsFacturasVentaUnaVez === 'function') {
+      docCargandoProductos = true;
+      cargarItemsFacturasVentaUnaVez().then(() => { docCargandoProductos = false; docProductosPorId = null; renderDocumentosGdexpress(true); }).catch(() => { docCargandoProductos = false; });
+    }
+    if (!docProductosPorId) return '';
+  }
+  return docProductosPorId[id] || '';
+}
+
+// Pago de cada factura (Cobranza), indexado por N° para la columna Estado.
+function docPagoPorFolio() {
+  const m = {};
+  facturasPago.forEach(p => { m[String(p.factura).trim()] = p; });
+  return m;
 }
 
 function renderDocumentosGdexpress(soloTabla) {
   const cont = document.getElementById('doc-contenido');
-  const delPeriodo = docListaDelPeriodo();
+  const buscando = !!(docBusqueda && docBusqueda.trim());
+  // Sin búsqueda se ve el mes elegido; con búsqueda, todas las fechas.
+  const delPeriodo = buscando ? documentosGdexpress : docListaDelPeriodo();
   actualizarLimpiarDoc();
 
-  // Contadores por tipo — ANTES de aplicar el filtro de tipo (para que se
-  // pueda ver cuántas facturas hay aunque estén desactivadas en este momento).
-  const cuenta = { '33': 0, '61': 0, '52': 0 };
-  delPeriodo.forEach(d => { if (cuenta[d.tipo_dte] !== undefined) cuenta[d.tipo_dte]++; });
-  document.getElementById('doc-tipo-filtros').innerHTML = Object.keys(TIPOS_DTE_INFO).map(t =>
-    `<button class="fpp-status-tab${docTiposActivos[t] ? ' active' : ''}" onclick="docToggleTipo('${t}')">${docTiposActivos[t] ? '✓' : '○'} ${TIPOS_DTE_INFO[t].nombre} (${cuenta[t]})</button>`
-  ).join('');
+  let base = delPeriodo;
+  if (buscando) {
+    base = base.filter(d => coincideBusqueda(
+      `${d.folio} ${d.rut_hospital||''} ${d.hospital||''} ${nombreHosp(d.hospital)||''} ${d.orden_compra_ref||''} ${docTextoProductos(d.id)}`, docBusqueda));
+  }
+  const cuenta = { todos: base.length, '33': 0, '61': 0, '52': 0, rechazadas: 0 };
+  base.forEach(d => { if (cuenta[d.tipo_dte] !== undefined) cuenta[d.tipo_dte]++; if (d.tipo_dte === '33' && estadoAceptacionFusionado(d) === 'N') cuenta.rechazadas++; });
+  document.getElementById('doc-tipo-filtros').innerHTML = DOC_ATAJOS.map(([k, l]) =>
+    `<button class="fpp-status-tab${docAtajo === k ? ' active' : ''}" onclick="docSetAtajo('${k}')">${l} <b>${cuenta[k]}</b></button>`).join('');
 
-  // Resumen compacto del período. "Total facturado" usa el mismo criterio que
-  // el Registro de Ventas del SII: cada documento cuenta en el mes en que fue
-  // emitido. O sea, facturas del mes MENOS notas de crédito del mes.
-  //
-  // Antes se hacía distinto: se sacaba del total la factura anulada completa,
-  // en vez de restar la NC. Da el mismo resultado mientras la NC y su factura
-  // caen en el mismo mes, pero cuando la NC cruza de mes el descuento aterriza
-  // en el mes equivocado. Ejemplo real: la NC 1272 (10-08-2026, $624.750)
-  // anula la factura 21696, que es del 28-07-2026 — agosto quedaba $624.750
-  // más alto y julio $624.750 más bajo que el portal del SII.
-  //
-  // Solo se restan las NC aceptadas: una NC rechazada no descuenta nada.
-  // Las guías se muestran aparte — no son una venta facturada todavía, son
-  // mercadería despachada que no se ha facturado.
-  const facturasDelPeriodo = delPeriodo.filter(d => d.tipo_dte === '33');
-  const facturasAnuladasPorNC = facturasDelPeriodo.filter(d => estadoAceptacionFusionado(d) === 'N');
-  const facturasRechazadasPeriodo = facturasDelPeriodo.filter(documentoRechazado);
-  const resumenVenta = totalFacturadoDelPeriodo(rangoDelAlcance('doc', docPeriodo));
-  const totalNotasCredito = resumenVenta.notas;
-  const totalFacturado = resumenVenta.total;
-  const totalGuiasPorFacturar = delPeriodo.filter(d => d.tipo_dte === '52').reduce((s,d) => s + montoTotalDoc(d), 0);
-  document.getElementById('doc-resumen').innerHTML = `
-    <div class="stat destacado" title="Facturas del período menos notas de crédito del período, igual que el Registro de Ventas del SII"><div class="stat-label">Total facturado (con IVA)</div><div class="stat-val" style="font-size:20px">${clp(totalFacturado)}</div></div>
-    <div class="stat"><div class="stat-label">Facturas</div><div class="stat-val" style="font-size:16px">${cuenta['33']}</div></div>
-    <div class="stat" title="Notas de crédito emitidas en el período, ya descontadas del total facturado. ${facturasAnuladasPorNC.length} factura(s) de este período quedaron anuladas por una NC.${facturasRechazadasPeriodo.length ? ' Además hay ' + facturasRechazadasPeriodo.length + ' factura(s) rechazada(s) por el receptor, que no se cuentan como venta.' : ''}"><div class="stat-label">Notas de crédito (−)</div><div class="stat-val" style="font-size:16px;color:var(--red)">${totalNotasCredito ? '−' + clp(totalNotasCredito) : '—'}</div></div>
-    <div class="stat"><div class="stat-label">Guías de despacho (por facturar)</div><div class="stat-val" style="font-size:16px;color:var(--amber)">${clp(totalGuiasPorFacturar)}</div></div>`;
-
-  const ningunTipoActivo = !docTiposActivos['33'] && !docTiposActivos['61'] && !docTiposActivos['52'];
-  if (ningunTipoActivo) {
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">📭</div><p>No hay tipos de documento seleccionados.</p><a onclick="docMostrarTodosLosTipos()">Mostrar todos</a></div></div>`;
-    docF = [];
-    return;
+  // Resumen en una línea. "Total facturado" usa el mismo criterio que el
+  // Registro de Ventas del SII: facturas del mes MENOS notas de crédito del mes
+  // (solo las NC aceptadas descuentan). Las guías van aparte: es mercadería
+  // despachada que todavía no se factura.
+  if (buscando) {
+    document.getElementById('doc-resumen').textContent = `${base.length.toLocaleString('es-CL')} documento${base.length === 1 ? ' encontrado' : 's encontrados'} en todas las fechas`;
+  } else {
+    const resumenVenta = totalFacturadoDelPeriodo(rangoDelAlcance('doc', docPeriodo));
+    const guias = delPeriodo.filter(d => d.tipo_dte === '52').reduce((t, d) => t + montoTotalDoc(d), 0);
+    document.getElementById('doc-resumen').textContent = `${nombrePeriodoAlcance('doc', docPeriodo)} · total facturado ${clp(resumenVenta.total)}`
+      + (resumenVenta.notas ? ` (ya descontadas NC por ${clp(resumenVenta.notas)})` : '') + (guias ? ` · guías por facturar ${clp(guias)}` : '');
   }
 
-  let lista = delPeriodo.filter(d => docTiposActivos[d.tipo_dte]);
-  if (docBusqueda) {
-    lista = lista.filter(d => coincideBusqueda(
-      `${d.folio} ${d.rut_hospital||''} ${d.hospital||''} ${nombreHosp(d.hospital)||''} ${d.orden_compra_ref||''}`,
-      docBusqueda
-    ));
-  }
-  // Único punto de ordenamiento de la lista: se aplica DESPUÉS de los
-  // filtros de período, tipo y búsqueda, y docF (que alimenta el
-  // anterior/siguiente del detalle) se queda con exactamente esta lista,
-  // así que la navegación respeta siempre este mismo orden.
+  let lista = docAtajo === 'rechazadas' ? base.filter(d => d.tipo_dte === '33' && estadoAceptacionFusionado(d) === 'N')
+    : docAtajo === 'todos' ? base : base.filter(d => d.tipo_dte === docAtajo);
+  // Único punto de ordenamiento: docF (que alimenta las flechas del panel) se
+  // queda con exactamente esta lista y este orden.
   lista = lista.slice().sort(compararDocumentosGdexpress);
   docF = lista;
 
   if (!lista.length) {
-    const nombrePeriodo = nombrePeriodoAlcance('doc', docPeriodo);
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${docBusqueda ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodo}.`}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${buscando ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodoAlcance('doc', docPeriodo)}.`}</p></div></div>`;
     return;
   }
 
+  const pagos = docPagoPorFolio();
+  const abierto = panelPila[0]?.docId;
+  const MAX = 300;
   cont.innerHTML = `
-    <div class="table-card">
+    <div class="table-card doc-tabla">
       <table>
         <thead><tr>
-          <th>Tipo</th><th>Emisión</th><th>N° Documento</th><th>Hospital</th><th>RUT Hospital</th><th>N° OC</th><th style="text-align:right">Monto</th><th>Estado</th>
+          <th>N°</th><th>Emisión</th><th>Hospital</th><th class="col-sec">OC</th><th style="text-align:right">Total</th><th>Estado</th>
         </tr></thead>
         <tbody>
-          ${lista.map(d => `
-            <tr style="cursor:pointer" onclick="abrirDetalleDocumentoGdexpress(${d.id})">
-              <td data-label="Tipo">${docBadgeTipo(d.tipo_dte)}</td>
-              <td data-label="Emisión" style="font-size:12px;white-space:nowrap">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
-              <td data-label="N° Documento" class="mono" style="color:var(--accent)">${d.folio} ↗</td>
-              <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(d.hospital)||d.hospital||''}">${nombreHosp(d.hospital)||d.hospital||'—'}</td>
-              <td data-label="RUT Hospital" style="font-size:12px;white-space:nowrap">${d.rut_hospital||'—'}</td>
-              <td data-label="N° OC" style="font-size:12px;white-space:nowrap">${d.orden_compra_ref && oc.find(o => o.codigooc === d.orden_compra_ref) ? `<span style="cursor:pointer;color:var(--accent)" onclick="event.stopPropagation();navReset();openOCDetail('${d.orden_compra_ref.replace(/'/g,"\\'")}')" title="Ver esta orden de compra">${d.orden_compra_ref} ↗</span>` : (d.orden_compra_ref || '—')}</td>
-              <td data-label="Monto" style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">${clp(montoTotalDoc(d))}${d.tipo_dte === '52' ? ' <span style="font-size:10px;color:var(--text-3)">(por facturar)</span>' : ''}</td>
-              <td data-label="Estado">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d), d)}</td>
-            </tr>`).join('')}
+          ${lista.slice(0, MAX).map(d => {
+            const p = d.tipo_dte === '33' ? pagos[String(d.folio).trim()] : null;
+            const pagada = p && (p.estado_pago === 'Pagado' || p.fecha_pago);
+            const rech = estadoAceptacionFusionado(d) === 'N';
+            return `
+            <tr class="oc-fila${abierto === d.id ? ' fila-abierta' : ''}" onclick="docAbrir(${d.id})">
+              <td data-label="N°"><span class="mono oc-cod">${escapeHtml(String(d.folio))}</span><small class="oc-origen">${TIPOS_DTE_INFO[d.tipo_dte]?.singular || ''}</small></td>
+              <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+              <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(nombreHosp(d.hospital)||d.hospital||'—')}</span><small>${escapeHtml(d.rut_hospital||'')}</small></td>
+              <td data-label="OC" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(d.orden_compra_ref || '—')}</td>
+              <td data-label="Total" style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:500">${clp(montoTotalDoc(d))}</td>
+              <td data-label="Estado" style="white-space:nowrap">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d), d)}${d.tipo_dte === '33' && !rech ? (pagada ? ' <span class="badge badge-green">Pagada</span>' : p ? ' <span class="badge badge-amber">Por cobrar</span>' : '') : ''}${d.tipo_dte === '52' ? ' <span class="badge badge-gray">Por facturar</span>' : ''}</td>
+            </tr>`; }).join('')}
         </tbody>
       </table>
+      ${lista.length > MAX ? `<div class="pagination"><span>Se muestran los ${MAX} más recientes de ${lista.length.toLocaleString('es-CL')}: usa el buscador o los atajos para acotar.</span></div>` : ''}
     </div>`;
 
   if (soloTabla) {
     const inp = document.getElementById('doc-search');
     if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
   }
+}
+
+function docAbrir(id) {
+  const f = fichaDocumento(id);
+  if (!f) return;
+  f.alCerrar = () => { if (document.getElementById('page-facturas')?.classList.contains('active')) renderDocumentosGdexpress(); };
+  panelAbrir(f);
+  renderDocumentosGdexpress();
 }
 
 // Desde el seguimiento de facturas, el N° de factura ahora abre el detalle
@@ -6861,6 +7007,100 @@ ${fechaDocumentoDesalineada(d) ? `
   } catch(e) {
     cuerpoItems.innerHTML = `<div style="color:var(--red)">No se pudo cargar el detalle: ${e.message}</div>`;
   }
+}
+
+// ─── Ficha de un documento (factura, guía o NC) en el panel lateral ───────
+// Todo en una sola vista: total y estado arriba, los productos a la vista y,
+// en "Relacionado", la OC, el envío, la cobranza y la NC o factura conectada.
+function envioFedexDeFolio(folio) {
+  const f = String(folio || '').trim();
+  if (!f) return null;
+  return fedex.find(e => parsearNumerosFactura(e.factura).some(n => String(n).replace(/\D/g, '') === f)) || null;
+}
+function pagoDeFolio(folio) {
+  return facturasPago.find(p => String(p.factura).trim() === String(folio).trim()) || null;
+}
+
+function fichaDocumento(id, lista) {
+  const d = documentosGdexpress.find(x => x.id === id);
+  if (!d) return null;
+  const info = TIPOS_DTE_INFO[d.tipo_dte] || { singular: 'Documento' };
+  const estado = estadoAceptacionFusionado(d);
+  const ordenOC = d.orden_compra_ref ? oc.find(o => o.codigooc === d.orden_compra_ref.trim()) : null;
+  const origen = ordenOC ? ocOrigen(ordenOC) : null;
+  const nc = d.tipo_dte === '33' ? notaCreditoQueAnula(d.folio) : null;
+  const anulada = d.tipo_dte === '61' && d.nc_factura_ref ? documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === String(d.nc_factura_ref)) : null;
+  const envio = envioFedexDeFolio(d.folio);
+  const pago = d.tipo_dte === '33' ? pagoDeFolio(d.folio) : null;
+  const rel = [];
+  if (envio) rel.push({ icono: 'ti-truck', titulo: `Envío FedEx · OT ${envio.orden_transporte || '—'}`,
+    resumen: [envio.estado_envio, envio.fecha_entrega ? fDate(envio.fecha_entrega) : '', envio.recibido_por ? 'recibió ' + envio.recibido_por : ''].filter(Boolean).join(' · '),
+    abrir: () => fichaEnvioFedex(envio.id) });
+  if (pago) rel.push({ icono: 'ti-cash', titulo: 'Cobranza',
+    resumen: pago.estado_pago === 'Pagado' || pago.fecha_pago ? `Pagada${pago.fecha_pago ? ' el ' + fDate(pago.fecha_pago) : ''}` : `Pendiente${pago.fecha_vencimiento ? ' · vence ' + fDate(pago.fecha_vencimiento) : ''}`,
+    abrir: () => { panelCerrar(); irAModuloPagina('facturas', 'pagos'); return null; } });
+  if (ordenOC) rel.push({ icono: 'ti-shopping-cart', titulo: 'Orden de compra',
+    resumen: `${clp(ordenOC.totaloc)} · ${ocFacturacion(ordenOC) === 'completa' ? 'Facturada completa' : ocFacturacion(ordenOC) === 'parcial' ? 'Facturada parcial' : 'Por facturar'}`,
+    abrir: () => fichaOC(ordenOC.codigooc) });
+  if (nc) rel.push({ icono: 'ti-receipt-refund', titulo: `Nota de crédito N° ${nc.folio}`, resumen: `Anula esta factura · ${clp(montoTotalDoc(nc))}`, abrir: () => fichaDocumento(nc.id) });
+  if (anulada) rel.push({ icono: 'ti-file-invoice', titulo: `Factura N° ${anulada.folio}`, resumen: `Anulada por esta nota de crédito · ${clp(montoTotalDoc(anulada))}`, abrir: () => fichaDocumento(anulada.id) });
+
+  const navLista = lista || docF;
+  const idx = navLista.findIndex(x => x.id === d.id);
+  const contItems = `doc-items-${d.id}-${Date.now()}`;
+  setTimeout(() => cargarItemsEnPanel(d, contItems), 0);
+  const dato = (k, v) => v ? `<div><span>${k}</span>${v}</div>` : '';
+  return {
+    docId: d.id,
+    titulo: `${info.singular} N° ${d.folio}`,
+    sub: `${nombreHosp(d.hospital) || d.hospital || '—'} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''}`,
+    destacado: clp(montoTotalDoc(d)),
+    etiquetas: badgeEstadoDocGdexpress(estado, d) + (pago ? (pago.estado_pago === 'Pagado' || pago.fecha_pago ? ' <span class="badge badge-green">Pagada</span>' : ' <span class="badge badge-amber">Por cobrar</span>') : '')
+      + (fechaDocumentoDesalineada(d) ? ` <span class="badge badge-amber" title="Para el SII cuenta en el mes en que se emitió de verdad">Emitida realmente el ${fDate(d.fecha_emision_real)}</span>` : ''),
+    ids: [{ label: info.singular, valor: String(d.folio) }, d.orden_compra_ref ? { label: 'OC', valor: d.orden_compra_ref.trim() } : null, origen ? { label: origen.tipo === 'COT' ? 'COT' : 'Licitación', valor: origen.codigo } : null],
+    acciones: d.doc_url ? `<a class="page-btn page-btn-pri" href="${d.doc_url}" target="_blank" rel="noopener">Ver PDF ↗</a>` : '',
+    cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>
+      <div class="panel-h">Datos del documento</div>
+      <div class="panel-datos">${dato('Neto', clp(d.monto))}${dato('Total con IVA', clp(montoTotalDoc(d)))}${dato('RUT', escapeHtml(d.rut_hospital || ''))}${pago && pago.fecha_vencimiento ? dato('Vence', fDate(pago.fecha_vencimiento)) : ''}</div>`,
+    relacionado: rel,
+    navegacion: idx === -1 ? null : {
+      texto: `${info.singular} ${idx + 1} de ${navLista.length}`,
+      anterior: idx > 0 ? () => panelAbrir(fichaDocumento(navLista[idx - 1].id, lista)) : null,
+      siguiente: idx < navLista.length - 1 ? () => panelAbrir(fichaDocumento(navLista[idx + 1].id, lista)) : null,
+    },
+  };
+}
+
+async function cargarItemsEnPanel(d, contId) {
+  const cont = document.getElementById(contId);
+  if (!cont) return;
+  if (!d.detalle_sincronizado) { cont.innerHTML = '<div class="panel-vacio">El detalle de este documento se completa en la próxima sincronización.</div>'; return; }
+  try {
+    const its = await fetchAll('documentos_gdexpress_items', `select=*&documento_id=eq.${d.id}`);
+    if (!document.getElementById(contId)) return;
+    cont.innerHTML = !its.length ? '<div class="panel-vacio">No se encontraron productos para este documento.</div>'
+      : `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        ${its.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${(it.codigo_valor || it.descripcion) ? `<small class="panel-muted">${it.codigo_valor ? escapeHtml((it.codigo_tipo ? it.codigo_tipo + ' - ' : '') + it.codigo_valor) : ''}${it.codigo_valor && it.descripcion ? ' · ' : ''}${escapeHtml(it.descripcion || '')}</small>` : ''}</td>
+          <td style="text-align:right;white-space:nowrap">${it.cantidad || '—'} ${escapeHtml(it.unidad || '')}</td>
+          <td style="text-align:right">${clp(it.precio_unitario)}</td><td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td></tr>`).join('')}</tbody></table>`;
+  } catch (e) {
+    cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudo cargar el detalle: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// Ficha corta de un envío FedEx (el rediseño completo de FedEx usa esta misma).
+function fichaEnvioFedex(id) {
+  const e = fedex.find(x => x.id === id);
+  if (!e) return null;
+  const docs = parsearNumerosFactura(e.factura).map(n => documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(n).replace(/\D/g, ''))).filter(Boolean);
+  return {
+    titulo: `Envío FedEx · OT ${e.orden_transporte || '—'}`,
+    sub: `${nombreHosp(e.hospital) || e.hospital || ''} · ingresado ${e.fecha_ingreso ? fDate(e.fecha_ingreso) : ''}`,
+    etiquetas: `<span class="badge ${e.estado_envio === 'Entregado' ? 'badge-green' : e.estado_envio === 'Retraso' ? 'badge-amber' : 'badge-blue'}">${escapeHtml(e.estado_envio || 'Sin información')}</span>`,
+    ids: [{ label: 'OT', valor: e.orden_transporte }, ...docs.map(d => ({ label: 'Factura', valor: String(d.folio), ver: () => fichaDocumento(d.id) }))],
+    acciones: e.orden_transporte ? `<a class="page-btn page-btn-pri" href="https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(e.orden_transporte)}" target="_blank" rel="noopener">Ver seguimiento en FedEx ↗</a>` : '',
+    cuerpo: e.estado_envio === 'Entregado' ? `<div class="panel-ok">✓ Entregado${e.fecha_entrega ? ' el ' + fDate(e.fecha_entrega) : ''}${e.recibido_por ? ` · Recibió: <b>${escapeHtml(e.recibido_por)}</b>` : ''}</div>` : '',
+  };
 }
 
 // ─── FACTURAS RECHAZADAS / ANULADAS ─────────────────────────────────────────
@@ -11350,17 +11590,13 @@ function ocListaDelPeriodo() {
   return oc.filter(x => { const f = x.fechaenvio || x.fechaoc || ''; return f >= r.desde && f < r.hasta; });
 }
 
-function updateStats() {
-  const base = ocListaDelPeriodo();
-  const total = base.reduce((s,r)=>s+(r.totaloc||0),0);
-  const hosps = new Set(base.map(r=>nombreHosp(r.hospital))).size;
+function updateStats(base) {
+  base = base || ocBaseActual();
+  const total = base.reduce((t,r)=>t+(r.totaloc||0),0);
   const ultima = oc[0]?.fechaenvio || oc[0]?.fechaoc; // "Última OC" es siempre la más reciente de verdad, no depende del período
-  document.getElementById('s-oc').textContent = base.length.toLocaleString('es-CL');
-  document.getElementById('s-monto').textContent = clp(total);
-  document.getElementById('s-hosp').textContent = hosps.toLocaleString('es-CL');
-  document.getElementById('s-fecha').textContent = fDate(ultima);
-  const nombrePeriodo = nombrePeriodoAlcance('oc', ocPeriodo);
-  document.getElementById('oc-subtitle').textContent = `${base.length.toLocaleString('es-CL')} órdenes en ${nombrePeriodo} — última actualización: ${fDate(ultima)}`;
+  const buscando = document.getElementById('oc-search').value.trim();
+  const donde = buscando ? 'todas las fechas' : nombrePeriodoAlcance('oc', ocPeriodo);
+  document.getElementById('oc-subtitle').textContent = `${base.length.toLocaleString('es-CL')} órdenes en ${donde} · ${clp(total)} con IVA · última OC: ${fDate(ultima)}`;
 }
 
 const ESTADISTICAS_DISPONIBLES = [

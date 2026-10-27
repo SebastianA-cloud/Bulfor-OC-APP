@@ -275,6 +275,20 @@ function dteInit(tipo) {
   }
 }
 
+// "Facturar" desde el Listado de OC: abre la Factura con el cliente y la OC
+// ya puestos; los productos se eligen de la lista de esa OC, como siempre.
+function dteFacturarOC(o) {
+  const actual = dteEstado[33] || dteCargarBorrador(33);
+  if (actual && dteTieneDatos(actual) && !actual.borradorId
+      && !confirm('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por una nueva para esta OC?')) return;
+  const s = dteNuevo(33);
+  s.refs = [{ ...dteRefNueva(), folio: o.codigo, fecha: dteFechaCL(o.fecha) }];
+  dteEstado[33] = s;
+  dteGuardarBorrador(33);
+  irAModuloPagina('documentos', 'doc-factura');
+  if (o.rut) dteBuscarRut(33, o.rut);
+}
+
 function dteLimpiar(tipo) {
   if (!confirm(`¿Empezar una ${DTE_NOMBRES[tipo]} nueva? Se borra lo escrito.`)) return;
   dteEstado[tipo] = dteNuevo(tipo);
