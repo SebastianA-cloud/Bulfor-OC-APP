@@ -15,6 +15,7 @@
 //   {
 //     titulo: 'Factura N° 22309',
 //     antetitulo: 'Orden de compra',          // opcional: título destacado (con línea roja)
+//     tituloMono: true,                        // título en letra de código (N° de OC)
 //     tituloCopiar: true,                      // ícono chico para copiar el título
 //     tituloExtra: '<a …>Ver en Mercado Público</a>', // html al lado del título
 //     resumen: '<div class="panel-datos">…</div>', // va bajo el subtítulo, antes del monto
@@ -194,7 +195,7 @@ function panelPintar() {
       <button class="panel-btn-ico" title="Cerrar (Esc)" onclick="panelCerrar()"><i class="ti ti-x"></i></button></span></div>
     <div class="panel-cuerpo">
       ${f.antetitulo ? `<div class="panel-antetit">${panelEsc(f.antetitulo)}</div>` : ''}
-      <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}"><span>${panelEsc(f.titulo)}</span>${f.tituloCopiar
+      <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}${f.tituloMono ? ' panel-tit-mono' : ''}"><span>${panelEsc(f.titulo)}</span>${f.tituloCopiar
         ? `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(f.titulo)))}, this)"><i class="ti ti-copy"></i></button>` : ''}${f.tituloExtra || ''}</div>
       ${f.sub ? `<div class="panel-sub">${panelEsc(f.sub)}</div>` : ''}
       ${ids ? `<div class="panel-ids">${ids}</div>` : ''}

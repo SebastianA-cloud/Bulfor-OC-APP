@@ -2379,7 +2379,7 @@ function fichaOC(codigoOC) {
   const infoOC = `<div class="oc-info">
       <div><span>${origen ? (origen.tipo === 'COT' ? 'Compra ágil (COT)' : 'Licitación') : (r.tipooc === 'SE' ? 'Licitación' : 'Compra ágil')}</span>
         ${origen ? `<div class="oc-info-cod"><b class="mono">${escapeHtml(origen.codigo)}</b>
-          <button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${escapeHtml(JSON.stringify(origen.codigo))}, this)"><i class="ti ti-copy"></i></button>
+          <button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(origen.codigo))}, this)"><i class="ti ti-copy"></i></button>
           ${botonMP(origen.url, origen.tipo === 'COT' ? 'Ver COT' : 'Ver licitación')}</div>` : '<div class="oc-info-cod" style="color:var(--text-3)">Sin código</div>'}</div>
       <div><span>Total OC (con IVA)</span><div class="oc-info-total">${clp(r.totaloc)}</div></div>
     </div>`;
@@ -2398,6 +2398,7 @@ function fichaOC(codigoOC) {
     ocCodigo: codigoOC,
     antetitulo: 'Orden de compra',
     titulo: codigoOC,
+    tituloMono: true,
     tituloCopiar: true,
     tituloExtra: botonMP(urlMercadoPublicoOC(codigoOC), 'Ver OC') + (r.nombreoc ? infoTip('Nombre en Mercado Público: ' + r.nombreoc) : ''),
     sub: `${lugar} · ${fDate(r.fechaenvio || r.fechaoc)}`,
@@ -2584,7 +2585,15 @@ function botonNavOCHtml(codigoActual) {
     <button onclick="openOCDetail('${codSiguiente}')" ${haySiguiente?'':'disabled'} title="OC siguiente" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
+// Todos los links a una OC abren la ficha nueva (ventana grande). La versión
+// anterior queda como openOCDetailAntiguo, sin uso.
 function openOCDetail(codigoOC) {
+  cerrarTodosLosModales();
+  const f = fichaOC(codigoOC);
+  if (f) panelAbrir(f);
+}
+
+function openOCDetailAntiguo(codigoOC) {
   cerrarTodosLosModales();
   const r = oc.find(o => o.codigooc === codigoOC);
   if (!r) return;
@@ -11714,71 +11723,138 @@ async function eliminarEnvio(id) {
   }
 }
 
+// ─── Ficha de un hospital: lo que compra, agrupado por producto ─────────────
+// Al apretar un hospital se abre la ventana grande con sus productos. Los
+// nombres parecidos se juntan en uno solo ("SALES COLONOSCOPIA 3 LTS",
+// "SALES DE COLONOSCOPIA PARA 3LTS"… son el mismo producto): se comparan las
+// palabras importantes del nombre, sin relleno ("de", "para", "elaborado por
+// recetario magistral"…), y las medidas tienen que coincidir (3 L no se junta
+// con 4 L). Si el producto tiene un nombre unificado, manda ese.
+// Al apretar un producto se ven sus OC, y al apretar una OC, su ficha.
+const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X A AL UN UNA O U ' +
+  'ELABORADO ELABORADA ELABORADOS RECETARIO MAGISTRAL BULFOR DESPACHO DESPACHAR DIA DIAS HABIL HABILES ' +
+  'PEDIDO SEGUN FARMACIA PREPARADO PREPARADA ENTREGA INMEDIATA URGENTE COD CODIGO FORMULA SE REQUIERE ' +
+  'CADA VIGENCIA MINIMA ANO ANOS FICHA TECNICA STOCK DISPONIBILIDAD OCTUBRE NOVIEMBRE DICIEMBRE ENERO ' +
+  'FEBRERO MARZO ABRIL MAYO JUNIO JULIO AGOSTO SEPTIEMBRE UNIDAD UNIDADES UN UND').split(' '));
+
+function hospPalabrasProducto(nombre) {
+  let t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
+  t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
+  // Medidas pegadas al número: "3 LTS" = "3LTS" = "3L".
+  t = t.replace(/(\d)\s*(LITROS?|LTS?|L)\b/g, '$1L').replace(/(\d)\s*(MLS?|CC)\b/g, '$1ML')
+       .replace(/(\d)\s*(GRAMOS?|GRS?|G)\b/g, '$1G').replace(/(\d)\s*(MG|MCG|UI|KG)\b/g, '$1$2');
+  return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)));
+}
+
+function hospAgruparProductos(ocsHospital) {
+  const codigos = new Set(ocsHospital.map(r => r.codigooc));
+  const fechaOC = {};
+  ocsHospital.forEach(r => { fechaOC[r.codigooc] = String(r.fechaenvio || r.fechaoc || '').slice(0, 10); });
+  const grupos = [];
+  items.filter(it => codigos.has(it.codigooc)).forEach(it => {
+    const original = textoOriginalDe(it);
+    const unificado = diccionarioNormalizacion[original];
+    const nombre = unificado || ocNombreProducto(it);
+    const palabras = hospPalabrasProducto(nombre);
+    const medidas = [...palabras].filter(w => /\d/.test(w)).sort().join(' ');
+    let g = null;
+    if (unificado) g = grupos.find(x => x.unificado === unificado);
+    if (!g && palabras.size) {
+      let mejor = 0;
+      grupos.forEach(x => {
+        if (x.unificado && x.unificado !== unificado) return;
+        if (x.medidas !== medidas && x.medidas && medidas) return;
+        const comunes = [...palabras].filter(w => x.palabras.has(w)).length;
+        const parecido = comunes / Math.min(palabras.size, x.palabras.size);
+        if (comunes >= 1 && parecido >= 0.8 && parecido > mejor) { mejor = parecido; g = x; }
+      });
+    }
+    if (!g) { g = { unificado: unificado || null, palabras, medidas, nombres: {}, ocs: new Set(), cantidad: 0 }; grupos.push(g); }
+    g.nombres[nombre] = (g.nombres[nombre] || 0) + 1;
+    g.ocs.add(it.codigooc);
+    g.cantidad += Number(it.cantidad) || 0;
+  });
+  grupos.forEach(g => {
+    // Nombre que se muestra: el unificado, o el que más se repite (si empatan, el más corto).
+    g.nombre = g.unificado || Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0];
+    g.listaOC = [...g.ocs].sort((a, b) => fechaOC[b].localeCompare(fechaOC[a]));
+    g.ultima = fechaOC[g.listaOC[0]] || '';
+    g.variantes = Object.keys(g.nombres).length;
+  });
+  return grupos.sort((a, b) => b.listaOC.length - a.listaOC.length || b.ultima.localeCompare(a.ultima));
+}
+
+function fichaHospital(hospital) {
+  const ocs = oc.filter(r => nombreHosp(r.hospital) === hospital);
+  if (!ocs.length) return null;
+  const datos = hosp.find(h => h.hospital === hospital) || {};
+  const grupos = hospAgruparProductos(ocs);
+  window.__hospFicha = { hospital, grupos };
+  const total = ocs.reduce((t, r) => t + (Number(r.totaloc) || 0), 0);
+  const lugar = [datos.comuna, datos.region].filter(Boolean).join(' · ');
+  return {
+    antetitulo: 'Hospital',
+    titulo: hospital,
+    sub: lugar,
+    resumen: `<div class="hosp-cifras">
+        <div><span>Órdenes de compra</span><b>${ocs.length.toLocaleString('es-CL')}</b></div>
+        <div><span>Total comprado (con IVA)</span><b>${clp(total)}</b></div>
+        <div><span>Primera compra</span><b>${fDate(datos.primeracompra)}</b></div>
+        <div><span>Última compra</span><b>${fDate(datos.ultimacompra)}</b></div>
+      </div>`,
+    cuerpo: `<div class="hosp-prod-cab"><div class="panel-h">Productos que compra <b class="hosp-cuenta">${grupos.length}</b></div>
+        <div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto o N° de OC…" oninput="hospFiltrarProductos(this.value)"></div></div>
+      <div class="hosp-productos" id="hosp-productos">${grupos.map((g, i) => `
+        <button class="hosp-producto" data-i="${i}" onclick="panelAbrir(fichaHospitalProducto(${i}), true)">
+          <span class="hosp-producto-nombre">${escapeHtml(g.nombre)}${g.variantes > 1 ? ` <small>${g.variantes} nombres distintos</small>` : ''}</span>
+          <span class="hosp-producto-oc"><b>${g.listaOC.length}</b> ${g.listaOC.length === 1 ? 'orden' : 'órdenes'}</span>
+          <span class="hosp-producto-fecha">Última: ${fDate(g.ultima)}</span>
+          <i class="ti ti-chevron-right"></i>
+        </button>`).join('')}
+        <div class="panel-vacio" id="hosp-sin-resultados" style="display:none">No hay productos ni OC con esa búsqueda.</div>
+      </div>`,
+  };
+}
+
+function hospFiltrarProductos(q) {
+  const f = window.__hospFicha;
+  if (!f) return;
+  let visibles = 0;
+  document.querySelectorAll('#hosp-productos .hosp-producto').forEach(el => {
+    const g = f.grupos[Number(el.dataset.i)];
+    const ok = coincideBusqueda(`${g.nombre} ${Object.keys(g.nombres).join(' ')} ${g.listaOC.join(' ')}`, q);
+    el.style.display = ok ? '' : 'none';
+    if (ok) visibles++;
+  });
+  const vacio = document.getElementById('hosp-sin-resultados');
+  if (vacio) vacio.style.display = visibles ? 'none' : '';
+}
+
+// OC de un producto del hospital: N°, fecha de emisión y total con IVA.
+function fichaHospitalProducto(i) {
+  const f = window.__hospFicha;
+  const g = f && f.grupos[i];
+  if (!g) return null;
+  const filas = g.listaOC.map(c => oc.find(r => r.codigooc === c)).filter(Boolean);
+  return {
+    antetitulo: f.hospital,
+    titulo: g.nombre,
+    sub: `${filas.length} ${filas.length === 1 ? 'orden de compra' : 'órdenes de compra'}${g.variantes > 1 ? ' · con ' + g.variantes + ' nombres distintos' : ''}`,
+    cuerpo: `<table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
+      ${filas.map(r => `<tr><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
+        <td>${fDate(r.fechaenvio || r.fechaoc)}</td><td>${OC_FACT_BADGE[ocFacturacion(r)] || ''}</td>
+        <td class="oc-monto">${clp(r.totaloc)}</td></tr>`).join('')}
+    </tbody></table>
+    ${g.variantes > 1 ? `<div class="hosp-variantes">Nombres que se juntaron aquí ${infoTip(Object.keys(g.nombres).join(' · '))}</div>` : ''}`,
+  };
+}
+
+// Antes era una ventana propia con la lista de OC; ahora abre la ficha nueva.
 function openHospitalOCs(hospital) {
   cerrarTodosLosModales();
-  window.__hospActualOCs = oc.filter(r => nombreHosp(r.hospital) === hospital)
-    .sort((a,b) => new Date(b.fechaenvio||b.fechaoc) - new Date(a.fechaenvio||a.fechaoc));
-  window.__hospActualNombre = hospital;
-
-  const modal = document.createElement('div');
-  modal.id = 'hosp-oc-modal-overlay';
-  modal.className = 'modal-overlay';
-  modal.style.zIndex = '1000';
-  modal.onclick = (e) => { if (e.target === modal) closeHospitalOCs(); };
-  modal.innerHTML = `
-    <div class="modal-shell modal-xl">
-      <div class="modal-header">
-        <div>
-          <div style="font-size:16px;font-weight:600">${hospital}</div>
-          <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="hosp-oc-count">${window.__hospActualOCs.length} órdenes de compra</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          ${botonAtrasHtml()}
-          <button onclick="closeHospitalOCs()" class="modal-close" aria-label="Cerrar">✕</button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <input type="text" id="hosp-oc-search" placeholder="Buscar por N° OC o producto…" style="width:100%;margin-bottom:14px" oninput="filterHospitalOCs()">
-        <div id="hosp-oc-table-wrap"></div>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  renderHospitalOCsTable(window.__hospActualOCs);
-}
-
-function renderHospitalOCsTable(lista) {
-  document.getElementById('hosp-oc-count').textContent = `${lista.length} órdenes de compra`;
-  document.getElementById('hosp-oc-table-wrap').innerHTML = !lista.length
-    ? `<div style="font-size:13px;color:var(--text-3);padding:16px 0;text-align:center">Sin resultados</div>`
-    : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <table style="margin:0">
-          <thead><tr>
-            <th style="font-size:10px">N° OC</th><th style="font-size:10px">Descripción</th>
-            <th style="font-size:10px">Fecha</th><th style="font-size:10px;text-align:right">Total (con IVA)</th>
-          </tr></thead>
-          <tbody>
-            ${lista.map(r => {
-              const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
-              return `<tr style="cursor:pointer" onclick="navPush(()=>openHospitalOCs('${window.__hospActualNombre.replace(/'/g,"\\'")}'));cerrarTodosLosModales();openOCDetail('${(r.codigooc||'').replace(/'/g,"\\'")}')">
-                <td data-label="N° OC"><span class="mono" style="color:var(--accent)">${r.codigooc||''} ↗</span></td>
-                <td data-label="Descripción" title="${descripcion}"><div class="oc-desc">${descripcion}</div></td>
-                <td data-label="Fecha" style="font-size:12px;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
-                <td data-label="Total (con IVA)" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(r.totaloc)}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
-}
-
-function filterHospitalOCs() {
-  const q = document.getElementById('hosp-oc-search').value;
-  const filtradas = window.__hospActualOCs.filter(r => {
-    const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
-    const textoProductos = productosTextoPorOC[r.codigooc] || '';
-    return coincideBusqueda(r.codigooc||'', q) || coincideBusqueda(descripcion, q) || coincideBusqueda(textoProductos, q);
-  });
-  renderHospitalOCsTable(filtradas);
+  const f = fichaHospital(hospital);
+  if (f) panelAbrir(f);
 }
 
 function closeHospitalOCs() {

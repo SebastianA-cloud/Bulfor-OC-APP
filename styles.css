@@ -1500,3 +1500,37 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .oc-saldo-flecha { transition: transform .15s; color: var(--text-3); }
 .oc-saldo details[open] .oc-saldo-flecha { transform: rotate(90deg); }
 .panel-cuerpo > .oc-saldo, .panel-cuerpo > .oc-facturas { flex: 0 0 auto; }
+
+/* ─── Ficha de hospital ─── */
+.hosp-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.hosp-cifras > div { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #FAF9F6; }
+.hosp-cifras span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; margin-bottom: 4px; }
+.hosp-cifras b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.hosp-prod-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.hosp-cuenta { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; margin-left: 4px; }
+.hosp-buscar { flex: 0 1 340px; }
+.hosp-productos { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.hosp-producto { display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px 20px; align-items: center; gap: 12px; padding: 12px 16px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); text-align: left; font: 14px var(--font); color: var(--text); cursor: pointer; }
+.hosp-producto:last-of-type { border-bottom: 0; }
+.hosp-producto:hover { background: #FBF6F5; }
+.hosp-producto:hover .ti-chevron-right { color: var(--accent); }
+.hosp-producto-nombre { font-weight: 600; }
+.hosp-producto-nombre small { display: block; font-weight: 400; color: var(--text-3); font-size: 12px; margin-top: 2px; }
+.hosp-producto-oc { text-align: right; color: var(--text-2); }
+.hosp-producto-oc b { color: var(--text); font-size: 15px; }
+.hosp-producto-fecha { color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.hosp-producto .ti-chevron-right { color: var(--text-3); }
+.hosp-oc-tabla { width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid var(--border); border-radius: 12px; }
+.hosp-oc-tabla th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); padding: 9px 14px; border: 1px solid var(--border); background: #FAF9F6; font-weight: 700; }
+.hosp-oc-tabla td { padding: 10px 14px; border: 1px solid var(--border); white-space: nowrap; }
+.hosp-oc-tabla .oc-monto { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hosp-oc-tabla tbody tr:hover td { background: #FBFAF8; }
+.hosp-variantes { font-size: 12.5px; color: var(--text-3); }
+@media (max-width: 760px) {
+  .hosp-cifras { grid-template-columns: 1fr 1fr; }
+  .hosp-producto { grid-template-columns: minmax(0, 1fr) auto 20px; }
+  .hosp-producto-fecha { display: none; }
+}
+/* El título destacado usa letra normal; la de código solo para N° (OC) */
+.panel-tit-destacado { font-family: var(--font); letter-spacing: -.2px; }
+.panel-tit-destacado.panel-tit-mono { font-family: var(--mono, ui-monospace, monospace); }
