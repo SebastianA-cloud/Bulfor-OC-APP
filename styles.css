@@ -1442,3 +1442,8 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .panel-cuerpo { flex: 1; min-height: 0; }
 .panel-cuerpo > * { flex-shrink: 0; }
 .oc-facturas-tabla .oc-monto-neto { font-weight: 500; color: var(--text-2); }
+/* El cuadro de facturas toma el ancho de sus datos, no el de toda la ventana */
+.oc-facturas { width: fit-content; max-width: 100%; align-self: flex-start; }
+.oc-facturas-tabla { width: auto; }
+.oc-facturas-tabla td, .oc-facturas-tabla th { white-space: nowrap; padding-left: 16px; padding-right: 16px; }
+.oc-facturas-cab { gap: 24px; }
