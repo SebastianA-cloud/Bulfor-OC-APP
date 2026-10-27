@@ -1436,3 +1436,8 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .oc-facturas-tabla tr > :last-child { border-right: 0; }
 .oc-facturas-tabla thead th { border-top: 0; }
 .oc-facturas-tabla tbody tr:last-child td, .oc-facturas-tabla tfoot td { border-bottom: 0; }
+/* Dentro de la ventana de detalle nada se achica para caber: el contenido
+   mantiene su alto y se baja con el scroll (antes, en pantallas bajas, el
+   cuadro de facturas se aplastaba hasta desaparecer). */
+.panel-cuerpo { flex: 1; min-height: 0; }
+.panel-cuerpo > * { flex-shrink: 0; }
