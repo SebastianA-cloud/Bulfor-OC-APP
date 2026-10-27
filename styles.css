@@ -1537,3 +1537,7 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 /* Buscadores de la ficha de hospital: a todo el ancho, bien visibles */
 .hosp-buscar { flex: none; width: 100%; max-width: none; }
 .hosp-buscar input { width: 100%; height: 42px; font-size: 14px; }
+/* Precios: tablas de clientes/productos clicables */
+.pv-fila { cursor: pointer; }
+.pv-unidad { color: var(--text-3); font-weight: 400; font-size: 11px; }
+.hosp-cifras b small { font-size: 12px; font-weight: 400; color: var(--text-3); }
