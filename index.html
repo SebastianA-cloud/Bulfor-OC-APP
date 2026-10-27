@@ -2368,26 +2368,38 @@ function fichaOC(codigoOC) {
           <td style="text-align:right">${clp(it.preciounitario)}</td>
           <td style="text-align:right;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td></tr>`;
       }).join('')}</tbody></table>` : '<div class="panel-vacio">No se encontraron productos para esta OC.</div>';
-  const dato = (k, v) => v ? `<div><span>${k}</span>${escapeHtml(v)}</div>` : '';
   const cod = codigoOC.replace(/'/g, "\\'");
-  // El código de COT o licitación se copia con un ícono chico, sin cajas grandes.
-  const datoOrigen = origen ? `<div><span>${origen.tipo === 'COT' ? 'Compra ágil (COT)' : 'Licitación'}</span><b class="mono">${escapeHtml(origen.codigo)}</b>
-      <button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${escapeHtml(JSON.stringify(origen.codigo))}, this)"><i class="ti ti-copy"></i></button></div>` : '';
+  const botonMP = (url, texto) => `<a class="btn-mp" href="${url}" target="_blank" rel="noopener" title="Abrir en Mercado Público">${texto} <i class="ti ti-external-link"></i></a>`;
+  // Recuadro de la OC: de qué compra ágil o licitación viene (con su botón a
+  // Mercado Público) y el total con IVA.
+  const infoOC = `<div class="oc-info">
+      <div><span>${origen ? (origen.tipo === 'COT' ? 'Compra ágil (COT)' : 'Licitación') : (r.tipooc === 'SE' ? 'Licitación' : 'Compra ágil')}</span>
+        ${origen ? `<div class="oc-info-cod"><b class="mono">${escapeHtml(origen.codigo)}</b>
+          <button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${escapeHtml(JSON.stringify(origen.codigo))}, this)"><i class="ti ti-copy"></i></button>
+          ${botonMP(origen.url, origen.tipo === 'COT' ? 'Ver COT' : 'Ver licitación')}</div>` : '<div class="oc-info-cod" style="color:var(--text-3)">Sin código</div>'}</div>
+      <div><span>Total OC (con IVA)</span><div class="oc-info-total">${clp(r.totaloc)}</div></div>
+    </div>`;
+  // Facturación en una barra: cuánto se ha facturado de la OC y cuánto falta.
+  const total = Number(r.totaloc) || 0;
+  const pct = fact === 'completa' ? 100 : total ? Math.max(0, Math.min(100, Math.round(facturado / total * 100))) : 0;
+  const saldo = Math.max(0, total - facturado);
+  const facturacion = `<div class="oc-fact oc-fact-${fact}">
+      <div class="oc-fact-cab"><span>Facturación</span>${OC_FACT_BADGE[fact]}</div>
+      <div class="oc-fact-barra"><div style="width:${pct}%"></div></div>
+      <div class="oc-fact-cifras">${fact === 'cancelada' ? 'OC cancelada en Mercado Público' : `<span>Facturado <b>${clp(facturado) === '—' ? '$ 0' : clp(facturado)}</b> de ${clp(total)}</span>${fact !== 'completa' && saldo ? `<span>Falta <b>${clp(saldo)}</b></span>` : ''}`}</div>
+      ${fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri oc-fact-btn" onclick="ocFacturar('${cod}')">Facturar ${fact === 'parcial' ? 'el saldo' : ''}</button>` : ''}
+    </div>`;
+  const lugar = [nombreHosp(r.hospital) || r.hospital, r.comuna, r.region].filter(Boolean).join(' · ');
   return {
     ocCodigo: codigoOC,
     antetitulo: 'Orden de compra',
     titulo: codigoOC,
     tituloCopiar: true,
-    sub: `${nombreHosp(r.hospital) || r.hospital || ''} · ${fDate(r.fechaenvio || r.fechaoc)}`,
-    destacado: clp(r.totaloc),
-    etiquetas: `${tipoBadge(r.tipooc)} ${OC_FACT_BADGE[fact]}${facturado > 0 && fact !== 'completa' ? ` <span class="badge badge-gray">Facturado ${clp(facturado)}</span>` : ''}`,
-    resumen: `<div class="panel-datos">${datoOrigen}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}</div>`,
-    acciones: `<a class="page-btn" href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener">Ver OC en Mercado Público ↗</a>`
-      + (origen ? `<a class="page-btn" href="${origen.url}" target="_blank" rel="noopener">Ver ${origen.tipo === 'COT' ? 'compra ágil' : 'licitación'} ↗</a>` : '')
-      + (fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri" onclick="ocFacturar('${cod}')">Facturar</button>` : ''),
+    tituloExtra: botonMP(urlMercadoPublicoOC(codigoOC), 'Ver OC') + (r.nombreoc ? infoTip('Nombre en Mercado Público: ' + r.nombreoc) : ''),
+    sub: `${lugar} · ${fDate(r.fechaenvio || r.fechaoc)}`,
+    resumen: `<div class="oc-arriba">${infoOC}${facturacion}</div>`,
     cuerpo: `<div class="panel-h">Productos</div>${productos}
-      ${ocTablaFacturasHtml(codigoOC, facturasVigentes)}
-      ${r.nombreoc ? `<div class="panel-h">Nombre en Mercado Público</div><div style="font-size:12.5px;color:var(--text-2)">${escapeHtml(r.nombreoc)}</div>` : ''}`,
+      ${ocTablaFacturasHtml(codigoOC, facturasVigentes)}`,
     // Las facturas vigentes ya están en el cuadro (con link): aquí solo queda
     // el resto del historial (anuladas, notas de crédito y guías).
     relacionado: historialDocumentosOC(codigoOC).filter(d => !facturasVigentes.includes(d)).map(d => ({
@@ -2417,6 +2429,13 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   try { its = await fetchAll('documentos_gdexpress_items', `select=documento_id,nombre_producto,cantidad,precio_unitario&documento_id=in.(${facturas.map(d => d.id).join(',')})`); }
   catch (e) { return; }
   if (!Array.isArray(its) || !its.length || !document.getElementById(`${idProd}-0`)) return;
+  // La factura más nueva manda (es el nombre más actualizado).
+  const orden = new Map(facturas.map(d => [d.id, String(d.fecha_emision || '') + String(d.folio).padStart(8, '0')]));
+  its.sort((a, b) => String(orden.get(b.documento_id) || '').localeCompare(String(orden.get(a.documento_id) || '')));
+  // OC de un solo producto y facturas de un solo producto: se emparejan
+  // aunque el precio no calce (por ejemplo, si se facturó con otro precio).
+  const distintos = [...new Set(its.map(f => f.nombre_producto).filter(Boolean))];
+  if (lineasOC.length === 1 && distintos.length === 1) its.forEach(f => { f.__unico = true; });
   const usados = new Set();
   const parecido = (a, b) => a && b && Math.abs(Number(a) - Number(b)) <= Math.max(1, Number(b) * 0.01);
   lineasOC.forEach((it, i) => {
@@ -2426,6 +2445,7 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
       const p = (parecido(f.precio_unitario, it.preciounitario) ? 2 : 0) + (parecido(f.cantidad, it.cantidad) ? 1 : 0);
       if (p > puntos) { puntos = p; mejor = j; }
     });
+    if (mejor === -1 && its[0].__unico) mejor = 0;
     if (mejor === -1 && lineasOC.length === its.length && !usados.has(i)) mejor = i;   // mismas líneas: en orden
     if (mejor === -1) return;
     const nombreFactura = its[mejor].nombre_producto;
@@ -2449,12 +2469,19 @@ function ocTablaFacturasHtml(codigoOC, facturas) {
   const lista = facturas.slice().sort((a, b) => String(a.fecha_emision || '').localeCompare(String(b.fecha_emision || '')) || Number(a.folio) - Number(b.folio));
   const total = lista.reduce((t, d) => t + montoTotalDoc(d), 0);
   window.__ocTablaCopiar = { codigo: codigoOC, filas: lista.map(d => [String(d.folio), d.fecha_emision ? fDate(d.fecha_emision) : '', clp(montoTotalDoc(d))]), total: clp(total) };
-  return `<div class="panel-h panel-h-accion"><span>Facturas de esta OC</span>
-      <button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="ocCopiarTablaFacturas(this)"><i class="ti ti-copy"></i> Copiar tabla</button></div>
-    <table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Monto</th></tr></thead><tbody>
-      ${window.__ocTablaCopiar.filas.map((f, i) => `<tr><td><span class="panel-link mono" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${lista[i].id}), true)">${escapeHtml(f[0])}</span></td><td>${f[1]}</td><td style="text-align:right">${f[2]}</td></tr>`).join('')}
-      ${lista.length > 1 ? `<tr><td colspan="2" style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">${clp(total)}</td></tr>` : ''}
-    </tbody></table>`;
+  const pago = d => {
+    const p = pagoDeFolio(d.folio);
+    if (!p) return '<span class="badge badge-gray">Sin registro</span>';
+    return p.estado_pago === 'Pagado' || p.fecha_pago ? `<span class="badge badge-green">Pagada${p.fecha_pago ? ' ' + fDate(p.fecha_pago) : ''}</span>` : `<span class="badge badge-amber">Por cobrar</span>`;
+  };
+  return `<div class="oc-facturas">
+    <div class="oc-facturas-cab"><span><i class="ti ti-file-invoice"></i> Facturas de esta OC <b>${lista.length}</b></span>
+      <button class="btn-copiar-tabla" onclick="ocCopiarTablaFacturas(this)" title="Copia N°, fecha y monto para pegarlos en un correo"><i class="ti ti-copy"></i> Copiar tabla</button></div>
+    <table class="oc-facturas-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th>Pago</th><th style="text-align:right">Monto</th></tr></thead><tbody>
+      ${lista.map((d, i) => `<tr><td><button class="oc-folio" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))} ›</button></td>
+        <td>${window.__ocTablaCopiar.filas[i][1]}</td><td>${pago(d)}</td><td class="oc-monto">${window.__ocTablaCopiar.filas[i][2]}</td></tr>`).join('')}
+    </tbody>${lista.length > 1 ? `<tfoot><tr><td colspan="3">Total facturado</td><td class="oc-monto">${clp(total)}</td></tr></tfoot>` : ''}</table>
+  </div>`;
 }
 
 function ocCopiarTablaFacturas(boton) {

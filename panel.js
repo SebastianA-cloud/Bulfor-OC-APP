@@ -1,11 +1,12 @@
 // ═══ Piezas comunes del rediseño ═════════════════════════════════════════
 // Se usan en toda la app para que todas las pantallas se comporten igual:
 //
-//  * panelAbrir(ficha)  → panel lateral con el detalle de algo (una factura,
-//    una OC, un envío…), a la derecha y sin tapar la lista. Arriba van los
-//    números para copiar; luego los botones de acción, el contenido y el
-//    bloque "Relacionado", cuyas fichas se abren en el mismo panel con
-//    "← Volver a …" para regresar.
+//  * panelAbrir(ficha)  → ventana con el detalle de algo (una factura, una
+//    OC, un envío…), al centro y lo más grande que cabe en la pantalla (antes
+//    era un panel angosto a la derecha, pero apretaba mucho la información).
+//    Arriba van los números para copiar; luego los botones de acción, el
+//    contenido y el bloque "Relacionado", cuyas fichas se abren en la misma
+//    ventana con "← Volver a …" para regresar.
 //  * infoTip(texto)     → la "ⓘ" chiquita que muestra una explicación al pasar
 //    el mouse (o al tocarla en el celular), en vez de recuadros grandes.
 //  * copiarTexto(valor) → copia al portapapeles y avisa "✓ Copiado".
@@ -15,6 +16,7 @@
 //     titulo: 'Factura N° 22309',
 //     antetitulo: 'Orden de compra',          // opcional: título destacado (con línea roja)
 //     tituloCopiar: true,                      // ícono chico para copiar el título
+//     tituloExtra: '<a …>Ver en Mercado Público</a>', // html al lado del título
 //     resumen: '<div class="panel-datos">…</div>', // va bajo el subtítulo, antes del monto
 //     sub: 'Hospital Clínico La Florida · 13-10-2026',
 //     destacado: '$ 2.522.241',               // número grande bajo el título
@@ -41,6 +43,31 @@ const panelEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', 
 function infoTip(texto) {
   return `<span class="info-tip" tabindex="0" role="note" aria-label="${panelEsc(texto)}" data-tip="${panelEsc(texto)}">i</span>`;
 }
+
+// La explicación de la "i" se muestra en un globo que se acomoda dentro de la
+// pantalla (antes se cortaba cuando la "i" quedaba cerca de un borde).
+function infoTipMostrar(tip) {
+  const texto = tip.getAttribute('data-tip');
+  if (!texto) return;
+  let g = document.getElementById('info-tip-globo');
+  if (!g) { g = document.createElement('div'); g.id = 'info-tip-globo'; g.className = 'info-tip-globo'; document.body.appendChild(g); }
+  g.textContent = texto;
+  g.style.display = 'block';
+  const r = tip.getBoundingClientRect(), gw = g.offsetWidth, gh = g.offsetHeight, m = 8;
+  const left = Math.min(Math.max(m, r.left + r.width / 2 - gw / 2), window.innerWidth - gw - m);
+  const arriba = r.top - gh - 8;
+  g.style.left = left + 'px';
+  g.style.top = (arriba >= m ? arriba : r.bottom + 8) + 'px';
+}
+function infoTipOcultar() {
+  const g = document.getElementById('info-tip-globo');
+  if (g) g.style.display = 'none';
+}
+document.addEventListener('mouseover', ev => { const t = ev.target.closest?.('.info-tip'); if (t) infoTipMostrar(t); });
+document.addEventListener('mouseout', ev => { if (ev.target.closest?.('.info-tip')) infoTipOcultar(); });
+document.addEventListener('focusin', ev => { const t = ev.target.closest?.('.info-tip'); if (t) infoTipMostrar(t); });
+document.addEventListener('focusout', ev => { if (ev.target.closest?.('.info-tip')) infoTipOcultar(); });
+document.addEventListener('scroll', infoTipOcultar, true);
 
 async function copiarTexto(valor, boton) {
   const texto = String(valor ?? '');
@@ -111,6 +138,7 @@ function panelCerrar() {
   const primera = panelPila[0];
   panelPila.length = 0;
   document.getElementById('panel-lateral')?.remove();
+  document.getElementById('panel-fondo')?.remove();
   document.body.classList.remove('con-panel');
   if (primera && primera.alCerrar) primera.alCerrar();
 }
@@ -144,6 +172,14 @@ function panelPintar() {
         <i class="ti ti-chevron-right panel-rel-go"></i>
       </button>`).join('');
 
+  // Fondo oscuro detrás de la ventana: un clic afuera la cierra.
+  if (!document.getElementById('panel-fondo')) {
+    const fondo = document.createElement('div');
+    fondo.id = 'panel-fondo';
+    fondo.className = 'panel-fondo';
+    fondo.onclick = panelCerrar;
+    document.body.appendChild(fondo);
+  }
   let el = document.getElementById('panel-lateral');
   if (!el) {
     el = document.createElement('aside');
@@ -158,7 +194,7 @@ function panelPintar() {
     <div class="panel-cuerpo">
       ${f.antetitulo ? `<div class="panel-antetit">${panelEsc(f.antetitulo)}</div>` : ''}
       <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}"><span>${panelEsc(f.titulo)}</span>${f.tituloCopiar
-        ? `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(f.titulo)))}, this)"><i class="ti ti-copy"></i></button>` : ''}</div>
+        ? `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(f.titulo)))}, this)"><i class="ti ti-copy"></i></button>` : ''}${f.tituloExtra || ''}</div>
       ${f.sub ? `<div class="panel-sub">${panelEsc(f.sub)}</div>` : ''}
       ${ids ? `<div class="panel-ids">${ids}</div>` : ''}
       ${f.resumen ? `<div class="panel-resumen">${f.resumen}</div>` : ''}

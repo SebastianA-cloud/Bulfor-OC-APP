@@ -1163,20 +1163,21 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 /* "ⓘ" de ayuda: la explicación aparece al pasar el mouse o al tocarla. */
 .info-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--text-3); color: var(--text-3); font: italic 700 10px/1 Georgia, serif; cursor: help; vertical-align: middle; margin-left: 4px; flex-shrink: 0; }
 .info-tip:hover, .info-tip:focus { border-color: var(--text); color: var(--text); outline: none; }
-.info-tip::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: max-content; max-width: 280px; background: #1A1917; color: #fff; font: 400 12.5px/1.45 var(--font); padding: 8px 11px; border-radius: 8px; box-shadow: var(--shadow-md); white-space: normal; text-align: left; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 300; }
-.info-tip:hover::after, .info-tip:focus::after { opacity: 1; }
+.info-tip-globo { position: fixed; z-index: 2000; display: none; max-width: 300px; background: #1A1917; color: #fff; font: 400 12.5px/1.45 var(--font); padding: 8px 11px; border-radius: 8px; box-shadow: var(--shadow-md); pointer-events: none; text-align: left; }
 
-/* Panel lateral estándar: el detalle se abre a la derecha y la lista queda visible. */
-.panel-lateral { position: fixed; top: calc(var(--nav-top, 34px) + 12px); right: 16px; bottom: 16px; width: 480px; z-index: 150; background: var(--surface); border: 1px solid #ECEAE4; border-radius: 14px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; animation: panelEntra .16s ease-out; }
-@keyframes panelEntra { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (min-width: 1200px) { body.con-panel .main { padding-right: 512px; } }
+/* Ventana de detalle estándar: al centro, lo más grande que cabe, con fondo oscuro. */
+.panel-fondo { position: fixed; inset: 0; z-index: 149; background: rgba(26,25,23,.42); animation: panelFondo .15s ease-out; }
+@keyframes panelFondo { from { opacity: 0; } to { opacity: 1; } }
+.panel-lateral { position: fixed; top: 24px; bottom: 24px; left: 50%; width: min(1120px, calc(100vw - 48px)); transform: translateX(-50%); z-index: 150; background: var(--surface); border: 1px solid #ECEAE4; border-radius: 16px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden; animation: panelEntra .16s ease-out; }
+@keyframes panelEntra { from { transform: translateX(-50%) scale(.98); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+body.con-panel { overflow: hidden; }
 .panel-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); flex-shrink: 0; }
 .panel-cab-btns { display: flex; gap: 6px; }
 .panel-btn-ico { width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2); font-size: 15px; }
 .panel-btn-ico:hover:not([disabled]) { color: var(--text); border-color: var(--border-strong); }
 .panel-btn-ico[disabled] { opacity: .35; cursor: default; }
 .panel-volver { border: none; background: none; color: var(--accent); font: 600 13px var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0; text-align: left; }
-.panel-cuerpo { padding: 16px 18px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.panel-cuerpo { padding: 22px 30px 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .panel-tit { font-size: 18px; font-weight: 700; line-height: 1.25; }
 .panel-sub { font-size: 13px; color: var(--text-2); margin-top: -8px; }
 .panel-destacado { font-size: 25px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1199,7 +1200,8 @@ tr.fila-sel td { background: var(--accent-light) !important; }
 .panel-rel-tx small { color: var(--text-2); }
 .panel-rel-go { color: var(--accent); font-size: 16px; }
 @media (max-width: 640px) {
-  .panel-lateral { top: calc(34px + env(safe-area-inset-top, 0)); right: 0; left: 0; bottom: 0; width: auto; border-radius: 0; }
+  .panel-lateral { top: env(safe-area-inset-top, 0); left: 0; right: 0; bottom: 0; width: auto; transform: none; border-radius: 0; animation: none; }
+  .panel-cuerpo { padding: 16px 16px 24px; }
 }
 
 /* Contenido del panel lateral */
@@ -1235,7 +1237,6 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .fpp-status-tab b { font-weight: 700; margin-left: 4px; opacity: .8; }
 /* Con el panel abierto se esconden las columnas secundarias para que lo
    importante (N°, hospital, total y estado) no se corte. */
-body.con-panel .col-sec { display: none; }
 .panel-tabla td[style*="text-align:right"] { white-space: nowrap; }
 
 /* Selector de vista (ej. Cobranza: Por cliente / Por factura) */
@@ -1380,8 +1381,7 @@ body.con-panel .col-sec { display: none; }
 .panel-copiar-mini { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 2px 4px; border-radius: 6px; font-size: 15px; vertical-align: middle; font-family: var(--font); }
 .panel-copiar-mini:hover { background: var(--bg); color: var(--text); }
 .panel-copiar-mini.ok { color: var(--green); font-size: 12px; }
-.panel-resumen { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #FAF9F6; }
-.panel-resumen .panel-datos > div { min-width: 0; overflow-wrap: anywhere; }
+.panel-resumen { margin-top: 6px; }
 /* Tabla de productos cuadriculada: cada dato en su casilla */
 .panel-tabla-cuadros { border: 1px solid var(--border); }
 .panel-tabla-cuadros th, .panel-tabla-cuadros td { border: 1px solid var(--border); }
@@ -1389,3 +1389,44 @@ body.con-panel .col-sec { display: none; }
 .panel-tabla-cuadros tbody tr:nth-child(even) td { background: #FBFAF8; }
 .panel-h-accion { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .panel-h-accion .page-btn { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+/* ─── Ficha de OC ─── */
+.btn-mp { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #F0D3CF; background: #FDF3F1; color: var(--accent); border-radius: 999px; padding: 3px 10px; font: 600 12px var(--font); text-decoration: none; white-space: nowrap; vertical-align: middle; margin-left: 4px; }
+.btn-mp:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.panel-tit-destacado .btn-mp { font-family: var(--font); letter-spacing: 0; }
+.oc-arriba { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 14px; }
+.oc-info { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; background: #FAF9F6; align-items: start; }
+.oc-info span, .oc-fact-cab span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; margin-bottom: 6px; }
+.oc-info-cod { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 14px; }
+.oc-info-cod .mono { font-size: 14px; }
+.oc-info-total { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.oc-info > div:last-child span { text-align: right; }
+.oc-fact { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; align-items: center; }
+.oc-fact-cab { grid-column: 1; display: flex; align-items: center; gap: 8px; }
+.oc-fact-cab span { margin: 0; }
+.oc-fact-barra { grid-column: 1; height: 10px; border-radius: 999px; background: #EFEDE8; overflow: hidden; }
+.oc-fact-barra div { height: 100%; border-radius: 999px; background: #185FA5; transition: width .3s; }
+.oc-fact-completa .oc-fact-barra div { background: #2D6A4F; }
+.oc-fact-por .oc-fact-barra div { background: #C98A1B; }
+.oc-fact-cifras { grid-column: 1; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+.oc-fact-cifras b { color: var(--text); font-variant-numeric: tabular-nums; }
+.oc-fact-btn { grid-column: 2; grid-row: 1 / span 3; padding: 10px 16px !important; }
+.oc-facturas { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.oc-facturas-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; background: #FAF9F6; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; }
+.oc-facturas-cab > span { display: inline-flex; align-items: center; gap: 8px; }
+.oc-facturas-cab b { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.btn-copiar-tabla { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 12px; font: 600 12.5px var(--font); color: var(--text); cursor: pointer; }
+.btn-copiar-tabla:hover { border-color: var(--accent); color: var(--accent); }
+.oc-facturas-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.oc-facturas-tabla th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 700; }
+.oc-facturas-tabla td { padding: 9px 14px; border-bottom: 1px solid #F1EFEA; vertical-align: middle; }
+.oc-facturas-tabla tbody tr:hover td { background: #FBFAF8; }
+.oc-facturas-tabla .oc-monto { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.oc-facturas-tabla th:last-child { text-align: right; }
+.oc-facturas-tabla tfoot td { background: #FDF3F1; font-weight: 700; border-bottom: 0; color: var(--text); }
+.oc-folio { border: 1px solid #F0D3CF; background: #FDF3F1; color: var(--accent); border-radius: 8px; padding: 3px 10px; font: 600 13px var(--mono); cursor: pointer; }
+.oc-folio:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+@media (max-width: 760px) { .oc-arriba { grid-template-columns: 1fr; } }
+/* La línea roja va solo bajo el número, no bajo los botones de al lado */
+.panel-tit-destacado { border-bottom: 0; padding-bottom: 0; flex-wrap: wrap; }
+.panel-tit-destacado > span:first-child { border-bottom: 3px solid var(--accent); padding-bottom: 3px; }
