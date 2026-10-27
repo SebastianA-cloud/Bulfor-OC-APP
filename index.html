@@ -2479,13 +2479,16 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
     return { nombre, pedidos, facturados, faltan: Math.max(0, pedidos - facturados) };
   });
   const pendientes = filas.filter(f => f.faltan > 0).length;
+  // Si se facturó todo de una vez (una sola factura y no queda nada), el cuadro
+  // no aporta: solo sirve cuando la OC se va facturando por partes.
+  if (!pendientes && facturas.length <= 1 && !sinPareja.length) { cajaSaldo.remove(); return; }
   const num = n => Number(n).toLocaleString('es-CL');
   cajaSaldo.innerHTML = `
     <div class="oc-saldo-cab"><span><i class="ti ti-list-check"></i> Saldo pendiente ${infoTip('Lo que queda disponible de cada producto de la OC: lo pedido menos lo que ya se facturó.')}</span>
       ${pendientes ? `<span class="badge badge-amber">${pendientes} con saldo</span>` : '<span class="badge badge-green">Todo facturado ✓</span>'}</div>
     <table class="oc-saldo-tabla"><thead><tr><th>Producto</th><th class="oc-saldo-disp">Disponible</th></tr></thead><tbody>
       ${filas.map(f => `<tr class="${f.faltan ? '' : 'listo'}"><td title="${escapeHtml(f.nombre)}">${escapeHtml(f.nombre)}</td>
-        <td class="oc-saldo-disp">${f.faltan ? `<b>${num(f.faltan)}</b> <small>de ${num(f.pedidos)}</small>` : `<span class="oc-ok">✓</span> <small>0 de ${num(f.pedidos)}</small>`}</td></tr>`).join('')}
+        <td class="oc-saldo-disp">${f.faltan ? `<b>${num(f.faltan)}</b> <small>de ${num(f.pedidos)}</small>` : '<span class="oc-sin-saldo">Sin saldo</span>'}</td></tr>`).join('')}
     </tbody></table>
     ${sinPareja.length ? `<div class="oc-saldo-nota">${sinPareja.length} producto${sinPareja.length === 1 ? '' : 's'} de las facturas no calza${sinPareja.length === 1 ? '' : 'n'} con ninguno de la OC: revisa a mano. ${infoTip('No calzan: ' + [...new Set(sinPareja.map(f => f.nombre_producto))].join(' · '))}</div>` : ''}`;
 }
