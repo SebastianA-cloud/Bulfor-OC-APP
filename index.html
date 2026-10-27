@@ -11804,9 +11804,11 @@ function hospAgruparProductos(ocsHospital) {
         if (comunes >= 1 && parecido >= 0.8 && parecido > mejor) { mejor = parecido; g = x; }
       });
     }
-    if (!g) { g = { unificado: unificado || null, palabras, medidas, nombres: {}, ocs: new Set(), cantidad: 0 }; grupos.push(g); }
+    if (!g) { g = { unificado: unificado || null, palabras, medidas, nombres: {}, ocs: new Set(), cantidad: 0, precios: {} }; grupos.push(g); }
     g.nombres[nombre] = (g.nombres[nombre] || 0) + 1;
     g.ocs.add(it.codigooc);
+    // Precio unitario (neto) de este producto en cada OC.
+    (g.precios[it.codigooc] = g.precios[it.codigooc] || []).push(Number(it.preciounitario) || 0);
     g.cantidad += Number(it.cantidad) || 0;
   });
   grupos.forEach(g => {
@@ -11878,7 +11880,8 @@ function hospFiltrarOC(input) {
   if (vacio) vacio.style.display = visibles ? 'none' : '';
 }
 
-// OC de un producto del hospital: N°, fecha de emisión y total con IVA.
+// OC de un producto del hospital: N°, fecha de emisión y precio unitario (neto)
+// de ese producto en cada OC.
 function fichaHospitalProducto(i) {
   const f = window.__hospFicha;
   const g = f && f.grupos[i];
@@ -11888,11 +11891,12 @@ function fichaHospitalProducto(i) {
     antetitulo: f.hospital,
     titulo: g.nombre,
     sub: `${filas.length} ${filas.length === 1 ? 'orden de compra' : 'órdenes de compra'}${g.variantes > 1 ? ' · con ' + g.variantes + ' nombres distintos' : ''}`,
-    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar N° de OC, fecha o monto…" oninput="hospFiltrarOC(this)"></div>
-      <table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
-      ${filas.map(r => `<tr data-buscar="${escapeHtml(`${r.codigooc} ${fDate(r.fechaenvio || r.fechaoc)} ${clp(r.totaloc)} ${String(r.totaloc || '')} ${productosTextoPorOC[r.codigooc] || ''}`)}"><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar N° de OC, fecha o precio…" oninput="hospFiltrarOC(this)"></div>
+      <table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Precio unitario (neto)</th></tr></thead><tbody>
+      ${filas.map(r => { const precio = [...new Set(g.precios[r.codigooc] || [])].filter(Boolean).map(clp).join(' · ') || '—';
+        return `<tr data-buscar="${escapeHtml(`${r.codigooc} ${fDate(r.fechaenvio || r.fechaoc)} ${precio} ${(g.precios[r.codigooc] || []).join(' ')} ${productosTextoPorOC[r.codigooc] || ''}`)}"><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
         <td>${fDate(r.fechaenvio || r.fechaoc)}</td><td>${OC_FACT_BADGE[ocFacturacion(r)] || ''}</td>
-        <td class="oc-monto">${clp(r.totaloc)}</td></tr>`).join('')}
+        <td class="oc-monto">${precio}</td></tr>`; }).join('')}
     </tbody></table>
     <div class="panel-vacio hosp-oc-vacio" style="display:none">No hay OC con esa búsqueda.</div>
     ${g.variantes > 1 ? `<div class="hosp-variantes">Nombres que se juntaron aquí ${infoTip(Object.keys(g.nombres).join(' · '))}</div>` : ''}`,
