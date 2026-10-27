@@ -1475,3 +1475,6 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 /* Si no cabe al lado con espacio para leer los nombres, baja y usa todo el ancho */
 .oc-saldo { flex-basis: 420px; }
 .oc-saldo-tabla th { width: 90px; }
+.oc-saldo-tabla th.oc-saldo-disp, .oc-saldo-tabla td.oc-saldo-disp { width: 130px; white-space: nowrap; }
+.oc-saldo-tabla td.oc-saldo-disp small { color: var(--text-3); font-size: 12px; }
+.oc-saldo { flex-basis: 360px; }

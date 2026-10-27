@@ -2426,7 +2426,8 @@ function fichaOC(codigoOC) {
 // línea, todo va a esa). Con eso se arman dos cosas:
 //  * el nombre que se muestra en Productos: el de la factura más nueva (el
 //    texto original de la OC queda en la "i" junto al nombre);
-//  * el cuadro "Por facturar por producto": pedidos, facturados y lo que falta.
+//  * el cuadro "Saldo pendiente": lo disponible de cada producto (pedido menos
+//    facturado), junto al total pedido.
 // Solo cambia lo que se ve; no se guarda nada.
 async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   let its;
@@ -2480,11 +2481,11 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   const pendientes = filas.filter(f => f.faltan > 0).length;
   const num = n => Number(n).toLocaleString('es-CL');
   cajaSaldo.innerHTML = `
-    <div class="oc-saldo-cab"><span><i class="ti ti-list-check"></i> Por facturar por producto</span>
+    <div class="oc-saldo-cab"><span><i class="ti ti-list-check"></i> Saldo pendiente ${infoTip('Lo que queda disponible de cada producto de la OC: lo pedido menos lo que ya se facturó.')}</span>
       ${pendientes ? `<span class="badge badge-amber">${pendientes} con saldo</span>` : '<span class="badge badge-green">Todo facturado ✓</span>'}</div>
-    <table class="oc-saldo-tabla"><thead><tr><th>Producto</th><th>Pedidos</th><th>Facturados</th><th>Faltan</th></tr></thead><tbody>
-      ${filas.map(f => `<tr class="${f.faltan ? '' : 'listo'}"><td title="${escapeHtml(f.nombre)}">${escapeHtml(f.nombre)}</td><td>${num(f.pedidos)}</td><td>${num(f.facturados)}</td>
-        <td>${f.faltan ? `<b>${num(f.faltan)}</b>` : '<span class="oc-ok">✓</span>'}</td></tr>`).join('')}
+    <table class="oc-saldo-tabla"><thead><tr><th>Producto</th><th class="oc-saldo-disp">Disponible</th></tr></thead><tbody>
+      ${filas.map(f => `<tr class="${f.faltan ? '' : 'listo'}"><td title="${escapeHtml(f.nombre)}">${escapeHtml(f.nombre)}</td>
+        <td class="oc-saldo-disp">${f.faltan ? `<b>${num(f.faltan)}</b> <small>de ${num(f.pedidos)}</small>` : `<span class="oc-ok">✓</span> <small>0 de ${num(f.pedidos)}</small>`}</td></tr>`).join('')}
     </tbody></table>
     ${sinPareja.length ? `<div class="oc-saldo-nota">${sinPareja.length} producto${sinPareja.length === 1 ? '' : 's'} de las facturas no calza${sinPareja.length === 1 ? '' : 'n'} con ninguno de la OC: revisa a mano. ${infoTip('No calzan: ' + [...new Set(sinPareja.map(f => f.nombre_producto))].join(' · '))}</div>` : ''}`;
 }
