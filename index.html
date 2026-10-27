@@ -11820,7 +11820,7 @@ const HOSP_PALABRAS_RELLENO = new Set(('DE DEL LA EL LOS LAS Y CON POR PARA EN X
   'CADA VIGENCIA MINIMA ANO ANOS FICHA TECNICA STOCK DISPONIBILIDAD OCTUBRE NOVIEMBRE DICIEMBRE ENERO ' +
   'FEBRERO MARZO ABRIL MAYO JUNIO JULIO AGOSTO SEPTIEMBRE UNIDAD UNIDADES UN UND ' +
   'FRASCO FRASCOS CAPSULA CAPSULAS SACHET SACHETS SOBRE SOBRES POLVO TRILAMINADO DS MONTO MINIMO ' +
-  'BIDON BIDONES ENVASE POTE POTES FCO USP').split(' '));
+  'BIDON BIDONES ENVASE POTE POTES FCO USP CP CPS CAP CAPS COMP COMPRIMIDO COMPRIMIDOS TAB TABS').split(' '));
 
 function hospPalabrasProducto(nombre) {
   let t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -11829,6 +11829,10 @@ function hospPalabrasProducto(nombre) {
   t = t.replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ');
   // El envase ("1x60", "2 FRASCO X 30") no es parte del producto: se quita.
   t = t.replace(/\d+\s*X\s*\d+/g, ' ');
+  // Tampoco la cantidad de cápsulas, comprimidos o sobres que trae ("35 CP",
+  // "X 30CP"): "ACETATO DE ZINC 25 MG 35 CP" y "… 25MG (2 FCO X 30CP)" son el
+  // mismo producto. La dosis (25 MG) sí cuenta.
+  t = t.replace(/\d+\s*(CP|CPS|CAP|CAPS|CAPSULAS?|COMP|COMPRIMIDOS?|TAB|TABS|TABLETAS?|SOBRES?|SACHETS?)\b/g, ' ');
   // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
   t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
   // Decimales en medidas: "2,5LT" es 2,5 litros (no "2" y "5L").
