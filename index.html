@@ -1809,6 +1809,14 @@ function populateFilters() {
   sel('hosp-region', [...new Set(hosp.map(r=>r.region).filter(Boolean))].sort());
 }
 
+// Nombres que en la farmacia significan lo mismo. Se usan en los buscadores
+// (buscar "peg" encuentra "polietilenglicol" y al revés) y al juntar productos
+// parecidos (ficha de hospital). Para agregar otra equivalencia, sumar una fila
+// con la abreviatura y el nombre completo, en mayúsculas y sin tildes.
+const SINONIMOS_PRODUCTO = [
+  ['PEG', 'POLIETILENGLICOL'],
+];
+
 function coincideBusqueda(texto, query) {
   // Búsqueda flexible: separa la consulta en palabras y exige que TODAS
   // aparezcan en el texto, sin importar el orden ni si hay otras palabras
@@ -1818,7 +1826,12 @@ function coincideBusqueda(texto, query) {
   const sinTildes = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const palabras = sinTildes(query).trim().split(/\s+/);
   const textoLower = sinTildes(texto);
-  return palabras.every(palabra => textoLower.includes(palabra));
+  return palabras.every(palabra => {
+    if (textoLower.includes(palabra)) return true;
+    // Equivalencias: "peg" también encuentra "polietilenglicol" y al revés.
+    const fila = SINONIMOS_PRODUCTO.find(f => f.some(x => x.toLowerCase() === palabra));
+    return !!fila && fila.some(x => textoLower.includes(x.toLowerCase()));
+  });
 }
 
 // Busca el RUT del hospital a partir de su nombre (crudo o ya normalizado),
@@ -11744,7 +11757,9 @@ function hospPalabrasProducto(nombre) {
   // Medidas pegadas al número: "3 LTS" = "3LTS" = "3L".
   t = t.replace(/(\d)\s*(LITROS?|LTS?|L)\b/g, '$1L').replace(/(\d)\s*(MLS?|CC)\b/g, '$1ML')
        .replace(/(\d)\s*(GRAMOS?|GRS?|G)\b/g, '$1G').replace(/(\d)\s*(MG|MCG|UI|KG)\b/g, '$1$2');
-  return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)));
+  // Equivalencias (PEG = POLIETILENGLICOL): todas cuentan como la misma palabra.
+  const equivalente = w => { const f = SINONIMOS_PRODUCTO.find(x => x.includes(w)); return f ? f[f.length - 1] : w; };
+  return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente));
 }
 
 function hospAgruparProductos(ocsHospital) {
