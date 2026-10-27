@@ -13,6 +13,9 @@
 // Una "ficha" es un objeto así (todo es opcional menos el título):
 //   {
 //     titulo: 'Factura N° 22309',
+//     antetitulo: 'Orden de compra',          // opcional: título destacado (con línea roja)
+//     tituloCopiar: true,                      // ícono chico para copiar el título
+//     resumen: '<div class="panel-datos">…</div>', // va bajo el subtítulo, antes del monto
 //     sub: 'Hospital Clínico La Florida · 13-10-2026',
 //     destacado: '$ 2.522.241',               // número grande bajo el título
 //     etiquetas: '<span class="tag">…</span>', // estados en color
@@ -124,9 +127,12 @@ function panelPintar() {
     <div class="panel-cab">${arriba}<span class="panel-cab-btns">${flechas}
       <button class="panel-btn-ico" title="Cerrar (Esc)" onclick="panelCerrar()"><i class="ti ti-x"></i></button></span></div>
     <div class="panel-cuerpo">
-      <div class="panel-tit">${panelEsc(f.titulo)}</div>
+      ${f.antetitulo ? `<div class="panel-antetit">${panelEsc(f.antetitulo)}</div>` : ''}
+      <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}"><span>${panelEsc(f.titulo)}</span>${f.tituloCopiar
+        ? `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(f.titulo)))}, this)"><i class="ti ti-copy"></i></button>` : ''}</div>
       ${f.sub ? `<div class="panel-sub">${panelEsc(f.sub)}</div>` : ''}
       ${ids ? `<div class="panel-ids">${ids}</div>` : ''}
+      ${f.resumen ? `<div class="panel-resumen">${f.resumen}</div>` : ''}
       ${f.destacado ? `<div class="panel-destacado">${panelEsc(f.destacado)}</div>` : ''}
       ${f.etiquetas ? `<div class="panel-etiquetas">${f.etiquetas}</div>` : ''}
       ${f.acciones ? `<div class="panel-acciones">${f.acciones}</div>` : ''}

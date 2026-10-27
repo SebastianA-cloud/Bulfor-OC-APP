@@ -2343,7 +2343,7 @@ function fichaOC(codigoOC) {
   const facturas = facturasAsociadasA(codigoOC).slice().sort((x, y) => String(y.fecha_emision || '').localeCompare(String(x.fecha_emision || '')));
   const facturado = ocFacturadoPorOC()[codigoOC.trim()] || 0;
   window.__ocItemsTextos = relacionados.map(it => ({ textoOriginal: textoOriginalDe(it), nombreFinal: nombreFinalDe(it) }));
-  const productos = relacionados.length ? `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
+  const productos = relacionados.length ? `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
       ${relacionados.map((it, i) => {
         const original = textoOriginalDe(it);
         const nombre = diccionarioNormalizacion[original] || original;
@@ -2354,19 +2354,23 @@ function fichaOC(codigoOC) {
       }).join('')}</tbody></table>` : '<div class="panel-vacio">No se encontraron productos para esta OC.</div>';
   const dato = (k, v) => v ? `<div><span>${k}</span>${escapeHtml(v)}</div>` : '';
   const cod = codigoOC.replace(/'/g, "\\'");
+  // El código de COT o licitación se copia con un ícono chico, sin cajas grandes.
+  const datoOrigen = origen ? `<div><span>${origen.tipo === 'COT' ? 'Compra ágil (COT)' : 'Licitación'}</span><b class="mono">${escapeHtml(origen.codigo)}</b>
+      <button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${escapeHtml(JSON.stringify(origen.codigo))}, this)"><i class="ti ti-copy"></i></button></div>` : '';
   return {
     ocCodigo: codigoOC,
-    titulo: `OC ${codigoOC}`,
+    antetitulo: 'Orden de compra',
+    titulo: codigoOC,
+    tituloCopiar: true,
     sub: `${nombreHosp(r.hospital) || r.hospital || ''} · ${fDate(r.fechaenvio || r.fechaoc)}`,
     destacado: clp(r.totaloc),
     etiquetas: `${tipoBadge(r.tipooc)} ${OC_FACT_BADGE[fact]}${facturado > 0 && fact !== 'completa' ? ` <span class="badge badge-gray">Facturado ${clp(facturado)}</span>` : ''}`,
-    ids: [{ label: 'OC', valor: codigoOC }, origen ? { label: origen.tipo === 'COT' ? 'COT' : 'Licitación', valor: origen.codigo } : null],
+    resumen: `<div class="panel-datos">${datoOrigen}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}${dato('Forma de pago', r.formapago)}</div>`,
     acciones: `<a class="page-btn" href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener">Ver OC en Mercado Público ↗</a>`
       + (origen ? `<a class="page-btn" href="${origen.url}" target="_blank" rel="noopener">Ver ${origen.tipo === 'COT' ? 'compra ágil' : 'licitación'} ↗</a>` : '')
       + (fact === 'por' || fact === 'parcial' ? `<button class="page-btn page-btn-pri" onclick="ocFacturar('${cod}')">Facturar</button>` : ''),
     cuerpo: `<div class="panel-h">Productos</div>${productos}
-      <div class="panel-h">Datos de la OC</div>
-      <div class="panel-datos">${dato('Nombre', r.nombreoc)}${dato('Unidad compradora', r.unidadcompradora)}${dato('Región', r.region)}${dato('Forma de pago', r.formapago)}${dato('Estado en Mercado Público', nombreEstadoOC(r.estadooc))}</div>`,
+      ${r.nombreoc ? `<div class="panel-h">Nombre en Mercado Público</div><div style="font-size:12.5px;color:var(--text-2)">${escapeHtml(r.nombreoc)}</div>` : ''}`,
     relacionado: facturas.map(d => ({
       icono: 'ti-file-invoice',
       titulo: `Factura N° ${d.folio}`,

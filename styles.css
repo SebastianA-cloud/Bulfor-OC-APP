@@ -1373,3 +1373,17 @@ body.con-panel .col-sec { display: none; }
 .oe-ficha-datos input, .oe-ficha-datos textarea { box-sizing: border-box; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; font: 400 14px var(--font); color: var(--text); background: var(--surface); }
 .oe-ficha-datos textarea { height: auto; padding: 8px 12px; }
 .oe-ficha-datos input:focus, .oe-ficha-datos textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(192,57,43,.12); }
+
+/* Título destacado de la ficha (ej. OC): antetítulo rojo y línea bajo el número */
+.panel-antetit { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.panel-tit-destacado { display: inline-flex; width: fit-content; align-self: flex-start; align-items: center; gap: 6px; font-family: var(--mono, ui-monospace, monospace); font-size: 21px; letter-spacing: -.2px; padding-bottom: 4px; border-bottom: 3px solid var(--accent); }
+.panel-copiar-mini { border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 2px 4px; border-radius: 6px; font-size: 15px; vertical-align: middle; font-family: var(--font); }
+.panel-copiar-mini:hover { background: var(--bg); color: var(--text); }
+.panel-copiar-mini.ok { color: var(--green); font-size: 12px; }
+.panel-resumen { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #FAF9F6; }
+.panel-resumen .panel-datos > div { min-width: 0; overflow-wrap: anywhere; }
+/* Tabla de productos cuadriculada: cada dato en su casilla */
+.panel-tabla-cuadros { border: 1px solid var(--border); }
+.panel-tabla-cuadros th, .panel-tabla-cuadros td { border: 1px solid var(--border); }
+.panel-tabla-cuadros tr:last-child td { border-bottom: 1px solid var(--border); }
+.panel-tabla-cuadros tbody tr:nth-child(even) td { background: #FBFAF8; }
