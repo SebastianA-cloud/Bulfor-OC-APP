@@ -1286,3 +1286,90 @@ body.con-panel .col-sec { display: none; }
 .fx-hist li.actual::before { background: var(--green); border-color: var(--green); }
 .fx-hist b { display: block; font-weight: 600; }
 .fx-hist small { color: var(--text-3); font-size: 11.5px; }
+
+/* ─── Órdenes de Elaboración: tablero ─── */
+.oe-tablero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.oe-col { background: #EFEDE8; border-radius: 14px; padding: 10px; min-height: 120px; }
+.oe-col-cab { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; padding: 4px 4px 10px; }
+.oe-col-cab span { background: var(--surface); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+.oe-col-vacia { color: var(--text-3); text-align: center; padding: 12px 0; font-size: 13px; }
+.oe-tarjeta { background: var(--surface); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; box-shadow: 0 1px 2px rgba(26,25,23,.06); border-left: 3px solid transparent; }
+.oe-tarjeta:hover { box-shadow: 0 3px 10px rgba(26,25,23,.12); }
+.oe-tarjeta.hoy { border-left-color: var(--red); }
+.oe-tarjeta-cab { display: flex; justify-content: space-between; gap: 8px; }
+.oe-tarjeta-cab b { font-size: 13.5px; font-weight: 600; }
+.oe-tarjeta-cab small { color: var(--text-3); font-size: 11.5px; white-space: nowrap; }
+.oe-tarjeta-prep { font-size: 12.5px; color: var(--text-2); margin: 3px 0 7px; }
+.oe-tarjeta-pie { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-3); }
+.oe-hoy { color: var(--red); font-weight: 600; }
+.oe-tablero-pie { text-align: right; margin-top: 12px; font-size: 13px; }
+.oe-tablero-pie a { color: #185FA5; font-weight: 600; cursor: pointer; }
+@media (max-width: 1100px) { .oe-tablero { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .oe-tablero { grid-template-columns: 1fr; } }
+
+/* ─── Órdenes de Elaboración: ficha ─── */
+.modal-shell.oe-ficha { max-width: 1080px; }
+.oe-ficha-tit { font-size: 17px; font-weight: 700; }
+.oe-ficha-sub { font-size: 12px; color: var(--text-3); margin-left: 6px; }
+.oe-barra { display: flex; align-items: center; gap: 6px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: #FAF9F6; flex-wrap: wrap; }
+.oe-barra-lbl { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-3); margin-right: 6px; }
+.oe-barra-linea { width: 14px; height: 2px; background: var(--border); }
+.oe-barra-ayuda { margin-left: auto; font-size: 12px; color: var(--text-3); }
+.oe-paso { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 13px 6px 9px; font: 500 13px var(--font); color: var(--text-2); cursor: pointer; }
+.oe-paso-punto { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #B8B5AE; box-sizing: border-box; }
+.oe-paso.hecho { background: #E8F3EC; border-color: #BFDCC9; color: #24563E; }
+.oe-paso.hecho .oe-paso-punto { background: #2D6A4F; border-color: #2D6A4F; }
+.oe-paso.actual { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.oe-paso.actual .oe-paso-punto { background: #fff; border-color: #fff; }
+.oe-ficha-cuerpo { display: grid; grid-template-columns: 380px 1fr; min-height: 0; }
+.oe-ficha-receta { background: #F6F5F1; border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.oe-receta-cab { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.oe-receta-visor { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; min-height: 380px; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; }
+.oe-receta-visor img { max-width: 100%; max-height: 480px; object-fit: contain; transition: transform .2s; }
+.oe-receta-pdf { text-align: center; color: var(--text-2); font-size: 13px; padding: 20px; }
+.oe-receta-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.oe-receta-btns .page-btn { flex: 1; padding: 7px 10px; white-space: nowrap; }
+.oe-drop { border: 2px dashed #E3B5AF; border-radius: 12px; min-height: 380px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 20px; background: var(--surface); font-size: 13px; color: var(--text-2); }
+.oe-drop b { font-size: 15px; color: var(--text); }
+.oe-drop small { color: var(--text-3); }
+.oe-drop.sobre { background: #FDF1EF; border-color: var(--accent); }
+.oe-drop kbd { border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 11.5px; background: #FAF9F6; }
+.oe-drop-o { color: var(--text-3); font-size: 12px; margin: 4px 0; }
+.oe-receta-anterior { display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 9px 12px; font: 13px var(--font); color: var(--text); cursor: pointer; width: 100%; }
+.oe-receta-anterior > span { width: 28px; height: 28px; border-radius: 50%; background: #EEF5EF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.oe-receta-anterior small { display: block; color: var(--text-3); font-size: 11.5px; }
+.oe-receta-anterior.apagada { cursor: default; opacity: .7; }
+.oe-receta-anterior.elegida { border-color: #2D6A4F; background: #F1F8F3; }
+.oe-ficha-datos { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.oe-bloque { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.oe-bloque label, .oe-lbl { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); position: relative; }
+.oe-bloque input { width: 100%; font-weight: 400; }
+.oe-bloque-tit { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.oe-bloque-tit span { width: 22px; height: 22px; border-radius: 6px; background: #FCE9E6; color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.oe-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.oe-grid-pago { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+.oe-seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 38px; }
+.oe-seg button { flex: 1; border: 0; background: var(--surface); font: 13px var(--font); color: var(--text-2); cursor: pointer; }
+.oe-seg button + button { border-left: 1px solid var(--border); }
+.oe-seg button.activo { background: var(--accent); color: #fff; font-weight: 600; }
+.oe-paciente-info { font-size: 12px; min-height: 0; }
+.oe-sugerencias { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 18px rgba(26,25,23,.12); max-height: 200px; overflow-y: auto; }
+.oe-sugerencias div { padding: 8px 12px; cursor: pointer; font-weight: 400; font-size: 13px; color: var(--text); display: flex; justify-content: space-between; gap: 8px; }
+.oe-sugerencias div:hover { background: #FAF8F4; }
+.oe-sugerencias small { color: var(--text-3); }
+.oe-obs summary { cursor: pointer; font-size: 13px; color: #185FA5; font-weight: 600; }
+.oe-obs textarea { width: 100%; min-height: 70px; margin-top: 8px; resize: vertical; font-family: inherit; }
+.oe-ficha-pie { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); flex-wrap: wrap; }
+.oe-ficha-pie .page-btn { padding: 8px 14px; }
+.oe-eliminar { color: var(--red); border-color: transparent; }
+.oe-pie-nota { font-size: 12.5px; color: var(--text-3); }
+@media (max-width: 860px) {
+  .oe-ficha-cuerpo { grid-template-columns: 1fr; }
+  .oe-ficha-receta { border-right: 0; border-bottom: 1px solid var(--border); }
+  .oe-receta-visor, .oe-drop { min-height: 240px; }
+  .oe-barra-ayuda { display: none; }
+  .oe-grid-pago { grid-template-columns: 1fr; }
+}
+.oe-ficha-datos input, .oe-ficha-datos textarea { box-sizing: border-box; height: 38px; border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; font: 400 14px var(--font); color: var(--text); background: var(--surface); }
+.oe-ficha-datos textarea { height: auto; padding: 8px 12px; }
+.oe-ficha-datos input:focus, .oe-ficha-datos textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(192,57,43,.12); }
