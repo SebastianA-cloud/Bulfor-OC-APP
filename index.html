@@ -1811,6 +1811,9 @@ function populateFilters() {
 const SINONIMOS_PRODUCTO = [
   ['PEG', 'POLIETILENGLICOL'],
   ['AC', 'ACIDO'],
+  ['PROPANOLOL', 'PROPRANOLOL'],
+  ['PODOFILINA', 'PODOFILINO'],
+  ['TRAZADONA', 'TRAZODONA'],
 ];
 
 function coincideBusqueda(texto, query) {
@@ -3493,7 +3496,34 @@ async function cargarItemsFacturasVentaUnaVez() {
     c[1]++;
     porCapsula.set(n, c);
   });
-  grupoProductosVenta = agruparNombresProducto(pesos, null, n => { const c = porCapsula.get(n); return !!c && c[0] * 2 >= c[1]; }).grupoDe;
+  const vendePorUnidad = n => { const c = porCapsula.get(n); return !!c && c[0] * 2 >= c[1]; };
+  const { grupoDe } = agruparNombresProducto(pesos, null, vendePorUnidad);
+  // Segunda capa: dentro de un mismo producto base, todo lo que tiene la misma
+  // medida es una sola presentación ("PEG 3350 10G" y "POLIETILENGLICOL 10 G
+  // SACHET" → POLIETILENGLICOL 10 G), aunque se escriba con otras palabras.
+  const gruposVenta = [...new Set(grupoDe.values())];
+  agruparPorBase(gruposVenta, g => g.nombre).forEach(({ base, items: gs }) => {
+    if (gs.length < 2) return;
+    const nombreBase = nombreDeBase(gs.map(g => g.nombre), base);
+    // Cada presentación se nombra igual: producto base + lo que la distingue
+    // (una palabra extra como GLACIAL, y la medida): "POLIETILENGLICOL 10 G".
+    const porMedida = new Map();
+    gs.forEach(g => {
+      const n0 = Object.keys(g.nombres)[0];
+      // Las medidas en el orden en que se escriben ("3% 100 ML"); para comparar, ordenadas.
+      const medidas = [...hospPalabrasProducto(g.nombre, vendePorUnidad(n0))].filter(w => /\d/.test(w));
+      const extras = [...precioBaseDe(g.nombre)].filter(w => !base.has(w)).sort();
+      const k = extras.join(' ') + '|' + medidas.slice().sort().join(' ');
+      if (!porMedida.has(k)) porMedida.set(k, { medidas, extras, gs: [] });
+      porMedida.get(k).gs.push(g);
+    });
+    porMedida.forEach(({ medidas, extras, gs: iguales }) => {
+      if (!medidas.length && !extras.length) return;   // sin nada que la distinga: queda con su nombre
+      const unido = { nombre: [nombreBase, ...extras, ...medidas.map(medidaLegible)].join(' '), nombres: {} };
+      iguales.forEach(g => Object.entries(g.nombres).forEach(([n, v]) => { unido.nombres[n] = (unido.nombres[n] || 0) + v; grupoDe.set(n, unido); }));
+    });
+  });
+  grupoProductosVenta = grupoDe;
   const map = new Map();
   facturaItemsRaw.forEach(it => {
     const key = productoVentaDe(it.nombre_producto);
@@ -3590,7 +3620,7 @@ function renderFacturaItems() {
 // ─── Precios: productos base ────────────────────────────────────────────────
 // Palabras que no son el producto sino su envase o forma: se quitan para
 // encontrar el producto base ("AC. ACETICO 5% 250ML" → ACIDO ACETICO).
-const PRECIOS_PALABRAS_FORMA = new Set(('BIDON BIDONES SOLUCION USP POTE POTES FCO FRASCO FRASCOS ENVASE ' +
+const PRECIOS_PALABRAS_FORMA = new Set(('BIDON BIDONES SOLUCION USP POTE POTES FCO FRASCO FRASCOS ENVASE PAPELILLO PAPELILLOS ' +
   'LT LTS L ML CC G GR GRS KG MG UN UND UNIDAD LITRO LITROS').split(' '));
 
 function precioBaseDe(nombre) {
@@ -3601,33 +3631,49 @@ function precioBaseDe(nombre) {
 // Agrupa los productos de la lista en productos base. Un producto se junta con
 // otro si sus palabras base son las mismas, o si tiene a lo más una palabra
 // más ("ACIDO ACETICO GLACIAL" va con "ACIDO ACETICO").
-function sustanciasDePrecios(productos) {
-  const conBase = productos.map(p => ({ p, base: precioBaseDe(p.nombre) }))
-    .sort((a, b) => a.base.size - b.base.size);
+// Junta elementos por producto base: mismas palabras base, o a lo más una más
+// ("ACIDO ACETICO GLACIAL" va con "ACIDO ACETICO"). Devuelve [{ base, items }].
+function agruparPorBase(lista, nombreDe) {
+  const conBase = lista.map(x => ({ x, base: precioBaseDe(nombreDe(x)) })).sort((a, b) => a.base.size - b.base.size);
   const grupos = [];
-  conBase.forEach(({ p, base }) => {
+  conBase.forEach(({ x, base }) => {
     let g = null;
-    if (base.size) {
-      g = grupos.find(x => x.base.size && [...x.base].every(w => base.has(w)) && base.size - x.base.size <= 1);
-    }
-    if (!g) { g = { base, productos: [] }; grupos.push(g); }
-    g.productos.push(p);
+    if (base.size) g = grupos.find(y => y.base.size && [...y.base].every(w => base.has(w)) && base.size - y.base.size <= 1);
+    if (!g) { g = { base, items: [] }; grupos.push(g); }
+    g.items.push(x);
   });
-  return grupos.map(g => {
-    if (g.productos.length === 1) return g.productos[0];
-    // Nombre del producto base, con las palabras en el orden en que se escriben.
-    const muestra = g.productos.slice().sort((a, b) => a.nombre.length - b.nombre.length)[0].nombre;
-    const orden = String(muestra).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').split(/[^A-Z0-9]+/)
-      .map(w => (SINONIMOS_PRODUCTO.find(f => f.includes(w)) || [w]).slice(-1)[0]);
-    const nombre = [...new Set(orden.filter(w => g.base.has(w)))].join(' ') || muestra;
+  return grupos;
+}
+
+// Nombre del producto base, con sus palabras en el orden en que se escriben
+// (tomado del nombre más corto del grupo).
+function nombreDeBase(nombres, base) {
+  const muestra = nombres.slice().sort((a, b) => a.length - b.length)[0];
+  const orden = String(muestra).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ').split(/[^A-Z0-9]+/)
+    .map(w => PALABRAS_CORREGIDAS.get(w) || w)
+    .map(w => (SINONIMOS_PRODUCTO.find(f => f.includes(w)) || [w]).slice(-1)[0]);
+  return [...new Set(orden.filter(w => base.has(w)))].join(' ') || muestra;
+}
+
+// Medida legible: 10G → 10 G, 2P5L → 2,5 L, 20PC → 20%, 35CAP → 35 CP.
+function medidaLegible(m) {
+  if (/POR/.test(m)) return m.replace(/(\d)P(\d)/g, '$1,$2').replace(/^([\d,]+)([A-Z]+)POR([A-Z]+)$/, '$1 $2/$3');
+  return m.replace(/(\d)P(\d)/g, '$1,$2').replace(/PC$/, '%').replace(/CAP$/, ' CP').replace(/COMP$/, ' COMP')
+    .replace(/(\d)(MG|MCG|UI|ML|KG|G|L|SOB|TAB)$/, '$1 $2');
+}
+
+function sustanciasDePrecios(productos) {
+  return agruparPorBase(productos, p => p.nombre).map(g => {
+    if (g.items.length === 1) return g.items[0];
     const docs = new Set();
-    g.productos.forEach(x => x.docs && x.docs.forEach(d => docs.add(d)));
+    g.items.forEach(x => x.docs && x.docs.forEach(d => docs.add(d)));
     return {
-      nombre, presentaciones: g.productos.slice().sort((a, b) => (b.ultimaFecha || '').localeCompare(a.ultimaFecha || '')),
+      nombre: nombreDeBase(g.items.map(x => x.nombre), g.base),
+      presentaciones: g.items.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true })),
       facturas: docs.size,
-      ultimaFecha: g.productos.reduce((m, x) => (x.ultimaFecha || '') > m ? x.ultimaFecha : m, ''),
-      totalFacturado: g.productos.reduce((t, x) => t + (x.totalFacturado || 0), 0),
+      ultimaFecha: g.items.reduce((m, x) => (x.ultimaFecha || '') > m ? x.ultimaFecha : m, ''),
+      totalFacturado: g.items.reduce((t, x) => t + (x.totalFacturado || 0), 0),
     };
   });
 }
@@ -11907,6 +11953,8 @@ function hospPalabrasProducto(nombre, porUnidad) {
   t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
   // Decimales en medidas: "2,5LT" es 2,5 litros (no "2" y "5L").
   t = t.replace(/(\d+)[.,](\d+)(?=\s*(LITROS?|LTS?|L|MLS?|CC|GRAMOS?|GRS?|G|MG|MCG|KG)\b)/g, '$1P$2');
+  // Concentraciones como una sola medida: "1 MG/ML" = "1MG/ML" (no "1 MG" y "ML").
+  t = t.replace(/(\d+(?:P\d+)?)\s*(MG|MCG|G|UI|MEQ)\s*\/\s*(ML|L|G)(?![A-Z0-9])/g, '$1$2POR$3');
   // Medidas pegadas al número: "3 LTS" = "3LTS" = "3L".
   t = t.replace(/(\d)\s*(LITROS?|LTS?|L)\b/g, '$1L').replace(/(\d)\s*(MLS?|CC)\b/g, '$1ML')
        .replace(/(\d)\s*(GRAMOS?|GRS?|G)\b/g, '$1G').replace(/(\d)\s*(MG|MCG|UI|KG)\b/g, '$1$2');
