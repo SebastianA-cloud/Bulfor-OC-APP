@@ -2388,7 +2388,9 @@ function fichaOC(codigoOC) {
     cuerpo: `<div class="panel-h">Productos</div>${productos}
       ${ocTablaFacturasHtml(codigoOC, facturasVigentes)}
       ${r.nombreoc ? `<div class="panel-h">Nombre en Mercado Público</div><div style="font-size:12.5px;color:var(--text-2)">${escapeHtml(r.nombreoc)}</div>` : ''}`,
-    relacionado: historialDocumentosOC(codigoOC).map(d => ({
+    // Las facturas vigentes ya están en el cuadro (con link): aquí solo queda
+    // el resto del historial (anuladas, notas de crédito y guías).
+    relacionado: historialDocumentosOC(codigoOC).filter(d => !facturasVigentes.includes(d)).map(d => ({
       icono: d.tipo_dte === '61' ? 'ti-receipt-refund' : d.tipo_dte === '52' ? 'ti-truck-delivery' : 'ti-file-invoice',
       titulo: `${TIPOS_DTE_INFO[d.tipo_dte]?.singular || 'Documento'} N° ${d.folio}`,
       resumen: [clp(montoTotalDoc(d)), d.fecha_emision ? fDate(d.fecha_emision) : '',
@@ -2446,7 +2448,7 @@ function ocTablaFacturasHtml(codigoOC, facturas) {
   return `<div class="panel-h panel-h-accion"><span>Facturas de esta OC</span>
       <button class="page-btn" style="padding:4px 10px;font-size:12px" onclick="ocCopiarTablaFacturas(this)"><i class="ti ti-copy"></i> Copiar tabla</button></div>
     <table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Monto</th></tr></thead><tbody>
-      ${window.__ocTablaCopiar.filas.map(f => `<tr><td class="mono">${escapeHtml(f[0])}</td><td>${f[1]}</td><td style="text-align:right">${f[2]}</td></tr>`).join('')}
+      ${window.__ocTablaCopiar.filas.map((f, i) => `<tr><td><span class="panel-link mono" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${lista[i].id}), true)">${escapeHtml(f[0])}</span></td><td>${f[1]}</td><td style="text-align:right">${f[2]}</td></tr>`).join('')}
       ${lista.length > 1 ? `<tr><td colspan="2" style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">${clp(total)}</td></tr>` : ''}
     </tbody></table>`;
 }
