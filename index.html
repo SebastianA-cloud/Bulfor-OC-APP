@@ -11826,7 +11826,7 @@ function fichaHospital(hospital) {
   const grupos = hospAgruparProductos(ocs);
   window.__hospFicha = { hospital, grupos };
   const total = ocs.reduce((t, r) => t + (Number(r.totaloc) || 0), 0);
-  const lugar = [datos.comuna, datos.region].filter(Boolean).join(' · ');
+  const lugar = [datos.comuna, datos.region].filter(x => x && x.trim() !== '*').join(' · ');
   return {
     antetitulo: 'Hospital',
     titulo: hospital,
@@ -11837,8 +11837,8 @@ function fichaHospital(hospital) {
         <div><span>Primera compra</span><b>${fDate(datos.primeracompra)}</b></div>
         <div><span>Última compra</span><b>${fDate(datos.ultimacompra)}</b></div>
       </div>`,
-    cuerpo: `<div class="hosp-prod-cab"><div class="panel-h">Productos que compra <b class="hosp-cuenta">${grupos.length}</b></div>
-        <div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto o N° de OC…" oninput="hospFiltrarProductos(this.value)"></div></div>
+    cuerpo: `<div class="panel-h">Productos que compra <b class="hosp-cuenta">${grupos.length}</b></div>
+      <div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto o N° de OC…" oninput="hospFiltrarProductos(this.value)"></div>
       <div class="hosp-productos" id="hosp-productos">${grupos.map((g, i) => `
         <button class="hosp-producto" data-i="${i}" onclick="panelAbrir(fichaHospitalProducto(${i}), true)">
           <span class="hosp-producto-nombre">${escapeHtml(g.nombre)}${g.variantes > 1 ? ` <small>${g.variantes} nombres distintos</small>` : ''}</span>
@@ -11865,6 +11865,19 @@ function hospFiltrarProductos(q) {
   if (vacio) vacio.style.display = visibles ? 'none' : '';
 }
 
+// Filtra la lista de OC de un producto (por N°, fecha o monto).
+function hospFiltrarOC(input) {
+  const cont = input.closest('.panel-cuerpo');
+  let visibles = 0;
+  cont.querySelectorAll('.hosp-oc-tabla tbody tr').forEach(tr => {
+    const ok = coincideBusqueda(tr.dataset.buscar || '', input.value);
+    tr.style.display = ok ? '' : 'none';
+    if (ok) visibles++;
+  });
+  const vacio = cont.querySelector('.hosp-oc-vacio');
+  if (vacio) vacio.style.display = visibles ? 'none' : '';
+}
+
 // OC de un producto del hospital: N°, fecha de emisión y total con IVA.
 function fichaHospitalProducto(i) {
   const f = window.__hospFicha;
@@ -11875,11 +11888,13 @@ function fichaHospitalProducto(i) {
     antetitulo: f.hospital,
     titulo: g.nombre,
     sub: `${filas.length} ${filas.length === 1 ? 'orden de compra' : 'órdenes de compra'}${g.variantes > 1 ? ' · con ' + g.variantes + ' nombres distintos' : ''}`,
-    cuerpo: `<table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
-      ${filas.map(r => `<tr><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar N° de OC, fecha o monto…" oninput="hospFiltrarOC(this)"></div>
+      <table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
+      ${filas.map(r => `<tr data-buscar="${escapeHtml(`${r.codigooc} ${fDate(r.fechaenvio || r.fechaoc)} ${clp(r.totaloc)} ${String(r.totaloc || '')} ${productosTextoPorOC[r.codigooc] || ''}`)}"><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
         <td>${fDate(r.fechaenvio || r.fechaoc)}</td><td>${OC_FACT_BADGE[ocFacturacion(r)] || ''}</td>
         <td class="oc-monto">${clp(r.totaloc)}</td></tr>`).join('')}
     </tbody></table>
+    <div class="panel-vacio hosp-oc-vacio" style="display:none">No hay OC con esa búsqueda.</div>
     ${g.variantes > 1 ? `<div class="hosp-variantes">Nombres que se juntaron aquí ${infoTip(Object.keys(g.nombres).join(' · '))}</div>` : ''}`,
   };
 }

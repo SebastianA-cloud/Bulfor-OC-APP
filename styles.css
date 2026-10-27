@@ -1534,3 +1534,6 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 /* El título destacado usa letra normal; la de código solo para N° (OC) */
 .panel-tit-destacado { font-family: var(--font); letter-spacing: -.2px; }
 .panel-tit-destacado.panel-tit-mono { font-family: var(--mono, ui-monospace, monospace); }
+/* Buscadores de la ficha de hospital: a todo el ancho, bien visibles */
+.hosp-buscar { flex: none; width: 100%; max-width: none; }
+.hosp-buscar input { width: 100%; height: 42px; font-size: 14px; }
