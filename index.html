@@ -87,14 +87,9 @@
     </div>
 
     <div class="nav-group" data-modulo="precios">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('precios', true)" title="Precios">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('precios')" title="Precios">
         <span class="nav-icon"><i class="ti ti-tag" aria-hidden="true"></i></span>
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Precios</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-precios">
-        <div class="nav-item nav-subitem" data-page="items" data-page-alt="oc-clientes" onclick="abrirPreciosOC(this)"><span>Precios de OC</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-productos" data-page-alt="facturas-clientes" onclick="abrirPrecios(this)"><span>Precios facturados</span></div>
       </div>
     </div>
 
@@ -484,7 +479,7 @@
   <!-- PRODUCTOS DE FACTURAS PAGE -->
   <div class="page" id="page-facturas-productos">
     <div class="page-header">
-      <div class="page-title">Precios facturados</div>
+      <div class="page-title">Precios</div>
       <div class="page-sub">A quién le hemos vendido cada producto y a qué precio</div>
     </div>
     <div class="scope-toggle" id="precios-toggle-producto" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -523,7 +518,7 @@
   <!-- PRECIOS — POR CLIENTE -->
   <div class="page" id="page-facturas-clientes">
     <div class="page-header">
-      <div class="page-title">Precios facturados</div>
+      <div class="page-title">Precios</div>
       <div class="page-sub">Qué le hemos vendido a cada cliente y a qué precio</div>
     </div>
     <div class="scope-toggle" id="precios-toggle-cliente" role="group" aria-label="Vista de precios" style="margin-bottom:14px">
@@ -15779,11 +15774,10 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
   ] },
-  // Por ahora reúne los dos precios que existían (de OC y facturados); en la
-  // etapa 3 del rediseño se unen en un solo módulo.
+  // Precios: solo los precios facturados (los de OC se quitaron). El menú
+  // entra directo; "Por cliente" es la otra vista de la misma pantalla.
   'precios': { items: [
-    { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Precios de OC', page: 'items' },
-    { icon: '<i class="ti ti-file-invoice"></i>', label: 'Precios facturados', page: 'facturas-productos' },
+    { icon: '<i class="ti ti-tag"></i>', label: 'Precios', page: 'facturas-productos' },
   ] },
   'documentos': { items: [
     { icon: '<i class="ti ti-file-invoice"></i>', label: 'Factura', page: 'doc-factura' },
@@ -15945,7 +15939,7 @@ function irAInicio() {
 // Agrupa las páginas de un módulo dentro de la barra de páginas (escritorio).
 const GRUPO_PAGINA = {};
 // Páginas que comparte un mismo ítem (la vista "Por cliente" de Precios).
-const ALT_PAGINA = { 'items': 'oc-clientes', 'facturas-productos': 'facturas-clientes' };
+const ALT_PAGINA = { 'facturas-productos': 'facturas-clientes' };
 
 function renderNavSubmenuMobile(modulo, pagina) {
   const cont = document.getElementById('nav-submenu');
