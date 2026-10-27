@@ -1447,3 +1447,31 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .oc-facturas-tabla { width: auto; }
 .oc-facturas-tabla td, .oc-facturas-tabla th { white-space: nowrap; padding-left: 16px; padding-right: 16px; }
 .oc-facturas-cab { gap: 24px; }
+/* Facturas de la OC + "Por facturar por producto" lado a lado */
+.oc-fact-fila { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.oc-fact-fila .oc-facturas { flex: 0 1 auto; }
+.oc-saldo { flex: 1 1 320px; min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.oc-saldo-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; background: #FAF9F6; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; }
+.oc-saldo-cab > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.oc-saldo-tabla { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.oc-saldo-tabla th { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); padding: 8px 10px; font-weight: 700; text-align: right; border: 1px solid var(--border); border-top: 0; width: 82px; }
+.oc-saldo-tabla th:first-child { text-align: left; width: auto; }
+.oc-saldo-tabla td { padding: 7px 10px; border: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+.oc-saldo-tabla td:first-child { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-saldo-tabla tr > :first-child { border-left: 0; }
+.oc-saldo-tabla tr > :last-child { border-right: 0; }
+.oc-saldo-tabla tbody tr:last-child td { border-bottom: 0; }
+.oc-saldo-tabla td b { color: #B45309; }
+.oc-saldo-tabla tr.listo td { color: var(--text-3); }
+.oc-ok { color: #2D6A4F; font-weight: 700; }
+.oc-saldo-nota { padding: 8px 12px; font-size: 12px; color: #92400E; background: #FEF6E4; border-top: 1px solid var(--border); }
+.oc-envio { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #DCD6F0; background: #F5F2FC; color: #4D148C; border-radius: 8px; padding: 3px 9px; font: 600 12px var(--font); cursor: pointer; white-space: nowrap; }
+.oc-envio:hover { background: #4D148C; color: #fff; border-color: #4D148C; }
+.oc-sin-envio { color: var(--text-3); text-align: center; }
+.oc-saldo { flex-basis: 250px; }
+.oc-saldo-tabla th { width: 74px; letter-spacing: 0; padding: 8px 8px; }
+.oc-saldo-tabla td { padding: 7px 8px; }
+.oc-facturas-tabla td, .oc-facturas-tabla th { padding-left: 12px; padding-right: 12px; }
+/* Si no cabe al lado con espacio para leer los nombres, baja y usa todo el ancho */
+.oc-saldo { flex-basis: 420px; }
+.oc-saldo-tabla th { width: 90px; }
