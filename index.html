@@ -11829,10 +11829,13 @@ function hospPalabrasProducto(nombre) {
   t = t.replace(/(^|[^A-Z0-9])A\.\s*/g, '$1ACIDO ').replace(/^\s*A\s+(?=[A-Z]{4})/, 'ACIDO ');
   // El envase ("1x60", "2 FRASCO X 30") no es parte del producto: se quita.
   t = t.replace(/\d+\s*X\s*\d+/g, ' ');
-  // Tampoco la cantidad de cápsulas, comprimidos o sobres que trae ("35 CP",
-  // "X 30CP"): "ACETATO DE ZINC 25 MG 35 CP" y "… 25MG (2 FCO X 30CP)" son el
-  // mismo producto. La dosis (25 MG) sí cuenta.
-  t = t.replace(/\d+\s*(CP|CPS|CAP|CAPS|CAPSULAS?|COMP|COMPRIMIDOS?|TAB|TABS|TABLETAS?|SOBRES?|SACHETS?)\b/g, ' ');
+  // La cantidad de cápsulas, comprimidos o sobres sí distingue (35 CP no es
+  // 30 CP), pero escrita de cualquier forma cuenta igual: "35 CP" = "35CP" =
+  // "35 CAPSULAS".
+  t = t.replace(/(\d+)\s*(CP|CPS|CAP|CAPS|CAPSULAS?)\b/g, '$1CAP')
+       .replace(/(\d+)\s*(COMP|COMPRIMIDOS?)\b/g, '$1COMP')
+       .replace(/(\d+)\s*(TAB|TABS|TABLETAS?)\b/g, '$1TAB')
+       .replace(/(\d+)\s*(SOBRES?|SACHETS?)\b/g, '$1SOB');
   // Porcentajes como una sola "medida": 5% y 10% son productos distintos.
   t = t.replace(/(\d+)[.,](\d+)\s*%/g, '$1P$2PC').replace(/(\d+)\s*%/g, '$1PC');
   // Decimales en medidas: "2,5LT" es 2,5 litros (no "2" y "5L").
@@ -11844,7 +11847,12 @@ function hospPalabrasProducto(nombre) {
   t = t.replace(/(^|[^A-Z0-9])(LITROS?|LTS?)(?![A-Z0-9])/g, '$1 1L').replace(/(^|[^A-Z0-9])KG(?![A-Z0-9])/g, '$1 1KG');
   // Equivalencias (PEG = POLIETILENGLICOL): todas cuentan como la misma palabra.
   const equivalente = w => { const f = SINONIMOS_PRODUCTO.find(x => x.includes(w)); return f ? f[f.length - 1] : w; };
-  return new Set(t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente));
+  let palabras = t.split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && !HOSP_PALABRAS_RELLENO.has(w) && !/^\d+$/.test(w)).map(equivalente);
+  // Si trae varias cantidades distintas ("20 FRASCO X 30 CAPSULAS, 13 FRASCO
+  // X 60 CAPSULAS…") es un detalle de entregas, no el tamaño del envase: no cuentan.
+  const cantidades = new Set(palabras.filter(w => /^\d+(CAP|COMP|TAB|SOB)$/.test(w)));
+  if (cantidades.size > 1) palabras = palabras.filter(w => !cantidades.has(w));
+  return new Set(palabras);
 }
 
 // Nombre para mostrar en la lista: solo la primera línea y sin la cola de
