@@ -1612,3 +1612,7 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .doc-estado-fila > .fpp-cuenta { font-size: 13px; flex-direction: column; flex-wrap: nowrap; gap: 4px; align-items: flex-start; }
 .fpp-cuenta .mono { color: var(--text); font-size: 14px; }
 .cob-pago-campos select { font: 400 14px var(--font); text-transform: none; letter-spacing: 0; color: var(--text); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+/* Grupo "#" plegable al final de las listas A-Z */
+tr.letra-plegable td { cursor: pointer; color: var(--text-2); font-weight: 600; }
+tr.letra-plegable:hover td { color: var(--accent); }

@@ -1092,6 +1092,10 @@
       <div class="page-title">Productos</div>
       <div class="page-sub">A quién le hemos comprado cada producto y a qué precio</div>
     </div>
+    <div class="scope-toggle" id="pp-toggle" role="group" aria-label="Vista" style="margin-bottom:14px">
+      <button data-vista="producto" class="active" onclick="ppIrA('producto')">Por producto</button>
+      <button data-vista="proveedor" onclick="ppIrA('proveedor')">Por proveedor</button>
+    </div>
     <div class="fpp-resumen" id="fpprov-items-resumen" style="display:none"></div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -1109,7 +1113,7 @@
       <div class="alfabetico-wrap">
         <div class="alfabetico-tabla">
           <table style="margin:0">
-            <thead><tr>
+            <thead id="fpprov-items-head"><tr>
               <th>Producto</th>
               <th style="text-align:right">N° facturas</th><th style="text-align:right">Última compra</th><th style="text-align:right">Precio (sin IVA)</th>
             </tr></thead>
@@ -2286,7 +2290,9 @@ function letraDe(texto) {
   return /[A-Z]/.test(l) ? l : '#';
 }
 
-function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn, colspan, mensajeVacioHtml) {
+// opts.numerosAlFinal: lo que no empieza con letra (códigos, guiones, "33x25x25")
+// va al final, en un grupo "#" plegado que se despliega al hacer clic.
+function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn, colspan, mensajeVacioHtml, opts = {}) {
   const contenedor = document.getElementById(idContenedor);
   const jump = document.getElementById(idJump);
 
@@ -2296,7 +2302,9 @@ function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn
     return;
   }
 
-  const ordenada = [...lista].sort((a,b) => nombreDe(a).localeCompare(nombreDe(b), 'es', {sensitivity:'base'}));
+  let ordenada = [...lista].sort((a,b) => nombreDe(a).localeCompare(nombreDe(b), 'es', {sensitivity:'base'}));
+  if (opts.numerosAlFinal) ordenada = [...ordenada.filter(x => letraDe(nombreDe(x)) !== '#'), ...ordenada.filter(x => letraDe(nombreDe(x)) === '#')];
+  const numAbierto = !!(window.__grupoNumAbierto && window.__grupoNumAbierto[idContenedor]);
   window.__alfabeticoOrden = window.__alfabeticoOrden || {};
   window.__alfabeticoOrden[idContenedor] = ordenada; // para que cada fila pueda referenciar su propio item por índice, sin incrustar texto crudo (con comillas, comas, etc.) dentro del onclick
   const letrasPresentes = new Set();
@@ -2304,21 +2312,37 @@ function renderTablaAlfabetica(idContenedor, idJump, lista, nombreDe, filaHtmlFn
   let html = '';
   ordenada.forEach((item, idx) => {
     const letra = letraDe(nombreDe(item));
+    const plegable = opts.numerosAlFinal && letra === '#';
     if (letra !== letraActual) {
       letraActual = letra;
       letrasPresentes.add(letra);
-      html += `<tr class="letra-header" id="letra-${idContenedor}-${letra}"><td colspan="${colspan}">${letra}</td></tr>`;
+      html += plegable
+        ? `<tr class="letra-header letra-plegable" id="letra-${idContenedor}-#" onclick="alternarGrupoNum('${idContenedor}')"><td colspan="${colspan}">${numAbierto ? '⌄' : '›'} # · ${ordenada.filter(x => letraDe(nombreDe(x)) === '#').length} sin nombre de producto (códigos, guiones, cajas…) — clic para ${numAbierto ? 'esconder' : 'ver'}</td></tr>`
+        : `<tr class="letra-header" id="letra-${idContenedor}-${letra}"><td colspan="${colspan}">${letra}</td></tr>`;
     }
-    html += filaHtmlFn(item, idx);
+    const fila = filaHtmlFn(item, idx);
+    html += plegable && !numAbierto ? fila.replace(/^\s*<tr/, '<tr hidden') : fila;
   });
   contenedor.innerHTML = html;
 
   if (jump) {
-    jump.innerHTML = LETRAS_ALFABETO.map(l => {
+    jump.innerHTML = LETRAS_ALFABETO.concat(opts.numerosAlFinal ? ['#'] : []).map(l => {
       const activa = letrasPresentes.has(l);
       return `<button ${activa ? '' : 'disabled'} onclick="document.getElementById('letra-${idContenedor}-${l}').scrollIntoView({block:'start'})">${l}</button>`;
     }).join('');
   }
+}
+
+// Abre o cierra el grupo "#" (se recuerda mientras la página esté abierta).
+function alternarGrupoNum(idContenedor) {
+  window.__grupoNumAbierto = window.__grupoNumAbierto || {};
+  window.__grupoNumAbierto[idContenedor] = !window.__grupoNumAbierto[idContenedor];
+  const abierto = window.__grupoNumAbierto[idContenedor];
+  const cab = document.getElementById(`letra-${idContenedor}-#`);
+  if (!cab) return;
+  let tr = cab.nextElementSibling;
+  while (tr && !tr.classList.contains('letra-header')) { tr.hidden = !abierto; tr = tr.nextElementSibling; }
+  cab.firstElementChild.textContent = cab.firstElementChild.textContent.replace(/^[›⌄]/, abierto ? '⌄' : '›').replace(/clic para \w+$/, 'clic para ' + (abierto ? 'esconder' : 'ver'));
 }
 
 function renderPages(container, total, pages, cur, setPage) {
@@ -4496,13 +4520,113 @@ async function cargarProductosFacturasProveedor() {
   }
 }
 
+// Vista de la página: por producto (como Precios) o por proveedor (como
+// Precios → Por cliente: a quién le compramos y qué).
+let ppVista = 'producto';
+function ppIrA(vista) {
+  ppVista = vista;
+  document.querySelectorAll('#pp-toggle button').forEach(b => b.classList.toggle('active', b.dataset.vista === vista));
+  const inp = document.getElementById('fpprov-items-search');
+  if (inp) { inp.value = ''; inp.placeholder = vista === 'proveedor' ? 'Buscar proveedor o RUT…' : 'Buscar producto…'; }
+  facturaProvProductosUnicosF = [...facturaProvProductosUnicos];
+  panelCerrar();
+  cargarProductosFacturasProveedor();   // si ya están cargados, solo dibuja
+}
+
+// Proveedores con lo que se les ha comprado (sobre los ítems ya cargados).
+function proveedoresCompras() {
+  const m = new Map();
+  facturaProvItemsRaw.forEach(it => {
+    const f = fppPorId(it.factura_id);
+    if (!f) return;
+    const nombre = f.proveedor || 'Sin proveedor';
+    if (!m.has(nombre)) m.set(nombre, { nombre, rut: f.rut_proveedor || '', docs: new Set(), productos: new Set(), total: 0, ultima: '' });
+    const e = m.get(nombre);
+    e.docs.add(f.id);
+    e.productos.add(productoProvDe(it.nombre_producto));
+    e.total += Number(it.monto_item || 0);
+    if ((f.fecha_emision || '') > e.ultima) e.ultima = f.fecha_emision || '';
+  });
+  return [...m.values()];
+}
+
+function renderProveedoresCompras() {
+  const q = document.getElementById('fpprov-items-search').value;
+  const lista = proveedoresCompras().filter(p => coincideBusqueda(`${p.nombre} ${p.rut}`, q));
+  document.getElementById('fpprov-items-cargando').style.display = 'none';
+  document.getElementById('fpprov-items-tabla').style.display = 'block';
+  document.getElementById('fpprov-items-info').textContent = `${lista.length.toLocaleString('es-CL')} proveedores`;
+  document.getElementById('fpprov-items-head').innerHTML = `<tr><th>Proveedor</th><th style="text-align:right">Productos</th><th style="text-align:right">Última compra</th><th style="text-align:right">Total comprado (neto)</th></tr>`;
+  const resumen = document.getElementById('fpprov-items-resumen');
+  resumen.style.display = 'grid';
+  resumen.innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Total comprado</div><div class="stat-val" style="font-size:20px">${clp(lista.reduce((t, p) => t + p.total, 0))}</div></div>
+    <div class="stat"><div class="stat-label">Proveedores</div><div class="stat-val" style="font-size:16px">${lista.length.toLocaleString('es-CL')}</div></div>
+    <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${new Set(lista.flatMap(p => [...p.docs])).size.toLocaleString('es-CL')}</div></div>`;
+  const vacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay compras a proveedores.'}</p></div></td>`;
+  renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', lista, p => p.nombre,
+    (p, idx) => `<tr onclick="navReset();ppAbrirProveedor(${idx})" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.rut ? `<small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${escapeHtml(p.rut)}</small>` : ''}</td>
+      <td style="text-align:right">${p.productos.size}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultima ? fDate(p.ultima) : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.total)}</td>
+    </tr>`, 4, vacio, { numerosAlFinal: true });
+}
+
+function ppAbrirProveedor(idx) {
+  const p = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body'] || [])[idx];
+  if (!p) return;
+  cerrarTodosLosModales();
+  const lista = window.__alfabeticoOrden['fpprov-items-body'];
+  const f = fichaProveedorCompras(p.nombre);
+  f.navegacion = {
+    texto: `${idx + 1} de ${lista.length}`,
+    anterior: idx > 0 ? () => ppAbrirProveedor(idx - 1) : null,
+    siguiente: idx < lista.length - 1 ? () => ppAbrirProveedor(idx + 1) : null,
+  };
+  panelAbrir(f);
+}
+
+// Proveedor: productos que se le han comprado; clic → historial de precios.
+function fichaProveedorCompras(proveedor) {
+  const m = new Map();
+  facturaProvItemsRaw.forEach(it => {
+    const f = fppPorId(it.factura_id);
+    if (!f || (f.proveedor || 'Sin proveedor') !== proveedor) return;
+    const n = productoProvDe(it.nombre_producto);
+    if (!m.has(n)) m.set(n, { nombre: n, docs: new Set(), total: 0, ultima: '', precio: null, unidad: '' });
+    const e = m.get(n);
+    e.docs.add(f.id);
+    e.total += Number(it.monto_item || 0);
+    if ((f.fecha_emision || '') >= e.ultima) { e.ultima = f.fecha_emision || ''; e.precio = Number(it.precio_unitario) || null; e.unidad = (it.unidad || '').trim(); }
+  });
+  const productos = [...m.values()].sort((a, b) => b.ultima.localeCompare(a.ultima));
+  window.__ppProductos = productos;
+  const total = productos.reduce((t, p) => t + p.total, 0);
+  return {
+    antetitulo: 'Proveedor',
+    titulo: proveedor,
+    sub: `${productos.length} ${productos.length === 1 ? 'producto comprado' : 'productos comprados'} · ${clp(total)} neto`,
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto comprado a este proveedor…" oninput="pvFiltrarProductos(this)"></div>
+      <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Facturas</th><th>Última compra</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Total comprado</th></tr></thead><tbody>
+        ${productos.map((p, i) => `<tr class="pv-fila" data-buscar="${escapeHtml(p.nombre)}" onclick="panelAbrir(fichaHistorialCompra(window.__ppProductos[${i}].nombre, ${panelEsc(JSON.stringify(proveedor))}), true)">
+          <td><span class="panel-link">${escapeHtml(p.nombre)}</span></td><td style="text-align:right">${p.docs.size}</td><td>${p.ultima ? fDate(p.ultima) : '—'}</td>
+          <td class="oc-monto">${p.precio != null ? clp(p.precio) : '—'}${p.unidad ? ` <small class="pv-unidad">/ ${escapeHtml(p.unidad)}</small>` : ''}</td><td class="oc-monto" style="font-weight:500">${clp(p.total)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="panel-vacio pv-vacio" style="display:none">No hay productos con esa búsqueda.</div>`,
+  };
+}
+
 function filterFacturaProvItems() {
+  if (ppVista === 'proveedor') { renderProveedoresCompras(); return; }
   const q = document.getElementById('fpprov-items-search').value;
   facturaProvProductosUnicosF = facturaProvProductosUnicos.filter(p => coincideBusqueda(`${p.nombre} ${p.alias ? [...p.alias].join(' ') : ''}`, q));
   renderFacturaProvItems();
 }
 
 function renderFacturaProvItems() {
+  if (ppVista === 'proveedor') { renderProveedoresCompras(); return; }
+  document.getElementById('fpprov-items-head').innerHTML = `<tr><th>Producto</th><th style="text-align:right">N° facturas</th><th style="text-align:right">Última compra</th><th style="text-align:right">Precio (sin IVA)</th></tr>`;
   // Mismo criterio que en la vista de venta (ver renderFacturaItems).
   document.getElementById('fpprov-items-cargando').style.display = 'none';
   document.getElementById('fpprov-items-tabla').style.display = 'block';
@@ -4536,7 +4660,7 @@ function renderFacturaProvItems() {
         <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
         ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
       </td>
-    </tr>`, 4, mensajeVacio);
+    </tr>`, 4, mensajeVacio, { numerosAlFinal: true });
 }
 
 // ─── Fichas de Productos de proveedores (igual que las de Precios) ─────────
