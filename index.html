@@ -7065,7 +7065,7 @@ function pintarGraficoPago(titulo, html) {
 
 function abrirGraficoPago(id) {
   graficoPagoActivo = id;
-  document.querySelectorAll('.grafico-selector-item').forEach((el, i) => {
+  document.querySelectorAll('#pagos-graficos-selector .grafico-selector-item').forEach((el, i) => {
     el.classList.toggle('active', GRAFICOS_PAGOS_DISPONIBLES[i].id === id);
   });
   const sinDatos = '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>';
