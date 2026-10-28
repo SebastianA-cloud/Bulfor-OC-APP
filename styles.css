@@ -1546,11 +1546,18 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .oc-info .doc-info-sub { margin-top: 12px; }
 .doc-info-neto { text-align: right; font-size: 12px; color: var(--text-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .oc-fact-vencida .oc-fact-barra div { background: var(--red, #C0392B); }
-.doc-estado { grid-template-columns: 1fr; align-content: start; }
-.doc-estado-pie { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 13px; }
-.doc-estado .oc-fact-cifras ~ .doc-estado-pie { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+.doc-arriba { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; }
+.doc-arriba .oc-info { flex: 1 1 380px; }
+.doc-caja { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.doc-cobro { flex: 0 1 280px; grid-template-columns: 1fr; align-content: start; }
+.doc-cobro .oc-fact-cifras { flex-direction: column; gap: 2px; }
+.doc-estado { flex: 0 1 300px; display: flex; flex-direction: column; gap: 12px; }
+.doc-estado-fila { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.doc-estado-fila > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .doc-estado-et { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
-.doc-estado-et ~ .doc-estado-et { margin-left: 10px; }
+.doc-envio-det { flex-basis: 100%; color: var(--text-2); font-size: 12px; }
+.doc-sin-envio { color: var(--text-3); }
+@media (max-width: 760px) { .doc-arriba > * { flex-basis: 100%; } }
 .doc-totales td { text-align: right; color: var(--text-2); background: #FAF9F6; font-variant-numeric: tabular-nums; }
 /* Neto, IVA y Total ocupan solo las columnas de precio y total; el resto queda en blanco. */
 .panel-tabla-cuadros:has(.doc-totales) { border: none; }

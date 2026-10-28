@@ -7613,12 +7613,21 @@ function fichaDocumento(id, lista) {
       <div class="oc-fact-barra"><div style="width:${pct}%"></div></div>
       <div class="oc-fact-cifras"><span>Emitida <b>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</b></span>${derecha}</div>`;
   }
-  const lineaEnvio = envio ? `<button class="oc-envio" title="Ver el envío" onclick="panelAbrir(fichaEnvioFedex(${envio.id}), true)"><i class="ti ti-truck"></i> FedEx · ${escapeHtml((envio.estado_envio || 'Sin información') + ((envio.estado_envio || '').toLowerCase() === 'entregado' && envio.fecha_entrega ? ' ' + fDate(envio.fecha_entrega) : ''))}</button>` : '';
-  const estadoDoc = `<div class="oc-fact oc-fact-${claseCobro} doc-estado">
-      ${cobro}
-      <div class="doc-estado-pie"><span class="doc-estado-et">SII</span>${badgeEstadoDocGdexpress(estado, d)}
-        ${fechaDocumentoDesalineada(d) ? `<span class="badge badge-amber" title="Para el SII cuenta en el mes en que se emitió de verdad">Emitida realmente el ${fDate(d.fecha_emision_real)}</span>` : ''}
-        ${lineaEnvio ? `<span class="doc-estado-et">Envío</span>${lineaEnvio}` : ''}</div>
+  // Recuadro de cobranza (chico) y, al lado, otro con el estado en el SII y
+  // el envío (lo mismo que se ve en el menú FedEx). Chilexpress se suma
+  // cuando ese módulo tenga registros.
+  const cajaCobro = cobro ? `<div class="oc-fact oc-fact-${claseCobro} doc-caja doc-cobro">${cobro}</div>` : '';
+  const entregado = envio && (envio.estado_envio || '').toLowerCase() === 'entregado';
+  const cajaEstado = `<div class="doc-caja doc-estado">
+      <div class="doc-estado-fila"><span class="doc-estado-et">Estado SII</span>
+        <div>${badgeEstadoDocGdexpress(estado, d)}
+        ${fechaDocumentoDesalineada(d) ? `<span class="badge badge-amber" title="Para el SII cuenta en el mes en que se emitió de verdad">Emitida realmente el ${fDate(d.fecha_emision_real)}</span>` : ''}</div></div>
+      <div class="doc-estado-fila"><span class="doc-estado-et">Envío</span>
+        ${envio ? `<div><button class="oc-envio" title="Ver el envío" onclick="panelAbrir(fichaEnvioFedex(${envio.id}), true)"><i class="ti ti-truck"></i> FedEx · ${escapeHtml(envio.estado_envio || 'Sin información')}</button>
+          <small class="doc-envio-det">${[envio.orden_transporte ? 'OT ' + escapeHtml(envio.orden_transporte) : '',
+            entregado && envio.fecha_entrega ? 'entregado el ' + fDate(envio.fecha_entrega) : '',
+            entregado && envio.recibido_por ? 'recibió <b>' + escapeHtml(envio.recibido_por) + '</b>' : ''].filter(Boolean).join(' · ')}</small></div>`
+          : '<div class="doc-sin-envio">Sin envío registrado</div>'}</div>
     </div>`;
 
   const lugar = [nombreHosp(d.hospital) || d.hospital, d.rut_hospital ? 'RUT ' + d.rut_hospital : ''].filter(Boolean).join(' · ');
@@ -7630,7 +7639,7 @@ function fichaDocumento(id, lista) {
     tituloCopiar: true,
     tituloExtra: d.doc_url ? `<a class="btn-mp" href="${d.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF del documento">Ver PDF <i class="ti ti-external-link"></i></a>` : '',
     sub: `${lugar || "—"}${d.fecha_emision ? " · " + fDate(d.fecha_emision) : ""}`,
-    resumen: `<div class="oc-arriba">${infoDoc}${estadoDoc}</div>`,
+    resumen: `<div class="doc-arriba">${infoDoc}${cajaCobro}${cajaEstado}</div>`,
     cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`,
     relacionado: rel,
     navegacion: idx === -1 ? null : {
