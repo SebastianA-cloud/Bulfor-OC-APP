@@ -13,11 +13,13 @@ Qué consulta:
   - Solo los envíos de los últimos DIAS_ATRAS días que todavía NO están
     "Entregado". Lo entregado ya no cambia, así que no se vuelve a preguntar.
 
-Qué escribe (solo estas tres columnas, nunca otras):
+Qué escribe (solo estas cuatro columnas, nunca otras):
   - estado_envio: Recibido por FedEx / En ruta / Retraso /
     Entrega reprogramada / Entregado (los mismos de la app).
   - fecha_entrega: el día en que FedEx lo entregó.
   - recibido_por: el nombre de quien firmó la entrega.
+  - historial: los movimientos del envío [{fecha, estado, lugar}], con los
+    que la app dibuja la "Ruta del envío" (un paso por día en ruta).
   Si FedEx todavía no tiene información del envío (recién creado), no se
   toca nada.
 
@@ -61,7 +63,7 @@ def rastrear(token, numeros):
     r = requests.post(f'{FEDEX_URL}/track/v1/trackingnumbers', timeout=60,
         headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json', 'X-locale': 'es_CL'},
         json={
-            'includeDetailedScans': False,
+            'includeDetailedScans': True,   # trae los movimientos (scanEvents) para el historial
             'trackingInfo': [{'trackingNumberInfo': {'trackingNumber': n}} for n in numeros],
         })
     if r.status_code != 200:
@@ -71,6 +73,24 @@ def rastrear(token, numeros):
     for completo in r.json().get('output', {}).get('completeTrackResults', []):
         resultados = completo.get('trackResults') or [{}]
         salida[completo.get('trackingNumber')] = resultados[0]
+    return salida
+
+
+def movimientos(res):
+    """Movimientos del envío, del más antiguo al más nuevo: [{fecha, estado, lugar, tipo}]."""
+    salida = []
+    for ev in res.get('scanEvents') or []:
+        if not ev.get('date'):
+            continue
+        loc = ev.get('scanLocation') or {}
+        lugar = ', '.join(x for x in (loc.get('city'), loc.get('stateOrProvinceCode')) if x)
+        salida.append({
+            'fecha': ev['date'],
+            'estado': ev.get('eventDescription') or ev.get('derivedStatus') or '',
+            'tipo': ev.get('eventType') or '',   # OC = etiqueta creada, PU = retirado, DL = entregado…
+            'lugar': lugar.title() if lugar.isupper() else lugar,
+        })
+    salida.sort(key=lambda x: x['fecha'])
     return salida
 
 
@@ -85,6 +105,9 @@ def traducir(res):
     atrasado = (det.get('delayDetail') or {}).get('status') == 'DELAYED'
 
     datos = {'codigo': codigo, 'descripcion': descripcion}
+    historial = movimientos(res)
+    if historial:
+        datos['historial'] = historial
     if codigo == 'DL':
         datos['estado_envio'] = 'Entregado'
         for f in res.get('dateAndTimes') or []:
@@ -112,7 +135,7 @@ def main():
     sb = create_client(SUPABASE_URL, SUPABASE_KEY)
     desde = (datetime.now(timezone.utc) - timedelta(days=DIAS_ATRAS)).isoformat()
     filas = (sb.table('seguimiento_fedex')
-               .select('id, orden_transporte, factura, estado_envio, fecha_entrega, recibido_por')
+               .select('id, orden_transporte, factura, estado_envio, fecha_entrega, recibido_por, historial')
                .gte('fecha_ingreso', desde).execute().data)
     # En modo prueba también se revisan algunos ya entregados, para comparar
     # lo que dice FedEx con lo que se anotó a mano.
@@ -132,13 +155,14 @@ def main():
             if not datos:
                 print(f'  {etiqueta}: FedEx aún sin información')
                 continue
-            nuevo = {k: datos[k] for k in ('estado_envio', 'fecha_entrega', 'recibido_por') if k in datos}
+            nuevo = {k: datos[k] for k in ('estado_envio', 'fecha_entrega', 'recibido_por', 'historial') if k in datos}
             actual = {k: (str(f.get(k) or '')[:10] if k == 'fecha_entrega' else f.get(k)) for k in nuevo}
             if nuevo == actual:
                 print(f"  {etiqueta}: sin cambios ({nuevo['estado_envio']})")
                 continue
             cambios += 1
             print(f"  {etiqueta}: {f.get('estado_envio') or 'Sin información'} -> {nuevo['estado_envio']}"
+                  f"  ({len(nuevo.get('historial') or [])} movimientos)"
                   f"  [{datos['codigo']} · {datos['descripcion']}]"
                   + (f"  entrega {nuevo.get('fecha_entrega', '')} a {nuevo.get('recibido_por', '')}" if 'fecha_entrega' in nuevo else ''))
             if MODO == 'escribir' and f.get('estado_envio') != 'Entregado':

@@ -18,6 +18,7 @@
 //     tituloMono: true,                        // título en letra de código (N° de OC)
 //     tituloCopiar: true,                      // ícono chico para copiar el título
 //     tituloExtra: '<a …>Ver en Mercado Público</a>', // html al lado del título
+//     angosto: true,                           // ventana más angosta (fichas con poca información)
 //     resumen: '<div class="panel-datos">…</div>', // va bajo el subtítulo, antes del monto
 //     sub: 'Hospital Clínico La Florida · 13-10-2026',
 //     destacado: '$ 2.522.241',               // número grande bajo el título
@@ -190,6 +191,8 @@ function panelPintar() {
     el.setAttribute('aria-label', 'Detalle');
     document.body.appendChild(el);
   }
+  // Fichas con poca información (envíos) van en una ventana más angosta.
+  el.classList.toggle('panel-angosto', !!f.angosto);
   el.innerHTML = `
     <div class="panel-cab">${arriba}<span class="panel-cab-btns">${flechas}
       <button class="panel-btn-ico" title="Cerrar (Esc)" onclick="panelCerrar()"><i class="ti ti-x"></i></button></span></div>

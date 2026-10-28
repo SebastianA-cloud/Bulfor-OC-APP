@@ -5789,6 +5789,7 @@ function fichaEnvioChilexpress(id, lista) {
   const fechaEnt = e.fecha_entrega ? new Date(e.fecha_entrega).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
   return {
     cxId: e.id,
+    angosto: true,
     antetitulo: 'Envío Chilexpress · OT',
     titulo: String(e.orden_transporte || '—'),
     tituloMono: true,
@@ -8513,6 +8514,7 @@ function fichaEnvioFedex(id, lista) {
   const idx = navLista.findIndex(x => x.id === e.id);
   return {
     envioId: e.id,
+    angosto: true,
     antetitulo: 'Envío FedEx · OT',
     titulo: String(e.orden_transporte || '—'),
     tituloMono: true,
@@ -8543,7 +8545,7 @@ function fichaEnvioFedex(id, lista) {
   };
 }
 
-// "Qué se envió": una fila por factura (N°, fecha, productos, total); al
+// "Qué se envió": una fila por factura (N°, OC, productos, total); al
 // hacer clic se despliega debajo con sus productos.
 async function cargarItemsEnvioEnPanel(docs, contId) {
   try {
@@ -8553,16 +8555,15 @@ async function cargarItemsEnvioEnPanel(docs, contId) {
     if (!cont) return;
     const porDoc = new Map(docs.map(d => [d.id, []]));
     its.forEach(it => porDoc.get(it.documento_id)?.push(it));
-    cont.innerHTML = `<table class="panel-tabla panel-tabla-cuadros fx-facturas"><thead><tr><th>Factura</th><th>Orden de compra</th><th>Fecha de emisión</th><th style="text-align:right">Productos</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
+    cont.innerHTML = `<table class="panel-tabla panel-tabla-cuadros fx-facturas"><thead><tr><th>Factura</th><th>Orden de compra</th><th style="text-align:right">Productos</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
       ${docs.map(d => {
         const lst = porDoc.get(d.id) || [];
         return `<tr class="fx-fac-fila" onclick="this.classList.toggle('abierta');this.nextElementSibling.hidden=!this.nextElementSibling.hidden">
           <td><span class="fx-chev">›</span> <b class="mono">N° ${escapeHtml(String(d.folio))}</b></td>
           <td class="mono">${d.orden_compra_ref ? escapeHtml(d.orden_compra_ref) : '<span style="color:var(--text-3)">—</span>'}</td>
-          <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
           <td style="text-align:right">${lst.length || '—'}</td>
           <td style="text-align:right;font-weight:500">${clp(montoTotalDoc(d))}</td></tr>
-        <tr class="fx-fac-detalle" hidden><td colspan="5">${lst.length
+        <tr class="fx-fac-detalle" hidden><td colspan="4">${lst.length
           ? `<table class="panel-tabla fx-productos"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>
               ${lst.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${it.descripcion ? `<small class="panel-muted">${escapeHtml(it.descripcion)}</small>` : ''}</td>
                 <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td></tr>`).join('')}
@@ -8587,7 +8588,8 @@ function fxRutaHtml(e, { entregado, estado, problema }) {
   let dias = [];
   if (Array.isArray(e.historial) && e.historial.length) {
     const porDia = new Map();
-    e.historial.filter(h => h.fecha && !/entregad|delivered/i.test(h.estado || ''))
+    // Fuera la "etiqueta creada" (OC) y la entrega (DL): esas no son días en ruta.
+    e.historial.filter(h => h.fecha && !/^(OC|DL)$/.test(h.tipo || '') && !/entregad|delivered/i.test(h.estado || ''))
       .forEach(h => { const d = diaCL(h.fecha); if (d && d !== enviado && !porDia.has(d)) porDia.set(d, h.lugar || ''); });
     dias = [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, lugar]) => ({ d, lugar }));
   } else if (!entregado && estado && e.updated_at) {
