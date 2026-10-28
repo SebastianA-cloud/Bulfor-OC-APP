@@ -1020,15 +1020,15 @@
 
   <div class="page" id="page-pagos">
     <div class="page-header">
-      <div class="page-title">Cobranza <span class="info-tip" tabindex="0" role="note" data-tip="Por cliente: cada hospital con facturas impagas, su deuda vencida y el atraso. Al abrir uno ves sus facturas, descargas el estado de cuenta en Excel, le escribes y anotas tus gestiones. Por factura: la lista de siempre, por mes.">i</span></div>
+      <div class="page-title">Cobranza <span class="info-tip" tabindex="0" role="note" data-tip="Por factura: las facturas de cada mes, con su vencimiento y pago; al abrir una anotas el pago. Por cliente: cada hospital con facturas impagas, su deuda vencida y el atraso; al abrir uno ves sus facturas, descargas el estado de cuenta en Excel, le escribes y anotas tus gestiones.">i</span></div>
       <div class="page-sub" id="pagos-linea"></div>
     </div>
     <div class="fpp-toolbar-top">
       <div class="vista-switch" role="group" aria-label="Vista">
-        <button id="pagos-vista-cliente" class="active" onclick="pagosSetVista('cliente')">Por cliente</button>
-        <button id="pagos-vista-factura" onclick="pagosSetVista('factura')">Por factura</button>
+        <button id="pagos-vista-factura" class="active" onclick="pagosSetVista('factura')">Por factura</button>
+        <button id="pagos-vista-cliente" onclick="pagosSetVista('cliente')">Por cliente</button>
       </div>
-      <div class="fpp-period" id="pagos-periodo" style="display:none">
+      <div class="fpp-period" id="pagos-periodo">
         <button class="fpp-period-btn" onclick="pagosCambiarMes(-1)" title="Mes anterior">‹</button>
         <select id="pagos-select-mes" onchange="pagosSeleccionarPeriodo()" aria-label="Mes"></select>
         <select id="pagos-select-anio" onchange="pagosSeleccionarPeriodo()" aria-label="Año"></select>
@@ -6364,7 +6364,7 @@ function renderPagosVista(soloTabla) {
 // facturas y el atraso más largo. Al abrir uno, el panel muestra sus
 // facturas impagas, el estado de cuenta en Excel, un correo ya redactado y
 // las gestiones de cobro (llamadas, compromisos de pago).
-let pagosVista = 'cliente';
+let pagosVista = 'factura';   // Por factura es la vista de entrada; Por cliente se consulta
 let cobAtajo = 'vencida';
 let cobClientesF = [];
 let cobGestiones = null;   // gestiones de cobranza leídas de Supabase
@@ -6562,6 +6562,8 @@ function estadoFusionadoPago(f) {
   return doc ? estadoAceptacionFusionado(doc) : f.estado_aceptacion;
 }
 
+// Fila del listado de Cobranza, con el mismo diseño de los listados de OC y
+// Documentos: toda la fila abre la ficha de la factura (que trae el PDF).
 function filaFacturaHtml(f, opts) {
   opts = opts || {};
   const estado = estadoFusionadoPago(f);
@@ -6569,16 +6571,17 @@ function filaFacturaHtml(f, opts) {
   const vencReal = !!f.fecha_vencimiento;
   const vencDate = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
   const vencHtml = vencDate ? (vencReal ? fDate(vencDate) : `<span style="color:var(--text-3)" title="Estimado (30 días desde emisión, o el plazo que corresponda) — todavía no tenemos la fecha real de GDExpress para esta factura">~${fDate(vencDate)}</span>`) : '—';
+  const abierta = panelPila.some(x => x.pagoId === f.id);
   return `
-    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPago(${f.id})">
-      <td data-label="Factura" class="mono" style="color:var(--accent)" onclick="event.stopPropagation();navReset();verDocumentoDeFactura('${String(f.factura).replace(/'/g,"\\'")}', ${f.id})">${f.factura} ↗</td>
-      <td data-label="Hospital" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${nombreHosp(f.hospital)||f.hospital||''}">${nombreHosp(f.hospital)||f.hospital||'—'}</td>
-      <td data-label="Fecha emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td data-label="Vencimiento" style="font-size:12px;white-space:nowrap">${vencHtml}</td>
-      <td data-label="Monto" style="white-space:nowrap">${clp(montoConIVAPago(f))}</td>
-      <td data-label="Estado">${estado === 'N' ? '<span style="color:var(--red);font-size:12px">Anulada/Rechazada</span>' : reclamo ? `<span style="color:var(--red);font-size:12px" title="${reclamo}">Reclamada</span>` : estado === 'A' ? '<span style="color:var(--green);font-size:12px">Aceptada</span>' : '—'}</td>
+    <tr class="oc-fila${abierta ? ' fila-abierta' : ''}" onclick="navReset();abrirDetalleFacturaPago(${f.id})">
+      <td data-label="Folio"><span class="mono oc-cod">${escapeHtml(String(f.factura))}</span></td>
+      <td data-label="Hospital" class="oc-hosp"><span title="${escapeHtml(nombreHosp(f.hospital) || f.hospital || '')}">${escapeHtml(nombreHosp(f.hospital) || f.hospital || '—')}</span>${f.rut_hospital ? `<small>${escapeHtml(f.rut_hospital)}</small>` : ''}</td>
+      <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td data-label="Vencimiento" style="white-space:nowrap">${vencHtml}</td>
+      <td data-label="Total" style="white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:500">${clp(montoConIVAPago(f))}</td>
+      <td data-label="Estado SII" style="white-space:nowrap">${estado === 'N' ? '<span class="badge-estado err">Anulada/Rechazada</span>' : reclamo ? `<span class="badge-estado err" title="${escapeHtml(reclamo)}">Reclamada</span>` : estado === 'A' ? '<span class="badge-estado ok">Aceptada</span>' : '—'}</td>
       ${opts.sinPago ? '' : `
-      <td data-label="Fecha de pago" style="font-size:12px;white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
+      <td data-label="Fecha de pago" style="white-space:nowrap">${f.fecha_pago ? fDate(f.fecha_pago) : '—'}</td>
       <td data-label="Estado de pago">${badgeEstadoPagoHtml(f)}</td>`}
     </tr>`;
 }
@@ -6586,10 +6589,10 @@ function filaFacturaHtml(f, opts) {
 function tablaFacturasHtml(lista, opts) {
   opts = opts || {};
   return `
-    <div class="table-card">
+    <div class="table-card oc-tabla tabla-centrada">
       <table>
         <thead><tr>
-          <th>Factura</th><th>Hospital</th><th>Fecha emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th>
+          <th>Folio</th><th>Hospital</th><th>Emisión</th><th>Vencimiento</th><th>Total</th><th>Estado SII</th>
           ${opts.sinPago ? '' : '<th>Fecha de pago</th><th>Estado de pago</th>'}
         </tr></thead>
         <tbody>${lista.map(f => filaFacturaHtml(f, opts)).join('')}</tbody>
@@ -6703,7 +6706,25 @@ function botonNavPagoHtml(idActual) {
     <button onclick="navegarPagoDesdeVisor(${haySiguiente?lista[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Factura siguiente (${donde}) — ${posicion}" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
-async function abrirDetalleFacturaPago(id, contextoNav = null) {
+// Abrir una factura desde Cobranza (o desde otras pantallas que pasan su
+// propia lista para las flechas): ficha nueva en el panel.
+function abrirDetalleFacturaPago(id, contextoNav = null) {
+  pagoNavLista = contextoNav;
+  cerrarTodosLosModales();
+  panelAbrir(fichaFacturaPago(id));
+  cobMarcarFilaAbierta();
+}
+
+// Resalta en el listado la factura abierta en la ficha.
+function cobMarcarFilaAbierta() {
+  // Se espera un instante: al pasar con las flechas, la ficha nueva entra
+  // justo después de cerrar la anterior.
+  setTimeout(() => {
+    if (document.getElementById('page-pagos')?.classList.contains('active') && pagosVista === 'factura') renderPagosVista();
+  }, 0);
+}
+
+async function abrirDetalleFacturaPagoAntiguo(id, contextoNav = null) {
   const f = facturasPago.find(x => x.id === id);
   if (!f) return;
   pagoNavLista = contextoNav;
@@ -6837,8 +6858,10 @@ async function guardarPagoFacturaDetalle(id, btnEl) {
     if (idx !== -1) { facturasPago[idx].fecha_pago = fecha || null; facturasPago[idx].estado_pago = estado || null; }
     btnEl.textContent = '✔ Guardado';
     setTimeout(() => {
-      cerrarDetalleFacturaPago();
-      renderPagosVista();
+      // Si la ficha nueva está abierta, se vuelve a dibujar con el pago al día.
+      const i = panelPila.findIndex(x => x.pagoId === id);
+      if (i !== -1) { panelPila[i] = fichaFacturaPago(id); panelPintar(); }
+      if (document.getElementById('page-pagos')?.classList.contains('active')) renderPagosVista();
     }, 500);
   } catch(e) {
     toast('No se pudo guardar: ' + e.message, 'err');
@@ -7546,7 +7569,9 @@ function pagoDeFolio(folio) {
   return facturasPago.find(p => String(p.factura).trim() === String(folio).trim()) || null;
 }
 
-function fichaDocumento(id, lista) {
+// opts.cobranza: se abre desde Cobranza; abajo va el formulario para anotar
+// el pago y las flechas recorren la lista de Cobranza.
+function fichaDocumento(id, lista, opts = {}) {
   const d = documentosGdexpress.find(x => x.id === id);
   if (!d) return null;
   const info = TIPOS_DTE_INFO[d.tipo_dte] || { singular: 'Documento' };
@@ -7600,7 +7625,11 @@ function fichaDocumento(id, lista) {
   } else if (pago) {
     const pagada = pago.estado_pago === 'Pagado' || !!pago.fecha_pago;
     const hoy = fechaLocalISO();
-    const vence = pago.fecha_vencimiento;
+    // Si GDExpress no trae el vencimiento real, se estima por el plazo de pago
+    // del hospital (igual que en el listado de Cobranza) y se marca con "~".
+    const fechaVence = calcularVencimientoFactura(pago, nombreHosp(pago.hospital) || pago.hospital);
+    const vence = fechaVence ? fechaVence.toLocaleDateString('sv-SE') : '';
+    const est = !pago.fecha_vencimiento && vence ? '~' : '';
     const vencida = !pagada && vence && vence < hoy;
     const dias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
     const plazo = d.fecha_emision && vence ? dias(d.fecha_emision, vence) : 0;
@@ -7608,7 +7637,7 @@ function fichaDocumento(id, lista) {
     claseCobro = pagada ? 'completa' : vencida ? 'vencida' : 'por';
     const badge = pagada ? '<span class="badge badge-green">Pagada</span>' : vencida ? '<span class="badge badge-red">Vencida</span>' : '<span class="badge badge-amber">Por cobrar</span>';
     const derecha = pagada ? (pago.fecha_pago ? `<span>Pagada el <b>${fDate(pago.fecha_pago)}</b></span>` : '')
-      : vence ? (vencida ? `<span>Venció hace <b>${dias(vence, hoy)} día${dias(vence, hoy) === 1 ? '' : 's'}</b></span>` : `<span>Vence el <b>${fDate(vence)}</b> (${dias(hoy, vence) === 0 ? 'hoy' : 'en ' + dias(hoy, vence) + ' día' + (dias(hoy, vence) === 1 ? '' : 's')})</span>`) : '';
+      : vence ? (vencida ? `<span>Venció hace <b>${dias(vence, hoy)} día${dias(vence, hoy) === 1 ? '' : 's'}</b></span>` : `<span${est ? ' title="Estimado: todavía no tenemos la fecha real de GDExpress"' : ''}>Vence el <b>${est}${fDate(vence)}</b> (${dias(hoy, vence) === 0 ? 'hoy' : 'en ' + dias(hoy, vence) + ' día' + (dias(hoy, vence) === 1 ? '' : 's')})</span>`) : '';
     cobro = `<div class="oc-fact-cab"><span>Cobranza</span>${badge}</div>
       <div class="oc-fact-barra"><div style="width:${pct}%"></div></div>
       <div class="oc-fact-cifras"><span>Emitida <b>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</b></span>${derecha}</div>`;
@@ -7642,11 +7671,63 @@ function fichaDocumento(id, lista) {
     resumen: `<div class="doc-arriba">${infoDoc}${cajaCobro}${cajaEstado}</div>`,
     cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`,
     relacionado: rel,
+    ...(opts.cobranza && pago ? { pagoId: pago.id, pie: formPagoHtml(pago), navegacion: navegacionPago(pago.id), alCerrar: cobMarcarFilaAbierta } : {
     navegacion: idx === -1 ? null : {
       texto: `${info.singular} ${idx + 1} de ${navLista.length}`,
       anterior: idx > 0 ? () => panelAbrir(fichaDocumento(navLista[idx - 1].id, lista)) : null,
       siguiente: idx < navLista.length - 1 ? () => panelAbrir(fichaDocumento(navLista[idx + 1].id, lista)) : null,
-    },
+    } }),
+  };
+}
+
+// ─── Ficha de una factura desde Cobranza ─────────────────────────────────
+// La misma ficha de la factura (Documentos) y abajo el formulario de pago.
+// Si la factura todavía no está en GDExpress, una ficha corta con lo que
+// tenemos del listado de pagos.
+function fichaFacturaPago(id) {
+  const f = facturasPago.find(x => x.id === id);
+  if (!f) return null;
+  const doc = documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(f.factura));
+  if (doc) return fichaDocumento(doc.id, null, { cobranza: true });
+  const venc = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+  return {
+    pagoId: f.id,
+    antetitulo: 'Factura electrónica',
+    titulo: String(f.factura),
+    tituloMono: true,
+    tituloCopiar: true,
+    sub: [nombreHosp(f.hospital) || f.hospital, f.rut_hospital ? 'RUT ' + f.rut_hospital : '', f.fecha_emision ? fDate(f.fecha_emision) : ''].filter(Boolean).join(' · '),
+    resumen: `<div class="doc-arriba"><div class="oc-info">
+        <div><span>Vencimiento</span><div class="oc-info-cod">${venc ? (f.fecha_vencimiento ? fDate(venc) : `~${fDate(venc)} (estimado)`) : '—'}</div></div>
+        <div><span>Total (con IVA)</span><div class="oc-info-total">${clp(montoConIVAPago(f))}</div></div></div></div>`,
+    cuerpo: '<div class="panel-vacio">Todavía no encontramos esta factura en GDExpress: los productos aparecen apenas se sincronice.</div>',
+    pie: formPagoHtml(f),
+    navegacion: navegacionPago(f.id),
+    alCerrar: cobMarcarFilaAbierta,
+  };
+}
+
+// Formulario para anotar el pago (fecha y estado), al final de la ficha.
+function formPagoHtml(f) {
+  return `<div class="cob-pago">
+    <div class="panel-h">Pago</div>
+    <div class="cob-pago-campos">
+      <label>Fecha de pago<input type="date" id="fp-detalle-fecha" value="${f.fecha_pago ? f.fecha_pago.slice(0, 10) : ''}"></label>
+      <label>Estado de pago<input type="text" id="fp-detalle-estado" value="${escapeHtml(f.estado_pago || '')}" placeholder="Ej: Pagado"></label>
+      <button class="page-btn page-btn-pri" onclick="guardarPagoFacturaDetalle(${f.id}, this)">Guardar</button>
+    </div>
+  </div>`;
+}
+
+// Flechas ‹ › de la ficha: recorren la lista de Cobranza que se está viendo.
+function navegacionPago(id) {
+  const lista = listaNavPago();
+  const idx = lista.findIndex(x => x.id === id);
+  if (idx === -1) return null;
+  return {
+    texto: `Factura ${idx + 1} de ${lista.length}`,
+    anterior: idx > 0 ? () => panelAbrir(fichaFacturaPago(lista[idx - 1].id)) : null,
+    siguiente: idx < lista.length - 1 ? () => panelAbrir(fichaFacturaPago(lista[idx + 1].id)) : null,
   };
 }
 

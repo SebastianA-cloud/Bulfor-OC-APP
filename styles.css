@@ -1571,3 +1571,10 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
   .tabla-centrada th, .tabla-centrada td { text-align: center !important; }
   .tabla-centrada .oc-hosp span, .tabla-centrada .oc-desc { margin: 0 auto; }
 }
+
+/* Formulario de pago al final de la ficha de la factura (Cobranza) */
+.cob-pago-campos { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.cob-pago-campos label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; flex: 1 1 180px; }
+.cob-pago-campos input { font: 400 14px var(--font); text-transform: none; letter-spacing: 0; color: var(--text); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.cob-pago-campos .page-btn { padding: 9px 20px !important; }
+.cob-pago .panel-h { margin-bottom: 10px; }
