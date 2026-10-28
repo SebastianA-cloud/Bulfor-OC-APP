@@ -12267,97 +12267,186 @@ function cerrarModalOE(id) {
   if (m) m.remove();
 }
 
+// ─── Nuevo envío ──────────────────────────────────────────────────────────
+// Lo más rápido es partir por la factura: con su N° se completan solos el
+// hospital y el RUT. El hospital también se puede buscar por nombre o por
+// RUT (con o sin puntos). La lista de sugerencias no repite clientes.
+const rutSoloDigitos = r => String(r || '').toUpperCase().replace(/[^0-9K]/g, '');
+function rutConPuntos(r) {
+  const d = rutSoloDigitos(r);
+  if (d.length < 2) return String(r || '').trim();
+  const cuerpo = d.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${cuerpo}-${d.slice(-1)}`;
+}
+function rutEsValido(r) {
+  const d = rutSoloDigitos(r);
+  if (!/^\d{7,8}[\dK]$/.test(d)) return false;
+  let suma = 0, mul = 2;
+  for (let i = d.length - 2; i >= 0; i--) { suma += Number(d[i]) * mul; mul = mul === 7 ? 2 : mul + 1; }
+  const dv = 11 - (suma % 11);
+  return (dv === 11 ? '0' : dv === 10 ? 'K' : String(dv)) === d.slice(-1);
+}
+
+// Clientes únicos (un nombre por cliente, con su RUT): de la tabla de
+// hospitales (que tiene varias filas por cliente, una por cada forma en que
+// se escribió) y de las facturas emitidas.
+function clientesParaEnvio() {
+  const porNombre = new Map();
+  const agregar = (nombre, rut) => {
+    nombre = (nombre || '').trim();
+    if (!nombre) return;
+    const k = nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const e = porNombre.get(k);
+    if (!e) porNombre.set(k, { nombre, rut: rut ? rutConPuntos(rut) : '' });
+    else if (!e.rut && rut) e.rut = rutConPuntos(rut);
+  };
+  hospitalesMaestro.forEach(h => agregar(h.nombre_estandar, h.rut));
+  documentosGdexpress.forEach(d => { if (d.tipo_dte === '33') agregar(nombreHosp(d.hospital) || d.hospital, d.rut_hospital); });
+  // Un mismo RUT con dos nombres: queda el primero (el de la tabla de hospitales).
+  const porRut = new Set();
+  return [...porNombre.values()].filter(c => { const r = rutSoloDigitos(c.rut); if (!r) return true; if (porRut.has(r)) return false; porRut.add(r); return true; })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
 function abrirNuevoEnvio() {
   cerrarTodosLosModales();
+  window.__fxClientes = clientesParaEnvio();
   const modal = document.createElement('div');
   modal.id = 'fedex-form-modal-overlay';
   modal.className = 'modal-overlay';
   modal.style.zIndex = '1000';
   modal.onclick = (e) => { if (e.target === modal) cerrarFormularioEnvio(); };
   modal.innerHTML = `
-    <div class="modal-shell modal-md" onclick="event.stopPropagation()">
+    <div class="modal-shell modal-md fx-nuevo" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <div style="font-size:16px;font-weight:600">Nuevo envío</div>
+        <div>
+          <div class="fx-nuevo-ante"><i class="ti ti-truck"></i> FedEx</div>
+          <div class="fx-nuevo-tit">Nuevo envío</div>
+        </div>
         <button onclick="cerrarFormularioEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div class="modal-body">
-        <div style="display:flex;flex-direction:column;gap:14px">
-          <div style="position:relative">
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Hospital *</div>
-            <input type="text" id="fx-new-hospital" placeholder="Escribe para buscar un hospital…" style="width:100%" autocomplete="off" oninput="filtrarSugerenciasHospital()" onfocus="filtrarSugerenciasHospital()">
-            <div id="fx-hospital-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
-          </div>
-          <div style="position:relative">
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">RUT del hospital</div>
-            <input type="text" id="fx-new-rut" placeholder="Ej: 61.602.260-1" style="width:100%" autocomplete="off" oninput="filtrarSugerenciasPorRut()" onfocus="filtrarSugerenciasPorRut()">
-            <div id="fx-rut-sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Puedes escribir el hospital o el RUT — el otro campo se completa solo si ya lo tenías guardado.</div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">N° Orden de transporte *</div>
-            <input type="text" id="fx-new-ot" placeholder="Ej: 873581859362" style="width:100%">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Factura</div>
-            <input type="text" id="fx-new-factura" placeholder="Ej: 21486" style="width:100%">
-          </div>
+        <div class="fx-nuevo-paso">
+          <label class="fx-campo">Factura(s)
+            <input type="text" id="fx-new-factura" placeholder="Ej: 22389  ·  varias: 22386, 22387" autocomplete="off" oninput="fxNuevoFactura()">
+            <small>Con el N° de factura se completan solos el hospital y el RUT.</small>
+          </label>
+          <div id="fx-new-facturas-info" class="fx-nuevo-facturas"></div>
         </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
-          <button class="page-btn" style="padding:8px 16px" onclick="cerrarFormularioEnvio()">Cancelar</button>
-          <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="intentarGuardarNuevoEnvio()">Guardar</button>
+        <div class="fx-nuevo-fila">
+          <label class="fx-campo fx-campo-sug">Hospital / cliente *
+            <input type="text" id="fx-new-hospital" placeholder="Escribe para buscar…" autocomplete="off" oninput="filtrarSugerenciasHospital()" onfocus="filtrarSugerenciasHospital()">
+            <div id="fx-hospital-sugerencias" class="fx-sugerencias" style="display:none"></div>
+          </label>
+          <label class="fx-campo fx-campo-sug fx-campo-rut">RUT
+            <input type="text" id="fx-new-rut" placeholder="61.602.260-1 o 61602260-1" autocomplete="off" oninput="filtrarSugerenciasPorRut()" onfocus="filtrarSugerenciasPorRut()" onblur="setTimeout(fxNuevoRutCompleto, 150)">
+            <div id="fx-rut-sugerencias" class="fx-sugerencias" style="display:none"></div>
+            <small id="fx-new-rut-aviso"></small>
+          </label>
+        </div>
+        <label class="fx-campo">N° orden de transporte (OT) *
+          <input type="text" id="fx-new-ot" class="mono" placeholder="Ej: 873581859362" inputmode="numeric" autocomplete="off" oninput="fxNuevoOT()">
+          <small id="fx-new-ot-aviso">Son los 12 números de la guía de FedEx.</small>
+        </label>
+        <div class="fx-nuevo-acciones">
+          <button class="page-btn" onclick="cerrarFormularioEnvio()">Cancelar</button>
+          <button class="page-btn page-btn-pri" onclick="intentarGuardarNuevoEnvio()"><i class="ti ti-check"></i> Guardar envío</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
-  setTimeout(() => document.getElementById('fx-new-hospital')?.focus(), 50);
+  setTimeout(() => document.getElementById('fx-new-factura')?.focus(), 50);
+}
+
+// Al escribir la factura: se muestran las facturas encontradas y, si el
+// hospital está vacío, se completa con el de la factura.
+function fxNuevoFactura() {
+  const nums = parsearNumerosFactura(document.getElementById('fx-new-factura').value).map(n => String(n).replace(/\D/g, '')).filter(Boolean);
+  const info = document.getElementById('fx-new-facturas-info');
+  const docs = nums.map(n => ({ n, d: documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === n) }));
+  info.innerHTML = docs.map(({ n, d }) => {
+    const envioPrevio = d ? envioFedexDeFolio(d.folio) : null;
+    return d ? `<div class="fx-fac-chip"><b class="mono">N° ${escapeHtml(n)}</b> ${escapeHtml(nombreHosp(d.hospital) || d.hospital || '')} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''} · ${clp(montoTotalDoc(d))}${d.orden_compra_ref ? ` · OC ${escapeHtml(d.orden_compra_ref)}` : ''}
+        ${envioPrevio ? `<span class="badge badge-amber" title="Esta factura ya está en otro envío">Ya enviada · OT ${escapeHtml(envioPrevio.orden_transporte || '')}</span>` : ''}</div>`
+      : (n.length >= 4 ? `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> aún no está sincronizada (se enlaza sola después)</div>` : '');
+  }).join('');
+  const d = docs.find(x => x.d)?.d;
+  const hosp = document.getElementById('fx-new-hospital');
+  if (d && !hosp.value.trim()) {
+    hosp.value = nombreHosp(d.hospital) || d.hospital || '';
+    const rut = document.getElementById('fx-new-rut');
+    if (!rut.value.trim() && d.rut_hospital) rut.value = rutConPuntos(d.rut_hospital);
+    fxNuevoRutCompleto();
+  }
+}
+
+// Aviso si la OT no tiene 12 números o si ya está registrada.
+function fxNuevoOT() {
+  const ot = document.getElementById('fx-new-ot').value.trim();
+  const aviso = document.getElementById('fx-new-ot-aviso');
+  const repetida = ot && fedex.find(f => String(f.orden_transporte || '').trim() === ot);
+  aviso.className = repetida ? 'fx-aviso-err' : '';
+  aviso.textContent = repetida ? `Esta OT ya está registrada (${nombreHosp(repetida.hospital) || repetida.hospital}).`
+    : ot && !/^\d{12}$/.test(ot) ? 'Ojo: las OT de FedEx suelen tener 12 números.' : 'Son los 12 números de la guía de FedEx.';
 }
 
 function filtrarSugerenciasHospital() {
   const q = document.getElementById('fx-new-hospital').value.trim();
   const cont = document.getElementById('fx-hospital-sugerencias');
   if (!q) { cont.style.display = 'none'; return; }
-
-  const coincidencias = hospitalesMaestro.filter(h => coincideBusqueda(h.nombre_estandar||'', q)).slice(0, 8);
-  if (!coincidencias.length) { cont.style.display = 'none'; return; }
-
-  cont.innerHTML = coincidencias.map(h => `
-    <div style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" 
-         onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-         onclick="seleccionarHospitalSugerido('${h.nombre_estandar.replace(/'/g,"\\'")}')">
-      ${h.nombre_estandar}
-    </div>`).join('');
+  const lista = (window.__fxClientes || []).map((c, i) => ({ c, i })).filter(({ c }) => coincideBusqueda(`${c.nombre} ${c.rut}`, q)).slice(0, 8);
+  if (!lista.length) { cont.style.display = 'none'; return; }
+  cont.innerHTML = lista.map(({ c, i }) => `<div class="fx-sug" onmousedown="event.preventDefault();fxElegirCliente(${i})"><b>${escapeHtml(c.nombre)}</b>${c.rut ? `<small>${escapeHtml(c.rut)}</small>` : ''}</div>`).join('');
   cont.style.display = 'block';
 }
 
-function seleccionarHospitalSugerido(nombre) {
-  document.getElementById('fx-new-hospital').value = nombre;
-  document.getElementById('fx-hospital-sugerencias').style.display = 'none';
-  const rutInput = document.getElementById('fx-new-rut');
-  if (mapaRutPorHospital[nombre]) rutInput.value = mapaRutPorHospital[nombre];
-}
-
+// Busca por RUT escrito con o sin puntos (y con o sin guion).
 function filtrarSugerenciasPorRut() {
-  const q = document.getElementById('fx-new-rut').value.trim();
+  const q = rutSoloDigitos(document.getElementById('fx-new-rut').value);
   const cont = document.getElementById('fx-rut-sugerencias');
-  if (!q) { cont.style.display = 'none'; return; }
-
-  const coincidencias = hospitalesMaestro.filter(h => h.rut && coincideBusqueda(h.rut, q)).slice(0, 8);
-  if (!coincidencias.length) { cont.style.display = 'none'; return; }
-
-  cont.innerHTML = coincidencias.map(h => `
-    <div style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
-         onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-         onclick="seleccionarHospitalPorRut('${(h.nombre_estandar||'').replace(/'/g,"\\'")}', '${h.rut.replace(/'/g,"\\'")}')">
-      <div>${h.nombre_estandar}</div>
-      <div style="font-size:11px;color:var(--text-3)">${h.rut}</div>
-    </div>`).join('');
+  if (q.length < 3) { cont.style.display = 'none'; return; }
+  const lista = (window.__fxClientes || []).map((c, i) => ({ c, i })).filter(({ c }) => c.rut && rutSoloDigitos(c.rut).startsWith(q)).slice(0, 8);
+  if (!lista.length) { cont.style.display = 'none'; return; }
+  cont.innerHTML = lista.map(({ c, i }) => `<div class="fx-sug" onmousedown="event.preventDefault();fxElegirCliente(${i})"><b>${escapeHtml(c.nombre)}</b><small>${escapeHtml(c.rut)}</small></div>`).join('');
   cont.style.display = 'block';
 }
 
+function fxElegirCliente(i) {
+  const c = (window.__fxClientes || [])[i];
+  if (!c) return;
+  document.getElementById('fx-new-hospital').value = c.nombre;
+  document.getElementById('fx-new-rut').value = c.rut || '';
+  document.getElementById('fx-hospital-sugerencias').style.display = 'none';
+  document.getElementById('fx-rut-sugerencias').style.display = 'none';
+  fxNuevoRutCompleto();
+}
+
+// Al salir del RUT: se deja con puntos, se revisa el dígito verificador y,
+// si corresponde a un cliente conocido, se completa el hospital.
+function fxNuevoRutCompleto() {
+  const inp = document.getElementById('fx-new-rut');
+  const aviso = document.getElementById('fx-new-rut-aviso');
+  if (!inp) return;
+  document.getElementById('fx-rut-sugerencias').style.display = 'none';
+  const v = inp.value.trim();
+  if (!v) { aviso.textContent = ''; aviso.className = ''; return; }
+  inp.value = rutConPuntos(v);
+  const ok = rutEsValido(v);
+  const c = (window.__fxClientes || []).find(x => rutSoloDigitos(x.rut) === rutSoloDigitos(v));
+  if (c && !document.getElementById('fx-new-hospital').value.trim()) document.getElementById('fx-new-hospital').value = c.nombre;
+  aviso.className = ok ? 'fx-aviso-ok' : 'fx-aviso-err';
+  aviso.textContent = !ok ? 'El RUT no es válido (revisa el dígito verificador).' : c ? `✓ ${c.nombre}` : '✓ RUT válido';
+}
+
+// Compatibilidad: otras partes llaman a estas funciones con el nombre.
+function seleccionarHospitalSugerido(nombre) {
+  const i = (window.__fxClientes || []).findIndex(c => c.nombre === nombre);
+  if (i !== -1) fxElegirCliente(i); else document.getElementById('fx-new-hospital').value = nombre;
+}
 function seleccionarHospitalPorRut(nombre, rut) {
   document.getElementById('fx-new-hospital').value = nombre;
-  document.getElementById('fx-new-rut').value = rut;
-  document.getElementById('fx-rut-sugerencias').style.display = 'none';
+  document.getElementById('fx-new-rut').value = rutConPuntos(rut);
+  fxNuevoRutCompleto();
 }
 
 function intentarGuardarNuevoEnvio() {
@@ -12367,9 +12456,14 @@ function intentarGuardarNuevoEnvio() {
   if (!hospitalEscrito || !ot) { toast('Hospital y N° de Orden de transporte son obligatorios.', 'err'); return; }
 
   // ¿Coincide exactamente con un hospital ya existente en la tabla maestra?
-  const existente = hospitalesMaestro.find(h => (h.nombre_estandar||'').toLowerCase() === hospitalEscrito.toLowerCase());
+  const sinTildes = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (rutEscrito && !rutEsValido(rutEscrito)) { toast('El RUT no es válido: revisa el dígito verificador.', 'err'); return; }
+  const existente = hospitalesMaestro.find(h => sinTildes(h.nombre_estandar) === sinTildes(hospitalEscrito));
+  // Cliente que solo aparece en las facturas (no está en la tabla de hospitales): se guarda igual.
+  const deFacturas = !existente && (window.__fxClientes || []).find(c => sinTildes(c.nombre) === sinTildes(hospitalEscrito));
+  if (deFacturas) { guardarNuevoEnvio(deFacturas.nombre); return; }
   if (existente) {
-    guardarRutHospitalSiCorresponde(existente, rutEscrito).then(() => guardarNuevoEnvio(hospitalEscrito));
+    guardarRutHospitalSiCorresponde(existente, rutEscrito).then(() => guardarNuevoEnvio(existente.nombre_estandar));
   } else {
     abrirConfirmacionHospitalNuevo(hospitalEscrito, rutEscrito);
   }
@@ -12379,7 +12473,8 @@ function intentarGuardarNuevoEnvio() {
 // distinto), lo completa/actualiza en hospitales_maestro — así queda
 // estandarizado de una vez, sin tener que ir al panel de normalización.
 async function guardarRutHospitalSiCorresponde(fila, rutEscrito) {
-  if (!rutEscrito || rutEscrito === fila.rut) return;
+  if (!rutEscrito || rutSoloDigitos(rutEscrito) === rutSoloDigitos(fila.rut)) return;
+  rutEscrito = rutConPuntos(rutEscrito);
   try {
     const res = await sb(`hospitales_maestro?nombre_original=eq.${encodeURIComponent(fila.nombre_original)}`, {
       method: 'PATCH',

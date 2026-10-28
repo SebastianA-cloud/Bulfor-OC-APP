@@ -1645,3 +1645,30 @@ tr.letra-plegable:hover td { color: var(--accent); }
 /* FedEx: separadores por día de envío */
 .fx-tabla tr.fx-dia td { background: #F4F2EE; font-size: 12px; font-weight: 700; color: var(--text); padding: 8px 16px; text-align: left !important; cursor: default; letter-spacing: .2px; }
 .fx-tabla tr.fx-dia td span { font-weight: 400; color: var(--text-3); }
+
+/* Nuevo envío FedEx */
+.fx-nuevo .modal-body { display: flex; flex-direction: column; gap: 16px; }
+.fx-nuevo-ante { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #4D148C; display: flex; align-items: center; gap: 6px; }
+.fx-nuevo-tit { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.fx-nuevo-paso { background: #F5F2FC; border: 1px solid #DCD6F0; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.fx-nuevo-fila { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .fx-nuevo-fila { grid-template-columns: 1fr; } }
+.fx-campo { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; position: relative; }
+.fx-campo input { font: 400 15px var(--font); text-transform: none; letter-spacing: 0; color: var(--text); padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; width: 100%; }
+.fx-campo input.mono { font-family: var(--mono); letter-spacing: .5px; }
+.fx-campo input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px #FDECEA; }
+.fx-campo small { font-size: 12px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-3); }
+.fx-campo small.fx-aviso-ok { color: var(--green); font-weight: 600; }
+.fx-campo small.fx-aviso-err { color: var(--accent); font-weight: 600; }
+.fx-sugerencias { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; max-height: 240px; overflow-y: auto; z-index: 10; box-shadow: 0 8px 24px rgba(0,0,0,.12); text-transform: none; letter-spacing: 0; }
+.fx-sug { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.fx-sug:hover { background: #F4F2EE; }
+.fx-sug b { font-size: 13px; font-weight: 500; color: var(--text); }
+.fx-sug small { font: 400 12px var(--mono); color: var(--text-3); white-space: nowrap; }
+.fx-nuevo-facturas { display: flex; flex-direction: column; gap: 6px; }
+.fx-nuevo-facturas:empty { display: none; }
+.fx-fac-chip { background: #fff; border: 1px solid #DCD6F0; border-radius: 8px; padding: 7px 10px; font-size: 13px; color: var(--text-2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fx-fac-chip b { color: var(--text); }
+.fx-fac-chip-no { border-style: dashed; color: var(--text-3); }
+.fx-nuevo-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.fx-nuevo-acciones .page-btn { padding: 9px 18px !important; }
