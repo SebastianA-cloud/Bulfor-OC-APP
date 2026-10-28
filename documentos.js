@@ -302,7 +302,9 @@ function dteRefacturar(o) {
   dteEstado[33] = s;
   dteGuardarBorrador(33);
   irAModuloPagina('documentos', 'doc-factura');
-  if (o.rut) dteBuscarRut(33, o.rut);
+  // Se copian todos los datos de la factura rechazada; si no está, al menos el cliente.
+  if (s.refact.folio) dteCopiarFactura(33, s.refact.folio, true).then(() => { if (!s.det.some(d => d.nombre) && o.rut) dteBuscarRut(33, o.rut); });
+  else if (o.rut) dteBuscarRut(33, o.rut);
 }
 
 function dteLimpiar(tipo) {
@@ -704,6 +706,65 @@ function dteSetVenc(t, v) {
 }
 function dteSetRefact(t, on) { dteEstado[t].refact.on = on; dteGuardarBorrador(t); dteRender(t); }
 
+// ── Refacturación: al poner el N° de la factura que se reemplaza, se copian
+// todos sus datos (cliente, referencias, productos, forma de pago y plazo)
+// para solo corregir lo que estaba malo. La fecha de emisión queda en hoy y
+// el vencimiento se corre con los mismos días de plazo que tenía.
+async function dteCopiarFactura(t, folio, sinPreguntar) {
+  const s = dteEstado[t];
+  folio = String(folio || '').replace(/\D/g, '');
+  if (!folio || s.tipo !== 33) return;
+  if (!sinPreguntar && s.det.some(d => d.nombre.trim() || d.qty || d.precio)
+      && !confirm(`¿Reemplazar lo escrito con los datos de la factura N° ${folio}?`)) return;
+  s.refact.info = 'Buscando la factura N° ' + folio + '…';
+  dteRender(t);
+  try {
+    const res = await sb(`documentos_gdexpress?select=folio,fecha_emision,xml_completo&tipo_dte=eq.33&folio=eq.${folio}&xml_completo=not.is.null&limit=1`);
+    const doc = res.ok ? (await res.json())[0] : null;
+    if (!doc) {
+      s.refact.info = `No se encontró la factura N° ${folio}: completa los datos a mano.`;
+    } else {
+      const x = new DOMParser().parseFromString(doc.xml_completo, 'application/xml');
+      const tx = (nodo, tag) => (nodo.getElementsByTagName(tag)[0]?.textContent || '').trim();
+      // Cliente
+      s.rut = dteRutLimpio(tx(x, 'RUTRecep'));
+      s.recep = { rzn: tx(x, 'RznSocRecep'), giro: tx(x, 'GiroRecep'), dir: tx(x, 'DirRecep'), cmna: tx(x, 'CmnaRecep'), ciudad: tx(x, 'CiudadRecep') };
+      s.recepInfo = '';
+      const g = dteBuscarComuna(s.recep.cmna);
+      s.dest = { dir: s.recep.dir, region: g ? g.region : '', ciudad: g ? g.provincia : s.recep.ciudad, cmna: g ? g.comuna : s.recep.cmna };
+      // Pago y plazo (los mismos días de la factura original, contados desde hoy)
+      if (tx(x, 'FmaPago')) s.fmaPago = tx(x, 'FmaPago');
+      if (tx(x, 'MedioPago')) s.pago.medio = tx(x, 'MedioPago');
+      if (tx(x, 'GlosaPagos')) s.pago.glosa = tx(x, 'GlosaPagos');
+      const plazo = dteDiasEntre(tx(x, 'FchEmis'), tx(x, 'FchVenc'));
+      if (plazo !== '' && plazo >= 0) s.fchVenc = dteMasDias(s.fchEmis, plazo);
+      // Referencias (OC, etc.)
+      const refs = [...x.getElementsByTagName('Referencia')].map(r => ({
+        tipo: tx(r, 'TpoDocRef'), folio: tx(r, 'FolioRef'), fecha: tx(r, 'FchRef'), razon: tx(r, 'RazonRef'),
+      })).filter(r => r.tipo);
+      if (refs.length) s.refs = refs;
+      // Productos: el vencimiento ("V:dd-mm-aaaa") y la descripción salen de
+      // DscItem; se quita el "- ESTA FACTURA REEMPLAZA A LA…" de una
+      // refacturación anterior (se vuelve a agregar solo con el N° nuevo).
+      const det = [...x.getElementsByTagName('Detalle')].map(d => {
+        const lineas = tx(d, 'DscItem').replace(/(^|\n)\s*-?\s*\n?\s*ESTA FACTURA REEMPLAZA[^\n]*/gi, '').split('\n').map(l => l.trim());
+        while (lineas.length && (lineas[lineas.length - 1] === '-' || !lineas[lineas.length - 1])) lineas.pop();
+        let venc = '';
+        const m = /^V\s*:?\s*(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/i.exec(lineas[0] || '');
+        if (m) { venc = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; lineas.shift(); }
+        return { ...dteDetNuevo(), tpoCod: tx(d, 'TpoCodigo') || 'RM', cod: tx(d, 'VlrCodigo'), nombre: tx(d, 'NmbItem'),
+          venc, desc2: lineas.join('\n').trim(), qty: tx(d, 'QtyItem'), unidad: tx(d, 'UnmdItem'), precio: tx(d, 'PrcItem') };
+      });
+      if (det.length) s.det = det;
+      s.refact.info = `Datos copiados de la factura N° ${folio} del ${dteDmy(doc.fecha_emision)}: corrige lo que estaba malo.`;
+    }
+  } catch (e) {
+    s.refact.info = 'No se pudo traer la factura: ' + e.message;
+  }
+  dteGuardarBorrador(t);
+  dteRender(t);
+}
+
 // ── Cliente: lista desplegable de RUT conocidos mientras se escribe ─────
 let dteClientes = null;
 function dteListaClientes() {
@@ -778,8 +839,9 @@ function dteRender(t) {
     </div>
     ${esFactura ? `<div class="dte-refact">
       <label class="dte-switch"><input type="checkbox" ${s.refact.on ? 'checked' : ''} onchange="dteSetRefact(${t},this.checked)"><span></span> ¿Es refacturación?</label>
-      ${s.refact.on ? `<div class="dte-refact-campo">${dteCampo('N° de la factura que reemplaza', `<input type="text" inputmode="numeric" class="dte-in" value="${dteAttr(s.refact.folio)}" placeholder="22354" oninput="dteSet(${t},'refact.folio',this.value.replace(/\\D/g,''))">`, true)}
-        <small class="dte-sub">Se agregará en la descripción del último producto: “- ESTA FACTURA REEMPLAZA A LA N° ${dteEsc(s.refact.folio || '…')}”.</small></div>` : ''}
+      ${s.refact.on ? `<div class="dte-refact-campo">${dteCampo('N° de la factura que reemplaza', `<input type="text" inputmode="numeric" class="dte-in" value="${dteAttr(s.refact.folio)}" placeholder="22354" oninput="dteSet(${t},'refact.folio',this.value.replace(/\\D/g,''))" onchange="dteCopiarFactura(${t},this.value)">`, true)}
+        <small class="dte-sub">Se agregará en la descripción del último producto: “- ESTA FACTURA REEMPLAZA A LA N° ${dteEsc(s.refact.folio || '…')}”.</small>
+        ${s.refact.info ? `<div class="dte-info">${dteEsc(s.refact.info)}</div>` : ''}</div>` : ''}
     </div>` : ''}`;
 
   const conocido = dteListaClientes().find(c => c.rut === s.rut);
