@@ -8534,8 +8534,7 @@ async function cargarItemsEnPanel(d, contId) {
 }
 
 // Ficha de un envío FedEx, compacta: la OT como título con "Ver en FedEx" y
-// "Editar", y al lado la factura y la OC como botones chicos (para copiar o
-// abrir). Debajo "Qué se envió" (barra que se despliega) y, lado a lado, el
+// "Editar". Debajo "Qué se envió" (barra que se despliega) y, lado a lado, el
 // historial y el estado del envío en dos recuadros.
 function fichaEnvioFedex(id, lista) {
   const e = fedex.find(x => x.id === id);
@@ -8547,19 +8546,19 @@ function fichaEnvioFedex(id, lista) {
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
   const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
 
-  // Factura(s) y OC como botones del mismo tamaño que "Editar".
+  // Factura(s) y OC van en el recuadro del estado, debajo de "Enviado", con
+  // el mismo formato (texto simple, sin enlaces; solo el botón de copiar).
   const facturasHtml = docs.length
-    ? docs.map(d => `<span class="fx-chip"><span class="fx-chip-lbl">Factura</span><b class="mono panel-link" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}${d.doc_url ? `<a href="${d.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF">PDF <i class="ti ti-external-link"></i></a>` : ''}</span>`).join('')
-    : `<span class="fx-chip"><span class="fx-chip-lbl">Factura</span>${e.factura ? `<b class="mono">${escapeHtml(e.factura)}</b> <small style="color:var(--text-3)">(aún no sincronizada)</small>` : '<small style="color:var(--text-3)">sin anotar</small>'}</span>`;
-  const ocsHtml = ocs.map(c => `<span class="fx-chip"><span class="fx-chip-lbl">OC</span>${oc.some(o => o.codigooc === c)
-      ? `<b class="mono panel-link" title="Ver la orden de compra" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(c))}), true)">${escapeHtml(c)}</b>`
-      : `<b class="mono">${escapeHtml(c)}</b>`}${copiar(c)}<a href="${urlMercadoPublicoOC(c)}" target="_blank" rel="noopener" title="Abrir en Mercado Público">Ver OC <i class="ti ti-external-link"></i></a></span>`).join('');
+    ? docs.map(d => `<span>Factura <b>${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}</span>`).join('')
+    : `<span>Factura <b>${e.factura ? escapeHtml(e.factura) : '—'}</b>${e.factura ? copiar(e.factura) : ''}</span>`;
+  const ocsHtml = ocs.map(c => `<span>OC <b>${escapeHtml(c)}</b>${copiar(c)}</span>`).join('');
 
   // Recuadro del estado del envío (va al lado del historial).
   const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
       <div class="oc-fact-cab"><span>Estado del envío</span>${entregado ? '<span class="badge badge-green">Entregado</span>' : badgeEstadoFedex(e.estado_envio)}</div>
       <div class="oc-fact-cifras">
         <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
+        ${facturasHtml}${ocsHtml}
         ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
         ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
       </div>
@@ -8575,8 +8574,7 @@ function fichaEnvioFedex(id, lista) {
     tituloMono: true,
     tituloCopiar: !!e.orden_transporte,
     tituloExtra: (e.orden_transporte ? `<a class="btn-mp" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento en FedEx">Ver en FedEx <i class="ti ti-external-link"></i></a>` : '')
-      + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`
-      + facturasHtml + ocsHtml,
+      + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`,
     sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
     // "Qué se envió" parte cerrado: es una barra grande que se abre al clic.
     cuerpo: `<details class="fx-envio">
