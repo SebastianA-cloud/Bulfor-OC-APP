@@ -7647,9 +7647,9 @@ async function cargarItemsEnPanel(d, contId) {
         ${its.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${(it.codigo_valor || it.descripcion) ? `<small class="panel-muted">${it.codigo_valor ? escapeHtml((it.codigo_tipo ? it.codigo_tipo + ' - ' : '') + it.codigo_valor) : ''}${it.codigo_valor && it.descripcion ? ' · ' : ''}${escapeHtml(it.descripcion || '')}</small>` : ''}</td>
           <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td>
           <td style="text-align:right">${clp(it.precio_unitario)}</td><td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td></tr>`).join('')}</tbody>
-        <tfoot class="doc-totales"><tr><td colspan="3">Neto</td><td>${clp(netoDoc(d))}</td></tr>
-          <tr><td colspan="3">IVA 19%</td><td>${clp(montoTotalDoc(d) - netoDoc(d))}</td></tr>
-          <tr class="doc-total"><td colspan="3">Total</td><td>${clp(montoTotalDoc(d))}</td></tr></tfoot></table>`;
+        <tfoot class="doc-totales"><tr><td class="doc-totales-vacio" colspan="2" rowspan="3"></td><td>Neto</td><td>${clp(netoDoc(d))}</td></tr>
+          <tr><td>IVA 19%</td><td>${clp(montoTotalDoc(d) - netoDoc(d))}</td></tr>
+          <tr class="doc-total"><td>Total</td><td>${clp(montoTotalDoc(d))}</td></tr></tfoot></table>`;
   } catch (e) {
     cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudo cargar el detalle: ${escapeHtml(e.message)}</div>`;
   }

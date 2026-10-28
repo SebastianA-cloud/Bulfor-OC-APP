@@ -1552,5 +1552,8 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .doc-estado-et { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
 .doc-estado-et ~ .doc-estado-et { margin-left: 10px; }
 .doc-totales td { text-align: right; color: var(--text-2); background: #FAF9F6; font-variant-numeric: tabular-nums; }
-.doc-totales td:first-child { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+/* Neto, IVA y Total ocupan solo las columnas de precio y total; el resto queda en blanco. */
+.panel-tabla-cuadros:has(.doc-totales) { border: none; }
+.doc-totales td.doc-totales-vacio { border-left: none; border-bottom: none; background: transparent; }
+.doc-totales td:not(.doc-totales-vacio):nth-last-child(2) { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
 .doc-totales .doc-total td { font-weight: 800; color: var(--text); font-size: 15px; }
