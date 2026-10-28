@@ -683,6 +683,14 @@
       <div class="page-title">FedEx <span class="info-tip" tabindex="0" role="note" data-tip="Envíos despachados por FedEx. El estado se actualiza solo cada 2 horas consultando a FedEx. Haz clic en un envío para copiar la OT, ver qué se envió y quién lo recibió. El buscador busca en todas las fechas, también por producto.">i</span></div>
       <div class="page-sub" id="fedex-resumen-compacto">Cargando datos…</div>
     </div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period" id="fedex-periodo">
+        <button class="fpp-period-btn" onclick="fedexCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="fedex-select-mes" onchange="fedexSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="fedex-select-anio" onchange="fedexSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="fedexCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+    </div>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
@@ -691,10 +699,10 @@
       <div class="fpp-status-tabs" id="fedex-tabs"></div>
       <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio()">+ Nuevo envío</button>
     </div>
-    <div class="table-card oc-tabla">
+    <div class="table-card oc-tabla tabla-centrada fx-tabla">
       <table>
         <thead><tr>
-          <th>Enviado</th><th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th>
+          <th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th>
         </tr></thead>
         <tbody id="fedex-body"></tbody>
       </table>
@@ -5445,7 +5453,39 @@ const FEDEX_CATEGORIAS = [
   { id: 'todos', label: 'Todos' },
 ];
 
+// Período (mes y año) según el día de envío. Aplica a "Entregados" y
+// "Todos"; "En ruta" y "Con retraso" muestran todo lo que sigue en camino,
+// sea del mes que sea. Con búsqueda se busca en todas las fechas.
+let fedexPeriodo = null;
+const fedexDiaChile = f => f.fecha_ingreso ? new Date(f.fecha_ingreso).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+
 function fedexInit() {
+  const hoy = new Date();
+  fedexPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  fedexPoblarSelectores();
+  filterFedex();
+}
+
+function fedexPoblarSelectores() {
+  const selMes = document.getElementById('fedex-select-mes');
+  const selAnio = document.getElementById('fedex-select-anio');
+  if (!selMes || !selAnio) return;
+  selMes.innerHTML = MESES_NOMBRE.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  const anios = new Set(fedex.map(f => fedexDiaChile(f).slice(0, 4)).filter(Boolean));
+  anios.add(fedexPeriodo.anio);
+  selAnio.innerHTML = [...anios].sort((a, b) => b.localeCompare(a)).map(a => `<option value="${a}">${a}</option>`).join('');
+  selMes.value = fedexPeriodo.mes; selAnio.value = fedexPeriodo.anio;
+}
+function fedexSeleccionarPeriodo() {
+  fedexPeriodo = { anio: document.getElementById('fedex-select-anio').value, mes: Number(document.getElementById('fedex-select-mes').value) };
+  filterFedex();
+}
+function fedexCambiarMes(delta) {
+  let a = parseInt(fedexPeriodo.anio, 10), m = fedexPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  fedexPeriodo = { anio: String(a), mes: m };
+  fedexPoblarSelectores();
   filterFedex();
 }
 
@@ -5486,9 +5526,16 @@ function fedexTextoBusqueda(e) {
 
 function filterFedex(soloTabla) {
   const q = document.getElementById('fedex-search').value;
-  const base = q && q.trim() ? fedex.filter(f => coincideBusqueda(fedexTextoBusqueda(f), q)) : fedex;
+  const buscando = !!(q && q.trim());
+  if (!fedexPeriodo) { const hoy = new Date(); fedexPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() }; }
+  const r = rangoDelAlcance('fedex', fedexPeriodo);
+  const usaMes = !buscando && ['entregado', 'todos'].includes(fedexCategoriaActiva);
+  const delMes = f => !r || (fedexDiaChile(f) >= r.desde && fedexDiaChile(f) < r.hasta);
+  const base = buscando ? fedex.filter(f => coincideBusqueda(fedexTextoBusqueda(f), q)) : fedex;
+  const sel = document.getElementById('fedex-periodo');
+  if (sel) sel.style.visibility = usaMes ? '' : 'hidden';
   const cuenta = {};
-  FEDEX_CATEGORIAS.forEach(c => { cuenta[c.id] = base.filter(f => coincideCategoriaFedex(f, c.id)).length; });
+  FEDEX_CATEGORIAS.forEach(c => { cuenta[c.id] = base.filter(f => coincideCategoriaFedex(f, c.id) && (buscando || ['ruta', 'retraso'].includes(c.id) || delMes(f))).length; });
   document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
     `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} <b>${cuenta[c.id]}</b></button>`
   ).join('');
@@ -5498,13 +5545,13 @@ function filterFedex(soloTabla) {
     ? `${base.length.toLocaleString('es-CL')} envío${base.length===1?' encontrado':'s encontrados'} en todas las fechas`
     : `${enCamino} en camino` + (retrasos ? ` · <b style="color:var(--red)">${retrasos} con retraso</b>` : ' · sin retrasos');
 
-  fedexF = base.filter(f => coincideCategoriaFedex(f, fedexCategoriaActiva));
+  fedexF = base.filter(f => coincideCategoriaFedex(f, fedexCategoriaActiva) && (!usaMes || delMes(f)));
   // Orden: primero por día de ingreso (hora de Chile, el más reciente
   // arriba) y dentro de cada día por correlativo de factura (la más alta
   // arriba), sin importar en qué orden se digitaron. Si un envío lleva
   // varias facturas manda la mayor; las guías (otra serie, números más
   // bajos) quedan debajo de las facturas de su mismo día.
-  const diaChile = f => f.fecha_ingreso ? new Date(f.fecha_ingreso).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+  const diaChile = fedexDiaChile;
   const mayorFactura = f => Math.max(0, ...parsearNumerosFactura(f.factura).map(n => parseInt(String(n).replace(/\D/g, ''), 10) || 0));
   fedexF.sort((a, b) => diaChile(b).localeCompare(diaChile(a)) || (mayorFactura(b) - mayorFactura(a))
     || String(b.fecha_ingreso || '').localeCompare(String(a.fecha_ingreso || '')));
@@ -5530,18 +5577,31 @@ function renderFedex() {
       retraso: '✓ No hay envíos con retraso.',
       entregado: 'No hay envíos entregados.',
     };
-    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="5"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!buscando?'✓':'🔍'}</div><p>${buscando ? 'No encontramos envíos con esa búsqueda.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
+    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="4"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!buscando?'✓':'🔍'}</div><p>${buscando ? 'No encontramos envíos con esa búsqueda.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
     return;
   }
   const abierto = panelPila[0]?.envioId;
-  document.getElementById('fedex-body').innerHTML = slice.map(f => `
+  // En vez de una columna con la fecha, la tabla va separada por día de envío.
+  const cuantosDia = {};
+  fedexF.forEach(f => { const d = fedexDiaChile(f); cuantosDia[d] = (cuantosDia[d] || 0) + 1; });
+  let diaAnterior = null;
+  const nombreDia = d => {
+    if (!d) return 'Sin fecha';
+    const t = new Date(d + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  document.getElementById('fedex-body').innerHTML = slice.map(f => {
+    const d = fedexDiaChile(f);
+    const cab = d !== diaAnterior ? `<tr class="fx-dia"><td colspan="4">${nombreDia(d)} <span>· ${cuantosDia[d]} envío${cuantosDia[d] === 1 ? '' : 's'}</span></td></tr>` : '';
+    diaAnterior = d;
+    return cab + `
     <tr class="oc-fila${abierto === f.id ? ' fila-abierta' : ''}" onclick="fedexAbrir(${f.id})">
-      <td data-label="Enviado" style="white-space:nowrap;color:var(--text-2)">${f.fecha_ingreso ? fDate(f.fecha_ingreso) : '—'}</td>
       <td data-label="Hospital" style="font-weight:500">${escapeHtml(nombreHosp(f.hospital)||f.hospital||'—')}</td>
       <td data-label="OT" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(f.orden_transporte||'—')}</td>
       <td data-label="Factura" class="mono" style="font-size:13px">${escapeHtml(f.factura||'—')}</td>
       <td data-label="Estado" style="white-space:nowrap">${fedexEtiquetaEstado(f)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function goFedex(p) { const {pages}=paginate(fedexF,fedexPage); if(p<1||p>pages) return; fedexPage=p; renderFedex(); }

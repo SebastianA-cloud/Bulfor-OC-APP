@@ -1641,3 +1641,7 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .fx-fac-fila.abierta .fx-chev { transform: rotate(90deg); }
 .fx-fac-detalle > td { background: #FBFAF8 !important; padding: 10px 14px !important; }
 .fx-productos { margin: 0; }
+
+/* FedEx: separadores por día de envío */
+.fx-tabla tr.fx-dia td { background: #F4F2EE; font-size: 12px; font-weight: 700; color: var(--text); padding: 8px 16px; text-align: left !important; cursor: default; letter-spacing: .2px; }
+.fx-tabla tr.fx-dia td span { font-weight: 400; color: var(--text-3); }
