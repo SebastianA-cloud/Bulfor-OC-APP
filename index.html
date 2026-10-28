@@ -8561,7 +8561,8 @@ function fichaEnvioFedex(id, lista) {
     tituloCopiar: !!e.orden_transporte,
     tituloExtra: (e.orden_transporte ? `<a class="btn-mp" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento en FedEx">Ver en FedEx <i class="ti ti-external-link"></i></a>` : '')
       + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`,
-    sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
+    // La fecha de envío va solo en el recuadro "Estado del envío" (y en la lista).
+    sub: nombreHosp(e.hospital) || e.hospital || '',
     // "Qué se envió" parte cerrado: es una barra grande que se abre al clic.
     cuerpo: `<details class="fx-envio">
         <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
@@ -8623,8 +8624,10 @@ function fedexHistorialHtml(e) {
     const est = e.estado_envio || '';
     if (est.toLowerCase() === 'entregado') pasos.push({ fecha: e.fecha_entrega, estado: 'Entregado' + (e.recibido_por ? ' · recibió ' + e.recibido_por : ''), soloDia: true });
     else if (est) pasos.push({ fecha: e.updated_at, estado: est });
-    pasos.push({ fecha: e.fecha_ingreso, estado: 'Ingresado en la app' });
+    // "Ingresado en la app" no se muestra: se confundía con la fecha de
+    // envío, que ya está en el recuadro del estado.
   }
+  if (!pasos.length) return '<div class="panel-muted" style="font-size:13px">Todavía sin movimientos.</div>';
   return `<ol class="fx-hist">${pasos.map((p, i) => `<li class="${i === 0 ? 'actual' : ''}"><b>${escapeHtml(p.estado || '')}</b>
     <small>${p.fecha ? (p.soloDia ? fDate(p.fecha) : fxFechaHora(p.fecha)) : ''}${p.lugar ? ' · ' + escapeHtml(p.lugar) : ''}</small></li>`).join('')}</ol>`;
 }
