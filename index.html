@@ -6724,6 +6724,7 @@ function renderPagosVista(soloTabla) {
   // del detalle. Así la navegación respeta siempre lo que se ve en pantalla.
   pagosF = lista;
   cont.innerHTML = construirTablaFacturasHtml(lista, '');
+  if (window.__pagosPaginas && document.getElementById('pagos-pages')) renderPages('pagos-pages', window.__pagosPaginas.total, window.__pagosPaginas.pages, pagosPage, 'goPagos');
   if (soloTabla) { const inp = document.getElementById('pagos-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
 }
 
@@ -6933,6 +6934,16 @@ function estadoFusionadoPago(f) {
 
 // Fila del listado de Cobranza, con el mismo diseño de los listados de OC y
 // Documentos: toda la fila abre la ficha de la factura (que trae el PDF).
+let pagosPage = 1, pagosClaveFiltro = '';
+function goPagos(p) {
+  const pg = window.__pagosPaginas;
+  if (!pg || p < 1 || p > pg.pages) return;
+  pagosPage = p;
+  if (panelPila.find(x => x.pagoId)) panelCerrar();   // cambiar de página cierra la ficha abierta
+  renderPagosVista();
+  window.scrollTo({ top: 0 });
+}
+
 function filaFacturaHtml(f, opts) {
   opts = opts || {};
   const estado = estadoFusionadoPago(f);
@@ -6966,6 +6977,7 @@ function tablaFacturasHtml(lista, opts) {
         </tr></thead>
         <tbody>${lista.map(f => filaFacturaHtml(f, opts)).join('')}</tbody>
       </table>
+      ${opts.paginas ? `<div class="pagination"><span>${opts.paginas.total.toLocaleString('es-CL')} factura${opts.paginas.total === 1 ? '' : 's'}</span><div class="page-btns" id="pagos-pages"></div></div>` : ''}
     </div>`;
 }
 
@@ -6986,8 +6998,17 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
       <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFacturasPago()">⬇️ Descargar Excel (${lista.length})</button>
     </div>`;
 
+  // Páginas de 15, como el listado de OC (las anuladas van aparte, abajo).
+  const claveFiltro = `${pagosEstadoFiltro}|${pagosBusqueda}|${JSON.stringify(pagosPeriodo)}`;
+  if (claveFiltro !== pagosClaveFiltro) { pagosClaveFiltro = claveFiltro; pagosPage = 1; }
+  const abierta = panelPila.find(x => x.pagoId)?.pagoId;
+  const iAbierta = abierta ? normales.findIndex(f => f.id === abierta) : -1;
+  if (iAbierta !== -1) pagosPage = Math.floor(iAbierta / PS) + 1;
+  const pag = paginate(normales, pagosPage);
+  if (pagosPage > pag.pages) pagosPage = pag.pages;
+  window.__pagosPaginas = pag;
   html += normales.length
-    ? tablaFacturasHtml(normales)
+    ? tablaFacturasHtml(pag.slice, { paginas: pag })
     : `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas normales — solo hay anuladas/rechazadas abajo.</p></div></div>`;
 
   if (anuladas.length) {
@@ -7809,7 +7830,14 @@ function renderDocumentosGdexpress(soloTabla) {
   }
 
   const abierto = panelPila[0]?.docId;
-  const MAX = 300;
+  // Páginas de 15, como el listado de OC. Se vuelve a la primera al cambiar
+  // el filtro; si hay un documento abierto, se muestra su página.
+  const claveFiltro = `${docAtajo}|${docBusqueda}|${JSON.stringify(docPeriodo)}|${alcanceBusqueda.doc}`;
+  if (claveFiltro !== docClaveFiltro) { docClaveFiltro = claveFiltro; docPage = 1; }
+  const iAbierto = abierto ? lista.findIndex(d => d.id === abierto) : -1;
+  if (iAbierto !== -1) docPage = Math.floor(iAbierto / PS) + 1;
+  const { slice, pages, total } = paginate(lista, docPage);
+  if (docPage > pages) docPage = pages;
   cont.innerHTML = `
     <div class="table-card doc-tabla tabla-centrada">
       <table>
@@ -7817,7 +7845,7 @@ function renderDocumentosGdexpress(soloTabla) {
           <th>Folio</th><th>Emisión</th><th>Hospital</th><th class="col-sec">OC</th><th style="text-align:right">Total</th><th>Estado</th>
         </tr></thead>
         <tbody>
-          ${lista.slice(0, MAX).map(d => {
+          ${slice.map(d => {
             // La cobranza (pagada / por cobrar) se ve dentro de la ficha, no en el listado.
             return `
             <tr class="oc-fila${abierto === d.id ? ' fila-abierta' : ''}" onclick="docAbrir(${d.id})">
@@ -7830,13 +7858,24 @@ function renderDocumentosGdexpress(soloTabla) {
             </tr>`; }).join('')}
         </tbody>
       </table>
-      ${lista.length > MAX ? `<div class="pagination"><span>Se muestran los ${MAX} más recientes de ${lista.length.toLocaleString('es-CL')}: usa el buscador o los atajos para acotar.</span></div>` : ''}
+      <div class="pagination"><span>${total.toLocaleString('es-CL')} documento${total === 1 ? '' : 's'}</span><div class="page-btns" id="doc-pages"></div></div>
     </div>`;
+  renderPages('doc-pages', total, pages, docPage, 'goDoc');
 
   if (soloTabla) {
     const inp = document.getElementById('doc-search');
     if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
   }
+}
+
+let docPage = 1, docClaveFiltro = '';
+function goDoc(p) {
+  const pages = Math.ceil(docF.length / PS) || 1;
+  if (p < 1 || p > pages) return;
+  docPage = p;
+  if (panelPila[0]?.docId) panelCerrar();   // cambiar de página cierra la ficha abierta
+  renderDocumentosGdexpress();
+  window.scrollTo({ top: 0 });
 }
 
 function docAbrir(id) {
