@@ -1586,3 +1586,9 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .tabla-centrada tr.rz-detalle td { text-align: left !important; background: #FBFAF8; padding: 14px 18px 16px; cursor: default; }
 .rz-detalle td > * + * { margin-top: 10px; }
 .rz-detalle .rz-cadena, .rz-detalle .rz-acc { display: flex; }
+.rz-dias { display: block; font-size: 11px; color: var(--text-3); }
+.rz-dias-ambar { color: #B45309; font-weight: 600; }
+.rz-dias-rojo { color: var(--accent); font-weight: 700; }
+.rz-nuevo { font-size: 10px; padding: 1px 6px; vertical-align: middle; }
+.rz-estado-celda { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.rz-btn-fila { padding: 4px 10px !important; font-size: 12px !important; }
