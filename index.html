@@ -10234,7 +10234,9 @@ async function rzCargarReemplazos() {
   try {
     const filas = await fetchAll('documentos_gdexpress', 'select=folio,xml_completo&tipo_dte=eq.33&xml_completo=ilike.*REEMPLAZA*');
     filas.forEach(r => {
-      const m = /REEMPLAZA\s+A\s+LA\s+N?[°º.]?\s*(\d+)/i.exec(r.xml_completo || '');
+      // Formas que se han escrito: "REEMPLAZA A LA N° 22354", "REEMPLAZA ALA 22059",
+      // "REEMPLAZA A FACTURA N 21138", "REEMPLAZA FACTURA Nº 18665".
+      const m = /REEMPLAZA\s+(?:A\s*LA|ALA|A)?\s*(?:LA\s+)?(?:FACTURA)?\s*(?:N\s*[°º.]?|N°|Nº)?\s*(\d{4,})/i.exec(r.xml_completo || '');
       if (!m) return;
       let viejo = m[1];
       const doble = /^(\d+)\1$/.exec(viejo);   // número escrito dos veces por error (ej. 2225122251)
@@ -10308,6 +10310,15 @@ function rzFechaRechazo(c) {
   return docNC?.fecha_emision || f.fecha_emision || c.fecha || '';
 }
 
+// Los rechazos anteriores a esta fecha ya se regularizaron a mano (con NC y
+// refactura anotadas fuera de la app): no se muestran como pendientes. Desde
+// esta fecha, todo rechazo nuevo aparece en "Por resolver", aunque la factura
+// sea de un mes anterior (lo que cuenta es cuándo llegó el rechazo).
+const RECHAZADAS_SEGUIR_DESDE = '2026-10-28';
+function rzSinSeguimiento(c) {
+  return c.estado !== 'resuelta' && (c.fechaRechazo || rzFechaRechazo(c) || '') < RECHAZADAS_SEGUIR_DESDE;
+}
+
 // Facturas rechazadas que eran nuevas al entrar (antes de marcarlas como
 // vistas): llevan la etiqueta "Nuevo" mientras se esté en la página.
 let rzNuevasAlEntrar = new Set();
@@ -10324,7 +10335,7 @@ function renderRechazadas(soloTabla) {
   const r = rangoDelAlcance('rechazadas', rechazadasPeriodo);
   const delMes = c => !r || ((c.fecha || '') >= r.desde && (c.fecha || '') < r.hasta);
   const busca = c => !q || coincideBusqueda(`${c.hospital} ${c.nodos.map(n => n.folio || '').join(' ')} ${c.ultimaRech?.rut_hospital || ''}`, q);
-  const porResolver = todos.filter(c => c.estado !== 'resuelta' && busca(c));
+  const porResolver = todos.filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c) && busca(c));
   const historial = todos.filter(c => busca(c) && (q || delMes(c)));
   const resueltas = historial.filter(c => c.estado === 'resuelta');
   const conMes = rechazadasEstadoActivo !== 'por_resolver' && !q;
@@ -10334,7 +10345,7 @@ function renderRechazadas(soloTabla) {
   document.getElementById('rechazadas-tabs').innerHTML = tabs.map(([k, l, n]) =>
     `<button class="fpp-status-tab${rechazadasEstadoActivo === k ? ' active' : ''}" onclick="filtrarRechazadasPorEstado('${k}')">${l} <b>${n}</b></button>`).join('');
   const periodo = q ? 'todas las fechas' : nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
-  const pend = todos.filter(c => c.estado !== 'resuelta');
+  const pend = todos.filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c));
   document.getElementById('rechazadas-resumen').textContent = rechazadasEstadoActivo === 'por_resolver' || q
     ? (pend.length ? `${pend.length} por resolver · ${pend.filter(c => c.estado === 'falta_nc').length} sin nota de crédito · ${pend.filter(c => c.estado === 'falta_refact').length} sin refacturar` : 'Nada por resolver: todos los rechazos están resueltos.')
     : `${periodo} · ${resueltas.length} resuelto${resueltas.length === 1 ? '' : 's'}`;
@@ -10354,8 +10365,9 @@ function renderRechazadas(soloTabla) {
     const ci = window.__rzCasos.push(c) - 1;
     const d = rzDoc(c.raiz);
     const abierto = rechazadasCasoAbierto === c.raiz;
-    const pendiente = c.estado !== 'resuelta';
-    const nuevo = c.nodos.some(n => n.tipo === 'rech' && rzNuevasAlEntrar.has(String(n.folio)));
+    const omitida = rzSinSeguimiento(c);
+    const pendiente = c.estado !== 'resuelta' && !omitida;
+    const nuevo = !omitida && c.nodos.some(n => n.tipo === 'rech' && rzNuevasAlEntrar.has(String(n.folio)));
     const colorDias = !pendiente || c.dias == null ? '' : c.dias > 5 ? 'rz-dias-rojo' : c.dias >= 3 ? 'rz-dias-ambar' : '';
     const detalle = abierto ? `<tr class="rz-detalle"><td colspan="7">
         ${c.motivos.length ? `<div class="rz-motivo"><b>Motivo:</b> ${c.motivos.map(m => `${c.motivos.length > 1 ? escapeHtml(m.folio) + ': ' : ''}“${escapeHtml(m.motivo)}”`).join(' · ')}</div>` : ''}
@@ -10373,7 +10385,7 @@ function renderRechazadas(soloTabla) {
       <td data-label="Rechazada" style="white-space:nowrap">${c.fechaRechazo ? fDate(c.fechaRechazo) : '—'}${pendiente && c.dias != null ? `<small class="rz-dias ${colorDias}">hace ${c.dias} día${c.dias === 1 ? '' : 's'}</small>` : ''}</td>
       <td data-label="Total" style="white-space:nowrap;font-weight:500">${clp(d ? montoTotalDoc(d) : c.nodos[0]?.monto)}</td>
       <td data-label="Cadena"><span class="rz-mini">${rzCadenaMini(c)}</span></td>
-      <td data-label="Estado"><div class="rz-estado-celda">${rzEstadoBadge(c)}${accion}<span class="rz-chev">${abierto ? '⌄' : '›'}</span></div></td>
+      <td data-label="Estado"><div class="rz-estado-celda">${omitida ? `<span class="badge badge-gray" title="Rechazo anterior al ${fDate(RECHAZADAS_SEGUIR_DESDE)}: se regularizó fuera de la app">Sin seguimiento</span>` : rzEstadoBadge(c)}${accion}<span class="rz-chev">${abierto ? '⌄' : '›'}</span></div></td>
     </tr>${detalle}`;
   }).join('');
   cont.innerHTML = `<div class="table-card oc-tabla tabla-centrada rz-tabla"><table>
@@ -16659,7 +16671,7 @@ function renderInicio() {
     if (n > 0) items.push({ texto: `${n} factura${n===1?'':'s'} atrasada${n===1?'':'s'}`, tipo: 'err', modulo: 'facturas', pagina: 'facturas-por-pagar' });
   }
   if (typeof rechazadasCasos === 'function') {
-    const pend = rechazadasCasos().filter(c => c.estado !== 'resuelta');
+    const pend = rechazadasCasos().filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c));
     if (pend.length) {
       const hoy = fechaLocalISO();
       const masAntigua = pend.map(rzFechaRechazo).filter(Boolean).sort()[0];
