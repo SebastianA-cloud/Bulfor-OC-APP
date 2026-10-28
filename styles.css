@@ -1548,7 +1548,7 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .oc-fact-vencida .oc-fact-barra div { background: var(--red, #C0392B); }
 .doc-estado { grid-template-columns: 1fr; align-content: start; }
 .doc-estado-pie { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 13px; }
-.doc-estado .oc-fact-cab + .oc-fact-barra ~ .doc-estado-pie { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+.doc-estado .oc-fact-cifras ~ .doc-estado-pie { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
 .doc-estado-et { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
 .doc-estado-et ~ .doc-estado-et { margin-left: 10px; }
 .doc-totales td { text-align: right; color: var(--text-2); background: #FAF9F6; font-variant-numeric: tabular-nums; }

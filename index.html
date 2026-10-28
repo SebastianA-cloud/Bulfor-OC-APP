@@ -7591,7 +7591,13 @@ function fichaDocumento(id, lista) {
   // Recuadro derecho: cobranza (barra con el plazo de pago), estado en el
   // SII y envío.
   let cobro = '', claseCobro = 'completa';
-  if (pago) {
+  // Una factura rechazada o anulada con nota de crédito nunca se va a pagar:
+  // no se muestra como "Por cobrar".
+  if (d.tipo_dte === '33' && (estado === 'N' || nc)) {
+    claseCobro = 'cancelada';
+    cobro = `<div class="oc-fact-cab"><span>Cobranza</span><span class="badge badge-gray">No se cobra</span></div>
+      <div class="oc-fact-cifras"><span>${nc ? `Anulada con la nota de crédito N° ${escapeHtml(String(nc.folio))}` : 'Factura rechazada: no entra a cobranza'}.</span></div>`;
+  } else if (pago) {
     const pagada = pago.estado_pago === 'Pagado' || !!pago.fecha_pago;
     const hoy = fechaLocalISO();
     const vence = pago.fecha_vencimiento;
