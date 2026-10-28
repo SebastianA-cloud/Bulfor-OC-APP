@@ -2363,6 +2363,9 @@ function ocAbrir(codigoOC) {
   if (f) panelAbrir(f);
   renderOC();
 }
+// Botón chico para abrir algo en Mercado Público (OC, COT o licitación).
+const botonMP = (url, texto) => `<a class="btn-mp" href="${url}" target="_blank" rel="noopener" title="Abrir en Mercado Público">${texto} <i class="ti ti-external-link"></i></a>`;
+
 function fichaOC(codigoOC) {
   const r = oc.find(o => o.codigooc === codigoOC);
   if (!r) return null;
@@ -2387,7 +2390,6 @@ function fichaOC(codigoOC) {
           <td style="text-align:right;font-weight:500">${clp(it.totalitem || (it.cantidad && it.preciounitario ? it.cantidad * it.preciounitario : null))}</td></tr>`;
       }).join('')}</tbody></table>` : '<div class="panel-vacio">No se encontraron productos para esta OC.</div>';
   const cod = codigoOC.replace(/'/g, "\\'");
-  const botonMP = (url, texto) => `<a class="btn-mp" href="${url}" target="_blank" rel="noopener" title="Abrir en Mercado Público">${texto} <i class="ti ti-external-link"></i></a>`;
   // Recuadro de la OC: de qué compra ágil o licitación viene (con su botón a
   // Mercado Público) y el total con IVA.
   const infoOC = `<div class="oc-info">
@@ -7565,16 +7567,9 @@ function fichaDocumento(id, lista) {
   const anulada = d.tipo_dte === '61' && d.nc_factura_ref ? documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === String(d.nc_factura_ref)) : null;
   const envio = envioFedexDeFolio(d.folio);
   const pago = d.tipo_dte === '33' ? pagoDeFolio(d.folio) : null;
+  // La OC, la cobranza y el envío van en los recuadros de arriba; en
+  // "Relacionado" solo queda la nota de crédito o la factura que anula.
   const rel = [];
-  if (envio) rel.push({ icono: 'ti-truck', titulo: `Envío FedEx · OT ${envio.orden_transporte || '—'}`,
-    resumen: [envio.estado_envio, envio.fecha_entrega ? fDate(envio.fecha_entrega) : '', envio.recibido_por ? 'recibió ' + envio.recibido_por : ''].filter(Boolean).join(' · '),
-    abrir: () => fichaEnvioFedex(envio.id) });
-  if (pago) rel.push({ icono: 'ti-cash', titulo: 'Cobranza',
-    resumen: pago.estado_pago === 'Pagado' || pago.fecha_pago ? `Pagada${pago.fecha_pago ? ' el ' + fDate(pago.fecha_pago) : ''}` : `Pendiente${pago.fecha_vencimiento ? ' · vence ' + fDate(pago.fecha_vencimiento) : ''}`,
-    abrir: () => { panelCerrar(); irAModuloPagina('facturas', 'pagos'); return null; } });
-  if (ordenOC) rel.push({ icono: 'ti-shopping-cart', titulo: 'Orden de compra',
-    resumen: `${clp(ordenOC.totaloc)} · ${ocFacturacion(ordenOC) === 'completa' ? 'Facturada completa' : ocFacturacion(ordenOC) === 'parcial' ? 'Facturada parcial' : 'Por facturar'}`,
-    abrir: () => fichaOC(ordenOC.codigooc) });
   if (nc) rel.push({ icono: 'ti-receipt-refund', titulo: `Nota de crédito N° ${nc.folio}`, resumen: `Anula esta factura · ${clp(montoTotalDoc(nc))}`, abrir: () => fichaDocumento(nc.id) });
   if (anulada) rel.push({ icono: 'ti-file-invoice', titulo: `Factura N° ${anulada.folio}`, resumen: `Anulada por esta nota de crédito · ${clp(montoTotalDoc(anulada))}`, abrir: () => fichaDocumento(anulada.id) });
 
@@ -7582,19 +7577,65 @@ function fichaDocumento(id, lista) {
   const idx = navLista.findIndex(x => x.id === d.id);
   const contItems = `doc-items-${d.id}-${Date.now()}`;
   setTimeout(() => cargarItemsEnPanel(d, contItems), 0);
-  const dato = (k, v) => v ? `<div><span>${k}</span>${v}</div>` : '';
+
+  // Recuadro izquierdo (como en la ficha de la OC): el N° de la OC con su
+  // botón a Mercado Público, de qué compra ágil o licitación viene, y el total.
+  const codOC = (d.orden_compra_ref || '').trim();
+  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(v))}, this)"><i class="ti ti-copy"></i></button>`;
+  const infoDoc = `<div class="oc-info">
+      <div>
+        ${d.tipo_dte === '61' ? '' : `<span>Orden de compra</span>
+        ${codOC ? `<div class="oc-info-cod">${ordenOC
+            ? `<b class="mono panel-link" title="Ver la orden de compra" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(ordenOC.codigooc))}), true)">${escapeHtml(codOC)}</b>`
+            : `<b class="mono">${escapeHtml(codOC)}</b>`}
+          ${copiar(codOC)}${botonMP(urlMercadoPublicoOC(codOC), 'Ver OC')}</div>`
+          : '<div class="oc-info-cod" style="color:var(--text-3)">Sin OC</div>'}
+        ${origen ? `<span class="doc-info-sub">${origen.tipo === 'COT' ? 'Compra ágil (COT)' : 'Licitación'}</span>
+          <div class="oc-info-cod"><b class="mono">${escapeHtml(origen.codigo)}</b>${copiar(origen.codigo)}${botonMP(origen.url, origen.tipo === 'COT' ? 'Ver COT' : 'Ver licitación')}</div>` : ''}`}
+        ${d.tipo_dte === '61' && anulada ? `<span>Anula la factura</span><div class="oc-info-cod"><b class="mono panel-link" onclick="panelAbrir(fichaDocumento(${anulada.id}), true)">N° ${escapeHtml(String(anulada.folio))}</b></div>` : ''}
+      </div>
+      <div><span>Total (con IVA)</span><div class="oc-info-total">${clp(montoTotalDoc(d))}</div>
+        <div class="doc-info-neto">Neto ${clp(netoDoc(d))}</div></div>
+    </div>`;
+
+  // Recuadro derecho: cobranza (barra con el plazo de pago), estado en el
+  // SII y envío.
+  let cobro = '', claseCobro = 'completa';
+  if (pago) {
+    const pagada = pago.estado_pago === 'Pagado' || !!pago.fecha_pago;
+    const hoy = fechaLocalISO();
+    const vence = pago.fecha_vencimiento;
+    const vencida = !pagada && vence && vence < hoy;
+    const dias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+    const plazo = d.fecha_emision && vence ? dias(d.fecha_emision, vence) : 0;
+    const pct = pagada || vencida ? 100 : plazo > 0 ? Math.max(0, Math.min(100, Math.round(dias(d.fecha_emision, hoy) / plazo * 100))) : 0;
+    claseCobro = pagada ? 'completa' : vencida ? 'vencida' : 'por';
+    const badge = pagada ? '<span class="badge badge-green">Pagada</span>' : vencida ? '<span class="badge badge-red">Vencida</span>' : '<span class="badge badge-amber">Por cobrar</span>';
+    const derecha = pagada ? (pago.fecha_pago ? `<span>Pagada el <b>${fDate(pago.fecha_pago)}</b></span>` : '')
+      : vence ? (vencida ? `<span>Venció hace <b>${dias(vence, hoy)} día${dias(vence, hoy) === 1 ? '' : 's'}</b></span>` : `<span>Vence el <b>${fDate(vence)}</b> (${dias(hoy, vence) === 0 ? 'hoy' : 'en ' + dias(hoy, vence) + ' día' + (dias(hoy, vence) === 1 ? '' : 's')})</span>`) : '';
+    cobro = `<div class="oc-fact-cab"><span>Cobranza</span>${badge}</div>
+      <div class="oc-fact-barra"><div style="width:${pct}%"></div></div>
+      <div class="oc-fact-cifras"><span>Emitida <b>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</b></span>${derecha}</div>`;
+  }
+  const lineaEnvio = envio ? `<button class="oc-envio" title="Ver el envío" onclick="panelAbrir(fichaEnvioFedex(${envio.id}), true)"><i class="ti ti-truck"></i> FedEx · ${escapeHtml((envio.estado_envio || 'Sin información') + ((envio.estado_envio || '').toLowerCase() === 'entregado' && envio.fecha_entrega ? ' ' + fDate(envio.fecha_entrega) : ''))}</button>` : '';
+  const estadoDoc = `<div class="oc-fact oc-fact-${claseCobro} doc-estado">
+      ${cobro}
+      <div class="doc-estado-pie"><span class="doc-estado-et">SII</span>${badgeEstadoDocGdexpress(estado, d)}
+        ${fechaDocumentoDesalineada(d) ? `<span class="badge badge-amber" title="Para el SII cuenta en el mes en que se emitió de verdad">Emitida realmente el ${fDate(d.fecha_emision_real)}</span>` : ''}
+        ${lineaEnvio ? `<span class="doc-estado-et">Envío</span>${lineaEnvio}` : ''}</div>
+    </div>`;
+
+  const lugar = [nombreHosp(d.hospital) || d.hospital, d.rut_hospital ? 'RUT ' + d.rut_hospital : ''].filter(Boolean).join(' · ');
   return {
     docId: d.id,
-    titulo: `${info.singular} N° ${d.folio}`,
-    sub: `${nombreHosp(d.hospital) || d.hospital || '—'} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''}`,
-    destacado: clp(montoTotalDoc(d)),
-    etiquetas: badgeEstadoDocGdexpress(estado, d) + (pago ? (pago.estado_pago === 'Pagado' || pago.fecha_pago ? ' <span class="badge badge-green">Pagada</span>' : ' <span class="badge badge-amber">Por cobrar</span>') : '')
-      + (fechaDocumentoDesalineada(d) ? ` <span class="badge badge-amber" title="Para el SII cuenta en el mes en que se emitió de verdad">Emitida realmente el ${fDate(d.fecha_emision_real)}</span>` : ''),
-    ids: [{ label: info.singular, valor: String(d.folio) }, d.orden_compra_ref ? { label: 'OC', valor: d.orden_compra_ref.trim() } : null, origen ? { label: origen.tipo === 'COT' ? 'COT' : 'Licitación', valor: origen.codigo } : null],
-    acciones: d.doc_url ? `<a class="page-btn page-btn-pri" href="${d.doc_url}" target="_blank" rel="noopener">Ver PDF ↗</a>` : '',
-    cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>
-      <div class="panel-h">Datos del documento</div>
-      <div class="panel-datos">${dato('Neto', clp(d.monto))}${dato('Total con IVA', clp(montoTotalDoc(d)))}${dato('RUT', escapeHtml(d.rut_hospital || ''))}${pago && pago.fecha_vencimiento ? dato('Vence', fDate(pago.fecha_vencimiento)) : ''}</div>`,
+    antetitulo: d.tipo_dte === '33' ? 'Factura electrónica' : info.singular,
+    titulo: String(d.folio),
+    tituloMono: true,
+    tituloCopiar: true,
+    tituloExtra: d.doc_url ? `<a class="btn-mp" href="${d.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF del documento">Ver PDF <i class="ti ti-external-link"></i></a>` : '',
+    sub: `${lugar || "—"}${d.fecha_emision ? " · " + fDate(d.fecha_emision) : ""}`,
+    resumen: `<div class="oc-arriba">${infoDoc}${estadoDoc}</div>`,
+    cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`,
     relacionado: rel,
     navegacion: idx === -1 ? null : {
       texto: `${info.singular} ${idx + 1} de ${navLista.length}`,
@@ -7612,10 +7653,13 @@ async function cargarItemsEnPanel(d, contId) {
     const its = await fetchAll('documentos_gdexpress_items', `select=*&documento_id=eq.${d.id}`);
     if (!document.getElementById(contId)) return;
     cont.innerHTML = !its.length ? '<div class="panel-vacio">No se encontraron productos para este documento.</div>'
-      : `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Total</th></tr></thead><tbody>
+      : `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
         ${its.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${(it.codigo_valor || it.descripcion) ? `<small class="panel-muted">${it.codigo_valor ? escapeHtml((it.codigo_tipo ? it.codigo_tipo + ' - ' : '') + it.codigo_valor) : ''}${it.codigo_valor && it.descripcion ? ' · ' : ''}${escapeHtml(it.descripcion || '')}</small>` : ''}</td>
-          <td style="text-align:right;white-space:nowrap">${it.cantidad || '—'} ${escapeHtml(it.unidad || '')}</td>
-          <td style="text-align:right">${clp(it.precio_unitario)}</td><td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td></tr>`).join('')}</tbody></table>`;
+          <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td>
+          <td style="text-align:right">${clp(it.precio_unitario)}</td><td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td></tr>`).join('')}</tbody>
+        <tfoot class="doc-totales"><tr><td colspan="3">Neto</td><td>${clp(netoDoc(d))}</td></tr>
+          <tr><td colspan="3">IVA 19%</td><td>${clp(montoTotalDoc(d) - netoDoc(d))}</td></tr>
+          <tr class="doc-total"><td colspan="3">Total</td><td>${clp(montoTotalDoc(d))}</td></tr></tfoot></table>`;
   } catch (e) {
     cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudo cargar el detalle: ${escapeHtml(e.message)}</div>`;
   }
