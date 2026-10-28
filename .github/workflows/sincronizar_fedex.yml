@@ -6,10 +6,10 @@ on:
   workflow_dispatch:  # permite ejecutarlo manualmente con un botón
     inputs:
       modo:
-        description: 'probar = solo mostrar los cambios / escribir = guardarlos'
+        description: 'probar = solo mostrar los cambios / escribir = guardarlos / historial = cargar movimientos de los ya entregados'
         default: 'probar'
         type: choice
-        options: [probar, escribir]
+        options: [probar, escribir, historial]
 
 jobs:
   sincronizar:

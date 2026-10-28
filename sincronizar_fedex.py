@@ -26,6 +26,9 @@ Qué escribe (solo estas cuatro columnas, nunca otras):
 Modos (variable MODO):
   - "probar": solo muestra lo que cambiaría, sin escribir nada.
   - "escribir": guarda los cambios en Supabase.
+  - "historial": carga única de los movimientos de los envíos YA entregados
+    (de los últimos DIAS_ATRAS días) que todavía no los tienen. Solo escribe
+    la columna historial; no toca estado, fecha de entrega ni quién recibió.
 """
 
 import os
@@ -115,6 +118,8 @@ def traducir(res):
                 # FedEx entrega la hora local del destino: basta con el día.
                 datos['fecha_entrega'] = f['dateTime'][:10]
         nombre = ((res.get('deliveryDetails') or {}).get('receivedByName') or '').strip()
+        if 'liberaci' in nombre.lower() or 'signature release' in nombre.lower():
+            nombre = 'Sin firma'   # FedEx lo dejó sin firma ("Liberación de firma en los registros")
         if nombre:
             datos['recibido_por'] = nombre
     elif codigo == 'DE':
@@ -130,7 +135,38 @@ def traducir(res):
     return datos
 
 
+def cargar_historial_entregados(sb):
+    """Modo "historial": llena solo la columna historial de los ya entregados."""
+    desde = (datetime.now(timezone.utc) - timedelta(days=DIAS_ATRAS)).isoformat()
+    filas = (sb.table('seguimiento_fedex').select('id, orden_transporte, historial')
+               .eq('estado_envio', 'Entregado').gte('fecha_ingreso', desde).execute().data)
+    faltan = [f for f in filas if f.get('orden_transporte') and not f.get('historial')]
+    print(f'{len(faltan)} envíos entregados sin movimientos (de {len(filas)} entregados en los últimos {DIAS_ATRAS} días)\n')
+    if not faltan:
+        return
+    token = token_fedex()
+    cargados = 0
+    for i in range(0, len(faltan), POR_CONSULTA):
+        grupo = faltan[i:i + POR_CONSULTA]
+        resultados = rastrear(token, [f['orden_transporte'].strip() for f in grupo])
+        for f in grupo:
+            res = resultados.get(f['orden_transporte'].strip())
+            historial = movimientos(res) if res and not res.get('error') else []
+            if not historial:
+                print(f"  OT {f['orden_transporte']}: FedEx sin movimientos")
+                continue
+            sb.table('seguimiento_fedex').update({'historial': historial}).eq('id', f['id']).execute()
+            cargados += 1
+            print(f"  OT {f['orden_transporte']}: {len(historial)} movimientos guardados")
+        time.sleep(1)
+    print(f'\n{cargados} envíos con movimientos cargados.')
+
+
 def main():
+    if MODO == 'historial':
+        print('Modo: HISTORIAL (carga única de movimientos de los ya entregados)')
+        cargar_historial_entregados(create_client(SUPABASE_URL, SUPABASE_KEY))
+        return
     print(f'Modo: {MODO.upper()}' + ('  (no se escribe nada)' if MODO != 'escribir' else ''))
     sb = create_client(SUPABASE_URL, SUPABASE_KEY)
     desde = (datetime.now(timezone.utc) - timedelta(days=DIAS_ATRAS)).isoformat()
