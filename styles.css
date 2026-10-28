@@ -1620,9 +1620,20 @@ tr.letra-plegable:hover td { color: var(--accent); }
 /* Ficha del envío FedEx */
 .fx-estado .oc-fact-cifras { flex-direction: column; gap: 2px; }
 .btn-mp-gris { background: #F4F2EE; color: var(--text-2); border-color: var(--border); cursor: pointer; font-family: var(--font); }
-.fx-envio > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.fx-envio { margin: 16px 0 6px; }
+.fx-envio > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: #FAF9F6; transition: border-color .15s, background .15s; }
 .fx-envio > summary::-webkit-details-marker { display: none; }
-.fx-envio[open] > summary .oc-saldo-flecha { transform: rotate(90deg); }
+.fx-envio > summary:hover { border-color: var(--accent); background: #FDF7F5; }
+.fx-envio-tit { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.fx-envio-sub { font-size: 13px; color: var(--text-3); flex: 1; }
+.fx-envio-ver { font: 600 13px var(--font); color: var(--accent); display: flex; align-items: center; gap: 4px; }
+.fx-envio-ver .ti { transition: transform .15s; }
+.fx-envio-cerrar { display: none; }
+.fx-envio[open] .fx-envio-abrir { display: none; }
+.fx-envio[open] .fx-envio-cerrar { display: inline; }
+.fx-envio[open] .fx-envio-ver .ti { transform: rotate(180deg); }
+.fx-envio[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.fx-envio > div { margin-top: 8px; }
 .fx-fac-fila { cursor: pointer; }
 .fx-fac-fila:hover td { background: #F4F2EE !important; }
 .fx-chev { display: inline-block; color: var(--text-3); transition: transform .15s; }

@@ -8190,8 +8190,11 @@ function fichaEnvioFedex(id, lista) {
       + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`,
     sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
     resumen: `<div class="doc-arriba">${infoEnvio}${cajaEstado}</div>`,
-    cuerpo: `<details class="fx-envio" open>
-        <summary class="panel-h fx-envio-cab"><i class="ti ti-chevron-right oc-saldo-flecha"></i> Qué se envió</summary>
+    // "Qué se envió" parte cerrado: es una barra grande que se abre al clic.
+    cuerpo: `<details class="fx-envio">
+        <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
+          <span class="fx-envio-sub">${docs.length ? `${docs.length} factura${docs.length === 1 ? '' : 's'} · ver productos` : 'sin detalle'}</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Esconder</span> <i class="ti ti-chevron-down"></i></span></summary>
         ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
           : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
       </details>
