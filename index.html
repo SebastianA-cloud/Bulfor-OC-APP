@@ -1051,7 +1051,11 @@
   <div class="page" id="page-pagos-graficos">
     <div class="page-header">
       <div class="page-title">Gráficos de cobros</div>
-      <div class="page-sub">Quién paga más, más rápido, y quién se demora</div>
+      <div class="page-sub">Cuánto se debe, cuánto se demoran en pagar y quién paga más</div>
+    </div>
+    <div class="stats gp-kpis" id="gp-kpis"></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-status-tabs" id="gp-periodo"></div>
     </div>
     <div id="pagos-graficos-layout" style="display:flex;gap:16px;align-items:flex-start">
       <div id="pagos-graficos-selector" style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;width:270px"></div>
@@ -6484,7 +6488,8 @@ function fichaCobranzaCliente(g, i) {
       ${ultima ? `<div class="panel-gestion"><b>${fDate(ultima.fecha)} · ${escapeHtml(ultima.nota)}</b>${ultima.recordar_el ? `<small>Recordar el ${fDate(ultima.recordar_el)}</small>` : ''}</div>
         ${gestiones.length > 1 ? `<details class="panel-plegable"><summary>Ver todas (${gestiones.length})</summary>${gestiones.slice(1).map(x => `<div class="panel-gestion"><b>${fDate(x.fecha)} · ${escapeHtml(x.nota)}</b>${x.creado_por ? `<small>${escapeHtml(x.creado_por)}</small>` : ''}</div>`).join('')}</details>` : ''}`
         : '<div class="panel-vacio">Todavía no hay gestiones anotadas para este cliente.</div>'}`,
-    navegacion: {
+    // i < 0: se abrió desde otra pantalla (Gráficos de cobros), sin flechas.
+    navegacion: i < 0 ? null : {
       texto: `Cliente ${i + 1} de ${cobClientesF.length}`,
       anterior: i > 0 ? () => cobAbrir(i - 1) : null,
       siguiente: i < cobClientesF.length - 1 ? () => cobAbrir(i + 1) : null,
@@ -6881,17 +6886,41 @@ async function guardarPagoFacturaDetalle(id, btnEl) {
 // trajo), así que "rapidez de pago" se mide como días entre fecha de
 // emisión y fecha de pago — es el dato más parecido que existe hoy.
 const GRAFICOS_PAGOS_DISPONIBLES = [
-  { id: 'top-monto-pagado', icono: '💰', titulo: 'Hospitales que más han pagado', sub: 'Ranking por monto total pagado' },
-  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Hospitales que más facturan', sub: 'Ranking por monto total facturado (pagado + pendiente)' },
-  { id: 'mas-rapidos', icono: '⚡', titulo: 'Los que pagan más puntual', sub: 'Comparado con su plazo de pago (vencimiento)' },
-  { id: 'mas-lentos', icono: '🐢', titulo: 'Los que más se atrasan', sub: 'Comparado con su plazo de pago (vencimiento)' },
-  { id: 'pct-pagado', icono: '📈', titulo: '% de facturas pagadas', sub: 'Qué tan al día está cada hospital' },
-  { id: 'evolucion-mensual-pagos', icono: '📅', titulo: 'Evolución mensual de pagos', sub: 'Total pagado mes a mes' },
+  { id: 'antiguedad', icono: '⏳', titulo: 'Antigüedad de la deuda', sub: 'Cuánto está vencido y hace cuánto' },
+  { id: 'facturado-cobrado', icono: '📅', titulo: 'Facturado vs. cobrado', sub: 'Mes a mes: lo que se factura y lo que entra' },
+  { id: 'top-monto-pagado', icono: '💰', titulo: 'Hospitales que más han pagado', sub: 'Ranking por monto pagado' },
+  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Hospitales que más facturan', sub: 'Ranking por monto facturado' },
+  { id: 'mas-rapidos', icono: '⚡', titulo: 'Los que pagan más puntual', sub: 'Comparado con su plazo de pago' },
+  { id: 'mas-lentos', icono: '🐢', titulo: 'Los que más se atrasan', sub: 'Comparado con su plazo de pago' },
 ];
 
 let graficoPagoActivo = null;
+// Período de los gráficos (fecha de emisión de la factura): este año, los
+// últimos 12 meses o todo el historial. "Antigüedad de la deuda" y "Por
+// cobrar hoy" miran siempre lo pendiente hoy, sin importar el período.
+let gpPeriodo = '12m';
+const GP_PERIODOS = [['anio', 'Este año'], ['12m', 'Últimos 12 meses'], ['todo', 'Todo']];
+
+function gpDesde() {
+  const hoy = new Date();
+  if (gpPeriodo === 'anio') return `${hoy.getFullYear()}-01-01`;
+  if (gpPeriodo === '12m') { const d = new Date(hoy); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() + 1); return d.toLocaleDateString('sv-SE'); }
+  return '';
+}
+function gpSetPeriodo(p) { gpPeriodo = p; renderGraficosPagos(); }
+
+// Monto con IVA de cada factura, con un índice por folio (los gráficos
+// recorren miles de facturas y buscar el documento una por una es lento).
+function gpMontoIVA() {
+  const docs = new Map();
+  documentosGdexpress.forEach(d => { if (d.tipo_dte === '33') docs.set(String(d.folio), d); });
+  return f => { const d = docs.get(String(f.factura)); return d ? montoTotalDoc(d) : Number(f.monto || 0); };
+}
 
 function renderGraficosPagos() {
+  const sel = document.getElementById('gp-periodo');
+  if (sel) sel.innerHTML = GP_PERIODOS.map(([k, l]) => `<button class="fpp-status-tab${gpPeriodo === k ? ' active' : ''}" onclick="gpSetPeriodo('${k}')">${l}</button>`).join('');
+  renderGpKpis();
   document.getElementById('pagos-graficos-selector').innerHTML = GRAFICOS_PAGOS_DISPONIBLES.map(g => `
     <div class="grafico-selector-item${graficoPagoActivo===g.id?' active':''}" onclick="abrirGraficoPago('${g.id}')">
       <span class="grafico-selector-icono">${g.icono}</span>
@@ -6900,7 +6929,62 @@ function renderGraficosPagos() {
         <div class="grafico-selector-sub">${g.sub}</div>
       </div>
     </div>`).join('');
+  if (!GRAFICOS_PAGOS_DISPONIBLES.some(g => g.id === graficoPagoActivo)) graficoPagoActivo = null;
   abrirGraficoPago(graficoPagoActivo || GRAFICOS_PAGOS_DISPONIBLES[0].id);
+}
+
+// Los 4 números de arriba.
+function renderGpKpis() {
+  const cont = document.getElementById('gp-kpis');
+  if (!cont) return;
+  const monto = gpMontoIVA();
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const validas = facturasPago.filter(f => estadoFusionadoPago(f) !== 'N');
+  // 1) Por cobrar hoy: vencido y en plazo.
+  let vencido = 0, enPlazo = 0;
+  validas.filter(f => !f.fecha_pago).forEach(f => {
+    const v = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+    if (v && v < hoy) vencido += monto(f); else enPlazo += monto(f);
+  });
+  // 2) Días promedio de pago (emisión → pago), según el año del pago.
+  const anio = hoy.getFullYear();
+  const diasProm = a => {
+    const xs = validas.filter(f => f.fecha_pago && f.fecha_emision && f.fecha_pago.slice(0, 4) === String(a))
+      .map(f => (new Date(f.fecha_pago + 'T12:00:00') - new Date(f.fecha_emision + 'T12:00:00')) / 86400000).filter(d => d >= 0);
+    return xs.length ? Math.round(xs.reduce((t, d) => t + d, 0) / xs.length) : null;
+  };
+  const dEste = diasProm(anio), dAnt = diasProm(anio - 1);
+  // 3) Cobrado este mes vs. el mismo mes del año pasado.
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const cobrado = clave => validas.filter(f => f.fecha_pago && f.fecha_pago.slice(0, 7) === clave).reduce((t, f) => t + monto(f), 0);
+  const cMes = cobrado(`${anio}-${mes}`), cAnt = cobrado(`${anio - 1}-${mes}`);
+  // 4) % pagadas a tiempo (dentro del período elegido, por emisión).
+  const desde = gpDesde();
+  const pagadas = validas.filter(f => f.fecha_pago && (!desde || (f.fecha_emision || '') >= desde));
+  const aTiempo = pagadas.filter(f => { const v = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital); return v && new Date(f.fecha_pago + 'T00:00:00') <= v; }).length;
+  const pct = pagadas.length ? Math.round(aTiempo / pagadas.length * 100) : null;
+  const nombreMes = MESES_NOMBRE[hoy.getMonth()].toLowerCase();
+  cont.innerHTML = `
+    <div class="stat destacado"><div class="stat-label">Por cobrar hoy</div><div class="stat-val">${clp(vencido + enPlazo)}</div>
+      <div class="stat-sub"><b style="color:var(--accent)">${clp(vencido)} vencido</b> · ${clp(enPlazo)} en plazo</div></div>
+    <div class="stat"><div class="stat-label">Días promedio de pago</div><div class="stat-val">${dEste != null ? dEste + ' días' : '—'}</div>
+      <div class="stat-sub">Pagos de ${anio}${dAnt != null ? ` · en ${anio - 1}: ${dAnt} días` : ''}</div></div>
+    <div class="stat"><div class="stat-label">Cobrado en ${nombreMes}</div><div class="stat-val">${clp(cMes) === '—' ? '$ 0' : clp(cMes)}</div>
+      <div class="stat-sub">${nombreMes} ${anio - 1}: ${clp(cAnt) === '—' ? '$ 0' : clp(cAnt)}</div></div>
+    <div class="stat"><div class="stat-label">Pagadas a tiempo</div><div class="stat-val">${pct != null ? pct + '%' : '—'}</div>
+      <div class="stat-sub">${aTiempo} de ${pagadas.length} pagadas · ${GP_PERIODOS.find(x => x[0] === gpPeriodo)[1].toLowerCase()}</div></div>`;
+}
+
+// Al tocar un hospital de un ranking se abre su ficha de Cobranza por
+// cliente (facturas pendientes, estado de cuenta, correo y gestiones).
+function gpAbrirHospital(nombre) {
+  const g = cobranzaPorCliente().find(x => x.nombre === nombre);
+  if (!g) { toast(`${nombre} no tiene facturas pendientes de pago.`); return; }
+  if (cobGestiones === null) { cobGestiones = []; cobCargarGestiones().then(() => panelAbrir(fichaCobranzaCliente(g, -1))); return; }
+  panelAbrir(fichaCobranzaCliente(g, -1));
+}
+function gpBarraHospital(i, s, valor, max, texto, color) {
+  return `<div class="gp-fila" onclick="gpAbrirHospital(${panelEsc(JSON.stringify(s.hospital))})" title="Ver su cobranza">${barraHtml(`${i + 1}. ${escapeHtml(s.hospital)}`, valor, max, texto, color)}</div>`;
 }
 
 // Plazo de pago en días, según lo que definiste. Si el nombre del hospital
@@ -6943,8 +7027,11 @@ function calcularVencimientoFactura(f, nombreHospital) {
 // Las anuladas ('N') no cuentan para nada de esto.
 function statsPagosPorHospital() {
   const grupos = {};
+  const desde = gpDesde();
+  const montoConIVAPago = gpMontoIVA();
   facturasPago.forEach(f => {
     if (estadoFusionadoPago(f) === 'N') return;
+    if (desde && (f.fecha_emision || '') < desde) return;
     const nombre = nombreHosp(f.hospital) || f.hospital || 'Sin hospital';
     if (!grupos[nombre]) grupos[nombre] = { hospital: nombre, totalFacturado: 0, totalPagado: 0, nFacturas: 0, nPagadas: 0, sumaAtraso: 0, nAtrasoValidos: 0 };
     const g = grupos[nombre];
@@ -6981,56 +7068,68 @@ function abrirGraficoPago(id) {
   document.querySelectorAll('.grafico-selector-item').forEach((el, i) => {
     el.classList.toggle('active', GRAFICOS_PAGOS_DISPONIBLES[i].id === id);
   });
+  const sinDatos = '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>';
+  const nota = t => `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">${t}</div>`;
+  const periodo = GP_PERIODOS.find(x => x[0] === gpPeriodo)[1].toLowerCase();
+  const MIN_MUESTRA = 3; // para rapidez evitamos rankear con 1 sola factura, no es representativo
+  const plazos = 'Comparado con su plazo de pago (30 días por defecto; SIRAK 15 días; Obra Don Guanella e Inversiones Farmalisto, al contado).';
 
-  const stats = statsPagosPorHospital();
-  const MIN_MUESTRA = 3; // para rapidez/% evitamos rankear con 1 sola factura, no es representativo
-
-  if (id === 'top-monto-pagado') {
-    const top = stats.filter(s => s.totalPagado > 0).sort((a,b) => b.totalPagado - a.totalPagado).slice(0, 15);
-    const max = Math.max(...top.map(s => s.totalPagado), 1);
-    pintarGraficoPago('Hospitales que más han pagado',
-      top.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.totalPagado, max, clp(s.totalPagado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
-
-  } else if (id === 'top-monto-facturado') {
-    const top = stats.filter(s => s.totalFacturado > 0).sort((a,b) => b.totalFacturado - a.totalFacturado).slice(0, 15);
-    const max = Math.max(...top.map(s => s.totalFacturado), 1);
-    pintarGraficoPago('Hospitales que más facturan',
-      top.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.totalFacturado, max, clp(s.totalFacturado))).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
-
-  } else if (id === 'mas-rapidos') {
-    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => a.atrasoPromedio - b.atrasoPromedio).slice(0, 15);
-    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
-    pintarGraficoPago('Hospitales que pagan más puntual',
-      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con su plazo de pago (30 días por defecto; SIRAK 15 días; Obra Don Guanella e Inversiones Farmalisto, al contado). Negativo = pagan antes del plazo. Solo hospitales con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
-      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--green)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
-
-  } else if (id === 'mas-lentos') {
-    const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => b.atrasoPromedio - a.atrasoPromedio).slice(0, 15);
-    const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
-    pintarGraficoPago('Hospitales que más se atrasan',
-      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Comparado con su plazo de pago (30 días por defecto; SIRAK 15 días; Obra Don Guanella e Inversiones Farmalisto, al contado). Solo hospitales con al menos ${MIN_MUESTRA} facturas pagadas.</div>` +
-      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, 'var(--red)')).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
-
-  } else if (id === 'pct-pagado') {
-    const con = stats.filter(s => s.nFacturas >= MIN_MUESTRA).sort((a,b) => b.pctPagado - a.pctPagado).slice(0, 15);
-    pintarGraficoPago('% de facturas pagadas por hospital',
-      `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Solo hospitales con al menos ${MIN_MUESTRA} facturas emitidas.</div>` +
-      (con.map((s,i) => barraHtml(`${i+1}. ${s.hospital}`, s.pctPagado, 100, `${s.pctPagado.toFixed(0)}%`)).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos suficientes todavía.</div>'));
-
-  } else if (id === 'evolucion-mensual-pagos') {
-    const porMes = {};
-    facturasPago.forEach(f => {
-      if (!f.fecha_pago || estadoFusionadoPago(f) === 'N') return;
-      const key = f.fecha_pago.slice(0,7);
-      porMes[key] = (porMes[key] || 0) + montoConIVAPago(f);
+  if (id === 'antiguedad') {
+    // Lo pendiente HOY, por días de atraso respecto al vencimiento.
+    const monto = gpMontoIVA();
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const tramos = [['En plazo', 'var(--green)'], ['1 a 30 días', '#C98A1B'], ['31 a 60 días', '#D97706'], ['61 a 90 días', '#C0392B'], ['Más de 90 días', '#8E1B12']].map(([l, c]) => ({ l, c, monto: 0, n: 0 }));
+    facturasPago.filter(f => esPendienteReal(f)).forEach(f => {
+      const v = calcularVencimientoFactura(f, nombreHosp(f.hospital) || f.hospital);
+      const d = v ? Math.round((hoy - v) / 86400000) : 0;
+      const t = d <= 0 ? tramos[0] : d <= 30 ? tramos[1] : d <= 60 ? tramos[2] : d <= 90 ? tramos[3] : tramos[4];
+      t.monto += monto(f); t.n += 1;
     });
-    const meses = Object.keys(porMes).sort();
-    const max = Math.max(...meses.map(m => porMes[m]), 1);
-    pintarGraficoPago('Evolución mensual de pagos',
-      meses.map(m => {
-        const [a, mm] = m.split('-');
-        return barraHtml(`${MESES_NOMBRE[parseInt(mm,10)-1]} ${a}`, porMes[m], max, clp(porMes[m]));
-      }).join('') || '<div style="font-size:13px;color:var(--text-3)">Sin datos todavía.</div>');
+    const max = Math.max(...tramos.map(t => t.monto), 1);
+    pintarGraficoPago('Antigüedad de la deuda',
+      nota('Facturas pendientes hoy, según cuántos días han pasado desde su vencimiento. No depende del período elegido. Ojo: los pagos de los últimos meses se cargan con retraso (Excel de la TGR), así que parte de esto puede estar pagado y sin anotar.') +
+      tramos.map(t => barraHtml(`${t.l} · ${t.n} factura${t.n === 1 ? '' : 's'}`, t.monto, max, clp(t.monto) === '—' ? '$ 0' : clp(t.monto), t.c)).join(''));
+  } else if (id === 'facturado-cobrado') {
+    // Por mes: facturado (por emisión) y cobrado (por fecha de pago).
+    const monto = gpMontoIVA();
+    const desde = gpDesde();
+    const fact = {}, cob = {};
+    facturasPago.forEach(f => {
+      if (estadoFusionadoPago(f) === 'N') return;
+      if (f.fecha_emision && (!desde || f.fecha_emision >= desde)) { const k = f.fecha_emision.slice(0, 7); fact[k] = (fact[k] || 0) + monto(f); }
+      if (f.fecha_pago && (!desde || f.fecha_pago >= desde)) { const k = f.fecha_pago.slice(0, 7); cob[k] = (cob[k] || 0) + monto(f); }
+    });
+    const meses = [...new Set([...Object.keys(fact), ...Object.keys(cob)])].sort().reverse();
+    const max = Math.max(...meses.map(m => Math.max(fact[m] || 0, cob[m] || 0)), 1);
+    const ancho = v => `${Math.round((v || 0) / max * 100)}%`;
+    pintarGraficoPago('Facturado vs. cobrado',
+      nota(`Mes a mes (${periodo}): <span class="gp-ley gp-ley-fact"></span> facturado según la fecha de emisión y <span class="gp-ley gp-ley-cob"></span> cobrado según la fecha de pago. Los meses recientes se ven bajos en cobrado porque los pagos se anotan con retraso.`) +
+      (meses.map(m => { const [a, mm] = m.split('-'); return `<div class="gp-mes">
+        <div class="gp-mes-nom">${MESES_NOMBRE[parseInt(mm, 10) - 1]} ${a}</div>
+        <div class="gp-mes-barras">
+          <div class="gp-barra"><div class="gp-barra-fact" style="width:${ancho(fact[m])}"></div><span>${fact[m] ? clp(fact[m]) : '$ 0'}</span></div>
+          <div class="gp-barra"><div class="gp-barra-cob" style="width:${ancho(cob[m])}"></div><span>${cob[m] ? clp(cob[m]) : '$ 0'}</span></div>
+        </div></div>`; }).join('') || sinDatos));
+  } else {
+    const stats = statsPagosPorHospital();
+    if (id === 'top-monto-pagado') {
+      const top = stats.filter(s => s.totalPagado > 0).sort((a,b) => b.totalPagado - a.totalPagado).slice(0, 15);
+      const max = Math.max(...top.map(s => s.totalPagado), 1);
+      pintarGraficoPago('Hospitales que más han pagado', nota(`Facturas emitidas en ${periodo}. Toca un hospital para ver su cobranza.`) +
+        (top.map((s,i) => gpBarraHospital(i, s, s.totalPagado, max, clp(s.totalPagado))).join('') || sinDatos));
+    } else if (id === 'top-monto-facturado') {
+      const top = stats.filter(s => s.totalFacturado > 0).sort((a,b) => b.totalFacturado - a.totalFacturado).slice(0, 15);
+      const max = Math.max(...top.map(s => s.totalFacturado), 1);
+      pintarGraficoPago('Hospitales que más facturan', nota(`Facturas emitidas en ${periodo}. Toca un hospital para ver su cobranza.`) +
+        (top.map((s,i) => gpBarraHospital(i, s, s.totalFacturado, max, clp(s.totalFacturado))).join('') || sinDatos));
+    } else if (id === 'mas-rapidos' || id === 'mas-lentos') {
+      const rapidos = id === 'mas-rapidos';
+      const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => rapidos ? a.atrasoPromedio - b.atrasoPromedio : b.atrasoPromedio - a.atrasoPromedio).slice(0, 15);
+      const max = Math.max(...con.map(s => Math.abs(s.atrasoPromedio)), 1);
+      pintarGraficoPago(rapidos ? 'Hospitales que pagan más puntual' : 'Hospitales que más se atrasan',
+        nota(`${plazos} ${rapidos ? 'Negativo = pagan antes del plazo. ' : ''}Facturas emitidas en ${periodo}; solo hospitales con al menos ${MIN_MUESTRA} facturas pagadas. Toca un hospital para ver su cobranza.`) +
+        (con.map((s,i) => gpBarraHospital(i, s, Math.abs(s.atrasoPromedio), max, s.atrasoPromedio <= 0 ? `${Math.abs(s.atrasoPromedio).toFixed(0)} días antes` : `${s.atrasoPromedio.toFixed(0)} días de atraso`, rapidos ? 'var(--green)' : 'var(--red)')).join('') || sinDatos));
+    }
   }
 }
 

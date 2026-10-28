@@ -1592,3 +1592,18 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .rz-nuevo { font-size: 10px; padding: 1px 6px; vertical-align: middle; }
 .rz-estado-celda { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .rz-btn-fila { padding: 4px 10px !important; font-size: 12px !important; }
+
+/* Gráficos de cobros */
+.gp-kpis { margin-bottom: 16px; }
+.gp-kpis .stat-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.gp-fila { cursor: pointer; border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
+.gp-fila:hover { background: #F4F2EE; }
+.gp-mes { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.gp-mes-nom { width: 120px; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+.gp-mes-barras { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.gp-barra { display: flex; align-items: center; gap: 8px; }
+.gp-barra > div { height: 8px; border-radius: 4px; min-width: 2px; }
+.gp-barra span { font-size: 11px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.gp-barra-fact, .gp-ley-fact { background: #B9B3A8; }
+.gp-barra-cob, .gp-ley-cob { background: var(--green); }
+.gp-ley { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: middle; }
