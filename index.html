@@ -1061,7 +1061,7 @@
 
   <div class="page" id="page-facturas-rechazadas">
     <div class="page-header">
-      <div class="page-title">Facturas rechazadas <span class="info-tip" tabindex="0" role="note" data-tip="Cada caso muestra la cadena completa: la factura rechazada, su nota de crédito y la factura que la reemplaza. Rojo: rechazada · morado: nota de crédito · verde: aceptada · punteado: lo que falta. Se actualiza solo al emitir la NC o la refactura.">i</span></div>
+      <div class="page-title">Facturas rechazadas <span class="info-tip" tabindex="0" role="note" data-tip="Listado de casos por mes (según la fecha de la factura rechazada). Al abrir uno ves la cadena completa: la factura rechazada, su nota de crédito y la factura que la reemplaza. Rojo: rechazada · morado: nota de crédito · verde: aceptada · punteado: lo que falta. Se actualiza solo al emitir la NC o la refactura.">i</span></div>
       <div class="page-sub" id="rechazadas-resumen"></div>
     </div>
     <div class="fpp-toolbar-top">
@@ -10301,49 +10301,102 @@ function renderRechazadas(soloTabla) {
     ? `${porResolver.length} caso${porResolver.length === 1 ? '' : 's'} por resolver · ${casos.filter(c => c.estado === 'falta_nc').length} sin nota de crédito · ${casos.filter(c => c.estado === 'falta_refact').length} sin refacturar`
     : 'Nada pendiente: todos los rechazos están resueltos.';
 
+  // Listado como los de OC y Documentos, separado por mes (mes en que se
+  // emitió la primera factura rechazada del caso). Cada fila abre la ficha
+  // del caso con la cadena completa.
   const cont = document.getElementById('rechazadas-contenido');
   window.__rzCasos = [];
-  const pendientesHtml = (rechazadasEstadoActivo === 'resueltas' ? [] : porResolver.slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))).map(c => {
-    const ci = window.__rzCasos.push(c) - 1;
-    const etiqueta = c.estado === 'falta_nc' ? 'Falta nota de crédito' : 'Falta refacturar';
-    return `<div class="rz-caso pend">
-      <div class="rz-cab"><div><b>${escapeHtml(c.hospital)}</b><span class="rz-mut">${c.fecha ? 'rechazada el ' + fDate(c.fecha) : ''}${c.intentos > 1 ? ` · primera factura: ${escapeHtml(c.raiz)} · ${c.intentos} intentos` : ''}</span></div><span class="badge badge-amber">${etiqueta}</span></div>
-      ${c.motivos.length ? `<div class="rz-motivo"><b>Motivo:</b> ${c.motivos.map(m => `${c.motivos.length > 1 ? escapeHtml(m.folio) + ': ' : ''}“${escapeHtml(m.motivo)}”`).join(' · ')}</div>` : ''}
-      <div class="rz-cadena">${c.nodos.map((n, ni) => (ni ? '<span class="rz-flecha">→</span>' : '') + rzNodoHtml(n, ci, ni)).join('')}</div>
-      <div class="rz-acc">${c.estado === 'falta_refact' ? `<button class="page-btn page-btn-pri" onclick="rzRefacturar(${ci})">Refacturar</button>` : ''}
-        <button class="page-btn" onclick="rzAnotarAMano(${ci})">Anotar NC o reemplazo a mano</button></div>
-    </div>`;
-  }).join('');
-
-  let resueltasHtml = '';
-  if (rechazadasEstadoActivo !== 'por_resolver') {
-    const orden = resueltas.slice().sort((a, b) => (b.fechaFin || b.fecha || '').localeCompare(a.fechaFin || a.fecha || ''));
-    let mesAnterior = '';
-    resueltasHtml = orden.map(c => {
-      const ci = window.__rzCasos.push(c) - 1;
-      const f = c.fechaFin || c.fecha || '';
-      const mes = f ? `${MESES_NOMBRE[Number(f.slice(5, 7)) - 1]} ${f.slice(0, 4)}` : 'Sin fecha';
-      const cab = mes !== mesAnterior ? `<div class="rz-mes">${mes}</div>` : '';
-      mesAnterior = mes;
-      const mini = c.nodos.filter(n => n.tipo === 'rech' || n.tipo === 'ok').map(n => n.tipo === 'ok' ? `<span class="rz-okt">${escapeHtml(n.folio)} ✓</span>` : `<span class="rz-rx">${escapeHtml(n.folio)}</span>`).join('<span class="rz-flecha">→</span>');
-      const abierto = rechazadasCasoAbierto === c.raiz;
-      return `${cab}<div class="rz-fila${abierto ? ' abierta' : ''}" onclick="rechazadasCasoAbierto=${abierto ? 'null' : `'${String(c.raiz).replace(/'/g, "\\'")}'`};renderRechazadas()">
-        <div class="rz-fila-top"><span class="rz-hosp">${escapeHtml(c.hospital)}</span><span class="rz-mini">${mini}</span><span class="rz-mut">${c.intentos} intentos${f ? ' · ' + fDate(f) : ''}</span><span class="badge badge-green">✓ Resuelta</span><span class="rz-chev">${abierto ? '⌄' : '›'}</span></div>
-        ${abierto ? `<div class="rz-cadena">${c.nodos.map((n, ni) => (ni ? '<span class="rz-flecha">→</span>' : '') + rzNodoHtml(n, ci, ni)).join('')}</div>
-          ${c.motivos.length ? `<div class="rz-motivo"><b>Motivos:</b> ${c.motivos.map(m => `${escapeHtml(m.folio)}: “${escapeHtml(m.motivo)}”`).join(' · ')}</div>` : ''}` : ''}
-      </div>`;
-    }).join('');
+  const visibles = (rechazadasEstadoActivo === 'por_resolver' ? porResolver : rechazadasEstadoActivo === 'resueltas' ? resueltas : base)
+    .slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || Number(b.raiz) - Number(a.raiz));
+  if (!visibles.length) {
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'resueltas' ? 'Todavía no hay casos resueltos.' : 'No hay rechazos por resolver. 🎉'}</p></div></div>`;
+    return;
   }
-
-  cont.innerHTML = (pendientesHtml || resueltasHtml)
-    ? `<div class="rz-lista">${pendientesHtml}${resueltasHtml}</div>`
-    : `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'resueltas' ? 'Todavía no hay casos resueltos.' : 'No hay rechazos por resolver. 🎉'}</p></div></div>`;
+  const abierto = panelPila.find(x => x.rzRaiz)?.rzRaiz;
+  let mesAnterior = '';
+  const filas = visibles.map(c => {
+    const ci = window.__rzCasos.push(c) - 1;
+    const mes = c.fecha ? `${MESES_NOMBRE[Number(c.fecha.slice(5, 7)) - 1]} ${c.fecha.slice(0, 4)}` : 'Sin fecha';
+    const cab = mes !== mesAnterior ? `<tr class="rz-mes-fila"><td colspan="6">${mes}</td></tr>` : '';
+    mesAnterior = mes;
+    const d = rzDoc(c.raiz);
+    return `${cab}<tr class="oc-fila${abierto === c.raiz ? ' fila-abierta' : ''}" onclick="rzAbrirCaso(${ci})">
+      <td data-label="Folio"><span class="mono oc-cod">${escapeHtml(c.raiz)}</span>${c.intentos > 1 ? `<small class="oc-origen">${c.intentos} intentos</small>` : ''}</td>
+      <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(c.hospital || '—')}</span>${c.ultimaRech?.rut_hospital ? `<small>${escapeHtml(c.ultimaRech.rut_hospital)}</small>` : ''}</td>
+      <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${c.fecha ? fDate(c.fecha) : '—'}</td>
+      <td data-label="Total" style="white-space:nowrap;font-weight:500">${clp(d ? montoTotalDoc(d) : c.nodos[0]?.monto)}</td>
+      <td data-label="Cadena"><span class="rz-mini">${rzCadenaMini(c)}</span></td>
+      <td data-label="Estado">${rzEstadoBadge(c)}</td>
+    </tr>`;
+  }).join('');
+  cont.innerHTML = `<div class="table-card oc-tabla tabla-centrada rz-tabla"><table>
+    <thead><tr><th>Folio</th><th>Hospital</th><th>Emisión</th><th>Total</th><th>Cadena</th><th>Estado</th></tr></thead>
+    <tbody>${filas}</tbody></table></div>`;
   if (soloTabla) { const inp = document.getElementById('rechazadas-search'); if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; } }
+}
+
+// Cadena en corto para la fila: 17213 → NC 983 → falta refactura.
+function rzCadenaMini(c) {
+  return c.nodos.map(n => n.tipo === 'rech' ? `<span class="rz-rx">${escapeHtml(n.folio)}</span>`
+    : n.tipo === 'nc' ? `<span class="rz-nct">NC ${escapeHtml(n.folio)}</span>`
+    : n.tipo === 'ok' ? `<span class="rz-okt">${escapeHtml(n.folio)} ✓</span>`
+    : `<span class="rz-faltat">falta ${n.texto === 'Refactura' ? 'refactura' : 'NC'}</span>`).join('<span class="rz-flecha">→</span>');
+}
+
+function rzEstadoBadge(c) {
+  return c.estado === 'resuelta' ? '<span class="badge badge-green">✓ Resuelta</span>'
+    : `<span class="badge badge-amber">${c.estado === 'falta_nc' ? 'Falta nota de crédito' : 'Falta refacturar'}</span>`;
+}
+
+// Ficha del caso: la misma cadena de antes (cada documento se abre con un
+// clic), el motivo, el botón Refacturar y, plegado, el formulario para anotar
+// a mano la NC o el reemplazo (casos antiguos).
+function rzAbrirCaso(ci) {
+  panelAbrir(fichaCasoRechazada(ci));
+  renderRechazadas();
+}
+
+function fichaCasoRechazada(ci) {
+  const c = window.__rzCasos[ci];
+  if (!c) return null;
+  const f = c.ultimaRech;
+  const pendiente = c.estado !== 'resuelta';
+  const idx = ci, total = window.__rzCasos.length;
+  const ncAuto = f?._ncAutoDetectada;
+  const formMano = f ? `<details class="rz-mano">
+      <summary><i class="ti ti-chevron-right oc-saldo-flecha"></i> Anotar NC o reemplazo a mano</summary>
+      <div class="cob-pago-campos">
+        <label>N° nota de crédito${ncAuto ? `<div class="rz-auto">${escapeHtml(String(ncAuto))} (detectada sola)</div>` : `<input type="text" id="rz-nc-detalle" value="${escapeHtml(f.nota_credito_asociada || '')}" placeholder="N° NC" ${f.id == null ? 'disabled' : ''}>`}</label>
+        <label>N° factura de reemplazo<input type="text" id="rz-reemplazo-detalle" value="${escapeHtml(f.factura_reemplazo || '')}" placeholder="N° factura" ${f.id == null ? 'disabled' : ''}></label>
+        <button class="page-btn page-btn-pri" ${f.id == null ? 'disabled' : ''} onclick="guardarRechazadaDesdeDetalle(${f.id}, this)">Guardar</button>
+      </div>
+      ${f.id == null ? '<div class="rz-mut" style="margin:8px 0 0">Esta factura todavía no tiene fila en Cobranza: solo se detectó vía GDExpress, no se puede editar aquí.</div>' : ''}
+    </details>` : '';
+  return {
+    rzRaiz: c.raiz,
+    antetitulo: pendiente ? 'Factura rechazada' : 'Rechazo resuelto',
+    titulo: String(c.raiz),
+    tituloMono: true,
+    tituloCopiar: true,
+    sub: [c.hospital, c.fecha ? 'emitida el ' + fDate(c.fecha) : '', c.intentos > 1 ? c.intentos + ' intentos' : ''].filter(Boolean).join(' · '),
+    resumen: `<div class="rz-ficha-estado">${rzEstadoBadge(c)}</div>`
+      + (c.motivos.length ? `<div class="rz-motivo-caja"><span>Motivo del rechazo</span>${c.motivos.map(m => `<div>${c.motivos.length > 1 ? `<b class="mono">${escapeHtml(m.folio)}:</b> ` : ''}“${escapeHtml(m.motivo)}”</div>`).join('')}</div>` : ''),
+    cuerpo: `<div class="panel-h">Cadena del caso</div>
+      <div class="rz-cadena">${c.nodos.map((n, ni) => (ni ? '<span class="rz-flecha">→</span>' : '') + rzNodoHtml(n, ci, ni)).join('')}</div>
+      ${pendiente ? `<div class="rz-acc" style="margin-top:14px">${c.estado === 'falta_refact' ? `<button class="page-btn page-btn-pri" onclick="panelCerrar();rzRefacturar(${ci})">Refacturar</button>` : ''}</div>` : ''}`,
+    pie: formMano,
+    navegacion: {
+      texto: `Caso ${idx + 1} de ${total}`,
+      anterior: idx > 0 ? () => { const x = fichaCasoRechazada(idx - 1); setTimeout(renderRechazadas, 0); return panelAbrir(x); } : null,
+      siguiente: idx < total - 1 ? () => { const x = fichaCasoRechazada(idx + 1); setTimeout(renderRechazadas, 0); return panelAbrir(x); } : null,
+    },
+    alCerrar: () => setTimeout(() => { if (document.getElementById('page-facturas-rechazadas')?.classList.contains('active')) renderRechazadas(); }, 0),
+  };
 }
 
 function rzVerNodo(ci, ni) {
   const n = window.__rzCasos[ci]?.nodos[ni];
-  if (n && n.doc) panelAbrir(fichaDocumento(n.doc.id, []));
+  if (n && n.doc) panelAbrir(fichaDocumento(n.doc.id, []), panelPila.some(x => x.rzRaiz));
 }
 
 // Abre una factura nueva con "¿Es refacturación?" activado y los datos de la rechazada.
@@ -10448,7 +10501,10 @@ async function guardarRechazadaDesdeDetalle(id, btnEl) {
     const idx = facturasPago.findIndex(f => f.id === id);
     if (idx !== -1) { facturasPago[idx].factura_reemplazo = reemplazo || null; facturasPago[idx].nota_credito_asociada = nc || null; }
     toast('✓ Regularización actualizada');
-    document.getElementById('rechazada-detalle-overlay').remove();
+    document.getElementById('rechazada-detalle-overlay')?.remove();
+    // Si se guardó desde la ficha del caso, se cierra: el caso puede haber
+    // cambiado de estado (o quedado resuelto) y el listado se vuelve a armar.
+    if (panelPila.some(x => x.rzRaiz)) panelCerrar();
     renderRechazadas();
   } catch(e) {
     toast('No se pudo guardar: ' + e.message, 'err');

@@ -1578,3 +1578,16 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .cob-pago-campos input { font: 400 14px var(--font); text-transform: none; letter-spacing: 0; color: var(--text); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 .cob-pago-campos .page-btn { padding: 9px 20px !important; }
 .cob-pago .panel-h { margin-bottom: 10px; }
+
+/* Facturas rechazadas: listado por mes y ficha del caso */
+.rz-tabla .rz-mes-fila td { background: #F4F2EE; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); font-weight: 700; padding: 8px 16px; cursor: default; }
+.rz-tabla .rz-mini { display: inline-flex; flex-wrap: wrap; justify-content: center; font-size: 12px; }
+.rz-nct { color: #6B46C1; font-weight: 600; }
+.rz-faltat { color: #B45309; font-family: var(--font); font-style: italic; }
+.rz-ficha-estado { margin-bottom: 10px; }
+.rz-motivo-caja { border: 1px solid #F5C6C0; background: #FDF4F2; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }
+.rz-motivo-caja span { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); font-weight: 700; }
+.rz-mano summary { cursor: pointer; font-size: 13px; color: var(--text-2); font-weight: 600; margin-bottom: 10px; list-style: none; display: flex; align-items: center; gap: 6px; }
+.rz-mano summary::-webkit-details-marker { display: none; }
+.rz-mano[open] .oc-saldo-flecha { transform: rotate(90deg); }
+.rz-auto { font: 600 14px var(--mono); color: var(--green); text-transform: none; letter-spacing: 0; padding: 8px 0; }
