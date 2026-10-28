@@ -1679,8 +1679,12 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .page .table-card { overflow: clip; }
 .page .table-card table > thead th { position: sticky; top: var(--thead-top, 34px); z-index: 5; background: #2B2724; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .6px; padding-top: 12px; padding-bottom: 12px; border-bottom: none; }
 .page .table-card table > thead th input[type=checkbox] { accent-color: #fff; }
-/* Listas A-Z con su propio scroll: ahí los títulos se pegan arriba de esa caja. */
-.page .alfabetico-tabla table > thead th { top: 0; }
-.page .alfabetico-tabla tr.letra-header td { top: 40px; }
+/* Listas A-Z (Precios, Productos de proveedores): sin scroll propio; se baja
+   con la página como las demás. Los títulos quedan fijos arriba, la letra
+   (A, B, C…) justo debajo, y la barra de letras queda a la vista. */
+.page .alfabetico-tabla { max-height: none; overflow: visible; }
+.page .alfabetico-tabla tr.letra-header td { top: calc(var(--thead-top, 34px) + 40px); z-index: 4; }
+.page .alfabetico-tabla tr.letra-header { scroll-margin-top: calc(var(--thead-top, 34px) + 44px); }
+.page .alfabetico-jump { position: sticky; top: calc(var(--thead-top, 34px) + 8px); align-self: flex-start; }
 .fx-tabla tbody tr.oc-fila:not(.fila-abierta):not(:hover) td { background: #fff !important; }
 .fx-tabla tbody tr.fx-dia td { background: #EFECE6 !important; border-top: 1px solid var(--border); }
