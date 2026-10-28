@@ -1688,3 +1688,7 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .page .alfabetico-jump { position: sticky; top: calc(var(--thead-top, 34px) + 8px); align-self: flex-start; }
 .fx-tabla tbody tr.oc-fila:not(.fila-abierta):not(:hover) td { background: #fff !important; }
 .fx-tabla tbody tr.fx-dia td { background: #EFECE6 !important; border-top: 1px solid var(--border); }
+
+/* Tablas dentro de otro recuadro (ej. Anuladas/Rechazadas en Cobranza): sus
+   títulos no quedan fijos, porque se cruzarían con los de la tabla principal. */
+.page .cob-anuladas .table-card table > thead th { position: static; }
