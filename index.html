@@ -695,7 +695,7 @@
     <div class="table-card oc-tabla tabla-centrada fx-tabla">
       <table>
         <thead><tr>
-          <th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th>
+          <th>Fecha</th><th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th><th>Recibió</th>
         </tr></thead>
         <tbody id="cx-body"></tbody>
       </table>
@@ -5642,7 +5642,7 @@ function renderFedex() {
 function fedexAjustarCabeceraFija() { ajustarCabecerasFijas(); }
 
 // ─── CHILEXPRESS ────────────────────────────────────────────────────────────
-// Igual que FedEx (mes y año, separación por día, ficha del envío), pero sin
+// Igual que FedEx (mes y año, fecha en columna, ficha del envío), pero sin
 // conexión automática: el estado se anota a mano en la ficha y el botón
 // "Ver en Chilexpress" abre el seguimiento de la OT en su página.
 const ESTADOS_CHILEXPRESS = [
@@ -5745,23 +5745,21 @@ function renderChilexpress() {
   renderPages('cx-pages', total, pages, cxPage, 'goChilexpress');
   if (!slice.length) {
     const q = (document.getElementById('cx-search')?.value || '').trim();
-    body.innerHTML = `<tr><td colspan="4"><div class="fpp-empty"><div class="fpp-empty-icon">📦</div><p>${q ? 'No encontramos envíos con esa búsqueda.' : chilexpress.length ? 'No hay envíos en esta vista.' : 'Todavía no hay envíos de Chilexpress. Usa «+ Nuevo envío» para registrar el primero.'}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">📦</div><p>${q ? 'No encontramos envíos con esa búsqueda.' : chilexpress.length ? 'No hay envíos en esta vista.' : 'Todavía no hay envíos de Chilexpress. Usa «+ Nuevo envío» para registrar el primero.'}</p></div></td></tr>`;
     return;
   }
   const abierto = panelPila[0]?.cxId;
-  const cuantosDia = {};
-  cxF.forEach(e => { const d = fedexDiaChile(e); cuantosDia[d] = (cuantosDia[d] || 0) + 1; });
-  let diaAnterior = null;
-  const nombreDia = d => { if (!d) return 'Sin fecha'; const t = new Date(d + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); };
+  // Igual que FedEx: la fecha en su propia columna y quién recibió.
   body.innerHTML = slice.map(e => {
     const d = fedexDiaChile(e);
-    const cab = d !== diaAnterior ? `<tr class="fx-dia"><td colspan="4">${nombreDia(d)} <span>· ${cuantosDia[d]} envío${cuantosDia[d] === 1 ? '' : 's'}</span></td></tr>` : '';
-    diaAnterior = d;
-    return cab + `<tr class="oc-fila${abierto === e.id ? ' fila-abierta' : ''}" onclick="cxAbrir(${e.id})">
+    const entregado = cxEstado(e) === 'entregado';
+    return `<tr class="oc-fila${abierto === e.id ? ' fila-abierta' : ''}" onclick="cxAbrir(${e.id})">
+      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${d ? fDate(d) : '—'}</td>
       <td data-label="Hospital" style="font-weight:500">${escapeHtml(nombreHosp(e.hospital) || e.hospital || '—')}</td>
       <td data-label="OT" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(e.orden_transporte || '—')}</td>
       <td data-label="Factura" class="mono" style="font-size:13px">${escapeHtml(e.factura || '—')}</td>
       <td data-label="Estado" style="white-space:nowrap">${cxEtiquetaEstado(e)}</td>
+      <td data-label="Recibió" style="font-size:13px">${entregado && e.recibido_por ? escapeHtml(e.recibido_por) : '<span style="color:var(--text-3)">—</span>'}</td>
     </tr>`;
   }).join('');
   ajustarCabecerasFijas();
@@ -5776,29 +5774,16 @@ function cxAbrir(id) {
   renderChilexpress();
 }
 
-// Ficha del envío: igual a la de FedEx, más el formulario para anotar el
+// Ficha del envío: igual a la de FedEx (OT arriba, "Qué se envió", historial
+// y estado lado a lado), más el formulario para anotar el
 // estado a mano (Chilexpress no informa el estado solo).
 function fichaEnvioChilexpress(id, lista) {
   const e = chilexpress.find(x => x.id === id);
   if (!e) return null;
   const docs = fedexDocsDeEnvio(e);
-  const ocs = [...new Set(docs.map(d => (d.orden_compra_ref || '').trim()).filter(Boolean))];
   const entregado = cxEstado(e) === 'entregado';
   const contItems = `cx-items-${e.id}-${Date.now()}`;
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
-  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
-  const facturasHtml = docs.length
-    ? docs.map(d => `<div class="oc-info-cod"><b class="mono panel-link" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}${d.doc_url ? `<a class="btn-mp" href="${d.doc_url}" target="_blank" rel="noopener">Ver PDF <i class="ti ti-external-link"></i></a>` : ''}</div>`).join('')
-    : `<div class="oc-info-cod" style="color:var(--text-3)">${e.factura ? escapeHtml(e.factura) + ' (aún no sincronizada)' : 'Sin factura anotada'}</div>`;
-  const ocsHtml = ocs.map(c => `<div class="oc-info-cod">${oc.some(o => o.codigooc === c)
-      ? `<b class="mono panel-link" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(c))}), true)">${escapeHtml(c)}</b>`
-      : `<b class="mono">${escapeHtml(c)}</b>`}${copiar(c)}${botonMP(urlMercadoPublicoOC(c), 'Ver OC')}</div>`).join('');
-  const total = docs.reduce((t, d) => t + montoTotalDoc(d), 0);
-  const infoEnvio = `<div class="oc-info">
-      <div><span>Factura${docs.length > 1 ? 's' : ''}</span>${facturasHtml}
-        ${ocs.length ? `<span class="doc-info-sub">Orden${ocs.length > 1 ? 'es' : ''} de compra</span>${ocsHtml}` : ''}</div>
-      ${docs.length ? `<div><span>Total (con IVA)</span><div class="oc-info-total">${clp(total)}</div></div>` : ''}
-    </div>`;
   const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
       <div class="oc-fact-cab"><span>Estado del envío</span>${cxEtiquetaEstado(e)}</div>
       <div class="oc-fact-cifras">
@@ -5807,6 +5792,7 @@ function fichaEnvioChilexpress(id, lista) {
         ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
       </div>
     </div>`;
+  const cajaHistorial = `<div class="doc-caja fx-hist-caja"><div class="oc-fact-cab"><span>Historial del envío</span></div>${fedexHistorialHtml(e)}</div>`;
   const navLista = lista || cxF;
   const idx = navLista.findIndex(x => x.id === e.id);
   const fechaEnt = e.fecha_entrega ? new Date(e.fecha_entrega).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
@@ -5817,8 +5803,7 @@ function fichaEnvioChilexpress(id, lista) {
     tituloMono: true,
     tituloCopiar: !!e.orden_transporte,
     tituloExtra: e.orden_transporte ? `<a class="btn-mp btn-mp-cx" href="${urlRastreoChilexpress(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento de esta OT en Chilexpress">Ver en Chilexpress <i class="ti ti-external-link"></i></a>` : '',
-    sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
-    resumen: `<div class="doc-arriba">${infoEnvio}${cajaEstado}</div>`,
+    sub: nombreHosp(e.hospital) || e.hospital || '',
     cuerpo: `<details class="fx-envio">
         <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
           <span class="fx-envio-sub">${docs.length ? `${docs.length} factura${docs.length === 1 ? '' : 's'} · clic para ver qué productos iban` : 'sin detalle'}</span>
@@ -5826,7 +5811,7 @@ function fichaEnvioChilexpress(id, lista) {
         ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
           : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
       </details>
-      <div class="panel-h">Historial del envío</div>${fedexHistorialHtml(e)}`,
+      <div class="fx-abajo">${cajaHistorial}${cajaEstado}</div>`,
     pie: `<div class="cob-pago">
       <div class="panel-h">Actualizar estado</div>
       <div class="cob-pago-campos">
