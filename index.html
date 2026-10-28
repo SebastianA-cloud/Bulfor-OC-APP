@@ -9936,21 +9936,23 @@ function fppRenderTabla(soloTabla) {
   const normales = lista.filter(f => f.estado_aceptacion !== 'N');
   const anuladas = lista.filter(f => f.estado_aceptacion === 'N');
 
+  // Mismo diseño que los listados de OC y Documentos; toda la fila abre la
+  // ficha de la factura. La casilla sigue sirviendo para pagar varias juntas.
+  const abierta = panelPila.find(x => x.fppId)?.fppId;
   const filaHtml = f => `
-    <tr style="cursor:pointer" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
+    <tr class="oc-fila${abierta === f.id ? ' fila-abierta' : ''}" onclick="navReset();abrirDetalleFacturaPorPagar(${f.id})">
       <td style="width:32px" onclick="event.stopPropagation()"><input type="checkbox" class="fpp-check" data-id="${f.id}" onchange="toggleFPPSeleccion(${f.id}, this.checked)"></td>
-      <td data-label="N° Factura" class="mono" style="color:var(--accent)">${f.factura}</td>
-      <td data-label="Proveedor" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.proveedor||''}">${f.proveedor||'—'}</td>
-      <td data-label="RUT" class="mono" style="font-size:12px;color:var(--text-2)">${f.rut_proveedor||'—'}</td>
-      <td data-label="Emisión" style="font-size:12px;white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
-      <td data-label="Vencimiento" style="font-size:12px;white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${fppContextoVencimiento(f)}</td>
-      <td data-label="Monto" style="white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums">${clp(f.monto_total ?? f.monto)}</td>
+      <td data-label="Folio"><span class="mono oc-cod">${escapeHtml(String(f.factura))}</span></td>
+      <td data-label="Proveedor" class="oc-hosp"><span title="${escapeHtml(f.proveedor || '')}">${escapeHtml(f.proveedor || '—')}</span>${f.rut_proveedor ? `<small>${escapeHtml(f.rut_proveedor)}</small>` : ''}</td>
+      <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+      <td data-label="Vencimiento" style="white-space:nowrap">${f.fecha_vencimiento ? fDate(f.fecha_vencimiento) : '—'}${fppContextoVencimiento(f)}</td>
+      <td data-label="Total" style="white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:500">${clp(f.monto_total ?? f.monto)}</td>
       <td data-label="Estado">${fppBadgeEstado(f)}</td>
     </tr>`;
 
-  const tabla = (arr, conCheckbox) => `<div class="table-card"><table><thead><tr>
+  const tabla = (arr, conCheckbox) => `<div class="table-card oc-tabla tabla-centrada"><table><thead><tr>
     ${conCheckbox ? `<th style="width:32px"><input type="checkbox" id="fpp-check-todo" onchange="toggleFPPSeleccionarTodo(this.checked)"></th>` : '<th style="width:32px"></th>'}
-    <th>N° Factura</th><th>Proveedor</th><th>RUT</th><th>Emisión</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th>Estado</th>
+    <th>Folio</th><th>Proveedor</th><th>Emisión</th><th>Vencimiento</th><th>Total</th><th>Estado</th>
   </tr></thead><tbody>${arr.map(filaHtml).join('')}</tbody></table></div>`;
 
   let html = tabla(normales, true);
@@ -10082,7 +10084,101 @@ function botonNavFPPHtml(idActual) {
     <button onclick="navegarFacturaProvDesdeVisor(${haySiguiente?lista[idx+1].id:''})" ${haySiguiente?'':'disabled'} title="Siguiente (${donde}) — ${posicion}" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
+// Abrir una factura de proveedor: ficha nueva en el panel, con el mismo
+// diseño que la de las facturas de venta.
 function abrirDetalleFacturaPorPagar(id, contextoNav = null) {
+  fppNavLista = contextoNav;
+  cerrarTodosLosModales();
+  panelAbrir(fichaFacturaProveedor(id));
+  fppMarcarFilaAbierta();
+}
+
+function fppMarcarFilaAbierta() {
+  // Se espera un instante: al pasar con las flechas, la ficha nueva entra
+  // justo después de cerrar la anterior.
+  setTimeout(() => { if (document.getElementById('page-facturas-por-pagar')?.classList.contains('active')) fppRenderTabla(); }, 0);
+}
+
+function fichaFacturaProveedor(id) {
+  const f = fppPorId(id);
+  if (!f) return null;
+  const total = Number(f.monto_total ?? f.monto ?? 0);
+  const neto = f.monto_total != null && f.monto != null && Number(f.monto) !== Number(f.monto_total) ? Number(f.monto) : Math.round(total / 1.19);
+  const cuenta = (f.cuenta_pago_id && proveedoresCuentas.find(p => p.id === f.cuenta_pago_id)) || nombreProveedorCuenta(f.rut_proveedor);
+  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
+  const contItems = `fpp-items-${f.id}-${Date.now()}`;
+  setTimeout(() => cargarItemsFacturaPorPagar(f, contItems), 0);
+
+  // Recuadro izquierdo: proveedor y total.
+  const infoProv = `<div class="oc-info">
+      <div><span>Proveedor</span>
+        <div class="oc-info-cod"><b>${escapeHtml(f.proveedor || '—')}</b></div>
+        ${f.rut_proveedor ? `<div class="oc-info-cod"><span class="mono" style="font-size:13px;color:var(--text-2);text-transform:none;letter-spacing:0;font-weight:400;margin:0">${escapeHtml(f.rut_proveedor)}</span>${copiar(f.rut_proveedor)}</div>` : ''}</div>
+      <div><span>Total (con IVA)</span><div class="oc-info-total">${clp(total)}</div><div class="doc-info-neto">Neto ${clp(neto)}</div></div>
+    </div>`;
+
+  // Recuadro de pago: misma barra que la cobranza de las facturas de venta.
+  const cat = categoriaFPP(f);
+  const hoy = fechaLocalISO();
+  const dias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+  let cajaPago;
+  if (cat === null) {
+    cajaPago = `<div class="oc-fact oc-fact-cancelada doc-caja doc-cobro"><div class="oc-fact-cab"><span>Pago</span><span class="badge badge-gray">No se paga</span></div>
+      <div class="oc-fact-cifras"><span>Factura anulada.</span></div></div>`;
+  } else {
+    const vence = f.fecha_vencimiento || '';
+    const plazo = f.fecha_emision && vence ? dias(f.fecha_emision, vence) : 0;
+    const pct = cat !== 'pending' ? 100 : plazo > 0 ? Math.max(0, Math.min(100, Math.round(dias(f.fecha_emision, hoy) / plazo * 100))) : 0;
+    const clase = cat === 'paid' ? 'completa' : cat === 'overdue' ? 'vencida' : 'por';
+    const badge = cat === 'paid' ? '<span class="badge badge-green">Pagada</span>' : cat === 'overdue' ? '<span class="badge badge-red">Atrasada</span>' : '<span class="badge badge-amber">Por pagar</span>';
+    const derecha = cat === 'paid' ? (f.fecha_pago ? `<span>Pagada el <b>${fDate(f.fecha_pago)}</b></span>` : '')
+      : vence ? (cat === 'overdue' ? `<span>Venció hace <b>${dias(vence, hoy)} día${dias(vence, hoy) === 1 ? '' : 's'}</b></span>` : `<span>Vence el <b>${fDate(vence)}</b> (${dias(hoy, vence) === 0 ? 'hoy' : 'en ' + dias(hoy, vence) + ' día' + (dias(hoy, vence) === 1 ? '' : 's')})</span>`) : '';
+    cajaPago = `<div class="oc-fact oc-fact-${clase} doc-caja doc-cobro">
+      <div class="oc-fact-cab"><span>Pago</span>${badge}</div>
+      <div class="oc-fact-barra"><div style="width:${pct}%"></div></div>
+      <div class="oc-fact-cifras"><span>Emitida <b>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</b></span>${derecha}</div></div>`;
+  }
+
+  // Recuadro de la cuenta a la que se paga (para transferir sin buscarla).
+  const cajaCuenta = `<div class="doc-caja doc-estado">
+      <div class="doc-estado-fila"><span class="doc-estado-et">Cuenta para pagar</span>
+        ${cuenta ? `<div class="fpp-cuenta"><span><b>${escapeHtml(cuenta.banco || 'Sin banco')}</b>${cuenta.tipo_cuenta ? ' · ' + escapeHtml(cuenta.tipo_cuenta) : ''}</span>
+          ${cuenta.numero_cuenta ? `<div class="oc-info-cod"><span class="mono">${escapeHtml(cuenta.numero_cuenta)}</span>${copiar(cuenta.numero_cuenta)}</div>` : ''}
+          ${cuenta.email_pago ? `<small class="doc-envio-det">${escapeHtml(cuenta.email_pago)}</small>` : ''}</div>`
+          : `<div class="doc-sin-envio">Sin cuenta registrada · <a class="panel-link" onclick="abrirGestionProveedores()">agregar</a></div>`}</div>
+    </div>`;
+
+  const opcionesCuenta = proveedoresCuentas.map(p => `<option value="${p.id}" ${f.cuenta_pago_id === p.id ? 'selected' : ''}>${escapeHtml((p.nombre_proveedor || p.rut_proveedor) + ' — ' + (p.banco || 'sin banco') + ' ' + (p.numero_cuenta || ''))}</option>`).join('');
+  const lista = listaNavFPP();
+  const idx = lista.findIndex(x => x.id === f.id);
+  return {
+    fppId: f.id,
+    antetitulo: 'Factura de proveedor',
+    titulo: String(f.factura),
+    tituloMono: true,
+    tituloCopiar: true,
+    tituloExtra: f.doc_url ? `<a class="btn-mp" href="${f.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF de la factura">Ver PDF <i class="ti ti-external-link"></i></a>` : '',
+    sub: [f.proveedor, f.fecha_emision ? fDate(f.fecha_emision) : ''].filter(Boolean).join(' · '),
+    resumen: `<div class="doc-arriba">${infoProv}${cajaPago}${cajaCuenta}</div>`,
+    cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`,
+    pie: cat === null ? '' : `<div class="cob-pago">
+      <div class="panel-h">Pago</div>
+      <div class="cob-pago-campos">
+        <label>Estado<select id="fpp-detalle-estado"><option value="Pendiente" ${f.estado_pago !== 'Pagado' ? 'selected' : ''}>Pendiente</option><option value="Pagado" ${f.estado_pago === 'Pagado' ? 'selected' : ''}>Pagado</option></select></label>
+        <label>Fecha de pago<input type="date" id="fpp-detalle-fecha-pago" value="${f.fecha_pago || ''}"></label>
+        <label>Cuenta de pago<select id="fpp-detalle-cuenta"><option value="">— sin asignar —</option>${opcionesCuenta}</select></label>
+        <button class="page-btn page-btn-pri" onclick="guardarPagoFacturaPorPagar(${f.id}, this)">Guardar</button>
+      </div></div>`,
+    navegacion: idx === -1 ? null : {
+      texto: `Factura ${idx + 1} de ${lista.length}`,
+      anterior: idx > 0 ? () => panelAbrir(fichaFacturaProveedor(lista[idx - 1].id)) : null,
+      siguiente: idx < lista.length - 1 ? () => panelAbrir(fichaFacturaProveedor(lista[idx + 1].id)) : null,
+    },
+    alCerrar: fppMarcarFilaAbierta,
+  };
+}
+
+function abrirDetalleFacturaPorPagarAntiguo(id, contextoNav = null) {
   fppNavLista = contextoNav;
   const f = fppPorId(id);
   if (!f) return;
@@ -10150,8 +10246,9 @@ function abrirDetalleFacturaPorPagar(id, contextoNav = null) {
   cargarItemsFacturaPorPagar(f);
 }
 
-async function cargarItemsFacturaPorPagar(f) {
-  const cuerpo = document.getElementById('fpp-items-cuerpo');
+async function cargarItemsFacturaPorPagar(f, contId) {
+  const cuerpo = document.getElementById(contId || 'fpp-items-cuerpo');
+  if (!cuerpo) return;
   if (!f.detalle_sincronizado) {
     cuerpo.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;font-size:12px;color:var(--text-3)">Todavía no se ha traído el detalle de esta factura — se completa solo en la próxima sincronización.</div>`;
     return;
@@ -10162,27 +10259,18 @@ async function cargarItemsFacturaPorPagar(f) {
       cuerpo.innerHTML = `<div style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;font-size:12px;color:var(--text-3)">No se encontraron productos para esta factura.</div>`;
       return;
     }
-    cuerpo.innerHTML = `
-      <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <table style="margin:0">
-          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
-          <tbody>
-            ${items.map(it => `<tr>
-              <td data-label="Producto" style="font-weight:500">
-                ${it.nombre_producto||'—'}
-                ${(it.codigo_valor || it.descripcion) ? `<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">
-                  ${it.codigo_valor ? `<span class="mono">${it.codigo_tipo ? it.codigo_tipo + ' - ' : ''}${it.codigo_valor}</span>` : ''}
-                  ${it.codigo_valor && it.descripcion ? ' · ' : ''}
-                  ${it.descripcion || ''}
-                </div>` : ''}
-              </td>
-              <td data-label="Cantidad" style="text-align:right">${it.cantidad||'—'} ${it.unidad||''}</td>
-              <td data-label="Precio unit." style="text-align:right">${clp(it.precio_unitario)}</td>
-              <td data-label="Total" style="text-align:right;font-weight:500">${clp(it.monto_item)}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
+    if (!document.body.contains(cuerpo)) return;
+    // Tabla cuadriculada como la de las facturas de venta, con Neto, IVA y
+    // Total solo bajo Precio unit. y Total.
+    const total = Number(f.monto_total ?? f.monto ?? 0);
+    const neto = f.monto_total != null && f.monto != null && Number(f.monto) !== Number(f.monto_total) ? Number(f.monto) : Math.round(total / 1.19);
+    cuerpo.innerHTML = `<table class="panel-tabla panel-tabla-cuadros"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>
+      ${items.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${(it.codigo_valor || it.descripcion) ? `<small class="panel-muted">${it.codigo_valor ? escapeHtml((it.codigo_tipo ? it.codigo_tipo + ' - ' : '') + it.codigo_valor) : ''}${it.codigo_valor && it.descripcion ? ' · ' : ''}${escapeHtml(it.descripcion || '')}</small>` : ''}</td>
+        <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td>
+        <td style="text-align:right">${clp(it.precio_unitario)}</td><td style="text-align:right;font-weight:500">${clp(it.monto_item)}</td></tr>`).join('')}</tbody>
+      <tfoot class="doc-totales"><tr><td class="doc-totales-vacio" colspan="2" rowspan="3"></td><td>Neto</td><td>${clp(neto)}</td></tr>
+        <tr><td>IVA 19%</td><td>${clp(total - neto)}</td></tr>
+        <tr class="doc-total"><td>Total</td><td>${clp(total)}</td></tr></tfoot></table>`;
   } catch (e) {
     cuerpo.innerHTML = `<div style="color:var(--red);font-size:12px">No se pudo cargar el detalle: ${e.message}</div>`;
   }
@@ -10198,7 +10286,10 @@ async function guardarPagoFacturaPorPagar(id, btnEl) {
     await sb(`facturas_por_pagar?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
     const f = fppPorId(id);
     if (f) Object.assign(f, cambios);
-    document.getElementById('fpp-detalle-overlay').remove();
+    document.getElementById('fpp-detalle-overlay')?.remove();
+    // Si la ficha nueva está abierta, se vuelve a dibujar con el pago al día.
+    const i = panelPila.findIndex(x => x.fppId === id);
+    if (i !== -1) { panelPila[i] = fichaFacturaProveedor(id); panelPintar(); }
     fppRender();
     toast('Guardado');
   } catch (e) {
