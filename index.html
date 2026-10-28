@@ -1090,7 +1090,7 @@
   <div class="page" id="page-facturas-prov-productos">
     <div class="page-header">
       <div class="page-title">Productos</div>
-      <div class="page-sub">Historial de productos de Facturas por pagar (proveedores)</div>
+      <div class="page-sub">A quién le hemos comprado cada producto y a qué precio</div>
     </div>
     <div class="fpp-resumen" id="fpprov-items-resumen" style="display:none"></div>
     <div class="toolbar">
@@ -1111,7 +1111,7 @@
           <table style="margin:0">
             <thead><tr>
               <th>Producto</th>
-              <th style="text-align:right">N° facturas</th><th style="text-align:right">Total facturado</th>
+              <th style="text-align:right">N° facturas</th><th style="text-align:right">Última compra</th><th style="text-align:right">Precio (sin IVA)</th>
             </tr></thead>
             <tbody id="fpprov-items-body"></tbody>
           </table>
@@ -3486,23 +3486,14 @@ function productoVentaDe(nombreFactura) {
   return g ? g.nombre : n;
 }
 
-async function cargarItemsFacturasVentaUnaVez() {
-  if (facturaItemsCargados) return;
-  const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
-  const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
-  facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
-
-  // Además del total se guarda el precio unitario: el mínimo, el máximo y el
-  // de la última factura. En documentos_gdexpress_items precio_unitario ya
-  // viene NETO (cantidad × precio_unitario = monto_item, y la suma de los
-  // monto_item es el neto del documento), así que se muestra tal cual, sin
-  // descontarle IVA.
-  // Los nombres parecidos de un mismo producto ("A. CITRICO 20% BIDON 5LT",
-  // "A CITRICO 20%, 5LT"…) se juntan en uno, con la misma regla que la ficha
-  // de hospital (ver agruparNombresProducto y productoVentaDe).
+// Junta los nombres parecidos de un mismo producto (errores de tipeo, PEG =
+// polietilenglicol, cápsulas por frasco…) y, dentro de un producto base, una
+// presentación por medida. Devuelve Map nombre en la factura → { nombre, nombres }.
+// La usan Precios (ventas) y Productos de proveedores (compras).
+function grupoDeProductos(items) {
   const pesos = new Map();
   const porCapsula = new Map();   // nombre -> [ventas por cápsula, ventas en total]
-  facturaItemsRaw.forEach(it => {
+  items.forEach(it => {
     const n = (it.nombre_producto || 'Sin nombre').trim();
     pesos.set(n, (pesos.get(n) || 0) + 1);
     const c = porCapsula.get(n) || [0, 0];
@@ -3538,6 +3529,24 @@ async function cargarItemsFacturasVentaUnaVez() {
       iguales.forEach(g => Object.entries(g.nombres).forEach(([n, v]) => { unido.nombres[n] = (unido.nombres[n] || 0) + v; grupoDe.set(n, unido); }));
     });
   });
+  return grupoDe;
+}
+
+async function cargarItemsFacturasVentaUnaVez() {
+  if (facturaItemsCargados) return;
+  const todos = await fetchAll('documentos_gdexpress_items', 'select=documento_id,nombre_producto,cantidad,unidad,precio_unitario,monto_item');
+  const idsFacturas = new Set(documentosGdexpress.filter(d => d.tipo_dte === '33').map(d => d.id));
+  facturaItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsFacturas.has(it.documento_id));
+
+  // Además del total se guarda el precio unitario: el mínimo, el máximo y el
+  // de la última factura. En documentos_gdexpress_items precio_unitario ya
+  // viene NETO (cantidad × precio_unitario = monto_item, y la suma de los
+  // monto_item es el neto del documento), así que se muestra tal cual, sin
+  // descontarle IVA.
+  // Los nombres parecidos de un mismo producto ("A. CITRICO 20% BIDON 5LT",
+  // "A CITRICO 20%, 5LT"…) se juntan en uno, con la misma regla que la ficha
+  // de hospital (ver agruparNombresProducto y productoVentaDe).
+  const grupoDe = grupoDeProductos(facturaItemsRaw);
   grupoProductosVenta = grupoDe;
   const map = new Map();
   facturaItemsRaw.forEach(it => {
@@ -4427,6 +4436,13 @@ let facturaProvItemsCargados = false;
 let facturaProvProductosUnicos = [];
 let facturaProvProductosUnicosF = [];
 let facturaProvItemsRaw = []; // ítems crudos, para armar el detalle por proveedor al hacer clic
+let grupoProductosProv = new Map();
+// Nombre de grupo de un producto comprado (como productoVentaDe en Precios).
+function productoProvDe(nombreFactura) {
+  const n = (nombreFactura || 'Sin nombre').trim();
+  const g = grupoProductosProv.get(n);
+  return g ? g.nombre : n;
+}
 
 // Igual que el de venta: una sola carga, compartida entre la página de
 // Productos de proveedor y el visor de Precio costo.
@@ -4436,15 +4452,32 @@ async function cargarItemsFacturasProveedor() {
   const idsValidas = new Set(facturasPorPagar.filter(f => f.estado_aceptacion !== 'N').map(f => f.id));
   facturaProvItemsRaw = (Array.isArray(todos) ? todos : []).filter(it => idsValidas.has(it.factura_id));
 
+  // Igual que Precios: los nombres parecidos se juntan en un producto y,
+  // dentro de un producto base, una presentación por medida. Por producto se
+  // guarda el último precio unitario y el rango.
+  grupoProductosProv = grupoDeProductos(facturaProvItemsRaw);
   const map = new Map();
   facturaProvItemsRaw.forEach(it => {
-    const key = (it.nombre_producto || 'Sin nombre').trim();
-    if (!map.has(key)) map.set(key, { nombre: key, facturas: 0, totalFacturado: 0 });
+    const key = productoProvDe(it.nombre_producto);
+    if (!map.has(key)) map.set(key, { nombre: key, docs: new Set(), totalFacturado: 0, alias: new Set(),
+      precioMin: null, precioMax: null, ultimoPrecio: null, ultimaFecha: null, ultimaUnidad: null });
     const entry = map.get(key);
-    entry.facturas += 1;
+    entry.alias.add((it.nombre_producto || 'Sin nombre').trim());
+    entry.docs.add(it.factura_id);
     entry.totalFacturado += Number(it.monto_item || 0);
+    const pr = Number(it.precio_unitario);
+    if (pr > 0) {
+      if (entry.precioMin === null || pr < entry.precioMin) entry.precioMin = pr;
+      if (entry.precioMax === null || pr > entry.precioMax) entry.precioMax = pr;
+    }
+    const fecha = fppPorId(it.factura_id)?.fecha_emision || '';
+    if (fecha && (!entry.ultimaFecha || fecha > entry.ultimaFecha)) {
+      entry.ultimaFecha = fecha;
+      entry.ultimoPrecio = pr > 0 ? pr : null;
+      entry.ultimaUnidad = (it.unidad || '').trim() || null;
+    }
   });
-  facturaProvProductosUnicos = Array.from(map.values()).sort((a, b) => b.totalFacturado - a.totalFacturado);
+  facturaProvProductosUnicos = Array.from(map.values()).map(e => ({ ...e, facturas: e.docs.size })).sort((a, b) => b.totalFacturado - a.totalFacturado);
   facturaProvProductosUnicosF = [...facturaProvProductosUnicos];
   facturaProvItemsCargados = true;
 }
@@ -4465,7 +4498,7 @@ async function cargarProductosFacturasProveedor() {
 
 function filterFacturaProvItems() {
   const q = document.getElementById('fpprov-items-search').value;
-  facturaProvProductosUnicosF = facturaProvProductosUnicos.filter(p => coincideBusqueda(p.nombre, q));
+  facturaProvProductosUnicosF = facturaProvProductosUnicos.filter(p => coincideBusqueda(`${p.nombre} ${p.alias ? [...p.alias].join(' ') : ''}`, q));
   renderFacturaProvItems();
 }
 
@@ -4476,7 +4509,9 @@ function renderFacturaProvItems() {
   document.getElementById('fpprov-items-info').textContent = `${facturaProvProductosUnicosF.length.toLocaleString('es-CL')} productos`;
 
   const totalFacturado = facturaProvProductosUnicosF.reduce((s,p) => s + (p.totalFacturado||0), 0);
-  const totalFacturas = facturaProvProductosUnicosF.reduce((s,p) => s + (p.facturas||0), 0);
+  const docsUnicos = new Set();
+  facturaProvProductosUnicosF.forEach(p => { if (p.docs) p.docs.forEach(id => docsUnicos.add(id)); });
+  const totalFacturas = docsUnicos.size;
   const resumen = document.getElementById('fpprov-items-resumen');
   resumen.style.display = 'grid';
   resumen.innerHTML = `
@@ -4486,12 +4521,130 @@ function renderFacturaProvItems() {
 
   const hayFiltro = document.getElementById('fpprov-items-search').value;
   const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos de facturas de proveedor.'}</p></div></td>`;
-  renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', facturaProvProductosUnicosF, p => p.nombre,
-    (p, idx) => `<tr onclick="navReset();openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx}].nombre)" style="cursor:pointer">
+  // Igual que Precios: una fila por producto base; sus presentaciones se ven al abrirlo.
+  renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', sustanciasDePrecios(facturaProvProductosUnicosF), p => p.nombre,
+    (p, idx) => p.presentaciones ? `<tr onclick="navReset();abrirFilaPreciosProv(${idx})" style="cursor:pointer">
+      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗ <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.presentaciones.length} presentaciones</small></td>
+      <td style="text-align:right">${p.facturas}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-3);white-space:nowrap">Ver presentaciones ›</td>
+    </tr>` : `<tr onclick="navReset();abrirFilaPreciosProv(${idx})" style="cursor:pointer">
       <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
       <td style="text-align:right">${p.facturas}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">${clp(p.totalFacturado)}</td>
-    </tr>`, 3, mensajeVacio);
+      <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+      </td>
+    </tr>`, 4, mensajeVacio);
+}
+
+// ─── Fichas de Productos de proveedores (igual que las de Precios) ─────────
+function abrirFilaPreciosProv(idx) {
+  const fila = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body'] || [])[idx];
+  if (!fila) return;
+  cerrarTodosLosModales();
+  const f = fila.presentaciones ? fichaSustanciaProv(idx) : fichaProductoProv(fila.nombre);
+  if (f) panelAbrir(f);
+}
+
+function navegacionPreciosProv(idx) {
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body']) || [];
+  if (idx < 0 || idx >= lista.length) return null;
+  return {
+    texto: `${idx + 1} de ${lista.length}`,
+    anterior: idx > 0 ? () => abrirFilaPreciosProv(idx - 1) : null,
+    siguiente: idx < lista.length - 1 ? () => abrirFilaPreciosProv(idx + 1) : null,
+  };
+}
+
+function fichaSustanciaProv(idx) {
+  const s = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body'] || [])[idx];
+  if (!s || !s.presentaciones) return null;
+  window.__ppPresentaciones = s.presentaciones;
+  return {
+    antetitulo: 'Producto comprado',
+    titulo: s.nombre,
+    sub: `${s.presentaciones.length} presentaciones · ${s.facturas.toLocaleString('es-CL')} facturas · ${clp(s.totalFacturado)} neto`,
+    cuerpo: `<div class="panel-h">Presentaciones — clic para ver proveedores y precios</div>
+      <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Presentación</th><th style="text-align:right">Facturas</th><th>Última compra</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Rango</th></tr></thead><tbody>
+        ${s.presentaciones.map((p, i) => `<tr class="pv-fila" onclick="panelAbrir(fichaProductoProv(window.__ppPresentaciones[${i}].nombre), true)">
+          <td><span class="panel-link">${escapeHtml(p.nombre)}</span>${p.alias && p.alias.size > 1 ? ' ' + infoTip('Nombres que se juntaron aquí: ' + [...p.alias].join(' · ')) : ''}</td>
+          <td style="text-align:right">${p.facturas}</td><td>${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
+          <td class="oc-monto">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <small class="pv-unidad">/ ${escapeHtml(p.ultimaUnidad)}</small>` : ''}</td>
+          <td class="oc-monto" style="font-weight:400;color:var(--text-2)">${p.precioMin != null && p.precioMin !== p.precioMax ? `${clp(p.precioMin)} – ${clp(p.precioMax)}` : '—'}</td></tr>`).join('')}
+      </tbody></table>`,
+    navegacion: navegacionPreciosProv(idx),
+  };
+}
+
+function comprasDeProducto(nombreProducto) {
+  return facturaProvItemsRaw
+    .filter(it => productoProvDe(it.nombre_producto) === nombreProducto)
+    .map(it => ({ item: it, f: fppPorId(it.factura_id) }))
+    .filter(x => x.f);
+}
+
+// Producto comprado: proveedores con su último precio; clic → historial.
+function fichaProductoProv(nombreProducto) {
+  const compras = comprasDeProducto(nombreProducto);
+  if (!compras.length) return null;
+  const prod = facturaProvProductosUnicos.find(p => p.nombre === nombreProducto) || {};
+  const total = compras.reduce((t, c) => t + Number(c.item.monto_item || 0), 0);
+  const docs = new Set(compras.map(c => c.f.id));
+  const porProv = new Map();
+  compras.forEach(({ item, f }) => {
+    const pr = f.proveedor || 'Sin proveedor';
+    if (!porProv.has(pr)) porProv.set(pr, { proveedor: pr, docs: new Set(), total: 0, ultima: '', precio: null, unidad: '' });
+    const e = porProv.get(pr);
+    e.docs.add(f.id);
+    e.total += Number(item.monto_item || 0);
+    if ((f.fecha_emision || '') >= e.ultima) { e.ultima = f.fecha_emision || ''; e.precio = Number(item.precio_unitario) || null; e.unidad = (item.unidad || '').trim(); }
+  });
+  const proveedores = [...porProv.values()].sort((a, b) => b.ultima.localeCompare(a.ultima));
+  window.__ppProveedores = proveedores;
+  const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fpprov-items-body']) || [];
+  const idx = lista.findIndex(p => p.nombre === nombreProducto && !p.presentaciones);
+  const alias = prod.alias && prod.alias.size > 1 ? [...prod.alias] : null;
+  return {
+    antetitulo: 'Producto comprado',
+    titulo: nombreProducto,
+    tituloExtra: alias ? infoTip('Nombres que se juntaron aquí: ' + alias.join(' · ')) : '',
+    sub: `${proveedores.length} ${proveedores.length === 1 ? 'proveedor' : 'proveedores'}${alias ? ' · ' + alias.length + ' nombres distintos' : ''}`,
+    resumen: `<div class="hosp-cifras">
+        <div><span>Facturas</span><b>${docs.size.toLocaleString('es-CL')}</b></div>
+        <div><span>Total comprado (neto)</span><b>${clp(total)}</b></div>
+        <div><span>Último precio unitario</span><b>${prod.ultimoPrecio != null ? clp(prod.ultimoPrecio) : '—'}${prod.ultimaUnidad ? ` <small>/ ${escapeHtml(prod.ultimaUnidad)}</small>` : ''}</b></div>
+        <div><span>Rango de precios</span><b>${prod.precioMin != null ? (prod.precioMin === prod.precioMax ? clp(prod.precioMin) : `${clp(prod.precioMin)} – ${clp(prod.precioMax)}`) : '—'}</b></div>
+      </div>`,
+    cuerpo: `<div class="panel-h">Proveedores — clic para ver el historial de precios</div>
+      <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Proveedor</th><th style="text-align:right">Facturas</th><th>Última compra</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Total comprado</th></tr></thead><tbody>
+        ${proveedores.map((c, i) => `<tr class="pv-fila" onclick="panelAbrir(fichaHistorialCompra(${panelEsc(JSON.stringify(nombreProducto))}, window.__ppProveedores[${i}].proveedor), true)">
+          <td><span class="panel-link">${escapeHtml(c.proveedor)}</span></td><td style="text-align:right">${c.docs.size}</td><td>${fDate(c.ultima)}</td>
+          <td class="oc-monto">${c.precio != null ? clp(c.precio) : '—'}${c.unidad ? ` <small class="pv-unidad">/ ${escapeHtml(c.unidad)}</small>` : ''}</td><td class="oc-monto" style="font-weight:500">${clp(c.total)}</td></tr>`).join('')}
+      </tbody></table>`,
+    navegacion: idx === -1 ? null : navegacionPreciosProv(idx),
+  };
+}
+
+// Historial de precios de un producto con un proveedor: cada factura con su
+// cantidad y precio unitario. El N° abre la ficha de la factura.
+function fichaHistorialCompra(nombreProducto, proveedor) {
+  const compras = comprasDeProducto(nombreProducto).filter(c => (c.f.proveedor || 'Sin proveedor') === proveedor)
+    .sort((a, b) => (b.f.fecha_emision || '').localeCompare(a.f.fecha_emision || '') || Number(b.f.factura) - Number(a.f.factura));
+  window.__ppFacturas = compras.map(c => c.f.id);
+  return {
+    antetitulo: proveedor,
+    titulo: nombreProducto,
+    sub: `Historial de precios · ${compras.length} ${compras.length === 1 ? 'compra' : 'compras'}`,
+    cuerpo: compras.length ? `<table class="hosp-oc-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unitario (neto)</th><th style="text-align:right">Total del producto</th></tr></thead><tbody>
+        ${compras.map(({ item, f }) => `<tr><td><button class="oc-folio" onclick="fppNavLista=window.__ppFacturas;panelAbrir(fichaFacturaProveedor(${f.id}), true)">N° ${escapeHtml(String(f.factura))} ›</button></td>
+          <td>${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
+          <td style="text-align:right">${Number(item.cantidad || 0).toLocaleString('es-CL')} ${escapeHtml(item.unidad || '')}</td>
+          <td class="oc-monto">${clp(item.precio_unitario)}</td><td class="oc-monto" style="font-weight:500">${clp(item.monto_item)}</td></tr>`).join('')}
+      </tbody></table>`
+      : '<div class="panel-vacio">No encontramos facturas de este proveedor con este producto.</div>',
+  };
 }
 
 function botonNavProductoFacturaProvHtml(nombreActual) {
@@ -4505,7 +4658,14 @@ function botonNavProductoFacturaProvHtml(nombreActual) {
     <button onclick="openProductoFacturaProvDetail(window.__alfabeticoOrden['fpprov-items-body'][${idx+1}]?.nombre)" ${haySiguiente?'':'disabled'} title="Producto siguiente (orden alfabético, respeta el filtro/búsqueda activa)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);padding:4px 10px;${haySiguiente?'':'opacity:.35;cursor:not-allowed'}">›</button>`;
 }
 
+// Los nombres de siempre abren ahora la ficha nueva.
 function openProductoFacturaProvDetail(nombreProducto) {
+  cerrarTodosLosModales();
+  const f = fichaProductoProv(productoProvDe(nombreProducto)) || fichaProductoProv(nombreProducto);
+  if (f) panelAbrir(f);
+}
+
+function openProductoFacturaProvDetailAntiguo(nombreProducto) {
   cerrarTodosLosModales();
   const compras = facturaProvItemsRaw.filter(it => (it.nombre_producto || 'Sin nombre').trim() === nombreProducto);
   if (!compras.length) return;
