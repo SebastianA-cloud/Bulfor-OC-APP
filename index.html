@@ -10595,7 +10595,14 @@ function fichaFacturaProveedor(id) {
     tituloExtra: f.doc_url ? `<a class="btn-mp" href="${f.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF de la factura">Ver PDF <i class="ti ti-external-link"></i></a>` : '',
     sub: [f.proveedor, f.fecha_emision ? fDate(f.fecha_emision) : ''].filter(Boolean).join(' · '),
     resumen: `<div class="doc-arriba">${infoProv}${cajaPago}${cajaCuenta}</div>`,
-    cuerpo: `<div class="panel-h">Productos</div><div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`,
+    // Los productos parten escondidos (igual que "Qué se envió" en FedEx):
+    // una barra grande que se abre al clic.
+    cuerpo: `<details class="fx-envio">
+        <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-list-details"></i> Productos</span>
+          <span class="fx-envio-sub" id="${contItems}-n">clic para ver qué se compró en esta factura</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver productos</span><span class="fx-envio-cerrar">Esconder</span> <span class="fx-envio-flecha">⌄</span></span></summary>
+        <div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>
+      </details>`,
     pie: cat === null ? '' : `<div class="cob-pago">
       <div class="panel-h">Pago</div>
       <div class="cob-pago-campos">
@@ -10695,6 +10702,8 @@ async function cargarItemsFacturaPorPagar(f, contId) {
       return;
     }
     if (!document.body.contains(cuerpo)) return;
+    const n = document.getElementById((contId || '') + '-n');
+    if (n) n.textContent = `${items.length} producto${items.length === 1 ? '' : 's'} · clic para ver el detalle`;
     // Tabla cuadriculada como la de las facturas de venta, con Neto, IVA y
     // Total solo bajo Precio unit. y Total.
     const total = Number(f.monto_total ?? f.monto ?? 0);
