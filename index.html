@@ -6434,7 +6434,7 @@ function renderCobranzaClientes(soloTabla) {
     return;
   }
   const abierto = panelPila[0]?.cobClave;
-  cont.innerHTML = `<div class="table-card"><table>
+  cont.innerHTML = `<div class="table-card oc-tabla tabla-centrada"><table>
     <thead><tr><th>Hospital</th><th style="text-align:right">Deuda vencida</th><th style="text-align:right">Facturas</th><th>Atraso</th><th class="col-sec" style="text-align:right">Por vencer</th><th class="col-sec">Próxima gestión</th></tr></thead>
     <tbody>${lista.map((g, i) => `
       <tr class="oc-fila${abierto === g.clave ? ' fila-abierta' : ''}" onclick="cobAbrir(${i})">
