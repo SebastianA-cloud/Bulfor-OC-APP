@@ -1564,3 +1564,10 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .doc-totales td.doc-totales-vacio { border-left: none; border-bottom: none; background: transparent; }
 .doc-totales td:not(.doc-totales-vacio):nth-last-child(2) { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
 .doc-totales .doc-total td { font-weight: 800; color: var(--text); font-size: 15px; }
+
+/* Listados de OC y de Documentos: todo centrado, como "Centrar" en Excel
+   (solo en pantalla ancha; en celular las filas son tarjetas). */
+@media (min-width: 761px) {
+  .tabla-centrada th, .tabla-centrada td { text-align: center !important; }
+  .tabla-centrada .oc-hosp span, .tabla-centrada .oc-desc { margin: 0 auto; }
+}

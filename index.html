@@ -388,7 +388,7 @@
       <select id="oc-tipo" onchange="filterOC()"><option value="">Compra ágil y licitación</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
       <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
     </div>
-    <div class="table-card oc-tabla">
+    <div class="table-card oc-tabla tabla-centrada">
       <table>
         <thead><tr>
           <th>N° OC</th><th class="col-sec">Fecha</th><th>Hospital</th><th class="col-sec">Descripción</th>
@@ -7325,7 +7325,7 @@ function renderDocumentosGdexpress(soloTabla) {
   const abierto = panelPila[0]?.docId;
   const MAX = 300;
   cont.innerHTML = `
-    <div class="table-card doc-tabla">
+    <div class="table-card doc-tabla tabla-centrada">
       <table>
         <thead><tr>
           <th>Folio</th><th>Emisión</th><th>Hospital</th><th class="col-sec">OC</th><th style="text-align:right">Total</th><th>Estado</th>
