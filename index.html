@@ -8540,25 +8540,15 @@ function fichaEnvioFedex(id, lista) {
   const e = fedex.find(x => x.id === id);
   if (!e) return null;
   const docs = fedexDocsDeEnvio(e);
-  const ocs = [...new Set(docs.map(d => (d.orden_compra_ref || '').trim()).filter(Boolean))];
   const entregado = (e.estado_envio || '').toLowerCase() === 'entregado';
   const contItems = `fx-items-${e.id}-${Date.now()}`;
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
-  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
-
-  // Factura(s) y OC van en el recuadro del estado, debajo de "Enviado", con
-  // el mismo formato (texto simple, sin enlaces; solo el botón de copiar).
-  const facturasHtml = docs.length
-    ? docs.map(d => `<span>Factura <b>${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}</span>`).join('')
-    : `<span>Factura <b>${e.factura ? escapeHtml(e.factura) : '—'}</b>${e.factura ? copiar(e.factura) : ''}</span>`;
-  const ocsHtml = ocs.map(c => `<span>OC <b>${escapeHtml(c)}</b>${copiar(c)}</span>`).join('');
 
   // Recuadro del estado del envío (va al lado del historial).
   const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
       <div class="oc-fact-cab"><span>Estado del envío</span>${entregado ? '<span class="badge badge-green">Entregado</span>' : badgeEstadoFedex(e.estado_envio)}</div>
       <div class="oc-fact-cifras">
         <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
-        ${facturasHtml}${ocsHtml}
         ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
         ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
       </div>
@@ -8603,15 +8593,16 @@ async function cargarItemsEnvioEnPanel(docs, contId) {
     if (!cont) return;
     const porDoc = new Map(docs.map(d => [d.id, []]));
     its.forEach(it => porDoc.get(it.documento_id)?.push(it));
-    cont.innerHTML = `<table class="panel-tabla panel-tabla-cuadros fx-facturas"><thead><tr><th>Factura</th><th>Fecha de emisión</th><th style="text-align:right">Productos</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
+    cont.innerHTML = `<table class="panel-tabla panel-tabla-cuadros fx-facturas"><thead><tr><th>Factura</th><th>Orden de compra</th><th>Fecha de emisión</th><th style="text-align:right">Productos</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
       ${docs.map(d => {
         const lst = porDoc.get(d.id) || [];
         return `<tr class="fx-fac-fila" onclick="this.classList.toggle('abierta');this.nextElementSibling.hidden=!this.nextElementSibling.hidden">
           <td><span class="fx-chev">›</span> <b class="mono">N° ${escapeHtml(String(d.folio))}</b></td>
+          <td class="mono">${d.orden_compra_ref ? escapeHtml(d.orden_compra_ref) : '<span style="color:var(--text-3)">—</span>'}</td>
           <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
           <td style="text-align:right">${lst.length || '—'}</td>
           <td style="text-align:right;font-weight:500">${clp(montoTotalDoc(d))}</td></tr>
-        <tr class="fx-fac-detalle" hidden><td colspan="4">${lst.length
+        <tr class="fx-fac-detalle" hidden><td colspan="5">${lst.length
           ? `<table class="panel-tabla fx-productos"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>
               ${lst.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${it.descripcion ? `<small class="panel-muted">${escapeHtml(it.descripcion)}</small>` : ''}</td>
                 <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td></tr>`).join('')}
