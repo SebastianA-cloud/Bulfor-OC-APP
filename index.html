@@ -6090,11 +6090,14 @@ function oeRetiroHoy(o) {
   return !!o.fecha_retiro && String(o.fecha_retiro).slice(0, 10) === oeHoyISO() && oeEstado(o) !== 'entregada';
 }
 
-// Etiqueta de pago solo cuando hay algo pendiente: por cancelar o abono.
-function oeBadgePago(o) {
-  if (o.pago === 'Por Cancelar') return '<span class="badge badge-amber">Por cancelar</span>';
-  if (o.tipo_pago === 'abonado') return '<span class="badge badge-amber">Abono</span>';
-  return '';
+// Etiqueta de pago: cómo se pagó (Mesón / Transferencia / Por cancelar) y si
+// fue un abono. Las órdenes antiguas sin dato se muestran como Mesón.
+function oeBadgePago(o, soloPendiente) {
+  if (soloPendiente && o.pago !== 'Por Cancelar' && o.tipo_pago !== 'abonado') return '';  // tablero: solo lo pendiente
+  const abono = o.tipo_pago === 'abonado' ? ' · Abono' : '';
+  if (o.pago === 'Por Cancelar') return `<span class="badge badge-amber">Por cancelar${abono}</span>`;
+  if (o.pago === 'Cancelado por Transferencia') return `<span class="badge ${abono ? 'badge-amber' : 'badge-blue'}">Transferencia${abono}</span>`;
+  return `<span class="badge ${abono ? 'badge-amber' : 'badge-green'}">Mesón${abono}</span>`;
 }
 
 // ─── Lista y tablero ────────────────────────────────────────────────────────
@@ -6175,7 +6178,7 @@ function renderTableroOE(base, buscando) {
     return `<div class="oe-tarjeta${hoy ? ' hoy' : ''}" onclick="abrirDetalleOE(${o.id})">
       <div class="oe-tarjeta-cab"><b>${escapeHtml(o.pacientes?.nombre || 'Sin nombre')}</b><small>N° ${o.id}</small></div>
       <div class="oe-tarjeta-prep">${detalle}</div>
-      <div class="oe-tarjeta-pie"><span class="${hoy ? 'oe-hoy' : ''}">${oeTextoRetiro(o)}</span>${oeBadgePago(o)}</div>
+      <div class="oe-tarjeta-pie"><span class="${hoy ? 'oe-hoy' : ''}">${oeTextoRetiro(o)}</span>${oeBadgePago(o, true)}</div>
     </div>`;
   };
   const cols = OE_ESTADOS.filter(e => e.id !== 'entregada').map(e => {
@@ -11602,7 +11605,8 @@ function oeAbrirFicha(id) {
     previewUrl: null,
     giro: 0,
     pago: o?.pago || '',
-    tipoPago: o?.tipo_pago === 'abonado' ? 'abonado' : 'total',
+    // En una orden nueva el pago y el monto (total o abono) se eligen siempre.
+    tipoPago: o ? (o.tipo_pago === 'abonado' ? 'abonado' : 'total') : '',
   };
   const pac = o?.paciente_id ? pacientes.find(p => p.id === o.paciente_id) : null;
   const esc = v => escapeHtml(v == null ? '' : String(v));
@@ -11657,8 +11661,8 @@ function oeAbrirFicha(id) {
           <div class="oe-bloque">
             <div class="oe-bloque-tit"><span>3</span> Pago y retiro</div>
             <div class="oe-grid-pago">
-              <div><div class="oe-lbl">Pago</div><div class="oe-seg" id="oe-seg-pago">${OE_PAGOS.map(([v, l]) => `<button type="button" data-v="${v}" onclick="oeElegirPago('${v}')">${l}</button>`).join('')}</div></div>
-              <div><div class="oe-lbl">Monto</div><div class="oe-seg" id="oe-seg-tipo"><button type="button" data-v="total" onclick="oeElegirTipoPago('total')">Total</button><button type="button" data-v="abonado" onclick="oeElegirTipoPago('abonado')">Abono</button></div></div>
+              <div><div class="oe-lbl"><span>Pago${o ? '' : ' <span style="color:var(--red)">*</span>'}</span></div><div class="oe-seg" id="oe-seg-pago">${OE_PAGOS.map(([v, l]) => `<button type="button" data-v="${v}" onclick="oeElegirPago('${v}')">${l}</button>`).join('')}</div></div>
+              <div><div class="oe-lbl"><span>Monto${o ? '' : ' <span style="color:var(--red)">*</span>'}</span></div><div class="oe-seg" id="oe-seg-tipo"><button type="button" data-v="total" onclick="oeElegirTipoPago('total')">Total</button><button type="button" data-v="abonado" onclick="oeElegirTipoPago('abonado')">Abono</button></div></div>
             </div>
             <label id="oe-abono-wrap" style="display:none">Monto abonado ($)
               <input type="number" id="oe-monto-abonado" value="${esc(o?.monto_abonado)}" placeholder="$">
@@ -11895,6 +11899,100 @@ async function oeElegirPaciente(id) {
     oeForm.recetasVigentes = (recetas || []).filter(r => recetaVigente(r.fecha_emision, r.fecha_vencimiento));
     oePintarRecetaLado();
   } catch (_) { /* sin recetas anteriores */ }
+  oeMostrarAnteriores(id);
+}
+
+// ── Preparados anteriores del paciente ──
+// Al elegir un paciente que ya existe (en una orden nueva) se abre una mini
+// ventana con lo que ha mandado a hacer antes (uno por preparado, el más
+// reciente). Al elegir uno se copia todo: preparado, valor, pago, observaciones
+// y la receta de esa vez si sigue vigente (un año). La fecha y hora de retiro
+// NO se copian: se llenan de nuevo.
+function oeMostrarAnteriores(pacienteId) {
+  document.getElementById('oe-anteriores-overlay')?.remove();
+  const p = pacientes.find(x => x.id === pacienteId);
+  const porPreparado = {};
+  ordenesElaboracion
+    .filter(o => o.paciente_id === pacienteId && o.indicacion)
+    .sort((a, b) => (b.fecha_orden || '').localeCompare(a.fecha_orden || '') || b.id - a.id)
+    .forEach(o => {
+      const k = o.indicacion.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+      if (!porPreparado[k]) porPreparado[k] = { o, veces: 0 };
+      porPreparado[k].veces++;
+    });
+  const lista = Object.values(porPreparado);
+  if (!lista.length) return;
+  const modal = document.createElement('div');
+  modal.id = 'oe-anteriores-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell oe-anteriores" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-size:16px;font-weight:700">Preparados anteriores</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:2px"><b>${escapeHtml(p?.nombre || '')}</b> ya ha mandado a hacer ${lista.length === 1 ? 'este preparado' : 'estos preparados'}. Elige uno para copiar sus datos.</div>
+        </div>
+        <button onclick="document.getElementById('oe-anteriores-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="oe-anteriores-lista">
+        ${lista.map(({ o, veces }) => {
+          const rec = o.recetas || {};
+          const vigente = o.receta_id && rec.fecha_emision && recetaVigente(rec.fecha_emision, rec.fecha_vencimiento);
+          return `<button type="button" class="oe-anterior" onclick="oeCopiarAnterior(${o.id})">
+            <div class="oe-anterior-tit">${escapeHtml(o.indicacion)}</div>
+            <div class="oe-anterior-sub">
+              <span>Última vez: ${fDate(o.fecha_orden)}${veces > 1 ? ` · ${veces} veces` : ''}</span>
+              ${o.valor ? `<span>${clp(o.valor)}</span>` : ''}
+              ${vigente ? `<span style="color:var(--green);font-weight:600">✓ Receta vigente hasta ${fDate(calcularVencimientoReceta(rec.fecha_emision, rec.fecha_vencimiento).toISOString())}</span>`
+                : `<span style="color:var(--text-3)">${o.receta_id ? 'Receta vencida' : 'Sin receta'}: hay que subir una nueva</span>`}
+            </div>
+          </button>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding:0 20px 16px">
+        <button class="page-btn" style="padding:8px 16px" onclick="document.getElementById('oe-anteriores-overlay').remove()">Es un preparado nuevo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function oeCopiarAnterior(ordenId) {
+  document.getElementById('oe-anteriores-overlay')?.remove();
+  const o = ordenesElaboracion.find(x => x.id === ordenId);
+  if (!o || !oeForm || oeForm.id) return;
+  const poner = (id, v) => { const el = document.getElementById(id); if (el) el.value = v == null ? '' : v; };
+  poner('oe-indicacion', o.indicacion);
+  poner('oe-valor', o.valor);
+  poner('oe-monto-abonado', o.monto_abonado);
+  if (o.observaciones) {
+    poner('oe-observaciones', o.observaciones);
+    document.querySelector('.oe-obs')?.setAttribute('open', '');
+  }
+  oeForm.pago = '';
+  oeElegirPago(o.pago || '');
+  oeElegirTipoPago(o.tipo_pago === 'abonado' ? 'abonado' : 'total');
+  // Retiro: siempre se llena de nuevo.
+  poner('oe-retiro-fecha', '');
+  poner('oe-retiro-hora', '');
+  // Receta de esa vez, solo si sigue vigente.
+  const rec = o.recetas || {};
+  if (o.receta_id && rec.fecha_emision && recetaVigente(rec.fecha_emision, rec.fecha_vencimiento)) {
+    if (oeForm.previewUrl) URL.revokeObjectURL(oeForm.previewUrl);
+    Object.assign(oeForm, { recetaId: o.receta_id, recetaUrl: rec.archivo_url || null, recetaVencimiento: rec.fecha_vencimiento || null, archivo: null, previewUrl: null, giro: 0 });
+    if (!(oeForm.recetasVigentes || []).some(r => r.id === o.receta_id)) {
+      oeForm.recetasVigentes = [...(oeForm.recetasVigentes || []), { id: o.receta_id, ...rec }];
+    }
+    poner('oe-receta-fecha', String(rec.fecha_emision).slice(0, 10));
+    oePintarRecetaLado();
+    toast('Datos copiados con la receta de esa vez. Falta la fecha y hora de retiro.');
+  } else {
+    poner('oe-receta-fecha', '');
+    oePintarRecetaLado();
+    toast('Datos copiados. La receta de esa vez ya no está vigente: sube una nueva. Falta la fecha y hora de retiro.', 'err');
+  }
+  setTimeout(() => document.getElementById('oe-retiro-fecha')?.focus(), 50);
 }
 
 document.addEventListener('click', ev => {
@@ -11950,6 +12048,8 @@ async function oeGuardarFicha() {
 
   if (nueva && !nombre && !archivo && !oeForm.recetaId) { toast('Pega o sube la foto de la receta, o escribe el nombre del paciente.', 'err'); return; }
   if (!nueva && !nombre) { toast('Falta el nombre del paciente.', 'err'); return; }
+  if (nueva && !oeForm.pago) { toast('Elige cómo se pagó: Mesón, Transferencia o Por cancelar.', 'err'); return; }
+  if (nueva && !oeForm.tipoPago) { toast('Elige si se pagó el Total o fue un Abono.', 'err'); return; }
   if (oeForm.tipoPago === 'abonado' && !montoAbonado) { toast('Escribe el monto que se abonó.', 'err'); return; }
   if (fechaReceta) {
     const venc = calcularVencimientoReceta(fechaReceta, oeForm.recetaId && !oeFechaRecetaCambio() ? oeForm.recetaVencimiento : null);
