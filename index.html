@@ -954,7 +954,7 @@
     <div class="table-card oc-tabla fx-tabla" id="oe-tabla-wrap" style="display:none">
       <table>
         <thead><tr>
-          <th>N°</th><th>Paciente</th><th>Preparado</th><th>RM</th><th>Retiro</th><th>Estado</th><th>Pago</th>
+          <th>N°</th><th>Fecha</th><th>Paciente</th><th>Preparado</th><th>RM</th><th>Retiro</th><th>Estado</th><th>Pago</th>
         </tr></thead>
         <tbody id="oe-body"></tbody>
       </table>
@@ -6220,34 +6220,22 @@ function renderOE() {
   if (!slice.length) {
     const buscando = document.getElementById('oe-search').value.trim();
     const cat = OE_CATEGORIAS.find(c => c.id === oeCategoria);
-    document.getElementById('oe-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${buscando ? 'No encontramos órdenes con esa búsqueda.' : `No hay órdenes${oeCategoria !== 'todos' ? ' «' + cat.label.toLowerCase() + '»' : ''} en ${nombrePeriodoAlcance('oe', oePeriodo)}.`}</p>${oeCategoria !== 'todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
+    document.getElementById('oe-body').innerHTML = `<tr><td colspan="8"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${buscando ? 'No encontramos órdenes con esa búsqueda.' : `No hay órdenes${oeCategoria !== 'todos' ? ' «' + cat.label.toLowerCase() + '»' : ''} en ${nombrePeriodoAlcance('oe', oePeriodo)}.`}</p>${oeCategoria !== 'todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
     return;
   }
-  // Igual que en FedEx: en vez de una columna con la fecha, la tabla va
-  // separada por el día en que se creó la orden.
-  const cuantosDia = {};
-  ordenesElaboracionF.forEach(o => { const d = String(o.fecha_orden || '').slice(0, 10); cuantosDia[d] = (cuantosDia[d] || 0) + 1; });
-  let diaAnterior = null;
-  const nombreDia = d => {
-    if (!d) return 'Sin fecha';
-    const t = new Date(d + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    return t.charAt(0).toUpperCase() + t.slice(1);
-  };
-  document.getElementById('oe-body').innerHTML = slice.map(o => {
-    const d = String(o.fecha_orden || '').slice(0, 10);
-    const cab = d !== diaAnterior ? `<tr class="fx-dia"><td colspan="7">${nombreDia(d)} <span>· ${cuantosDia[d]} orden${cuantosDia[d] === 1 ? '' : 'es'}</span></td></tr>` : '';
-    diaAnterior = d;
-    return cab + `
+  // La fecha va en su propia columna (sin separaciones entre días). Paciente
+  // y preparado pueden pasar a dos líneas para que se lean completos.
+  document.getElementById('oe-body').innerHTML = slice.map(o => `
     <tr class="oc-fila" onclick="abrirDetalleOE(${o.id})">
-      <td data-label="N°" class="mono" style="font-size:12px">${o.id}</td>
-      <td data-label="Paciente" style="font-weight:600">${escapeHtml(o.pacientes?.nombre || 'Sin nombre')}</td>
-      <td data-label="Preparado" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(o.indicacion || '')}">${oeEstado(o) === 'recibida' && !o.indicacion ? '<span style="color:var(--text-3)">Sin digitar</span>' : escapeHtml(o.indicacion || '—')}</td>
+      <td data-label="N°" class="mono" style="font-size:12px;white-space:nowrap">${o.id}</td>
+      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${fDate(o.fecha_orden)}</td>
+      <td data-label="Paciente" style="font-weight:600;min-width:150px">${escapeHtml(o.pacientes?.nombre || 'Sin nombre')}</td>
+      <td data-label="Preparado" style="min-width:190px">${oeEstado(o) === 'recibida' && !o.indicacion ? '<span style="color:var(--text-3)">Sin digitar</span>' : escapeHtml(o.indicacion || '—')}</td>
       <td data-label="RM" class="mono" style="font-size:12px;white-space:nowrap">${o.numero_rm ? escapeHtml(o.numero_rm) : '<span style="color:var(--text-3)">—</span>'}</td>
-      <td data-label="Retiro" style="white-space:nowrap;${oeRetiroHoy(o) ? 'color:var(--red);font-weight:600' : ''}">${oeTextoRetiro(o, true)}</td>
-      <td data-label="Estado">${oeBadgeEstado(o)}</td>
-      <td data-label="Pago">${oeBadgePago(o)}</td>
-    </tr>`;
-  }).join('');
+      <td data-label="Retiro" style="white-space:nowrap;${oeRetiroHoy(o) ? 'color:var(--red);font-weight:600' : ''}">${o.fecha_retiro ? `${String(o.fecha_retiro).slice(0, 10) === oeHoyISO() ? 'Hoy' : fDate(o.fecha_retiro)}${o.hora_retiro ? `<span class="oe-retiro-hora">${String(o.hora_retiro).slice(0, 5)}</span>` : ''}` : '—'}</td>
+      <td data-label="Estado" style="white-space:nowrap">${oeBadgeEstado(o)}</td>
+      <td data-label="Pago" style="white-space:nowrap">${oeBadgePago(o)}</td>
+    </tr>`).join('');
 }
 
 function goOE(p) { const {pages}=paginate(ordenesElaboracionF,oePage); if(p<1||p>pages) return; oePage=p; renderOE(); }

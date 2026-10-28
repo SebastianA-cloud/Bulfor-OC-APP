@@ -1728,3 +1728,8 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .fx-hist-caja { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
 .fx-hist-caja .oc-fact-cab { margin-bottom: 10px; }
 @media (max-width: 700px) { .fx-abajo { grid-template-columns: 1fr; } }
+
+/* Órdenes de Elaboración (lista): celdas un poco más angostas para que las
+   8 columnas quepan a lo ancho sin cortar nada. */
+#oe-tabla-wrap table th, #oe-tabla-wrap table td { padding-left: 10px; padding-right: 10px; }
+#oe-tabla-wrap .oe-retiro-hora { display: block; font-size: 12px; color: var(--text-3); }
