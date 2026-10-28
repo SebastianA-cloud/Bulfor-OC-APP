@@ -8193,8 +8193,8 @@ function fichaEnvioFedex(id, lista) {
     // "Qué se envió" parte cerrado: es una barra grande que se abre al clic.
     cuerpo: `<details class="fx-envio">
         <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
-          <span class="fx-envio-sub">${docs.length ? `${docs.length} factura${docs.length === 1 ? '' : 's'} · ver productos` : 'sin detalle'}</span>
-          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Esconder</span> <i class="ti ti-chevron-down"></i></span></summary>
+          <span class="fx-envio-sub">${docs.length ? `${docs.length} factura${docs.length === 1 ? '' : 's'} · clic para ver qué productos iban` : 'sin detalle'}</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver productos</span><span class="fx-envio-cerrar">Esconder</span> <span class="fx-envio-flecha">⌄</span></span></summary>
         ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
           : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
       </details>
