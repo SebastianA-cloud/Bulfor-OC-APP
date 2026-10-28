@@ -8600,7 +8600,7 @@ function fxRutaHtml(e, { entregado, estado, problema }) {
     const porDia = new Map();
     // Fuera la "etiqueta creada" (OC) y la entrega (DL): esas no son días en ruta.
     e.historial.filter(h => h.fecha && !/^(OC|DL)$/.test(h.tipo || '') && !/entregad|delivered/i.test(h.estado || ''))
-      .forEach(h => { const d = diaCL(h.fecha); if (d && d !== enviado && !porDia.has(d)) porDia.set(d, h.lugar || ''); });
+      .forEach(h => { const d = diaCL(h.fecha); if (d && d !== enviado && !porDia.has(d)) porDia.set(d, String(h.lugar || '').split(',')[0].trim()); });  // solo la ciudad (sin "Rm", "Ar"…)
     dias = [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, lugar]) => ({ d, lugar }));
   } else if (!entregado && estado && e.updated_at) {
     dias = [{ d: diaCL(e.updated_at), lugar: '' }];
