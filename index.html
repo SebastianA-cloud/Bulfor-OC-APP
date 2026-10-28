@@ -9480,7 +9480,7 @@ function estadoGestionRechazada(f) {
   return 'requiere_gestion';
 }
 
-let rechazadasEstadoActivo = 'todas';
+let rechazadasEstadoActivo = 'por_resolver';
 
 function filtrarRechazadasPorEstado(estado) {
   rechazadasEstadoActivo = estado;
@@ -16227,8 +16227,11 @@ showPage = function(id, el) {
     renderClientesOC();
   }
   // Entrar a Facturas rechazadas es "ya las vi": se apaga el aviso.
+  // Además siempre parte en la pestaña "Por resolver".
   if (id === 'facturas-rechazadas') {
     marcarRechazadasComoVistas();
+    rechazadasEstadoActivo = 'por_resolver';
+    renderRechazadas();
   }
 };
 
