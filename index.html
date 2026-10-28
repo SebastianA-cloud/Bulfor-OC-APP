@@ -673,10 +673,37 @@
 
   <div class="page" id="page-chilexpress">
     <div class="page-header">
-      <div class="page-title">Chilexpress</div>
-      <div class="page-sub">Envíos despachados por sucursal de Chilexpress</div>
+      <div class="page-title">Chilexpress <span class="info-tip" tabindex="0" role="note" data-tip="Envíos despachados por Chilexpress. Chilexpress no tiene conexión automática: el estado se anota a mano en la ficha de cada envío. El botón «Ver en Chilexpress» abre el seguimiento de esa OT en su página.">i</span></div>
+      <div class="page-sub" id="cx-resumen">Envíos despachados por sucursal de Chilexpress</div>
     </div>
-    <div class="table-card"><div class="empty-state"><i class="ti ti-tools"></i><h4>Próximamente</h4><p>Aquí se registrarán los envíos de Chilexpress, con su factura y su seguimiento.</p></div></div>
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period" id="cx-periodo">
+        <button class="fpp-period-btn" onclick="cxCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="cx-select-mes" onchange="cxSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="cx-select-anio" onchange="cxSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="cxCambiarMes(1)" title="Mes siguiente">›</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="cx-search" placeholder="Buscar por OT, factura, OC, hospital o producto…" oninput="filterChilexpress()">
+      </div>
+      <div class="fpp-status-tabs" id="cx-tabs"></div>
+      <button class="import-btn" style="margin-top:0" onclick="abrirNuevoEnvio('chilexpress')">+ Nuevo envío</button>
+    </div>
+    <div class="table-card oc-tabla tabla-centrada fx-tabla">
+      <table>
+        <thead><tr>
+          <th>Hospital</th><th class="col-sec">OT</th><th>Factura</th><th>Estado</th>
+        </tr></thead>
+        <tbody id="cx-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="cx-info"></span>
+        <div class="page-btns" id="cx-pages"></div>
+      </div>
+    </div>
   </div>
   <div class="page" id="page-fedex">
     <div class="page-header">
@@ -1546,7 +1573,7 @@ function promptModal(mensaje, valorInicial = '') {
 }
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
-let oc = [], items = [], hosp = [], fedex = [];
+let oc = [], items = [], hosp = [], fedex = [], chilexpress = [];
 let facturasPorPagar = [], facturasPorPagarF = [], fppPage = 1;
 let proveedoresCuentas = [];
 let hospitalesMaestro = [];
@@ -1769,6 +1796,9 @@ async function init() {
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
     fedex = Array.isArray(fedexR) ? fedexR : [];
+    fetchAll('seguimiento_chilexpress', 'select=*&order=fecha_ingreso.desc')
+      .then(r => { chilexpress = Array.isArray(r) ? r : []; cxInit(); })
+      .catch(() => { chilexpress = []; cxInit(); });
     fedexF = [...fedex];
     hospitalesMaestro = Array.isArray(hospMaestroR) ? hospMaestroR : [];
     reconstruirMapaHospitales();
@@ -5618,6 +5648,237 @@ function renderFedex() {
 // La fila de títulos de la tabla queda fija al bajar (ver ajustarCabecerasFijas).
 function fedexAjustarCabeceraFija() { ajustarCabecerasFijas(); }
 
+// ─── CHILEXPRESS ────────────────────────────────────────────────────────────
+// Igual que FedEx (mes y año, separación por día, ficha del envío), pero sin
+// conexión automática: el estado se anota a mano en la ficha y el botón
+// "Ver en Chilexpress" abre el seguimiento de la OT en su página.
+const ESTADOS_CHILEXPRESS = [
+  { texto: 'En tránsito', clase: 'badge-amber' },
+  { texto: 'En sucursal de destino', clase: 'badge-blue' },
+  { texto: 'Entregado', clase: 'badge-green' },
+  { texto: 'Con problema', clase: 'badge-red' },
+];
+const CX_CATEGORIAS = [
+  { id: 'camino', label: 'En camino' },
+  { id: 'problema', label: 'Con problema' },
+  { id: 'entregado', label: 'Entregados' },
+  { id: 'todos', label: 'Todos' },
+];
+let cxCategoriaActiva = 'todos', cxF = [], cxPage = 1, cxPeriodo = null;
+
+function urlRastreoChilexpress(ot) {
+  return `https://centrodeayuda.chilexpress.cl/seguimiento/${encodeURIComponent(String(ot || '').replace(/\D/g, ''))}`;
+}
+function envioChilexpressDeFolio(folio) {
+  const f = String(folio || '').replace(/\D/g, '');
+  if (!f) return null;
+  return chilexpress.find(e => parsearNumerosFactura(e.factura).some(n => String(n).replace(/\D/g, '') === f)) || null;
+}
+function cxEstado(e) { return (e.estado_envio || '').toLowerCase(); }
+function cxEtiquetaEstado(e) {
+  if (cxEstado(e) === 'entregado') return `<span class="badge badge-green">Entregado${e.fecha_entrega ? ' ' + fDate(e.fecha_entrega) : ''}</span>`;
+  const est = ESTADOS_CHILEXPRESS.find(x => x.texto.toLowerCase() === cxEstado(e));
+  return est ? `<span class="badge ${est.clase}">${escapeHtml(est.texto)}</span>` : `<span class="badge badge-gray">${escapeHtml(e.estado_envio || 'Sin estado')}</span>`;
+}
+function cxCoincideCategoria(e, c) {
+  if (c === 'todos') return true;
+  if (c === 'entregado') return cxEstado(e) === 'entregado';
+  if (c === 'problema') return cxEstado(e) === 'con problema';
+  return cxEstado(e) !== 'entregado';
+}
+
+function cxInit() {
+  const hoy = new Date();
+  if (!cxPeriodo) cxPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  cxPoblarSelectores();
+  filterChilexpress();
+}
+function cxPoblarSelectores() {
+  const selMes = document.getElementById('cx-select-mes'), selAnio = document.getElementById('cx-select-anio');
+  if (!selMes || !selAnio) return;
+  selMes.innerHTML = MESES_NOMBRE.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  const anios = new Set(chilexpress.map(e => fedexDiaChile(e).slice(0, 4)).filter(Boolean));
+  anios.add(cxPeriodo.anio);
+  selAnio.innerHTML = [...anios].sort((a, b) => b.localeCompare(a)).map(a => `<option value="${a}">${a}</option>`).join('');
+  selMes.value = cxPeriodo.mes; selAnio.value = cxPeriodo.anio;
+}
+function cxSeleccionarPeriodo() {
+  cxPeriodo = { anio: document.getElementById('cx-select-anio').value, mes: Number(document.getElementById('cx-select-mes').value) };
+  filterChilexpress();
+}
+function cxCambiarMes(delta) {
+  let a = parseInt(cxPeriodo.anio, 10), m = cxPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  cxPeriodo = { anio: String(a), mes: m };
+  cxPoblarSelectores();
+  filterChilexpress();
+}
+function cxSetCategoria(c) { cxCategoriaActiva = c; filterChilexpress(); }
+
+// Igual que FedEx: el mes aplica a "Entregados" y "Todos"; "En camino" y
+// "Con problema" muestran todo lo pendiente. Con búsqueda, todas las fechas.
+function filterChilexpress() {
+  if (!cxPeriodo) { const hoy = new Date(); cxPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() }; }
+  const q = (document.getElementById('cx-search')?.value || '').trim();
+  const r = { desde: `${cxPeriodo.anio}-${String(cxPeriodo.mes + 1).padStart(2, '0')}-01`, hasta: cxPeriodo.mes === 11 ? `${Number(cxPeriodo.anio) + 1}-01-01` : `${cxPeriodo.anio}-${String(cxPeriodo.mes + 2).padStart(2, '0')}-01` };
+  const delMes = e => fedexDiaChile(e) >= r.desde && fedexDiaChile(e) < r.hasta;
+  const usaMes = !q && ['entregado', 'todos'].includes(cxCategoriaActiva);
+  const base = q ? chilexpress.filter(e => coincideBusqueda(fedexTextoBusqueda(e), q)) : chilexpress;
+  const sel = document.getElementById('cx-periodo');
+  if (sel) sel.style.visibility = usaMes ? '' : 'hidden';
+  const tabs = document.getElementById('cx-tabs');
+  if (tabs) tabs.innerHTML = CX_CATEGORIAS.map(c => {
+    const n = base.filter(e => cxCoincideCategoria(e, c.id) && (q || ['camino', 'problema'].includes(c.id) || delMes(e))).length;
+    return `<button class="fpp-status-tab${cxCategoriaActiva === c.id ? ' active' : ''}" onclick="cxSetCategoria('${c.id}')">${c.label} <b>${n}</b></button>`;
+  }).join('');
+  const enCamino = chilexpress.filter(e => cxCoincideCategoria(e, 'camino')).length;
+  const problemas = chilexpress.filter(e => cxCoincideCategoria(e, 'problema')).length;
+  const res = document.getElementById('cx-resumen');
+  if (res) res.innerHTML = q ? `${base.length} envío${base.length === 1 ? ' encontrado' : 's encontrados'} en todas las fechas`
+    : `${enCamino} en camino` + (problemas ? ` · <b style="color:var(--red)">${problemas} con problema</b>` : '');
+  const mayorFactura = e => Math.max(0, ...parsearNumerosFactura(e.factura).map(n => parseInt(String(n).replace(/\D/g, ''), 10) || 0));
+  cxF = base.filter(e => cxCoincideCategoria(e, cxCategoriaActiva) && (!usaMes || delMes(e)))
+    .sort((a, b) => fedexDiaChile(b).localeCompare(fedexDiaChile(a)) || (mayorFactura(b) - mayorFactura(a)));
+  cxPage = 1;
+  renderChilexpress();
+}
+
+function renderChilexpress() {
+  const body = document.getElementById('cx-body');
+  if (!body) return;
+  const { slice, pages, total } = paginate(cxF, cxPage);
+  document.getElementById('cx-info').textContent = `${total.toLocaleString('es-CL')} envíos`;
+  renderPages('cx-pages', total, pages, cxPage, 'goChilexpress');
+  if (!slice.length) {
+    const q = (document.getElementById('cx-search')?.value || '').trim();
+    body.innerHTML = `<tr><td colspan="4"><div class="fpp-empty"><div class="fpp-empty-icon">📦</div><p>${q ? 'No encontramos envíos con esa búsqueda.' : chilexpress.length ? 'No hay envíos en esta vista.' : 'Todavía no hay envíos de Chilexpress. Usa «+ Nuevo envío» para registrar el primero.'}</p></div></td></tr>`;
+    return;
+  }
+  const abierto = panelPila[0]?.cxId;
+  const cuantosDia = {};
+  cxF.forEach(e => { const d = fedexDiaChile(e); cuantosDia[d] = (cuantosDia[d] || 0) + 1; });
+  let diaAnterior = null;
+  const nombreDia = d => { if (!d) return 'Sin fecha'; const t = new Date(d + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); };
+  body.innerHTML = slice.map(e => {
+    const d = fedexDiaChile(e);
+    const cab = d !== diaAnterior ? `<tr class="fx-dia"><td colspan="4">${nombreDia(d)} <span>· ${cuantosDia[d]} envío${cuantosDia[d] === 1 ? '' : 's'}</span></td></tr>` : '';
+    diaAnterior = d;
+    return cab + `<tr class="oc-fila${abierto === e.id ? ' fila-abierta' : ''}" onclick="cxAbrir(${e.id})">
+      <td data-label="Hospital" style="font-weight:500">${escapeHtml(nombreHosp(e.hospital) || e.hospital || '—')}</td>
+      <td data-label="OT" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(e.orden_transporte || '—')}</td>
+      <td data-label="Factura" class="mono" style="font-size:13px">${escapeHtml(e.factura || '—')}</td>
+      <td data-label="Estado" style="white-space:nowrap">${cxEtiquetaEstado(e)}</td>
+    </tr>`;
+  }).join('');
+  ajustarCabecerasFijas();
+}
+function goChilexpress(p) { const { pages } = paginate(cxF, cxPage); if (p < 1 || p > pages) return; cxPage = p; renderChilexpress(); window.scrollTo({ top: 0 }); }
+
+function cxAbrir(id) {
+  const f = fichaEnvioChilexpress(id, cxF);
+  if (!f) return;
+  f.alCerrar = () => { if (document.getElementById('page-chilexpress')?.classList.contains('active')) renderChilexpress(); };
+  panelAbrir(f);
+  renderChilexpress();
+}
+
+// Ficha del envío: igual a la de FedEx, más el formulario para anotar el
+// estado a mano (Chilexpress no informa el estado solo).
+function fichaEnvioChilexpress(id, lista) {
+  const e = chilexpress.find(x => x.id === id);
+  if (!e) return null;
+  const docs = fedexDocsDeEnvio(e);
+  const ocs = [...new Set(docs.map(d => (d.orden_compra_ref || '').trim()).filter(Boolean))];
+  const entregado = cxEstado(e) === 'entregado';
+  const contItems = `cx-items-${e.id}-${Date.now()}`;
+  if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
+  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
+  const facturasHtml = docs.length
+    ? docs.map(d => `<div class="oc-info-cod"><b class="mono panel-link" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}${d.doc_url ? `<a class="btn-mp" href="${d.doc_url}" target="_blank" rel="noopener">Ver PDF <i class="ti ti-external-link"></i></a>` : ''}</div>`).join('')
+    : `<div class="oc-info-cod" style="color:var(--text-3)">${e.factura ? escapeHtml(e.factura) + ' (aún no sincronizada)' : 'Sin factura anotada'}</div>`;
+  const ocsHtml = ocs.map(c => `<div class="oc-info-cod">${oc.some(o => o.codigooc === c)
+      ? `<b class="mono panel-link" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(c))}), true)">${escapeHtml(c)}</b>`
+      : `<b class="mono">${escapeHtml(c)}</b>`}${copiar(c)}${botonMP(urlMercadoPublicoOC(c), 'Ver OC')}</div>`).join('');
+  const total = docs.reduce((t, d) => t + montoTotalDoc(d), 0);
+  const infoEnvio = `<div class="oc-info">
+      <div><span>Factura${docs.length > 1 ? 's' : ''}</span>${facturasHtml}
+        ${ocs.length ? `<span class="doc-info-sub">Orden${ocs.length > 1 ? 'es' : ''} de compra</span>${ocsHtml}` : ''}</div>
+      ${docs.length ? `<div><span>Total (con IVA)</span><div class="oc-info-total">${clp(total)}</div></div>` : ''}
+    </div>`;
+  const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
+      <div class="oc-fact-cab"><span>Estado del envío</span>${cxEtiquetaEstado(e)}</div>
+      <div class="oc-fact-cifras">
+        <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
+        ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
+        ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
+      </div>
+    </div>`;
+  const navLista = lista || cxF;
+  const idx = navLista.findIndex(x => x.id === e.id);
+  const fechaEnt = e.fecha_entrega ? new Date(e.fecha_entrega).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+  return {
+    cxId: e.id,
+    antetitulo: 'Envío Chilexpress · OT',
+    titulo: String(e.orden_transporte || '—'),
+    tituloMono: true,
+    tituloCopiar: !!e.orden_transporte,
+    tituloExtra: e.orden_transporte ? `<a class="btn-mp btn-mp-cx" href="${urlRastreoChilexpress(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento de esta OT en Chilexpress">Ver en Chilexpress <i class="ti ti-external-link"></i></a>` : '',
+    sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
+    resumen: `<div class="doc-arriba">${infoEnvio}${cajaEstado}</div>`,
+    cuerpo: `<details class="fx-envio">
+        <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
+          <span class="fx-envio-sub">${docs.length ? `${docs.length} factura${docs.length === 1 ? '' : 's'} · clic para ver qué productos iban` : 'sin detalle'}</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver productos</span><span class="fx-envio-cerrar">Esconder</span> <span class="fx-envio-flecha">⌄</span></span></summary>
+        ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
+          : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
+      </details>
+      <div class="panel-h">Historial del envío</div>${fedexHistorialHtml(e)}`,
+    pie: `<div class="cob-pago">
+      <div class="panel-h">Actualizar estado</div>
+      <div class="cob-pago-campos">
+        <label>Estado<select id="cx-estado" onchange="document.getElementById('cx-entrega-campos').style.display=this.value==='Entregado'?'contents':'none'">
+          ${ESTADOS_CHILEXPRESS.map(x => `<option ${x.texto.toLowerCase() === cxEstado(e) ? 'selected' : ''}>${x.texto}</option>`).join('')}</select></label>
+        <span id="cx-entrega-campos" style="display:${entregado ? 'contents' : 'none'}">
+          <label>Fecha de entrega<input type="date" id="cx-fecha-entrega" value="${fechaEnt}"></label>
+          <label>Recibió<input type="text" id="cx-recibido" value="${escapeHtml(e.recibido_por || '')}" placeholder="Nombre de quien recibió"></label>
+        </span>
+        <button class="page-btn page-btn-pri" onclick="cxGuardarEstado(${e.id}, this)">Guardar</button>
+      </div></div>`,
+    navegacion: idx === -1 ? null : {
+      texto: `Envío ${idx + 1} de ${navLista.length}`,
+      anterior: idx > 0 ? () => cxAbrir(navLista[idx - 1].id) : null,
+      siguiente: idx < navLista.length - 1 ? () => cxAbrir(navLista[idx + 1].id) : null,
+    },
+  };
+}
+
+async function cxGuardarEstado(id, btn) {
+  const estado = document.getElementById('cx-estado').value;
+  const entregado = estado === 'Entregado';
+  const fecha = document.getElementById('cx-fecha-entrega')?.value || '';
+  const cambios = {
+    estado_envio: estado,
+    fecha_entrega: entregado ? (fecha ? fecha + 'T12:00:00-03:00' : new Date().toISOString()) : null,
+    recibido_por: entregado ? (document.getElementById('cx-recibido')?.value.trim() || null) : null,
+    updated_at: new Date().toISOString(),
+  };
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = await sb(`seguimiento_chilexpress?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(cambios) });
+    if (!res.ok) throw new Error(await res.text());
+    const e = chilexpress.find(x => x.id === id);
+    if (e) Object.assign(e, cambios);
+    toast('✓ Estado actualizado');
+    const i = panelPila.findIndex(x => x.cxId === id);
+    if (i !== -1) { const alCerrar = panelPila[i].alCerrar; panelPila[i] = Object.assign(fichaEnvioChilexpress(id, cxF), { alCerrar }); panelPintar(); }
+    filterChilexpress();
+  } catch (err) {
+    toast('No se pudo guardar: ' + err.message, 'err');
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
 function goFedex(p) { const {pages}=paginate(fedexF,fedexPage); if(p<1||p>pages) return; fedexPage=p; renderFedex(); }
 
 function fedexAbrir(id) {
@@ -8083,6 +8344,7 @@ function fichaDocumento(id, lista, opts = {}) {
   const nc = d.tipo_dte === '33' ? notaCreditoQueAnula(d.folio) : null;
   const anulada = d.tipo_dte === '61' && d.nc_factura_ref ? documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === String(d.nc_factura_ref)) : null;
   const envio = envioFedexDeFolio(d.folio);
+  const envioCx = envio ? null : envioChilexpressDeFolio(d.folio);
   const pago = d.tipo_dte === '33' ? pagoDeFolio(d.folio) : null;
   // La OC, la cobranza y el envío van en los recuadros de arriba; en
   // "Relacionado" solo queda la nota de crédito o la factura que anula.
@@ -8158,6 +8420,8 @@ function fichaDocumento(id, lista, opts = {}) {
           <small class="doc-envio-det">${[envio.orden_transporte ? 'OT ' + escapeHtml(envio.orden_transporte) : '',
             entregado && envio.fecha_entrega ? 'entregado el ' + fDate(envio.fecha_entrega) : '',
             entregado && envio.recibido_por ? 'recibió <b>' + escapeHtml(envio.recibido_por) + '</b>' : ''].filter(Boolean).join(' · ')}</small></div>`
+          : envioCx ? `<div><button class="oc-envio oc-envio-cx" title="Ver el envío" onclick="panelAbrir(fichaEnvioChilexpress(${envioCx.id}), true)"><i class="ti ti-truck"></i> Chilexpress · ${escapeHtml(envioCx.estado_envio || 'Sin estado')}</button>
+              <small class="doc-envio-det">${envioCx.orden_transporte ? 'OT ' + escapeHtml(envioCx.orden_transporte) : ''}</small></div>`
           : '<div class="doc-sin-envio">Sin envío registrado</div>'}</div>
     </div>`;
 
@@ -12370,8 +12634,10 @@ function clientesParaEnvio() {
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
-function abrirNuevoEnvio() {
+function abrirNuevoEnvio(courier = 'fedex') {
   cerrarTodosLosModales();
+  window.__fxCourier = courier === 'chilexpress' ? 'chilexpress' : 'fedex';
+  const esCx = window.__fxCourier === 'chilexpress';
   window.__fxClientes = clientesParaEnvio();
   window.__fxGdx = {};
   const modal = document.createElement('div');
@@ -12383,7 +12649,7 @@ function abrirNuevoEnvio() {
     <div class="modal-shell modal-md fx-nuevo" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <div class="fx-nuevo-ante"><i class="ti ti-truck"></i> FedEx</div>
+          <div class="fx-nuevo-ante${esCx ? ' fx-nuevo-ante-cx' : ''}"><i class="ti ti-truck"></i> ${esCx ? 'Chilexpress' : 'FedEx'}</div>
           <div class="fx-nuevo-tit">Nuevo envío</div>
         </div>
         <button onclick="cerrarFormularioEnvio()" class="modal-close" aria-label="Cerrar">✕</button>
@@ -12408,8 +12674,8 @@ function abrirNuevoEnvio() {
           </label>
         </div>
         <label class="fx-campo">N° orden de transporte (OT) *
-          <input type="text" id="fx-new-ot" class="mono" placeholder="Ej: 873581859362" inputmode="numeric" autocomplete="off" oninput="fxNuevoOT()">
-          <small id="fx-new-ot-aviso">Son los 12 números de la guía de FedEx.</small>
+          <input type="text" id="fx-new-ot" class="mono" placeholder="${esCx ? 'Ej: 99887766554' : 'Ej: 873581859362'}" inputmode="numeric" autocomplete="off" oninput="fxNuevoOT()">
+          <small id="fx-new-ot-aviso">${esCx ? 'Son los 10 a 12 números de la orden de transporte de Chilexpress.' : 'Son los 12 números de la guía de FedEx.'}</small>
         </label>
         <div class="fx-nuevo-acciones">
           <button class="page-btn" onclick="cerrarFormularioEnvio()">Cancelar</button>
@@ -12429,7 +12695,7 @@ function fxNuevoFactura() {
   window.__fxGdx = window.__fxGdx || {};   // facturas traídas de GDExpress en el momento
   const docs = nums.map(n => ({ n, d: documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === n), g: window.__fxGdx[n] }));
   info.innerHTML = docs.map(({ n, d, g }) => {
-    const envioPrevio = envioFedexDeFolio(n);
+    const envioPrevio = envioFedexDeFolio(n) || envioChilexpressDeFolio(n);
     const yaEnviada = envioPrevio ? `<span class="badge badge-amber" title="Esta factura ya está en otro envío">Ya enviada · OT ${escapeHtml(envioPrevio.orden_transporte || '')}</span>` : '';
     if (d) return `<div class="fx-fac-chip"><b class="mono">N° ${escapeHtml(n)}</b> ${escapeHtml(nombreHosp(d.hospital) || d.hospital || '')} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''} · ${clp(montoTotalDoc(d))}${d.orden_compra_ref ? ` · OC ${escapeHtml(d.orden_compra_ref)}` : ''} ${yaEnviada}</div>`;
     if (g === 'buscando') return `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> buscando en GDExpress…</div>`;
@@ -12482,9 +12748,11 @@ async function fxBuscarEnGdexpress(folios) {
 function fxNuevoOT() {
   const ot = document.getElementById('fx-new-ot').value.trim();
   const aviso = document.getElementById('fx-new-ot-aviso');
-  const repetida = ot && fedex.find(f => String(f.orden_transporte || '').trim() === ot);
+  const esCx = window.__fxCourier === 'chilexpress';
+  const repetida = ot && (esCx ? chilexpress : fedex).find(f => String(f.orden_transporte || '').trim() === ot);
   aviso.className = repetida ? 'fx-aviso-err' : '';
   aviso.textContent = repetida ? `Esta OT ya está registrada (${nombreHosp(repetida.hospital) || repetida.hospital}).`
+    : esCx ? (ot && !/^\d{10,12}$/.test(ot) ? 'Ojo: las OT de Chilexpress tienen de 10 a 12 números.' : 'Son los 10 a 12 números de la orden de transporte de Chilexpress.')
     : ot && !/^\d{12}$/.test(ot) ? 'Ojo: las OT de FedEx suelen tener 12 números.' : 'Son los 12 números de la guía de FedEx.';
 }
 
@@ -12654,14 +12922,17 @@ async function guardarNuevoEnvio(hospital) {
   const factura = document.getElementById('fx-new-factura').value.trim();
   if (!hospital || !ot) { toast('Hospital y N° de Orden de transporte son obligatorios.', 'err'); return; }
 
+  // El mismo formulario sirve para FedEx y Chilexpress (cada uno en su tabla).
+  const esCx = window.__fxCourier === 'chilexpress';
   try {
-    const res = await sb('seguimiento_fedex', {
+    const res = await sb(esCx ? 'seguimiento_chilexpress' : 'seguimiento_fedex', {
       method: 'POST',
       headers: { 'Prefer': 'return=representation' },
-      body: JSON.stringify([{ hospital, orden_transporte: ot, factura: factura || null }])
+      body: JSON.stringify([esCx ? { hospital, orden_transporte: ot, factura: factura || null, estado_envio: 'En tránsito' } : { hospital, orden_transporte: ot, factura: factura || null }])
     });
     if (!res.ok) { const err = await res.text(); throw new Error(err); }
     const nuevo = (await res.json())[0];
+    if (esCx) { chilexpress.unshift(nuevo); cerrarFormularioEnvio(); filterChilexpress(); return; }
     fedex.unshift(nuevo);
     cerrarFormularioEnvio();
     filterFedex();   // vuelve a filtrar y ordenar por N° de factura
