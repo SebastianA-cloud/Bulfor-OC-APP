@@ -5497,7 +5497,17 @@ const FEDEX_CATEGORIAS = [
 // "Todos"; "En ruta" y "Con retraso" muestran todo lo que sigue en camino,
 // sea del mes que sea. Con búsqueda se busca en todas las fechas.
 let fedexPeriodo = null;
-const fedexDiaChile = f => f.fecha_ingreso ? new Date(f.fecha_ingreso).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+// Día (AAAA-MM-DD) de una fecha de envío/entrega en hora de Chile. Ojo: varias
+// fechas se guardan solo como día (quedan a medianoche UTC, p. ej. la entrega
+// que anota la sincronización de FedEx o los envíos antiguos). Esas se toman
+// tal cual: pasarlas a hora de Chile las corría al día anterior.
+function diaEnvioChile(d) {
+  if (!d) return '';
+  const t = String(d);
+  if (/^\d{4}-\d{2}-\d{2}([T ]00:00:00(\.0+)?(\+00(:00)?|Z))?$/.test(t)) return t.slice(0, 10);
+  return new Date(d).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+}
+const fedexDiaChile = f => diaEnvioChile(f.fecha_ingreso);
 
 function fedexInit() {
   const hoy = new Date();
@@ -8582,7 +8592,7 @@ async function cargarItemsEnvioEnPanel(docs, contId) {
 // [{fecha, estado, lugar}]), "En ruta" muestra cada día con su lugar; si no,
 // el último día en que se actualizó el estado.
 function fxRutaHtml(e, { entregado, estado, problema }) {
-  const diaCL = d => d ? new Date(d).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+  const diaCL = diaEnvioChile;
   const enviado = e.fecha_ingreso ? diaCL(e.fecha_ingreso) : '';
   // Días "en ruta": de los movimientos guardados, o el de la última actualización.
   let dias = [];
