@@ -1061,7 +1061,7 @@
 
   <div class="page" id="page-facturas-rechazadas">
     <div class="page-header">
-      <div class="page-title">Facturas rechazadas <span class="info-tip" tabindex="0" role="note" data-tip="Por resolver: todos los casos pendientes, de cualquier mes, con el rechazo más reciente arriba (Nuevo = llegó desde tu última visita). Resueltas y Todas: el historial por mes. Al hacer clic en uno se despliega la cadena completa: la factura rechazada, su nota de crédito y la factura que la reemplaza. Rojo: rechazada · morado: nota de crédito · verde: aceptada · punteado: lo que falta. Se actualiza solo al emitir la NC o la refactura.">i</span></div>
+      <div class="page-title">Facturas rechazadas <span class="info-tip" tabindex="0" role="note" data-tip="Por resolver: todos los casos pendientes, de cualquier mes, con el rechazo más reciente arriba (Nuevo = llegó desde tu última visita). Resueltas: el historial por mes. Al hacer clic en uno se despliega la cadena completa: la factura rechazada, su nota de crédito y la factura que la reemplaza. Rojo: rechazada · morado: nota de crédito · verde: aceptada · punteado: lo que falta. Se actualiza solo al emitir la NC o la refactura.">i</span></div>
       <div class="page-sub" id="rechazadas-resumen"></div>
     </div>
     <div class="fpp-toolbar-top">
@@ -10328,9 +10328,9 @@ function renderRechazadas(soloTabla) {
   const hoy = fechaLocalISO();
   todos.forEach(c => { c.fechaRechazo = rzFechaRechazo(c); c.dias = c.fechaRechazo ? Math.max(0, Math.round((new Date(hoy + 'T12:00:00') - new Date(c.fechaRechazo + 'T12:00:00')) / 86400000)) : null; });
   const q = (rechazadasBusqueda || '').trim();
-  if (!['por_resolver', 'resueltas', 'todas'].includes(rechazadasEstadoActivo)) rechazadasEstadoActivo = 'por_resolver';
+  if (!['por_resolver', 'resueltas'].includes(rechazadasEstadoActivo)) rechazadasEstadoActivo = 'por_resolver';
   // "Por resolver" muestra TODOS los pendientes, sean del mes que sean; el
-  // mes y año solo aplican a "Resueltas" y "Todas" (el historial). Con
+  // mes y año solo aplican a "Resueltas" (el historial). Con
   // búsqueda se busca en todas las fechas.
   const r = rangoDelAlcance('rechazadas', rechazadasPeriodo);
   const delMes = c => !r || ((c.fecha || '') >= r.desde && (c.fecha || '') < r.hasta);
@@ -10341,7 +10341,7 @@ function renderRechazadas(soloTabla) {
   const conMes = rechazadasEstadoActivo !== 'por_resolver' && !q;
   const selPeriodo = document.getElementById('rechazadas-periodo');
   if (selPeriodo) selPeriodo.style.display = conMes ? '' : 'none';
-  const tabs = [['por_resolver', 'Por resolver', porResolver.length], ['resueltas', 'Resueltas', resueltas.length], ['todas', 'Todas', historial.length]];
+  const tabs = [['por_resolver', 'Por resolver', porResolver.length], ['resueltas', 'Resueltas', resueltas.length]];
   document.getElementById('rechazadas-tabs').innerHTML = tabs.map(([k, l, n]) =>
     `<button class="fpp-status-tab${rechazadasEstadoActivo === k ? ' active' : ''}" onclick="filtrarRechazadasPorEstado('${k}')">${l} <b>${n}</b></button>`).join('');
   const periodo = q ? 'todas las fechas' : nombrePeriodoAlcance('rechazadas', rechazadasPeriodo);
@@ -10354,7 +10354,7 @@ function renderRechazadas(soloTabla) {
   window.__rzCasos = [];
   const visibles = rechazadasEstadoActivo === 'por_resolver'
     ? porResolver.slice().sort((a, b) => (b.fechaRechazo || '').localeCompare(a.fechaRechazo || '') || Number(b.raiz) - Number(a.raiz))
-    : (rechazadasEstadoActivo === 'resueltas' ? resueltas : historial).slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || Number(b.raiz) - Number(a.raiz));
+    : resueltas.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || Number(b.raiz) - Number(a.raiz));
   if (!visibles.length) {
     cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'por_resolver' ? 'No hay rechazos por resolver. 🎉' : `No hay casos en ${periodo}.`}</p></div></div>`;
     return;
@@ -10382,7 +10382,7 @@ function renderRechazadas(soloTabla) {
       <td data-label="Folio"><span class="mono oc-cod">${escapeHtml(c.raiz)}</span>${nuevo ? ' <span class="badge badge-red rz-nuevo">Nuevo</span>' : ''}${c.intentos > 1 ? `<small class="oc-origen">${c.intentos} intentos</small>` : ''}</td>
       <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(c.hospital || '—')}</span>${c.ultimaRech?.rut_hospital ? `<small>${escapeHtml(c.ultimaRech.rut_hospital)}</small>` : ''}</td>
       <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${c.fecha ? fDate(c.fecha) : '—'}</td>
-      <td data-label="Rechazada" style="white-space:nowrap">${c.fechaRechazo ? fDate(c.fechaRechazo) : '—'}${pendiente && c.dias != null ? `<small class="rz-dias ${colorDias}">hace ${c.dias} día${c.dias === 1 ? '' : 's'}</small>` : ''}</td>
+      <td data-label="Rechazada" style="white-space:nowrap">${c.fechaRechazo ? fDate(c.fechaRechazo) : '—'}${pendiente && c.dias != null ? `<small class="rz-dias ${colorDias}">${c.dias === 0 ? 'hoy' : `hace ${c.dias} día${c.dias === 1 ? '' : 's'}`}</small>` : ''}</td>
       <td data-label="Total" style="white-space:nowrap;font-weight:500">${clp(d ? montoTotalDoc(d) : c.nodos[0]?.monto)}</td>
       <td data-label="Cadena"><span class="rz-mini">${rzCadenaMini(c)}</span></td>
       <td data-label="Estado"><div class="rz-estado-celda">${omitida ? `<span class="badge badge-gray" title="Rechazo anterior al ${fDate(RECHAZADAS_SEGUIR_DESDE)}: se regularizó fuera de la app">Sin seguimiento</span>` : rzEstadoBadge(c)}${accion}<span class="rz-chev">${abierto ? '⌄' : '›'}</span></div></td>
@@ -16676,7 +16676,7 @@ function renderInicio() {
       const hoy = fechaLocalISO();
       const masAntigua = pend.map(rzFechaRechazo).filter(Boolean).sort()[0];
       const dias = masAntigua ? Math.round((new Date(hoy + 'T12:00:00') - new Date(masAntigua + 'T12:00:00')) / 86400000) : null;
-      items.push({ texto: `${pend.length} factura${pend.length === 1 ? '' : 's'} rechazada${pend.length === 1 ? '' : 's'} por resolver${dias != null ? ` · la más antigua hace ${dias} día${dias === 1 ? '' : 's'}` : ''}`, tipo: 'err', modulo: 'facturas', pagina: 'facturas-rechazadas' });
+      items.push({ texto: `${pend.length} factura${pend.length === 1 ? '' : 's'} rechazada${pend.length === 1 ? '' : 's'} por resolver${dias ? ` · la más antigua hace ${dias} día${dias === 1 ? '' : 's'}` : ''}`, tipo: 'err', modulo: 'facturas', pagina: 'facturas-rechazadas' });
     }
   }
   if (Array.isArray(fedex) && fedex.length) {
