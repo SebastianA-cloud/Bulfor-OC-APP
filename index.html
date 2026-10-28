@@ -5602,6 +5602,20 @@ function renderFedex() {
       <td data-label="Estado" style="white-space:nowrap">${fedexEtiquetaEstado(f)}</td>
     </tr>`;
   }).join('');
+  fedexAjustarCabeceraFija();
+}
+
+// La fila de títulos (Hospital, OT, Factura, Estado) queda fija al bajar,
+// justo debajo de la cabecera fija de la página (título, mes, buscador).
+function fedexAjustarCabeceraFija() {
+  const ps = document.querySelector('#page-fedex > .page-sticky');
+  if (!ps) return;
+  const tope = (parseFloat(getComputedStyle(ps).top) || 0) + ps.offsetHeight;
+  document.documentElement.style.setProperty('--fx-thead-top', tope + 'px');
+  if (!window.__fxObsCabecera && window.ResizeObserver) {
+    window.__fxObsCabecera = new ResizeObserver(() => fedexAjustarCabeceraFija());
+    window.__fxObsCabecera.observe(ps);
+  }
 }
 
 function goFedex(p) { const {pages}=paginate(fedexF,fedexPage); if(p<1||p>pages) return; fedexPage=p; renderFedex(); }

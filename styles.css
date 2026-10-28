@@ -1672,3 +1672,9 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .fx-fac-chip-no { border-style: dashed; color: var(--text-3); }
 .fx-nuevo-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .fx-nuevo-acciones .page-btn { padding: 9px 18px !important; }
+
+/* FedEx: títulos de columna destacados y fijos al bajar; filas blancas */
+.fx-tabla { overflow: clip; }
+.fx-tabla thead th { position: sticky; top: var(--fx-thead-top, 34px); z-index: 5; background: #2B2724; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .6px; padding-top: 12px; padding-bottom: 12px; border-bottom: none; }
+.fx-tabla tbody tr.oc-fila:not(.fila-abierta):not(:hover) td { background: #fff !important; }
+.fx-tabla tbody tr.fx-dia td { background: #EFECE6 !important; border-top: 1px solid var(--border); }
