@@ -7280,13 +7280,6 @@ function docTextoProductos(id) {
   return docProductosPorId[id] || '';
 }
 
-// Pago de cada factura (Cobranza), indexado por N° para la columna Estado.
-function docPagoPorFolio() {
-  const m = {};
-  facturasPago.forEach(p => { m[String(p.factura).trim()] = p; });
-  return m;
-}
-
 function renderDocumentosGdexpress(soloTabla) {
   const cont = document.getElementById('doc-contenido');
   const buscando = !!(docBusqueda && docBusqueda.trim());
@@ -7329,28 +7322,25 @@ function renderDocumentosGdexpress(soloTabla) {
     return;
   }
 
-  const pagos = docPagoPorFolio();
   const abierto = panelPila[0]?.docId;
   const MAX = 300;
   cont.innerHTML = `
     <div class="table-card doc-tabla">
       <table>
         <thead><tr>
-          <th>N°</th><th>Emisión</th><th>Hospital</th><th class="col-sec">OC</th><th style="text-align:right">Total</th><th>Estado</th>
+          <th>Folio</th><th>Emisión</th><th>Hospital</th><th class="col-sec">OC</th><th style="text-align:right">Total</th><th>Estado</th>
         </tr></thead>
         <tbody>
           ${lista.slice(0, MAX).map(d => {
-            const p = d.tipo_dte === '33' ? pagos[String(d.folio).trim()] : null;
-            const pagada = p && (p.estado_pago === 'Pagado' || p.fecha_pago);
-            const rech = estadoAceptacionFusionado(d) === 'N';
+            // La cobranza (pagada / por cobrar) se ve dentro de la ficha, no en el listado.
             return `
             <tr class="oc-fila${abierto === d.id ? ' fila-abierta' : ''}" onclick="docAbrir(${d.id})">
-              <td data-label="N°"><span class="mono oc-cod">${escapeHtml(String(d.folio))}</span><small class="oc-origen">${TIPOS_DTE_INFO[d.tipo_dte]?.singular || ''}</small></td>
+              <td data-label="Folio"><span class="mono oc-cod">${escapeHtml(String(d.folio))}</span><small class="oc-origen">${TIPOS_DTE_INFO[d.tipo_dte]?.singular || ''}</small></td>
               <td data-label="Emisión" style="white-space:nowrap;color:var(--text-2)">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
               <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(nombreHosp(d.hospital)||d.hospital||'—')}</span><small>${escapeHtml(d.rut_hospital||'')}</small></td>
               <td data-label="OC" class="col-sec mono" style="font-size:12px;white-space:nowrap">${escapeHtml(d.orden_compra_ref || '—')}</td>
               <td data-label="Total" style="text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:500">${clp(montoTotalDoc(d))}</td>
-              <td data-label="Estado" style="white-space:nowrap">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d), d)}${d.tipo_dte === '33' && !rech ? (pagada ? ' <span class="badge badge-green">Pagada</span>' : p ? ' <span class="badge badge-amber">Por cobrar</span>' : '') : ''}${d.tipo_dte === '52' ? ' <span class="badge badge-gray">Por facturar</span>' : ''}</td>
+              <td data-label="Estado" style="white-space:nowrap">${badgeEstadoDocGdexpress(estadoAceptacionFusionado(d), d)}${d.tipo_dte === '52' ? ' <span class="badge badge-gray">Por facturar</span>' : ''}</td>
             </tr>`; }).join('')}
         </tbody>
       </table>
