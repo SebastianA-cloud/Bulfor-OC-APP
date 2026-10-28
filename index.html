@@ -12325,6 +12325,7 @@ function clientesParaEnvio() {
 function abrirNuevoEnvio() {
   cerrarTodosLosModales();
   window.__fxClientes = clientesParaEnvio();
+  window.__fxGdx = {};
   const modal = document.createElement('div');
   modal.id = 'fedex-form-modal-overlay';
   modal.className = 'modal-overlay';
@@ -12343,7 +12344,7 @@ function abrirNuevoEnvio() {
         <div class="fx-nuevo-paso">
           <label class="fx-campo">Factura(s)
             <input type="text" id="fx-new-factura" placeholder="Ej: 22389  ·  varias: 22386, 22387" autocomplete="off" oninput="fxNuevoFactura()">
-            <small>Con el N° de factura se completan solos el hospital y el RUT.</small>
+            <small>Con el N° de factura se completan solos el hospital y el RUT (si se emitió recién, se busca directo en GDExpress).</small>
           </label>
           <div id="fx-new-facturas-info" class="fx-nuevo-facturas"></div>
         </div>
@@ -12377,21 +12378,56 @@ function abrirNuevoEnvio() {
 function fxNuevoFactura() {
   const nums = parsearNumerosFactura(document.getElementById('fx-new-factura').value).map(n => String(n).replace(/\D/g, '')).filter(Boolean);
   const info = document.getElementById('fx-new-facturas-info');
-  const docs = nums.map(n => ({ n, d: documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === n) }));
-  info.innerHTML = docs.map(({ n, d }) => {
-    const envioPrevio = d ? envioFedexDeFolio(d.folio) : null;
-    return d ? `<div class="fx-fac-chip"><b class="mono">N° ${escapeHtml(n)}</b> ${escapeHtml(nombreHosp(d.hospital) || d.hospital || '')} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''} · ${clp(montoTotalDoc(d))}${d.orden_compra_ref ? ` · OC ${escapeHtml(d.orden_compra_ref)}` : ''}
-        ${envioPrevio ? `<span class="badge badge-amber" title="Esta factura ya está en otro envío">Ya enviada · OT ${escapeHtml(envioPrevio.orden_transporte || '')}</span>` : ''}</div>`
-      : (n.length >= 4 ? `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> aún no está sincronizada (se enlaza sola después)</div>` : '');
+  window.__fxGdx = window.__fxGdx || {};   // facturas traídas de GDExpress en el momento
+  const docs = nums.map(n => ({ n, d: documentosGdexpress.find(x => x.tipo_dte === '33' && String(x.folio) === n), g: window.__fxGdx[n] }));
+  info.innerHTML = docs.map(({ n, d, g }) => {
+    const envioPrevio = envioFedexDeFolio(n);
+    const yaEnviada = envioPrevio ? `<span class="badge badge-amber" title="Esta factura ya está en otro envío">Ya enviada · OT ${escapeHtml(envioPrevio.orden_transporte || '')}</span>` : '';
+    if (d) return `<div class="fx-fac-chip"><b class="mono">N° ${escapeHtml(n)}</b> ${escapeHtml(nombreHosp(d.hospital) || d.hospital || '')} · ${d.fecha_emision ? fDate(d.fecha_emision) : ''} · ${clp(montoTotalDoc(d))}${d.orden_compra_ref ? ` · OC ${escapeHtml(d.orden_compra_ref)}` : ''} ${yaEnviada}</div>`;
+    if (g === 'buscando') return `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> buscando en GDExpress…</div>`;
+    if (g && g.hospital) return `<div class="fx-fac-chip"><b class="mono">N° ${escapeHtml(n)}</b> ${escapeHtml(nombreHosp(g.hospital) || g.hospital)} · ${g.fecha_emision ? fDate(g.fecha_emision) : ''}${g.neto ? ' · ' + clp(Math.round(g.neto * 1.19)) : ''}${g.oc ? ` · OC ${escapeHtml(g.oc)}` : ''} <span class="badge badge-gray" title="Recién emitida: se trajo directo de GDExpress">recién emitida</span> ${yaEnviada}</div>`;
+    if (g === 'error') return `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> no se pudo consultar GDExpress ahora; completa el hospital a mano</div>`;
+    if (g === 'no') return `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> no la encontramos en GDExpress (revisa el número)</div>`;
+    return n.length >= 4 ? `<div class="fx-fac-chip fx-fac-chip-no"><b class="mono">N° ${escapeHtml(n)}</b> buscando…</div>` : '';
   }).join('');
-  const d = docs.find(x => x.d)?.d;
+  const conDatos = docs.find(x => x.d) || docs.find(x => x.g && x.g.hospital);
   const hosp = document.getElementById('fx-new-hospital');
-  if (d && !hosp.value.trim()) {
-    hosp.value = nombreHosp(d.hospital) || d.hospital || '';
+  if (conDatos && !hosp.value.trim()) {
+    const nombre = conDatos.d ? (nombreHosp(conDatos.d.hospital) || conDatos.d.hospital) : (nombreHosp(conDatos.g.hospital) || conDatos.g.hospital);
+    const rutF = conDatos.d ? conDatos.d.rut_hospital : conDatos.g.rut;
+    // Si el RUT es de un cliente conocido, se usa su nombre de siempre.
+    const conocido = (window.__fxClientes || []).find(c => rutF && rutSoloDigitos(c.rut) === rutSoloDigitos(rutF));
+    hosp.value = conocido ? conocido.nombre : (nombre || '');
     const rut = document.getElementById('fx-new-rut');
-    if (!rut.value.trim() && d.rut_hospital) rut.value = rutConPuntos(d.rut_hospital);
+    if (!rut.value.trim() && rutF) rut.value = rutConPuntos(rutF);
     fxNuevoRutCompleto();
   }
+  // Las que la app todavía no tiene se buscan en GDExpress (un momento
+  // después de dejar de escribir, para no consultar a cada tecla).
+  const faltan = docs.filter(x => !x.d && x.g === undefined && x.n.length >= 4).map(x => x.n);
+  clearTimeout(window.__fxGdxTimer);
+  if (faltan.length) window.__fxGdxTimer = setTimeout(() => fxBuscarEnGdexpress(faltan), 700);
+}
+
+// Pregunta a GDExpress (función del servidor buscar-factura, solo lectura)
+// por facturas recién emitidas que la sincronización aún no trae.
+async function fxBuscarEnGdexpress(folios) {
+  folios.forEach(n => { window.__fxGdx[n] = 'buscando'; });
+  fxNuevoFactura();
+  let r = {};
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/buscar-factura`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${sesionActual?.access_token || SUPABASE_KEY}`, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folios }),
+    });
+    r = await res.json();
+  } catch (e) { r = { ok: false }; }
+  if (!document.getElementById('fx-new-factura')) return;   // se cerró la ventana
+  const encontradas = new Map((r.facturas || []).map(f => [String(f.folio), f]));
+  folios.forEach(n => { window.__fxGdx[n] = encontradas.get(n) || (r.ok ? 'no' : 'error'); });
+  if (!r.ok) toast('No se pudo consultar GDExpress en este momento: completa el hospital a mano.', 'err');
+  fxNuevoFactura();
 }
 
 // Aviso si la OT no tiene 12 números o si ya está registrada.

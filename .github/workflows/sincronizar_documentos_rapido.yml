@@ -1,0 +1,40 @@
+name: Sincronizar documentos recientes (rápida)
+
+# Cada 15 minutos en horario de oficina (lunes a sábado, 8:00 a 21:00 de
+# Chile aprox.): trae solo lo emitido en los últimos 3 días, para que una
+# factura recién hecha aparezca pronto en la app. La sincronización completa
+# sigue corriendo cada 2 horas (sincronizar_documentos_gdexpress.yml).
+on:
+  schedule:
+    - cron: '*/15 11-23 * * 1-6'   # hora UTC (Chile = UTC-3 en verano, UTC-4 en invierno)
+  workflow_dispatch:
+
+# Nunca dos sincronizaciones de documentos al mismo tiempo.
+concurrency:
+  group: sincronizar-documentos-rapido
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase
+
+      - name: Ejecutar sincronización rápida
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: se salta las reglas de seguridad, para que el robot pueda escribir
+          DTEBOX_IP: ${{ secrets.DTEBOX_IP }}
+          GDEXPRESS_API_KEY: ${{ secrets.GDEXPRESS_API_KEY }}
+          DIAS_RECIENTES: '3'
+          LIMITE_DETALLE: '30'
+        run: python sincronizar_documentos_gdexpress.py

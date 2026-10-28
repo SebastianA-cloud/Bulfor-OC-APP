@@ -20,7 +20,7 @@ import re
 import base64
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from supabase import create_client
@@ -37,6 +37,14 @@ TAMANO_PAGINA = 300
 
 FECHA_MINIMA = '2025-01-01'
 FECHA_MAXIMA = datetime.now().strftime('%Y-%m-%d')
+
+# Modo rápido (sincronización cada 15 minutos en horario de oficina): solo
+# los documentos emitidos en los últimos DIAS_RECIENTES días y su detalle,
+# para que lo facturado en el día aparezca pronto en la app. La revisión
+# completa (todo el historial y el estado fiscal) sigue en la corrida normal.
+DIAS_RECIENTES = int(os.environ.get('DIAS_RECIENTES', '0') or 0)
+if DIAS_RECIENTES > 0:
+    FECHA_MINIMA = (datetime.now() - timedelta(days=DIAS_RECIENTES)).strftime('%Y-%m-%d')
 
 TIPOS_DTE = {
     '33': 'Facturas',
@@ -598,6 +606,16 @@ def main():
         total += sincronizar_tipo(tipo_dte, nombre)
         time.sleep(2)
     print(f"\n✔✔ Listo en total: {total} documentos sincronizados entre los 3 tipos.")
+
+    if DIAS_RECIENTES > 0:
+        # Modo rápido: el detalle de lo nuevo y las correcciones que salen de
+        # su XML (fecha, OC, monto, NC), en lotes chicos; sin estado fiscal.
+        sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 30)))
+        corregir_fechas_desde_xml_completo(limite=50)
+        corregir_oc_ref_desde_xml_completo(limite=50)
+        corregir_monto_total_desde_xml_completo(limite=50)
+        corregir_nc_factura_ref_desde_xml_completo(limite=50)
+        return
 
     sincronizar_detalle_pendiente(limite=int(os.environ.get('LIMITE_DETALLE', 150)))
     corregir_fechas_desde_xml_completo()
