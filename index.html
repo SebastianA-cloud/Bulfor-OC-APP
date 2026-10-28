@@ -5774,8 +5774,8 @@ function cxAbrir(id) {
   renderChilexpress();
 }
 
-// Ficha del envío: igual a la de FedEx (OT arriba, "Qué se envió", historial
-// y estado lado a lado), más el formulario para anotar el
+// Ficha del envío: igual a la de FedEx (OT arriba con el estado en la
+// esquina, "Qué se envió" y la ruta del envío), más el formulario para anotar el
 // estado a mano (Chilexpress no informa el estado solo).
 function fichaEnvioChilexpress(id, lista) {
   const e = chilexpress.find(x => x.id === id);
@@ -5784,15 +5784,6 @@ function fichaEnvioChilexpress(id, lista) {
   const entregado = cxEstado(e) === 'entregado';
   const contItems = `cx-items-${e.id}-${Date.now()}`;
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
-  const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
-      <div class="oc-fact-cab"><span>Estado del envío</span>${cxEtiquetaEstado(e)}</div>
-      <div class="oc-fact-cifras">
-        <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
-        ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
-        ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
-      </div>
-    </div>`;
-  const cajaHistorial = `<div class="doc-caja fx-hist-caja"><div class="oc-fact-cab"><span>Historial del envío</span></div>${fedexHistorialHtml(e)}</div>`;
   const navLista = lista || cxF;
   const idx = navLista.findIndex(x => x.id === e.id);
   const fechaEnt = e.fecha_entrega ? new Date(e.fecha_entrega).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
@@ -5802,7 +5793,8 @@ function fichaEnvioChilexpress(id, lista) {
     titulo: String(e.orden_transporte || '—'),
     tituloMono: true,
     tituloCopiar: !!e.orden_transporte,
-    tituloExtra: e.orden_transporte ? `<a class="btn-mp btn-mp-cx" href="${urlRastreoChilexpress(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento de esta OT en Chilexpress">Ver en Chilexpress <i class="ti ti-external-link"></i></a>` : '',
+    tituloExtra: (e.orden_transporte ? `<a class="btn-mp btn-mp-cx" href="${urlRastreoChilexpress(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento de esta OT en Chilexpress">Ver en Chilexpress <i class="ti ti-external-link"></i></a>` : '')
+      + `<span class="panel-esquina">${entregado ? '<span class="badge badge-green">Entregado</span>' : cxEtiquetaEstado(e)}</span>`,
     sub: nombreHosp(e.hospital) || e.hospital || '',
     cuerpo: `<details class="fx-envio">
         <summary class="fx-envio-cab"><span class="fx-envio-tit"><i class="ti ti-package"></i> Qué se envió</span>
@@ -5811,7 +5803,11 @@ function fichaEnvioChilexpress(id, lista) {
         ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
           : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
       </details>
-      <div class="fx-abajo">${cajaHistorial}${cajaEstado}</div>`,
+      <div class="fx-ruta-caja"><div class="fx-ruta-tit">Ruta del envío</div>${fxRutaHtml(e, {
+        entregado,
+        estado: e.estado_envio,
+        problema: cxEstado(e) === 'con problema',
+      })}</div>`,
     pie: `<div class="cob-pago">
       <div class="panel-h">Actualizar estado</div>
       <div class="cob-pago-campos">
@@ -8503,7 +8499,7 @@ async function cargarItemsEnPanel(d, contId) {
 }
 
 // Ficha de un envío FedEx, compacta: la OT como título con "Ver en FedEx" y
-// "Editar". Debajo "Qué se envió" (barra que se despliega) y, lado a lado, el
+// "Editar", y el estado actual en la esquina superior derecha. Debajo "Qué se envió" (barra que se despliega) y, lado a lado, el
 // historial y el estado del envío en dos recuadros.
 function fichaEnvioFedex(id, lista) {
   const e = fedex.find(x => x.id === id);
@@ -8512,17 +8508,6 @@ function fichaEnvioFedex(id, lista) {
   const entregado = (e.estado_envio || '').toLowerCase() === 'entregado';
   const contItems = `fx-items-${e.id}-${Date.now()}`;
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
-
-  // Recuadro del estado del envío (va al lado del historial).
-  const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
-      <div class="oc-fact-cab"><span>Estado del envío</span>${entregado ? '<span class="badge badge-green">Entregado</span>' : badgeEstadoFedex(e.estado_envio)}</div>
-      <div class="oc-fact-cifras">
-        <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
-        ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
-        ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
-      </div>
-    </div>`;
-  const cajaHistorial = `<div class="doc-caja fx-hist-caja"><div class="oc-fact-cab"><span>Historial del envío</span></div>${fedexHistorialHtml(e)}</div>`;
 
   const navLista = lista || fedexF;
   const idx = navLista.findIndex(x => x.id === e.id);
@@ -8533,7 +8518,8 @@ function fichaEnvioFedex(id, lista) {
     tituloMono: true,
     tituloCopiar: !!e.orden_transporte,
     tituloExtra: (e.orden_transporte ? `<a class="btn-mp" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento en FedEx">Ver en FedEx <i class="ti ti-external-link"></i></a>` : '')
-      + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`,
+      + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`
+      + `<span class="panel-esquina">${entregado ? '<span class="badge badge-green">Entregado</span>' : badgeEstadoFedex(e.estado_envio)}</span>`,
     // La fecha de envío va solo en el recuadro "Estado del envío" (y en la lista).
     sub: nombreHosp(e.hospital) || e.hospital || '',
     // "Qué se envió" parte cerrado: es una barra grande que se abre al clic.
@@ -8544,7 +8530,11 @@ function fichaEnvioFedex(id, lista) {
         ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
           : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
       </details>
-      <div class="fx-abajo">${cajaHistorial}${cajaEstado}</div>`,
+      <div class="fx-ruta-caja"><div class="fx-ruta-tit">Ruta del envío</div>${fxRutaHtml(e, {
+        entregado,
+        estado: e.estado_envio,
+        problema: /retraso|reprogramada/i.test(e.estado_envio || ''),
+      })}</div>`,
     navegacion: idx === -1 ? null : {
       texto: `Envío ${idx + 1} de ${navLista.length}`,
       anterior: idx > 0 ? () => fedexAbrir(navLista[idx - 1].id) : null,
@@ -8585,24 +8575,43 @@ async function cargarItemsEnvioEnPanel(docs, contId) {
   }
 }
 
-// Historial del envío. Si la sincronización guarda los pasos de FedEx (columna
-// "historial": [{fecha, estado, lugar}]), se muestran todos; mientras tanto se
-// arma con lo que sí tenemos: el ingreso y el estado actual.
-function fedexHistorialHtml(e) {
-  let pasos = Array.isArray(e.historial) && e.historial.length
-    ? e.historial.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))
-    : null;
-  if (!pasos) {
-    pasos = [];
-    const est = e.estado_envio || '';
-    if (est.toLowerCase() === 'entregado') pasos.push({ fecha: e.fecha_entrega, estado: 'Entregado' + (e.recibido_por ? ' · recibió ' + e.recibido_por : ''), soloDia: true });
-    else if (est) pasos.push({ fecha: e.updated_at, estado: est });
-    // "Ingresado en la app" no se muestra: se confundía con la fecha de
-    // envío, que ya está en el recuadro del estado.
+// Ruta del envío, de izquierda a derecha: Enviado (fecha) → En ruta (los días
+// en que tuvo movimiento) → Entregado (fecha y quién recibió). Si la
+// sincronización guarda los movimientos de FedEx (columna "historial":
+// [{fecha, estado, lugar}]), "En ruta" muestra cada día con su lugar; si no,
+// el último día en que se actualizó el estado.
+function fxRutaHtml(e, { entregado, estado, problema }) {
+  const diaCL = d => d ? new Date(d).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
+  const enviado = e.fecha_ingreso ? diaCL(e.fecha_ingreso) : '';
+  // Días "en ruta": de los movimientos guardados, o el de la última actualización.
+  let dias = [];
+  if (Array.isArray(e.historial) && e.historial.length) {
+    const porDia = new Map();
+    e.historial.filter(h => h.fecha && !/entregad|delivered/i.test(h.estado || ''))
+      .forEach(h => { const d = diaCL(h.fecha); if (d && d !== enviado && !porDia.has(d)) porDia.set(d, h.lugar || ''); });
+    dias = [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, lugar]) => ({ d, lugar }));
+  } else if (!entregado && estado && e.updated_at) {
+    dias = [{ d: diaCL(e.updated_at), lugar: '' }];
   }
-  if (!pasos.length) return '<div class="panel-muted" style="font-size:13px">Todavía sin movimientos.</div>';
-  return `<ol class="fx-hist">${pasos.map((p, i) => `<li class="${i === 0 ? 'actual' : ''}"><b>${escapeHtml(p.estado || '')}</b>
-    <small>${p.fecha ? (p.soloDia ? fDate(p.fecha) : fxFechaHora(p.fecha)) : ''}${p.lugar ? ' · ' + escapeHtml(p.lugar) : ''}</small></li>`).join('')}</ol>`;
+  const enRuta = entregado || !!estado;
+  // Cada día en ruta es un paso más hacia la derecha (la ruta crece a lo ancho).
+  const pasosRuta = dias.length
+    ? dias.map((x, i) => {
+        const ultimo = i === dias.length - 1;
+        return { tit: ultimo && !entregado && estado ? estado : 'En ruta',
+          clase: entregado || !ultimo ? 'hecho' : (problema ? 'alerta' : 'actual'),
+          det: `<b>${fDate(x.d)}</b>${x.lugar ? `<small>${escapeHtml(x.lugar)}</small>` : ''}` };
+      })
+    : [{ tit: !entregado && estado ? estado : 'En ruta',
+        clase: entregado ? 'hecho' : enRuta ? (problema ? 'alerta' : 'actual') : '',
+        det: enRuta ? '' : '<small>Esperando información</small>' }];
+  const pasos = [
+    { tit: 'Enviado', clase: 'hecho', det: enviado ? `<b>${fDate(enviado)}</b>` : '' },
+    ...pasosRuta,
+    { tit: 'Entregado', clase: entregado ? 'hecho fin' : '',
+      det: entregado ? `${e.fecha_entrega ? `<b>${fDate(diaCL(e.fecha_entrega))}</b>` : ''}${e.recibido_por ? `<small>Recibió ${escapeHtml(e.recibido_por)}</small>` : ''}` : '' },
+  ];
+  return `<ol class="fx-ruta" style="grid-template-columns:repeat(${pasos.length}, 1fr)">${pasos.map(p => `<li class="${p.clase}"><span class="fx-ruta-punto"></span><div class="fx-ruta-paso">${escapeHtml(p.tit)}</div><div class="fx-ruta-det">${p.det}</div></li>`).join('')}</ol>`;
 }
 
 // Fecha y hora en hora de Chile (dd-mm-aaaa hh:mm).

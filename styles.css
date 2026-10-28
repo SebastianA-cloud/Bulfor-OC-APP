@@ -1733,3 +1733,26 @@ tr.letra-plegable:hover td { color: var(--accent); }
    8 columnas quepan a lo ancho sin cortar nada. */
 #oe-tabla-wrap table th, #oe-tabla-wrap table td { padding-left: 10px; padding-right: 10px; }
 #oe-tabla-wrap .oe-retiro-hora { display: block; font-size: 12px; color: var(--text-3); }
+
+/* FedEx / Chilexpress: estado actual en la esquina superior derecha de la ficha */
+.panel-cuerpo { position: relative; }
+.panel-esquina { position: absolute; top: 22px; right: 30px; }
+.panel-esquina .badge { font-size: 13px; padding: 6px 14px; font-family: var(--font); letter-spacing: 0; }
+/* Ruta del envío, de izquierda a derecha */
+.fx-ruta-caja { border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px 18px; margin-top: 14px; }
+.fx-ruta-tit { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; margin-bottom: 14px; }
+.fx-ruta { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); }
+.fx-ruta li { position: relative; text-align: center; padding: 0 8px; }
+.fx-ruta li::before { content: ''; position: absolute; top: 8px; left: -50%; width: 100%; height: 3px; background: var(--border); z-index: 0; }
+.fx-ruta li:first-child::before { display: none; }
+.fx-ruta li.hecho::before, .fx-ruta li.actual::before, .fx-ruta li.alerta::before { background: #2D6A4F; }
+.fx-ruta-punto { position: relative; z-index: 1; display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid #C9C5BD; box-sizing: border-box; }
+.fx-ruta li.hecho .fx-ruta-punto { background: #2D6A4F; border-color: #2D6A4F; }
+.fx-ruta li.actual .fx-ruta-punto { background: #fff; border-color: #2D6A4F; box-shadow: 0 0 0 4px rgba(45,106,79,.15); }
+.fx-ruta li.alerta .fx-ruta-punto { background: #fff; border-color: #C77700; box-shadow: 0 0 0 4px rgba(199,119,0,.15); }
+.fx-ruta-paso { font-weight: 700; font-size: 14px; margin-top: 6px; color: var(--text); }
+.fx-ruta li:not(.hecho):not(.actual):not(.alerta) .fx-ruta-paso { color: var(--text-3); font-weight: 600; }
+.fx-ruta li.alerta .fx-ruta-paso { color: #A35F00; }
+.fx-ruta-det { font-size: 12.5px; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
+.fx-ruta-det b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fx-ruta-det small { display: block; color: var(--text-3); font-size: 11.5px; }
