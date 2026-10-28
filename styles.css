@@ -1616,3 +1616,16 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 /* Grupo "#" plegable al final de las listas A-Z */
 tr.letra-plegable td { cursor: pointer; color: var(--text-2); font-weight: 600; }
 tr.letra-plegable:hover td { color: var(--accent); }
+
+/* Ficha del envío FedEx */
+.fx-estado .oc-fact-cifras { flex-direction: column; gap: 2px; }
+.btn-mp-gris { background: #F4F2EE; color: var(--text-2); border-color: var(--border); cursor: pointer; font-family: var(--font); }
+.fx-envio > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.fx-envio > summary::-webkit-details-marker { display: none; }
+.fx-envio[open] > summary .oc-saldo-flecha { transform: rotate(90deg); }
+.fx-fac-fila { cursor: pointer; }
+.fx-fac-fila:hover td { background: #F4F2EE !important; }
+.fx-chev { display: inline-block; color: var(--text-3); transition: transform .15s; }
+.fx-fac-fila.abierta .fx-chev { transform: rotate(90deg); }
+.fx-fac-detalle > td { background: #FBFAF8 !important; padding: 10px 14px !important; }
+.fx-productos { margin: 0; }

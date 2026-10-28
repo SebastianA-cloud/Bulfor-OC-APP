@@ -8140,9 +8140,10 @@ async function cargarItemsEnPanel(d, contId) {
   }
 }
 
-// Ficha de un envío FedEx en el panel lateral. En vez de "Relacionado" lleva
-// lo que pidió el equipo: la OT para copiar, Factura y OC con "Ver ›", quién
-// recibió (en verde), qué se envió y el historial del envío.
+// Ficha de un envío FedEx, con el mismo diseño que las de OC y facturas:
+// la OT como título (para copiar), arriba las facturas y la OC con sus
+// botones, y el estado del envío; abajo "Qué se envió" (facturas que se
+// despliegan para ver sus productos) y el historial.
 function fichaEnvioFedex(id, lista) {
   const e = fedex.find(x => x.id === id);
   if (!e) return null;
@@ -8151,29 +8152,50 @@ function fichaEnvioFedex(id, lista) {
   const entregado = (e.estado_envio || '').toLowerCase() === 'entregado';
   const contItems = `fx-items-${e.id}-${Date.now()}`;
   if (docs.length) setTimeout(() => cargarItemsEnvioEnPanel(docs, contItems), 0);
+  const copiar = v => `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(v)))}, this)"><i class="ti ti-copy"></i></button>`;
+
+  // Recuadro izquierdo: facturas y OC, como en la ficha de la factura.
+  const facturasHtml = docs.length
+    ? docs.map(d => `<div class="oc-info-cod"><b class="mono panel-link" title="Ver la factura" onclick="panelAbrir(fichaDocumento(${d.id}), true)">N° ${escapeHtml(String(d.folio))}</b>${copiar(d.folio)}${d.doc_url ? `<a class="btn-mp" href="${d.doc_url}" target="_blank" rel="noopener" title="Abrir el PDF">Ver PDF <i class="ti ti-external-link"></i></a>` : ''}</div>`).join('')
+    : `<div class="oc-info-cod" style="color:var(--text-3)">${e.factura ? escapeHtml(e.factura) + ' (aún no sincronizada)' : 'Sin factura anotada'}</div>`;
+  const ocsHtml = ocs.map(c => `<div class="oc-info-cod">${oc.some(o => o.codigooc === c)
+      ? `<b class="mono panel-link" title="Ver la orden de compra" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(c))}), true)">${escapeHtml(c)}</b>`
+      : `<b class="mono">${escapeHtml(c)}</b>`}${copiar(c)}${botonMP(urlMercadoPublicoOC(c), 'Ver OC')}</div>`).join('');
+  const total = docs.reduce((t, d) => t + montoTotalDoc(d), 0);
+  const infoEnvio = `<div class="oc-info">
+      <div><span>Factura${docs.length > 1 ? 's' : ''}</span>${facturasHtml}
+        ${ocs.length ? `<span class="doc-info-sub">Orden${ocs.length > 1 ? 'es' : ''} de compra</span>${ocsHtml}` : ''}</div>
+      ${docs.length ? `<div><span>Total (con IVA)</span><div class="oc-info-total">${clp(total)}</div></div>` : ''}
+    </div>`;
+
+  // Recuadro derecho: estado del envío.
+  const cajaEstado = `<div class="oc-fact ${entregado ? 'oc-fact-completa' : 'oc-fact-por'} doc-caja doc-cobro fx-estado">
+      <div class="oc-fact-cab"><span>Estado del envío</span>${entregado ? '<span class="badge badge-green">Entregado</span>' : badgeEstadoFedex(e.estado_envio)}</div>
+      <div class="oc-fact-cifras">
+        <span>Enviado <b>${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}</b></span>
+        ${entregado && e.fecha_entrega ? `<span>Entregado el <b>${fDate(e.fecha_entrega)}</b></span>` : ''}
+        ${entregado && e.recibido_por ? `<span>Recibió <b>${escapeHtml(e.recibido_por)}</b></span>` : ''}
+      </div>
+    </div>`;
 
   const navLista = lista || fedexF;
   const idx = navLista.findIndex(x => x.id === e.id);
-  const pdf = docs.find(d => d.doc_url);
   return {
     envioId: e.id,
-    titulo: nombreHosp(e.hospital) || e.hospital || 'Envío FedEx',
-    sub: `Enviado ${e.fecha_ingreso ? fDate(e.fecha_ingreso) : '—'}`,
-    etiquetas: entregado ? '' : badgeEstadoFedex(e.estado_envio),
-    ids: [
-      { label: 'OT', valor: e.orden_transporte },
-      ...(docs.length ? docs.map(d => ({ label: 'Factura', valor: String(d.folio), ver: () => fichaDocumento(d.id) }))
-        : e.factura ? [{ label: 'Factura', valor: e.factura }] : []),
-      ...ocs.map(c => oc.some(o => o.codigooc === c) ? { label: 'OC', valor: c, ver: () => fichaOC(c) } : { label: 'OC', valor: c }),
-    ],
-    acciones: (e.orden_transporte ? `<a class="page-btn page-btn-pri" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener">Ver seguimiento en FedEx ↗</a>` : '')
-      + (pdf ? ` <a class="page-btn" href="${pdf.doc_url}" target="_blank" rel="noopener">Ver PDF factura ↗</a>` : '')
-      + ` <button class="page-btn" onclick="fedexEditar(${e.id})">✎ Editar</button>`,
-    cuerpo: (entregado ? `<div class="panel-ok">✓ Entregado${e.fecha_entrega ? ' el ' + fDate(e.fecha_entrega) : ''}${e.recibido_por ? `<br>Recibió: <b>${escapeHtml(e.recibido_por)}</b>` : ''}</div>` : '')
-      + `<div class="panel-h">Qué se envió</div>`
-      + (docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div><div class="skeleton" style="height:34px;width:80%"></div></div>`
-        : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`)
-      + `<div class="panel-h">Historial del envío</div>${fedexHistorialHtml(e)}`,
+    antetitulo: 'Envío FedEx · OT',
+    titulo: String(e.orden_transporte || '—'),
+    tituloMono: true,
+    tituloCopiar: !!e.orden_transporte,
+    tituloExtra: (e.orden_transporte ? `<a class="btn-mp" href="${urlRastreoFedex(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento en FedEx">Ver en FedEx <i class="ti ti-external-link"></i></a>` : '')
+      + ` <button class="btn-mp btn-mp-gris" onclick="fedexEditar(${e.id})" title="Corregir los datos del envío">✎ Editar</button>`,
+    sub: [nombreHosp(e.hospital) || e.hospital, e.fecha_ingreso ? 'enviado el ' + fDate(e.fecha_ingreso) : ''].filter(Boolean).join(' · '),
+    resumen: `<div class="doc-arriba">${infoEnvio}${cajaEstado}</div>`,
+    cuerpo: `<details class="fx-envio" open>
+        <summary class="panel-h fx-envio-cab"><i class="ti ti-chevron-right oc-saldo-flecha"></i> Qué se envió</summary>
+        ${docs.length ? `<div id="${contItems}"><div class="skeleton" style="height:34px;margin-bottom:6px"></div></div>`
+          : `<div class="panel-vacio">${e.factura ? 'La factura de este envío todavía no está sincronizada.' : 'Este envío no tiene factura anotada.'}</div>`}
+      </details>
+      <div class="panel-h">Historial del envío</div>${fedexHistorialHtml(e)}`,
     navegacion: idx === -1 ? null : {
       texto: `Envío ${idx + 1} de ${navLista.length}`,
       anterior: idx > 0 ? () => fedexAbrir(navLista[idx - 1].id) : null,
@@ -8182,18 +8204,31 @@ function fichaEnvioFedex(id, lista) {
   };
 }
 
-// Productos de las facturas del envío: nombre y cantidad (y el detalle, que
-// suele traer el lote y el vencimiento).
+// "Qué se envió": una fila por factura (N°, fecha, productos, total); al
+// hacer clic se despliega debajo con sus productos.
 async function cargarItemsEnvioEnPanel(docs, contId) {
   try {
     const ids = docs.map(d => d.id).join(',');
-    const its = await fetchAll('documentos_gdexpress_items', `select=nombre_producto,descripcion,cantidad,unidad&documento_id=in.(${ids})`);
+    const its = await fetchAll('documentos_gdexpress_items', `select=documento_id,nombre_producto,descripcion,cantidad,unidad&documento_id=in.(${ids})`);
     const cont = document.getElementById(contId);
     if (!cont) return;
-    cont.innerHTML = !its.length ? '<div class="panel-vacio">El detalle de la factura se completa en la próxima sincronización.</div>'
-      : `<table class="panel-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Cant.</th></tr></thead><tbody>
-        ${its.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${it.descripcion ? `<small class="panel-muted">${escapeHtml(it.descripcion)}</small>` : ''}</td>
-          <td style="text-align:right;white-space:nowrap">${it.cantidad || '—'} ${escapeHtml(it.unidad || '')}</td></tr>`).join('')}</tbody></table>`;
+    const porDoc = new Map(docs.map(d => [d.id, []]));
+    its.forEach(it => porDoc.get(it.documento_id)?.push(it));
+    cont.innerHTML = `<table class="panel-tabla panel-tabla-cuadros fx-facturas"><thead><tr><th>Factura</th><th>Fecha de emisión</th><th style="text-align:right">Productos</th><th style="text-align:right">Total con IVA</th></tr></thead><tbody>
+      ${docs.map(d => {
+        const lst = porDoc.get(d.id) || [];
+        return `<tr class="fx-fac-fila" onclick="this.classList.toggle('abierta');this.nextElementSibling.hidden=!this.nextElementSibling.hidden">
+          <td><span class="fx-chev">›</span> <b class="mono">N° ${escapeHtml(String(d.folio))}</b></td>
+          <td>${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
+          <td style="text-align:right">${lst.length || '—'}</td>
+          <td style="text-align:right;font-weight:500">${clp(montoTotalDoc(d))}</td></tr>
+        <tr class="fx-fac-detalle" hidden><td colspan="4">${lst.length
+          ? `<table class="panel-tabla fx-productos"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>
+              ${lst.map(it => `<tr><td><b>${escapeHtml(it.nombre_producto || '—')}</b>${it.descripcion ? `<small class="panel-muted">${escapeHtml(it.descripcion)}</small>` : ''}</td>
+                <td style="text-align:right;white-space:nowrap">${it.cantidad ? Number(it.cantidad).toLocaleString('es-CL') : '—'} ${escapeHtml(it.unidad || '')}</td></tr>`).join('')}
+            </tbody></table>`
+          : '<div class="panel-vacio">El detalle de esta factura se completa en la próxima sincronización.</div>'}</td></tr>`;
+      }).join('')}</tbody></table>`;
   } catch (err) {
     const cont = document.getElementById(contId);
     if (cont) cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudo cargar el detalle: ${escapeHtml(err.message)}</div>`;
