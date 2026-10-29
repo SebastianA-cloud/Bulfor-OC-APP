@@ -15407,8 +15407,8 @@ function recPreparadoHtml(r) {
     formula: `Misma fórmula que RM ${escapeHtml(r.nombre_ref || '')}`,
     manual: 'Nombre puesto a mano',
   }[r.nombre_origen] || '';
-  return `<span class="rec-preparado" title="${escapeHtml(r.descripcion || '')}">${escapeHtml(r.nombre)}</span>${lapiz}
-    ${origen ? `<small class="rec-origen">${origen}</small>` : ''}`;
+  // De dónde salió el nombre va solo en el globo al pasar el mouse.
+  return `<span class="rec-preparado" title="${escapeHtml((origen ? origen + '\n' : '') + (r.descripcion || ''))}">${escapeHtml(r.nombre)}</span>${lapiz}`;
 }
 
 function recBuscarRender(q) {
