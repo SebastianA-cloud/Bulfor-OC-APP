@@ -17207,10 +17207,26 @@ function fichaMateriaRec(idProducto) {
         <div class="fpp-status-tabs cc-tabs" id="rec-cm-cc-tabs">${REC_CM_PERIODOS.map(pr => `<button class="fpp-status-tab${pr.id === recCmPeriodo ? ' active' : ''}" data-p="${pr.id}" onclick="recCmSetPeriodo('${pr.id}')">${pr.label}</button>`).join('')}</div>
       </div>
       <div id="rec-cm-cc">${recCmCompVsConsHtml(m)}</div>
-      ${compras.length > 1 ? `<div class="panel-h">Historia de precios${compras.length > 24 ? ' · últimas 24 compras' : ''}</div><div class="mini-graf" id="rec-cm-graf">${recCmGraficoSvg(compras.slice(0, 24).reverse())}</div>` : ''}
-      <div class="table-card drawer-compras">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</div>
-      ${compras.length ? `<div class="rec-prep-vertodas"><span>${compras.length > 10 ? `Se muestran las 10 más recientes de ${recNum(compras.length)}.` : ''}</span>
-        <button class="btn-mp" onclick="recCmHistorial(${m.id_producto})">Ver historial de compras (${recNum(compras.length)}) ›</button></div>` : ''}`,
+      ${compras.length > 1 ? `<details class="fx-envio rec-cm-pleg" ontoggle="if(this.open&&!this.dataset.listo){this.dataset.listo='1';recCmActivarGrafico()}">
+        <summary>
+          <span class="fx-envio-tit">📈 Historia de precios</span>
+          <span class="fx-envio-sub">${recCmResumenPrecio(compras.slice(0, 24))}</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Ocultar</span> <span class="fx-envio-flecha">⌄</span></span>
+        </summary>
+        <div class="rec-cm-pleg-cuerpo">${recCmGraficoSvg(compras.slice(0, 24).reverse(), m)}</div>
+      </details>` : ''}
+      <details class="fx-envio rec-cm-pleg">
+        <summary>
+          <span class="fx-envio-tit">🧾 Últimas compras</span>
+          <span class="fx-envio-sub">${compras.length ? `${compras.length > 10 ? 'las 10 más recientes de ' : ''}${recNum(compras.length)} compra${compras.length === 1 ? '' : 's'}` : 'sin compras registradas'}</span>
+          <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Ocultar</span> <span class="fx-envio-flecha">⌄</span></span>
+        </summary>
+        <div class="rec-cm-pleg-cuerpo">
+          <div class="table-card drawer-compras">${recPrepComprasHtml(compras.slice(0, 10), m.unidad_stock, 'recCmVerFactura')}</div>
+          ${compras.length ? `<div class="rec-prep-vertodas"><span></span>
+            <button class="btn-mp" onclick="recCmHistorial(${m.id_producto})">Ver historial de compras (${recNum(compras.length)}) ›</button></div>` : ''}
+        </div>
+      </details>`,
     navegacion: idx === -1 ? null : {
       texto: `${idx + 1} de ${recCmF.length}`,
       anterior: idx > 0 ? () => recCmAbrir(recCmF[idx - 1].id_producto) : null,
@@ -17221,7 +17237,7 @@ function fichaMateriaRec(idProducto) {
 
 // Después de abrir la ficha: gráficos, consumo y el lote (se piden aparte).
 async function recCmActivarFicha(id) {
-  setTimeout(() => { recCmActivarGrafico(); recCmActivarGraficoCC(); }, 0);
+  setTimeout(() => recCmActivarGraficoCC(), 0);
   recCmCargarConsumo(id);
   const m = recCmMaterias.find(x => x.id_producto === id);
   if (!m) return;
@@ -17287,51 +17303,121 @@ function recCmHistVerFactura(idMateria, idFactura) {
   recCmVerFactura(idFactura);
 }
 
-// Línea de precios en el tiempo (una sola serie; el hover muestra cada compra).
-function recCmGraficoSvg(compras) {
-  const W = 500, H = 150, pl = 8, pr = 8, pt = 12, pb = 22;
-  const xs = compras.map(c => new Date(String(c.fecha).slice(0, 10) + 'T12:00:00').getTime());
-  const ys = compras.map(c => Number(c.precio_compra) || 0);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const padY = (y1 - y0) * 0.15 || y1 * 0.1 || 1;
-  const sx = t => pl + (x1 === x0 ? (W - pl - pr) / 2 : (t - x0) / (x1 - x0) * (W - pl - pr));
-  const sy = v => pt + (1 - (v - (y0 - padY)) / ((y1 + padY) - (y0 - padY))) * (H - pt - pb);
-  const pts = compras.map((c, i) => ({ x: sx(xs[i]), y: sy(ys[i]), c }));
-  window._recCmPuntos = pts;
-  const linea = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const yMax = sy(y1), yMin = sy(y0);
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Historia de precios">
-      <line x1="${pl}" x2="${W - pr}" y1="${yMax}" y2="${yMax}" stroke="var(--border)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
-      <line x1="${pl}" x2="${W - pr}" y1="${yMin}" y2="${yMin}" stroke="var(--border)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
-      <path d="${linea}" fill="none" stroke="var(--ink-chart)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-      <circle id="rec-cm-graf-pt" r="4" cx="-20" cy="-20" fill="var(--ink-chart)" stroke="var(--surface)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-    </svg>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:-16px">
-      <span>${fDate(compras[0].fecha)}</span><span>máx ${recClpDec(y1)} · mín ${recClpDec(y0)}</span><span>${fDate(compras[compras.length - 1].fecha)}</span>
-    </div>
-    <div class="tip" id="rec-cm-graf-tip" style="display:none"></div>`;
+// ── Historia de precios ──
+// Lo que se quiere mostrar: cuánto se pagó por unidad en cada compra, si el
+// precio viene subiendo o bajando, a qué proveedor le sale más barato y cómo
+// está el costo actual frente a eso. Cada punto es una compra (color = proveedor),
+// la línea punteada es el costo actual y arriba van tres cifras que lo resumen.
+const REC_CM_COLORES_PROV = ['#2F5D8A', '#C98A1B', '#2D6A4F', '#8E4B9E', '#B5473A'];
+
+// Texto corto para la barra plegada: "$ 12,5 → $ 14,7 · ▲ 17,6% en 12 meses".
+function recCmResumenPrecio(compras) {
+  if (compras.length < 2) return '';
+  const ult = compras[0], pri = compras[compras.length - 1];
+  const v = Number(pri.precio_compra) ? (Number(ult.precio_compra) - Number(pri.precio_compra)) / Number(pri.precio_compra) : null;
+  const meses = Math.max(1, Math.round((new Date(String(ult.fecha).slice(0, 10)) - new Date(String(pri.fecha).slice(0, 10))) / 86400000 / 30.4));
+  return `${recClpDec(pri.precio_compra)} → <b style="color:var(--text)">${recClpDec(ult.precio_compra)}</b> ${recCmVariacionHtml(v) || ''} en ${meses} mes${meses === 1 ? '' : 'es'}`;
 }
 
+function recCmGraficoSvg(compras, m) {
+  const W = 1000, H = 260, pl = 78, pr = 120, pt = 16, pb = 34;
+  const u = m && m.unidad_stock ? ' / ' + m.unidad_stock : '';
+  const xs = compras.map(c => new Date(String(c.fecha).slice(0, 10) + 'T12:00:00').getTime());
+  const ys = compras.map(c => Number(c.precio_compra) || 0);
+  const costo = Number(m && m.precio_costo) || null;
+  const todos = costo ? [...ys, costo] : ys;
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...todos), y1 = Math.max(...todos);
+  const pad = (y1 - y0) * 0.12 || y1 * 0.1 || 1;
+  y0 = Math.max(0, y0 - pad); y1 = y1 + pad;
+  const sx = t => pl + (x1 === x0 ? (W - pl - pr) / 2 : (t - x0) / (x1 - x0) * (W - pl - pr));
+  const sy = v => pt + (1 - (v - y0) / (y1 - y0)) * (H - pt - pb);
+
+  // Proveedores: un color por cada uno (los más comprados primero; el resto en gris).
+  const cuenta = {};
+  compras.forEach(c => { cuenta[c.id_proveedor] = (cuenta[c.id_proveedor] || 0) + 1; });
+  const orden = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a]);
+  const color = id => REC_CM_COLORES_PROV[orden.indexOf(String(id))] || '#9A968E';
+
+  const pts = compras.map((c, i) => ({ x: sx(xs[i]), y: sy(ys[i]), c, ant: compras[i - 1] }));
+  window._recCmPuntos = pts;
+  window._recCmGrafDim = { W, H, u };
+  const linea = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  // El rótulo del último precio se corre si choca con el de "Costo actual"
+  // (que ocupa desde 14 px sobre la línea hasta 14 px bajo ella).
+  let yUlt = pts[pts.length - 1].y;
+  if (costo && Math.abs(yUlt - sy(costo)) < 30) yUlt = yUlt >= sy(costo) ? sy(costo) + 30 : sy(costo) - 30;
+
+  // Eje Y: 4 líneas guía con su precio. Eje X: un rótulo por mes (máx. ~8).
+  const guias = [0, 1, 2, 3].map(i => y0 + (y1 - y0) * i / 3);
+  const meses = [];
+  const d = new Date(x0); d.setDate(1); d.setHours(12);
+  if (d.getTime() < x0) d.setMonth(d.getMonth() + 1);
+  for (; d.getTime() <= x1; d.setMonth(d.getMonth() + 1)) meses.push(d.getTime());
+  const paso = Math.ceil(meses.length / 8) || 1;
+  const nombreMes = t => new Date(t).toLocaleDateString('es-CL', { month: 'short', year: '2-digit' }).replace('.', '');
+
+  // Las tres cifras de arriba.
+  const iMin = ys.indexOf(Math.min(...ys)), iMax = ys.indexOf(Math.max(...ys));
+  const prov = c => recCmNombreProv(c.id_proveedor) || 'proveedor sin nombre';
+  const ult = compras[compras.length - 1], pri = compras[0];
+  const cambio = Number(pri.precio_compra) ? (Number(ult.precio_compra) - Number(pri.precio_compra)) / Number(pri.precio_compra) : null;
+  const cifra = (t, v, sub) => `<div class="rec-cm-cifra"><span>${t}</span><b>${v}</b><small>${sub}</small></div>`;
+
+  return `<div class="rec-cm-cifras">
+      ${cifra('Cambio en el período', `${recClpDec(pri.precio_compra)} → ${recClpDec(ult.precio_compra)}`, `${recCmVariacionHtml(cambio) || ''} desde ${fDate(pri.fecha)}`)}
+      ${cifra('Lo más barato', recClpDec(ys[iMin]) + u, `${escapeHtml(prov(compras[iMin]))} · ${fDate(compras[iMin].fecha)}`)}
+      ${cifra('Lo más caro', recClpDec(ys[iMax]) + u, `${escapeHtml(prov(compras[iMax]))} · ${fDate(compras[iMax].fecha)}`)}
+    </div>
+    <div class="mini-graf rec-cm-graf" id="rec-cm-graf">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Historia de precios por compra">
+      ${guias.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${sy(v).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="#ECE9E3"/>
+        <text x="${pl - 10}" y="${(sy(v) + 4).toFixed(1)}" text-anchor="end" class="rec-cm-eje">${recClpDec(v)}</text>`).join('')}
+      ${meses.filter((_, i) => i % paso === 0).map(t => `<line x1="${sx(t).toFixed(1)}" x2="${sx(t).toFixed(1)}" y1="${H - pb}" y2="${H - pb + 5}" stroke="#CFCBC2"/>
+        <text x="${sx(t).toFixed(1)}" y="${H - pb + 20}" text-anchor="middle" class="rec-cm-eje">${nombreMes(t)}</text>`).join('')}
+      <line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="#CFCBC2"/>
+      ${costo ? `<line x1="${pl}" x2="${W - pr}" y1="${sy(costo).toFixed(1)}" y2="${sy(costo).toFixed(1)}" stroke="var(--accent)" stroke-dasharray="6 5" stroke-width="1.5"/>
+        <text x="${W - pr + 8}" y="${(sy(costo) - 3).toFixed(1)}" class="rec-cm-eje" style="fill:var(--accent);font-weight:700">Costo actual</text>
+        <text x="${W - pr + 8}" y="${(sy(costo) + 12).toFixed(1)}" class="rec-cm-eje" style="fill:var(--accent)">${recClpDec(costo)}</text>` : ''}
+      <path d="${linea}" fill="none" stroke="#B9B4AA" stroke-width="1.5" stroke-linejoin="round"/>
+      ${pts.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="${color(p.c.id_proveedor)}" stroke="#fff" stroke-width="2"/>`).join('')}
+      <text x="${pts[pts.length - 1].x + 10}" y="${(yUlt + 4).toFixed(1)}" class="rec-cm-eje" style="font-weight:700;fill:var(--text)">${recClpDec(ys[ys.length - 1])}</text>
+      <circle id="rec-cm-graf-pt" r="9" cx="-40" cy="-40" fill="none" stroke="var(--text)" stroke-width="2"/>
+    </svg>
+    <div class="tip" id="rec-cm-graf-tip" style="display:none"></div>
+    </div>
+    <div class="rec-cm-leyenda">
+      ${orden.slice(0, REC_CM_COLORES_PROV.length).map(id => `<span><i style="background:${color(id)}"></i>${escapeHtml(recCmNombreProv(Number(id)) || recCmNombreProv(id) || 'Proveedor ' + id)} <small>(${cuenta[id]})</small></span>`).join('')}
+      ${orden.length > REC_CM_COLORES_PROV.length ? '<span><i style="background:#9A968E"></i>Otros</span>' : ''}
+      ${costo ? '<span><i class="rec-cm-ley-linea"></i>Costo actual en el recetario</span>' : ''}
+      <span style="color:var(--text-3)">Cada punto es una compra: precio pagado por ${m && m.unidad_stock ? escapeHtml(m.unidad_stock) : 'unidad'}.${compras.length >= 24 ? ' Últimas 24 compras.' : ''}</span>
+    </div>`;
+}
+
+// Al pasar el mouse: la compra más cercana con precio, fecha, proveedor,
+// cantidad y cuánto cambió respecto de la compra anterior.
 function recCmActivarGrafico() {
   const caja = document.getElementById('rec-cm-graf');
   if (!caja) return;
   const svg = caja.querySelector('svg'), tip = document.getElementById('rec-cm-graf-tip'), pt = document.getElementById('rec-cm-graf-pt');
+  const { W, H, u } = window._recCmGrafDim || { W: 1000, H: 260, u: '' };
   const mover = ev => {
     const r = svg.getBoundingClientRect();
-    const xVb = (ev.clientX - r.left) / r.width * 500;
+    const xVb = (ev.clientX - r.left) / r.width * W;
     const p = (window._recCmPuntos || []).reduce((a, b) => Math.abs(b.x - xVb) < Math.abs(a.x - xVb) ? b : a);
     pt.setAttribute('cx', p.x); pt.setAttribute('cy', p.y);
     tip.style.display = '';
-    tip.style.left = (p.x / 500 * r.width) + 'px';
-    tip.style.top = (p.y / 150 * r.height) + 'px';
+    tip.style.left = (p.x / W * r.width) + 'px';
+    tip.style.top = (p.y / H * r.height) + 'px';
     const prov = recCmNombreProv(p.c.id_proveedor);
-    tip.innerHTML = `${recClpDec(p.c.precio_compra)}<small>${fDate(p.c.fecha)}${prov ? ' · ' + prov : ''}</small>`;
+    const v = p.ant && Number(p.ant.precio_compra) ? (Number(p.c.precio_compra) - Number(p.ant.precio_compra)) / Number(p.ant.precio_compra) : null;
+    tip.innerHTML = `${recClpDec(p.c.precio_compra)}${u} ${v !== null ? recCmVariacionHtml(v) : ''}
+      <small>${fDate(p.c.fecha)}${prov ? ' · ' + escapeHtml(prov) : ''} · ${recNum(p.c.cantidad, 2)}${u ? ' ' + u.slice(3) : ''}</small>`;
   };
   svg.addEventListener('pointermove', mover);
   svg.addEventListener('pointerdown', mover);
-  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; pt.setAttribute('cx', -20); });
+  svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; pt.setAttribute('cx', -40); });
 }
-
 
 // La ficha de la factura se apila sobre la de la materia: "← Volver" regresa a ella.
 function recCmVerFactura(idFactura) {
