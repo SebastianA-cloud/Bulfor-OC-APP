@@ -164,6 +164,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 29-10-2026 — Consumo y compras: "Compras vs consumo" oculto en Envases e insumos.
 - 29-10-2026 — Consumo y compras: sin "Costo actual" en la ficha; "Consumido" y "Usada en" abren el detalle del consumo del período (Por lote con aviso "usado de más" / Por RM, cada RM se abre). Título de columna ordenada en blanco. Revisión de consumos raros (ver Pendientes).
 - 29-10-2026 — Consumo y compras: ficha compacta (franja de 5 celdas, compras vs consumo en una fila) para que quepa sin scroll.
 - 29-10-2026 — Consumo y compras: Historia de precios y Últimas compras plegables; gráfico de precios rehecho (ejes, proveedores por color, costo actual, tres cifras de resumen).
@@ -174,7 +175,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 ## 10. Pendientes
 
 - [ ] **Consumos raros en Consumo y compras** (revisado 29-10-2026, esperando decisión de Seba):
-  - Envases, cápsulas, etiquetas y cajas: Pharma_RM no descuenta su uso por RM → siempre "consumo 0". Propuesta: ocultar "Compras vs consumo" en Envases e insumos.
+  - Envases e insumos: "Compras vs consumo" **oculto** (decisión de Seba 29-10). Más adelante se agregarán envases/potes/botellas a las preparaciones para poder calcular su consumo.
+  - [ ] Reasignación de lotes por orden de llegada (FIFO) para materias con lotes "usados de más": simulación en SQL pendiente (la consulta pidió confirmación en Supabase y no se respondió).
   - Alcohol 70° y Crema no iónica: ingresos cada ~3 semanas de la propia Bulfor (elaboración propia que se vende directo), no se consumen en RM → no son compras sin uso.
   - Vaselina líquida: compras registradas en ml (25.950 a $4,5) pero su unidad de stock es Lt → compras y consumo en unidades distintas (corregir en Pharma_RM).
   - Omeprazol pellets 8,5%: Pharma registra el omeprazol (no el peso de pellets): 657 g ÷ 0,085 ≈ 7,7 kg de pellets vs 11 kg comprados.

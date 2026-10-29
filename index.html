@@ -17208,11 +17208,13 @@ function fichaMateriaRec(idProducto) {
     sub: [m.unidad_stock ? 'Unidad: ' + m.unidad_stock : '', `${recNum(compras.length)} compra${compras.length === 1 ? '' : 's'}`,
       `${recNum(m._provs.size)} proveedor${m._provs.size === 1 ? '' : 'es'}`, ult ? 'última ' + recCmDiasDesde(ult.fecha) : ''].filter(Boolean).join(' · '),
     resumen: franja,
-    cuerpo: `
+    // Envases e insumos: Pharma_RM no descuenta su uso por RM, así que el
+    // consumo siempre saldría 0. Se oculta hasta que se agreguen a las preparaciones.
+    cuerpo: `${m._insumo ? '' : `
       <div class="panel-h cc-cab">Compras vs consumo
         <div class="fpp-status-tabs cc-tabs" id="rec-cm-cc-tabs">${REC_CM_PERIODOS.map(pr => `<button class="fpp-status-tab${pr.id === recCmPeriodo ? ' active' : ''}" data-p="${pr.id}" onclick="recCmSetPeriodo('${pr.id}')">${pr.label}</button>`).join('')}</div>
       </div>
-      <div id="rec-cm-cc" class="rec-cm-cc-compacto">${recCmCompVsConsHtml(m)}</div>
+      <div id="rec-cm-cc" class="rec-cm-cc-compacto">${recCmCompVsConsHtml(m)}</div>`}
       ${compras.length > 1 ? `<details class="fx-envio rec-cm-pleg" ontoggle="if(this.open&&!this.dataset.listo){this.dataset.listo='1';recCmActivarGrafico()}">
         <summary>
           <span class="fx-envio-tit">📈 Historia de precios</span>
@@ -17243,10 +17245,9 @@ function fichaMateriaRec(idProducto) {
 
 // Después de abrir la ficha: gráficos, consumo y el lote (se piden aparte).
 async function recCmActivarFicha(id) {
-  setTimeout(() => recCmActivarGraficoCC(), 0);
-  recCmCargarConsumo(id);
   const m = recCmMaterias.find(x => x.id_producto === id);
   if (!m) return;
+  if (!m._insumo) { setTimeout(() => recCmActivarGraficoCC(), 0); recCmCargarConsumo(id); }
   try { await recCmCargarLotes((recCmComprasPorMateria[id] || []).slice(0, 5)); } catch (_) { /* queda "sin lote" */ }
   const el = document.getElementById(`rec-cm-lote-${id}`);
   if (el) el.innerHTML = recCmUltimoLoteHtml(m);
