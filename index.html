@@ -751,20 +751,35 @@
       <div class="page-sub">Fórmula completa de cada receta magistral: materias primas, cantidades, lotes con su vencimiento y costo</div>
     </div>
     <div id="rec-estado-buscar"></div>
-    <div class="toolbar">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), contraseña de la etiqueta, materia prima, hospital…" onkeydown="if(event.key==='Enter')recBuscar()" autocomplete="off">
+    <div class="fpp-toolbar-top">
+      <div class="fpp-period" id="rec-periodo">
+        <button class="fpp-period-btn" onclick="recCambiarMes(-1)" title="Mes anterior">‹</button>
+        <select id="rec-select-mes" onchange="recSeleccionarPeriodo()" aria-label="Mes"></select>
+        <select id="rec-select-anio" onchange="recSeleccionarPeriodo()" aria-label="Año"></select>
+        <button class="fpp-period-btn" onclick="recCambiarMes(1)" title="Mes siguiente">›</button>
       </div>
-      <button class="import-btn" style="margin-top:0" onclick="recBuscar()">Buscar</button>
-    </div>
-    <div class="toolbar">
-      <div class="fpp-status-tabs" id="rec-buscar-rangos"></div>
       <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
         <input type="checkbox" id="rec-buscar-alertas" onchange="recBuscar()"> Solo con lote vencido
       </label>
     </div>
-    <div id="rec-buscar-res"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), preparado, materia prima, hospital… (busca en todas las fechas)" onkeydown="if(event.key==='Enter')recBuscar()" oninput="recBuscarAlEscribir()" autocomplete="off">
+      </div>
+    </div>
+    <div class="table-card oc-tabla tabla-centrada" id="rec-tabla-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th><th>RM</th><th>Cantidad</th><th>Preparado</th><th>Paciente / Hospital</th><th>Costo MP</th><th>Avisos</th>
+        </tr></thead>
+        <tbody id="rec-body"></tbody>
+      </table>
+      <div class="pagination">
+        <span id="rec-info"></span>
+        <div class="page-btns" id="rec-pages"></div>
+      </div>
+    </div>
   </div>
 
   <div class="page" id="page-rec-alertas">
@@ -15215,7 +15230,7 @@ function descargarPedidoExcel() {
 // Sin datos personales de pacientes ni médicos: solo el nombre cuando el
 // "paciente" es una institución (hospital).
 let recResumen = null;
-let recBuscarRango = 90, recBuscarData = null;
+let recBuscarData = null;
 let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
 // RM con lote vencido que alguien marcó como revisados (tabla rec_lotes_revisados):
 // se ocultan del historial. Clave "id_rp_detalle|lote".
@@ -15311,54 +15326,228 @@ function recCantidadRm(r) {
 }
 
 // ── BUSCAR RM ──────────────────────────────────────────────────────────────
+// Lista por mes y año, como Órdenes de compra y Facturas. El buscador busca en
+// todas las fechas. Cada RM trae el nombre del preparado (rec_lista):
+//   1) puesto a mano, 2) como se digitó en la factura o guía de ese RM,
+//   3) el de otro RM con la misma fórmula. Si no tiene, un editor lo nombra.
+let recPeriodo = null, recPage = 1, recBuscarTimer = null, recFormulasDic = null;
+
 function recBuscarInit() {
-  recBuscarRenderRangos();
   recPintarEstado('rec-estado-buscar');
   cargarRecResumen().then(() => recPintarEstado('rec-estado-buscar'));
+  if (!recPeriodo) {
+    const hoy = new Date();
+    recPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() };
+  }
+  recPoblarSelectores();
   if (!recBuscarData) recBuscar();
 }
 
-function recBuscarRenderRangos() {
-  const ops = [{ id: 7, label: '7 días' }, { id: 30, label: '30 días' }, { id: 90, label: '90 días' }, { id: 365, label: '1 año' }, { id: 0, label: 'Todo' }];
-  document.getElementById('rec-buscar-rangos').innerHTML = recTabsHtml(ops, recBuscarRango, 'recBuscarSetRango');
+function recPoblarSelectores() {
+  const selMes = document.getElementById('rec-select-mes');
+  const selAnio = document.getElementById('rec-select-anio');
+  if (!selMes || !selAnio) return;
+  selMes.innerHTML = MESES_NOMBRE.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  const hasta = Math.max(new Date().getFullYear(), Number(recPeriodo.anio));
+  const anios = [];
+  for (let a = hasta; a >= 2024; a--) anios.push(String(a));
+  selAnio.innerHTML = anios.map(a => `<option value="${a}">${a}</option>`).join('');
+  selMes.value = recPeriodo.mes; selAnio.value = recPeriodo.anio;
 }
-function recBuscarSetRango(d) { recBuscarRango = d; recBuscarRenderRangos(); recBuscar(); }
+function recSeleccionarPeriodo() {
+  recPeriodo = { anio: document.getElementById('rec-select-anio').value, mes: Number(document.getElementById('rec-select-mes').value) };
+  recBuscar();
+}
+function recCambiarMes(delta) {
+  let a = parseInt(recPeriodo.anio, 10), m = recPeriodo.mes + delta;
+  if (m < 0) { m = 11; a -= 1; }
+  if (m > 11) { m = 0; a += 1; }
+  recPeriodo = { anio: String(a), mes: m };
+  recPoblarSelectores();
+  recBuscar();
+}
+// Al escribir se busca solo (con una pausa corta); Enter busca al tiro.
+function recBuscarAlEscribir() {
+  clearTimeout(recBuscarTimer);
+  recBuscarTimer = setTimeout(recBuscar, 450);
+}
 
 async function recBuscar() {
+  clearTimeout(recBuscarTimer);
   const q = (document.getElementById('rec-buscar-q').value || '').trim();
   const solo = document.getElementById('rec-buscar-alertas').checked;
-  const esNumero = /^\s*(rm)?\s*\d/i.test(q);
-  const cont = document.getElementById('rec-buscar-res');
-  cont.innerHTML = `<div class="table-card"><div class="empty"><p>Buscando…</p></div></div>`;
-  const params = { p_q: q, p_solo_alertas: solo, p_limite: 300 };
-  if (!esNumero && recBuscarRango) { params.p_desde = recHaceDias(recBuscarRango - 1); params.p_hasta = fechaLocalISO(); }
-  recBuscarData = await recRpc('rec_buscar', params);
+  document.getElementById('rec-periodo').style.visibility = q ? 'hidden' : '';
+  document.getElementById('rec-body').innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><p>Buscando…</p></div></td></tr>`;
+  const params = { p_q: q, p_solo_alertas: solo, p_limite: q ? 300 : 3000 };
+  if (!q) {
+    const a = Number(recPeriodo.anio), m = recPeriodo.mes;
+    params.p_desde = `${a}-${String(m + 1).padStart(2, '0')}-01`;
+    params.p_hasta = new Date(a, m + 1, 0).toLocaleDateString('sv-SE');
+  }
+  const consulta = JSON.stringify(params);
+  recBuscar.ultima = consulta;
+  const filas = await recRpc('rec_lista', params);
+  if (recBuscar.ultima !== consulta) return;   // llegó tarde: ya se pidió otra cosa
+  recBuscarData = filas;
+  recPage = 1;
   recBuscarRender(q);
 }
 
+function recPreparadoHtml(r) {
+  const esEditor = sesionActual?.rol === 'editor';
+  const lapiz = esEditor ? `<button class="rec-nombrar-lapiz" title="Cambiar el nombre" onclick="event.stopPropagation();recNombrar(${r.id_rp_detalle})">✎</button>` : '';
+  if (!r.nombre) {
+    return esEditor
+      ? `<button class="rec-nombrar" onclick="event.stopPropagation();recNombrar(${r.id_rp_detalle})" title="${escapeHtml(r.descripcion || '')}">＋ Ponerle nombre</button>`
+      : `<span style="color:var(--text-3)" title="${escapeHtml(r.descripcion || '')}">Sin nombre</span>`;
+  }
+  const origen = {
+    factura: `Factura ${escapeHtml(r.nombre_ref || '')}`,
+    guia: `Guía ${escapeHtml(r.nombre_ref || '')}`,
+    formula: `Misma fórmula que RM ${escapeHtml(r.nombre_ref || '')}`,
+    manual: 'Nombre puesto a mano',
+  }[r.nombre_origen] || '';
+  return `<span class="rec-preparado" title="${escapeHtml(r.descripcion || '')}">${escapeHtml(r.nombre)}</span>${lapiz}
+    ${origen ? `<small class="rec-origen">${origen}</small>` : ''}`;
+}
+
 function recBuscarRender(q) {
-  const cont = document.getElementById('rec-buscar-res');
   const filas = recBuscarData || [];
-  if (!filas.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🔍</div><p>${q ? 'No encontré RM con esa búsqueda.' : 'No hay RM en este período.'}</p></div></div>`;
+  const { slice, pages, total } = paginate(filas, recPage);
+  document.getElementById('rec-info').textContent = q
+    ? `${total.toLocaleString('es-CL')} RM encontrados${total === 300 ? ' (los 300 más recientes)' : ''}`
+    : `${total.toLocaleString('es-CL')} RM en ${MESES_NOMBRE[recPeriodo.mes].toLowerCase()} ${recPeriodo.anio}`;
+  renderPages('rec-pages', total, pages, recPage, 'goRec');
+  const body = document.getElementById('rec-body');
+  if (!slice.length) {
+    body.innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'No encontré RM con esa búsqueda.' : 'No hay RM en este mes.'}</p></div></td></tr>`;
     return;
   }
-  cont.innerHTML = `
-    <div style="font-size:12px;color:var(--text-3);padding:4px 2px 8px">${filas.length === 300 ? 'Mostrando los 300 más recientes.' : `${filas.length} RM.`} Haz clic en uno para ver la fórmula completa.</div>
-    <div class="table-card farm-grilla"><table><thead><tr>
-      <th>RM</th><th>Fecha</th><th>Forma</th><th style="text-align:right">Cantidad</th><th>Fórmula</th><th>Institución</th>
-      <th style="text-align:right">Costo MP</th><th>Avisos</th></tr></thead><tbody>
-      ${filas.map(r => `<tr style="cursor:pointer" onclick="recAbrirRm(${r.id_rp_detalle})">
-        <td data-label="RM" class="mono" style="color:var(--accent);white-space:nowrap;font-weight:600">${escapeHtml(r.rm || ('#' + r.id_rp))}</td>
-        <td data-label="Fecha" style="white-space:nowrap;font-size:12px;color:var(--text-2)">${recFechaHora(r.fecha)}</td>
-        <td data-label="Forma" style="font-size:12px">${escapeHtml(r.forma || '—')}</td>
-        <td data-label="Cantidad" style="text-align:right;white-space:nowrap">${recCantidadRm(r)}</td>
-        <td data-label="Fórmula" style="max-width:360px;font-size:12px" title="${escapeHtml(r.descripcion || '')}">${escapeHtml(r.descripcion || '—')}</td>
-        <td data-label="Institución" style="font-size:12px;color:var(--text-2)">${escapeHtml(r.institucion || '')}</td>
-        <td data-label="Costo MP" style="text-align:right;white-space:nowrap">${recClp(r.costo)}</td>
-        <td data-label="Avisos">${recAvisosRm(r)}</td>
-      </tr>`).join('')}
-    </tbody></table></div>`;
+  body.innerHTML = slice.map(r => `<tr class="oc-fila" onclick="recAbrirRm(${r.id_rp_detalle})">
+      <td data-label="Fecha" style="white-space:nowrap;color:var(--text-2)">${recFechaTs(r.fecha)}</td>
+      <td data-label="RM" class="mono" style="color:var(--accent);white-space:nowrap;font-weight:600">${escapeHtml(r.rm || ('#' + r.id_rp))}</td>
+      <td data-label="Cantidad" style="white-space:nowrap">${recCantidadRm(r)}</td>
+      <td data-label="Preparado" class="rec-col-preparado">${recPreparadoHtml(r)}</td>
+      <td data-label="Paciente / Hospital">${r.paciente ? `<b>${escapeHtml(r.paciente)}</b>` : r.institucion ? `<span style="color:var(--text-2);font-size:13px">${escapeHtml(r.institucion)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td data-label="Costo MP" style="white-space:nowrap">${recClp(r.costo)}</td>
+      <td data-label="Avisos">${recAvisosRm(r)}</td>
+    </tr>`).join('');
+  ajustarCabecerasFijas();
+}
+function goRec(p) { const { pages } = paginate(recBuscarData || [], recPage); if (p < 1 || p > pages) return; recPage = p; recBuscarRender((document.getElementById('rec-buscar-q').value || '').trim()); window.scrollTo({ top: 0 }); }
+
+// ── Nombrar un preparado ──
+// Sugerencias: fórmulas ya nombradas con las mismas materias primas (aunque
+// cambie el %). Si el nombre trae la concentración (mg/ml o %), se recalcula
+// con el % de este RM; y si trae el volumen en ml, se cambia por el de este RM.
+const recFirma = d => String(d || '').toUpperCase().replace(/\d+([.,]\d+)?\s*(%|MCG|MG|G|ML|UI)?/g, '').replace(/\s+/g, ' ').trim();
+// % del principio activo que nombra el preparado (p. ej. CAPTOPRIL en "CAPTOPRIL
+// 1MG/ML"): se busca en la fórmula el componente cuya primera palabra sale en
+// el nombre. Si no se encuentra, el primer componente con %.
+function recPctActivo(descripcion, nombre) {
+  const comps = String(descripcion || '').split(' + ').map(c => {
+    const m = c.match(/^(.*?)\s(\d+(?:[.,]\d+)?)\s*%/);
+    return m ? { palabra: m[1].replace(/^M\.R\.\s*/i, '').trim().split(/[\s(]/)[0].toUpperCase(), pct: parseFloat(m[2].replace(',', '.')) } : null;
+  }).filter(Boolean);
+  const n = String(nombre || '').toUpperCase();
+  const c = comps.find(x => x.palabra.length > 3 && n.includes(x.palabra)) || comps[0];
+  return c ? c.pct : null;
+}
+const recFmtNum = n => String(Math.round(n * 100) / 100).replace('.', ',');
+
+function recNombreSugerido(cand, r) {
+  let nombre = cand.nombre;
+  const pNuevo = recPctActivo(r.descripcion, cand.nombre), pViejo = recPctActivo(cand.descripcion, cand.nombre);
+  if (pNuevo && pViejo && pNuevo !== pViejo) {
+    const f = pNuevo / pViejo;
+    if (/\d+(?:[.,]\d+)?\s*MG\s*\/\s*ML/i.test(nombre)) nombre = nombre.replace(/(\d+(?:[.,]\d+)?)(\s*MG\s*\/\s*ML)/i, (_, n, u) => recFmtNum(parseFloat(n.replace(',', '.')) * f) + u);
+    else if (/\d+(?:[.,]\d+)?\s*%/.test(nombre)) nombre = nombre.replace(/(\d+(?:[.,]\d+)?)(\s*%)/, (_, n, u) => recFmtNum(pNuevo) + u);
+  }
+  if (/^ml$/i.test(r.unidad || '') && r.cantidad) {
+    nombre = nombre.replace(/(\d+(?:[.,]\d+)?)(\s*ML)\s*$/i, (_, n, u) => recFmtNum(Number(r.cantidad)) + u);
+  }
+  return nombre;
+}
+
+async function recNombrar(idDetalle) {
+  const r = (recBuscarData || []).find(x => x.id_rp_detalle === idDetalle);
+  if (!r) return;
+  if (!recFormulasDic) {
+    const d = await fetchAll('rec_formulas_nombre', 'select=descripcion,nombre,origen,rm_ref');
+    recFormulasDic = Array.isArray(d) ? d : [];
+  }
+  const firma = recFirma(r.descripcion);
+  const vistos = new Set();
+  const sugerencias = recFormulasDic
+    .filter(c => c.descripcion !== r.descripcion && recFirma(c.descripcion) === firma)
+    .map(c => ({ ...c, propuesto: recNombreSugerido(c, r) }))
+    .filter(c => !vistos.has(c.propuesto) && vistos.add(c.propuesto))
+    .slice(0, 6);
+  const nombres = [...new Set(recFormulasDic.map(c => c.nombre))].sort();
+  document.getElementById('rec-nombrar-overlay')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rec-nombrar-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell rec-nombrar-modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div><div style="font-size:16px;font-weight:700">Nombre del preparado · RM ${escapeHtml(r.rm || '')}</div>
+          <div style="font-size:12.5px;color:var(--text-2);margin-top:4px">${escapeHtml(r.descripcion || '')}</div></div>
+        <button onclick="document.getElementById('rec-nombrar-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div style="padding:16px 20px">
+        ${sugerencias.length ? `<div class="rec-sug-tit">Sugerencias (mismas materias primas)</div>
+          ${sugerencias.map((c, i) => `<button type="button" class="rec-sug" onclick="document.getElementById('rec-nombre-input').value=this.dataset.n" data-n="${escapeHtml(c.propuesto)}">
+            <b>${escapeHtml(c.propuesto)}</b><small>basado en «${escapeHtml(c.nombre)}»${c.rm_ref ? ` · RM ${escapeHtml(c.rm_ref)}` : ''}</small></button>`).join('')}` : ''}
+        <label class="rec-sug-tit" for="rec-nombre-input" style="display:block;margin-top:${sugerencias.length ? 14 : 0}px">Nombre</label>
+        <input id="rec-nombre-input" list="rec-nombres-lista" value="${escapeHtml(r.nombre || '')}" placeholder="Ej: CAPTOPRIL 1MG/ML 100ML" style="width:100%;box-sizing:border-box;height:40px;border:1px solid var(--border);border-radius:8px;padding:0 12px;font:14px var(--font)" onkeydown="if(event.key==='Enter')recGuardarNombre(${r.id_rp_detalle})">
+        <datalist id="rec-nombres-lista">${nombres.map(n => `<option value="${escapeHtml(n)}">`).join('')}</datalist>
+        <div style="font-size:12px;color:var(--text-3);margin-top:6px">Las próximas veces que se repita esta misma fórmula saldrá con este nombre.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 20px 16px">
+        <button class="page-btn" onclick="document.getElementById('rec-nombrar-overlay').remove()">Cancelar</button>
+        <button class="import-btn" style="margin-top:0" id="rec-nombre-guardar" onclick="recGuardarNombre(${r.id_rp_detalle})">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('rec-nombre-input')?.focus(), 50);
+}
+
+async function recGuardarNombre(idDetalle) {
+  const r = (recBuscarData || []).find(x => x.id_rp_detalle === idDetalle);
+  const nombre = (document.getElementById('rec-nombre-input')?.value || '').trim().toUpperCase();
+  if (!r || !nombre) { toast('Escribe el nombre del preparado.', 'err'); return; }
+  const btn = document.getElementById('rec-nombre-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const quien = sesionActual?.email || null;
+    const r1 = await sb('rec_rm_nombres', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ rm: r.rm, nombre, descripcion: r.descripcion || null, creado_por: quien, creado_en: new Date().toISOString() }]) });
+    if (!r1.ok) throw new Error(await r1.text());
+    if (r.descripcion) {
+      // También en el diccionario, para que la misma fórmula salga con este nombre.
+      const r2 = await sb('rec_formulas_nombre', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ descripcion: r.descripcion, nombre, origen: 'manual', rm_ref: r.rm, actualizado_en: new Date().toISOString() }]) });
+      if (!r2.ok) throw new Error(await r2.text());
+      if (recFormulasDic) {
+        recFormulasDic = recFormulasDic.filter(c => c.descripcion !== r.descripcion);
+        recFormulasDic.push({ descripcion: r.descripcion, nombre, origen: 'manual', rm_ref: r.rm });
+      }
+    }
+    // En pantalla: este RM queda "a mano" y los del mismo mes con la misma fórmula sin nombre, igual.
+    (recBuscarData || []).forEach(x => {
+      if (x.id_rp_detalle === idDetalle) Object.assign(x, { nombre, nombre_origen: 'manual', nombre_ref: null });
+      else if (!x.nombre && x.descripcion && x.descripcion === r.descripcion) Object.assign(x, { nombre, nombre_origen: 'formula', nombre_ref: r.rm });
+    });
+    document.getElementById('rec-nombrar-overlay')?.remove();
+    recBuscarRender((document.getElementById('rec-buscar-q').value || '').trim());
+    toast(`✓ RM ${r.rm}: ${nombre}`);
+  } catch (e) {
+    toast('No se pudo guardar el nombre: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
 }
 
 // ── DETALLE DE UN RM (fórmula, lotes, costos) ──────────────────────────────

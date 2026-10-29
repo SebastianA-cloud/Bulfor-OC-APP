@@ -623,6 +623,18 @@ def main():
     corregir_monto_total_desde_xml_completo()
     corregir_nc_factura_ref_desde_xml_completo()
     actualizar_estado_fiscal(limite=int(os.environ.get('LIMITE_FISCAL', 200)))
+    refrescar_nombres_preparados()
+
+
+def refrescar_nombres_preparados():
+    """Buscar RM: actualiza el diccionario fórmula -> nombre del preparado con
+    lo recién facturado (como se digitó en la factura o guía). No toca los
+    nombres puestos a mano. Si falla, la sincronización sigue igual."""
+    try:
+        n = supabase.rpc('rec_formulas_refrescar').execute().data
+        print(f"✔ Nombres de preparados (Buscar RM): {n} fórmulas actualizadas")
+    except Exception as e:
+        print(f"  ! No se pudieron actualizar los nombres de preparados: {e}")
 
 
 if __name__ == '__main__':
