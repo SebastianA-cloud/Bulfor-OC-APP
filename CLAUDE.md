@@ -1,5 +1,9 @@
 # Bulfor OC App — instrucciones para Claude
 
+> **Antes de leer `index.html`, lee `docs/CEREBRO.md`**: mapa de la app, base de datos,
+> sincronizaciones, decisiones tomadas, bitácora y pendientes. Al terminar cada cambio,
+> actualiza su Bitácora y Pendientes. (`AGENTS.md` tiene estas mismas reglas para Codex/ChatGPT.)
+
 App web interna de Farmacia Bulfor (recetario magistral, Chile). La usa el equipo de la farmacia para órdenes de compra de Mercado Público, despachos FedEx, Órdenes de Elaboración, seguimiento de pago de facturas, emisión de documentos tributarios y Control Farmacia (stock, lotes, vencimientos).
 
 Seba (dueño y Director Técnico) es quien pide los cambios. Trabaja solo desde la web (GitHub, Vercel, dashboard de Supabase), sin entorno local. Habla en español: responde en español y explica en lenguaje simple, sin jerga innecesaria.
@@ -15,7 +19,7 @@ Seba (dueño y Director Técnico) es quien pide los cambios. Trabaja solo desde 
 
 ## Estructura
 
-- `index.html` — la app completa en JavaScript vanilla (~16.000 líneas). Es muy grande: busca con grep y edita solo el bloque necesario; nunca la reescribas entera.
+- `index.html` — la app completa en JavaScript vanilla (~18.600 líneas). Es muy grande: busca con grep y edita solo el bloque necesario; nunca la reescribas entera.
 - `styles.css` — estilos. Color de marca `#C0392B`. Íconos: Tabler Icons (CDN).
 - `documentos.js` — módulo de creación de documentos.
 - `api/notificar-receta.js` — función serverless de Vercel (aviso por correo con Resend de nuevas Órdenes de Elaboración).
