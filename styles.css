@@ -1784,3 +1784,12 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-rm-formula table { width: auto; }
 .rec-rm-formula th, .rec-rm-formula td { text-align: center !important; padding-left: 14px; padding-right: 14px; }
 .rec-rm-formula tfoot td:first-child { text-align: right !important; }
+
+/* Buscar RM: interruptor Por RM / Por preparado */
+.rec-vistas { margin: 4px 0 12px; }
+.rec-vistas button.active { background: #2B2724; color: #fff; }
+.rec-formula-corta { max-width: 340px; margin: 2px auto 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-sube { color: var(--red); font-size: 11.5px; font-weight: 700; }
+.rec-baja { color: var(--green); font-size: 11.5px; font-weight: 700; }
+.rec-prep-rms thead th { position: static !important; }
+#rec-prep-cont .rec-col-preparado { max-width: 380px; }
