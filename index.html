@@ -5621,7 +5621,7 @@ function filterFedex(soloTabla) {
   const cuenta = {};
   FEDEX_CATEGORIAS.forEach(c => { cuenta[c.id] = base.filter(f => coincideCategoriaFedex(f, c.id) && (buscando || ['ruta', 'retraso'].includes(c.id) || delMes(f))).length; });
   document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
-    `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} <b>${cuenta[c.id]}</b></button>`
+    `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label}${etiquetaMesEnvios(c.id, buscando, fedexPeriodo)} <b>${cuenta[c.id]}</b></button>`
   ).join('');
   const enCamino = fedex.filter(f => coincideCategoriaFedex(f, 'ruta')).length;
   const retrasos = fedex.filter(f => coincideCategoriaFedex(f, 'retraso')).length;
@@ -5755,6 +5755,14 @@ function cxSetCategoria(c) { cxCategoriaActiva = c; filterChilexpress(); }
 
 // Igual que FedEx: el mes aplica a "Entregados" y "Todos"; "En camino" y
 // "Con problema" muestran todo lo pendiente. Con búsqueda, todas las fechas.
+// "Entregados" y "Todos" cuentan solo el mes elegido; "En camino"/"Con retraso"/
+// "Con problema", todos los meses. Para que no se confunda, las pestañas del mes
+// llevan el mes en el nombre (ej. "Todos · oct").
+function etiquetaMesEnvios(categoria, buscando, periodo) {
+  if (buscando || !periodo || !['entregado', 'todos'].includes(categoria)) return '';
+  return ` <span class="tab-mes">· ${MESES_NOMBRE[periodo.mes].slice(0, 3).toLowerCase()}</span>`;
+}
+
 function filterChilexpress() {
   if (!cxPeriodo) { const hoy = new Date(); cxPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() }; }
   const q = (document.getElementById('cx-search')?.value || '').trim();
@@ -5767,7 +5775,7 @@ function filterChilexpress() {
   const tabs = document.getElementById('cx-tabs');
   if (tabs) tabs.innerHTML = CX_CATEGORIAS.map(c => {
     const n = base.filter(e => cxCoincideCategoria(e, c.id) && (q || ['camino', 'problema'].includes(c.id) || delMes(e))).length;
-    return `<button class="fpp-status-tab${cxCategoriaActiva === c.id ? ' active' : ''}" onclick="cxSetCategoria('${c.id}')">${c.label} <b>${n}</b></button>`;
+    return `<button class="fpp-status-tab${cxCategoriaActiva === c.id ? ' active' : ''}" onclick="cxSetCategoria('${c.id}')">${c.label}${etiquetaMesEnvios(c.id, q, cxPeriodo)} <b>${n}</b></button>`;
   }).join('');
   const enCamino = chilexpress.filter(e => cxCoincideCategoria(e, 'camino')).length;
   const problemas = chilexpress.filter(e => cxCoincideCategoria(e, 'problema')).length;
