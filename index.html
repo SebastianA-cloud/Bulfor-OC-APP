@@ -17082,15 +17082,16 @@ function recCmCompVsConsHtml(m) {
 
 // Barras agrupadas compras / consumo por tramo, con eje y recesivo.
 function recCmGraficoCCSvg(tramos) {
-  const W = 520, H = 190, pl = 44, pr = 6, pt = 10, pb = 24;
+  // Ancho como el de la ventana (1000) y bajo, para que la ficha quepa sin desplazarse.
+  const W = 1000, H = 130, pl = 44, pr = 6, pt = 8, pb = 22;
   const max = Math.max(...tramos.flatMap(t => [t.compra, t.consumo]), 0) || 1;
   const paso = Math.pow(10, Math.floor(Math.log10(max)));
   const tope = Math.ceil(max / paso) * paso;
   const sy = v => pt + (1 - v / tope) * (H - pt - pb);
   const g = (W - pl - pr) / tramos.length;
-  const bw = Math.max(3, Math.min(16, g * 0.32));
+  const bw = Math.max(3, Math.min(22, g * 0.3));
   const fmt = v => v >= 1000 ? (v / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + 'k' : v.toLocaleString('es-CL', { maximumFractionDigits: 1 });
-  const cada = Math.ceil(tramos.length / 7);
+  const cada = Math.ceil(tramos.length / 12);
   const barra = (x, v, color) => {
     if (!v) return '';
     const y = sy(v), h = H - pb - y, r = Math.min(4, bw / 2, h);
@@ -17099,12 +17100,12 @@ function recCmGraficoCCSvg(tramos) {
   let s = '';
   [0, tope / 2, tope].forEach(v => {
     s += `<line x1="${pl}" x2="${W - pr}" y1="${sy(v)}" y2="${sy(v)}" stroke="var(--border)" ${v ? 'stroke-dasharray="3 3"' : ''}/>`;
-    s += `<text x="${pl - 6}" y="${sy(v) + 4}" text-anchor="end" font-size="10" fill="var(--text-3)">${fmt(v)}</text>`;
+    s += `<text x="${pl - 6}" y="${sy(v) + 4}" text-anchor="end" font-size="11" fill="var(--text-3)">${fmt(v)}</text>`;
   });
   tramos.forEach((t, i) => {
     const cx = pl + g * i + g / 2;
     s += barra(cx - bw - 1, t.compra, 'var(--cc-compra)') + barra(cx + 1, t.consumo, 'var(--cc-consumo)');
-    if (i % cada === 0 || i === tramos.length - 1) s += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--text-3)">${t.label}</text>`;
+    if (i % cada === 0 || i === tramos.length - 1) s += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--text-3)">${t.label}</text>`;
     s += `<rect class="cc-hit" data-i="${i}" x="${pl + g * i}" y="${pt}" width="${g}" height="${H - pt - pb}" fill="transparent"/>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Compras y consumo por período">${s}</svg><div class="tip" id="rec-cm-cc-tip" style="display:none"></div>`;
@@ -17164,14 +17165,13 @@ function recCmVenceHtml(vence) {
 function recCmUltimoLoteHtml(m) {
   const compras = recCmComprasPorMateria[m.id_producto] || [];
   const c = compras.find(x => x.id_lote);
-  if (!c) return `<div class="oc-fact-cifras"><span style="color:var(--text-3)">${compras.length ? 'Las compras no tienen lote registrado.' : 'Sin compras registradas.'}</span></div>`;
+  const celda = (t, v, sub = '') => `<div class="rec-cm-celda"><span>${t}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  if (!c) return celda('Último lote', '—', compras.length ? 'sin lote registrado' : 'sin compras') + celda('Vencimiento', '—');
   const l = recCmLotes[c.id_lote];
-  if (!l) return '<div class="oc-fact-cifras"><span style="color:var(--text-3)">Cargando lote…</span></div>';
-  return `<div class="oc-fact-cifras rec-cm-lote">
-      <span>Lote <b class="mono">${escapeHtml(l.lote || '—')}</b></span>
-      <span>Vence ${recCmVenceHtml(l.vence)}</span>
-      <span>Comprado el <b>${fDate(c.fecha)}</b>${recCmNombreProv(c.id_proveedor) ? ' · ' + escapeHtml(recCmNombreProv(c.id_proveedor)) : ''}</span>
-    </div>`;
+  if (!l) return celda('Último lote', '…', 'cargando') + celda('Vencimiento', '…');
+  const prov = recCmNombreProv(c.id_proveedor);
+  return celda('Último lote', `<span class="mono">${escapeHtml(l.lote || '—')}</span>`, `comprado el ${fDate(c.fecha)}${prov ? ` · <span title="${escapeHtml(prov)}">${escapeHtml(prov)}</span>` : ''}`)
+    + celda('Vencimiento', l.vence ? fDate(l.vence) : '—', l.vence ? recCmVenceHtml(l.vence).replace(/^<b>[^<]*<\/b> /, '') : 'sin vencimiento');
 }
 
 function fichaMateriaRec(idProducto) {
@@ -17184,14 +17184,13 @@ function fichaMateriaRec(idProducto) {
   const ult12 = compras.filter(c => String(c.fecha).slice(0, 10) >= hace12);
   const cant12 = ult12.reduce((t, c) => t + (Number(c.cantidad) || 0), 0);
   const prom12 = cant12 ? ult12.reduce((t, c) => t + (Number(c.cantidad) || 0) * (Number(c.precio_compra) || 0), 0) / cant12 : null;
-  const cajaPrecios = `<div class="oc-info rec-cm-precios">
-      <div><span>Costo actual</span><div class="oc-info-total">${Number(m.precio_costo) ? recClpDec(m.precio_costo) + `<small>${u}</small>` : '—'}</div></div>
-      <div><span>Último precio</span><div class="rec-cm-dato">${ult ? recClpDec(ult.precio_compra) + u : '—'} ${recCmVariacionHtml(m._variacion) || ''}</div>
-        <span class="doc-info-sub">Promedio 12 meses</span><div class="rec-cm-dato">${prom12 !== null ? recClpDec(prom12) + u : '—'}</div></div>
-    </div>`;
-  const cajaLote = `<div class="oc-fact oc-fact-completa doc-caja doc-cobro">
-      <div class="oc-fact-cab"><span>Último lote</span></div>
-      <div id="rec-cm-lote-${m.id_producto}">${recCmUltimoLoteHtml(m)}</div>
+  // Franja compacta: precios a la izquierda, último lote y vencimiento a la derecha.
+  const celda = (t, v, sub = '') => `<div class="rec-cm-celda"><span>${t}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const franja = `<div class="rec-cm-franja">
+      ${celda('Costo actual', Number(m.precio_costo) ? recClpDec(m.precio_costo) + `<small>${u}</small>` : '—')}
+      ${celda('Último precio', ult ? recClpDec(ult.precio_compra) + `<small>${u}</small>` : '—', recCmVariacionHtml(m._variacion) || (ult ? 'primera compra' : ''))}
+      ${celda('Promedio 12 meses', prom12 !== null ? recClpDec(prom12) + `<small>${u}</small>` : '—')}
+      <div class="rec-cm-franja-lote" id="rec-cm-lote-${m.id_producto}">${recCmUltimoLoteHtml(m)}</div>
     </div>`;
   const idx = recCmF.findIndex(x => x.id_producto === m.id_producto);
   return {
@@ -17201,12 +17200,12 @@ function fichaMateriaRec(idProducto) {
     tituloExtra: m.activo ? '' : ' <span class="badge badge-gray">Inactiva</span>',
     sub: [m.unidad_stock ? 'Unidad: ' + m.unidad_stock : '', `${recNum(compras.length)} compra${compras.length === 1 ? '' : 's'}`,
       `${recNum(m._provs.size)} proveedor${m._provs.size === 1 ? '' : 'es'}`, ult ? 'última ' + recCmDiasDesde(ult.fecha) : ''].filter(Boolean).join(' · '),
-    resumen: `<div class="oc-arriba">${cajaPrecios}${cajaLote}</div>`,
+    resumen: franja,
     cuerpo: `
       <div class="panel-h cc-cab">Compras vs consumo
         <div class="fpp-status-tabs cc-tabs" id="rec-cm-cc-tabs">${REC_CM_PERIODOS.map(pr => `<button class="fpp-status-tab${pr.id === recCmPeriodo ? ' active' : ''}" data-p="${pr.id}" onclick="recCmSetPeriodo('${pr.id}')">${pr.label}</button>`).join('')}</div>
       </div>
-      <div id="rec-cm-cc">${recCmCompVsConsHtml(m)}</div>
+      <div id="rec-cm-cc" class="rec-cm-cc-compacto">${recCmCompVsConsHtml(m)}</div>
       ${compras.length > 1 ? `<details class="fx-envio rec-cm-pleg" ontoggle="if(this.open&&!this.dataset.listo){this.dataset.listo='1';recCmActivarGrafico()}">
         <summary>
           <span class="fx-envio-tit">📈 Historia de precios</span>

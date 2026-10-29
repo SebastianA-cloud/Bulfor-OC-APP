@@ -1808,17 +1808,36 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-todas-sel { height: var(--control-h, 40px); border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: 500 13px var(--font); background: var(--surface); }
 
 /* Consumo y compras — ficha centrada (como la de OC) */
-.rec-cm-precios .rec-cm-dato { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; margin-bottom: 8px; }
-.rec-cm-precios .oc-info-total small { font-size: 12px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
-.rec-cm-lote { flex-direction: column; gap: 6px; font-size: 14px; }
-.rec-cm-lote .badge { margin-left: 4px; }
+.rec-cm-franja { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 12px; background: #FAF9F6; }
+.rec-cm-franja-lote { display: contents; }
+.rec-cm-celda { padding: 9px 14px; min-width: 0; border-left: 1px solid var(--border); }
+.rec-cm-franja > .rec-cm-celda:first-child { border-left: 0; }
+.rec-cm-celda > span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
+.rec-cm-celda > b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec-cm-celda > b small { font-size: 11.5px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.rec-cm-celda > b .mono { font-size: 14px; color: var(--text); }
+.rec-cm-celda > small { display: block; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.rec-cm-celda > small .badge { font-size: 11px; padding: 1px 7px; }
+@media (max-width: 760px) { .rec-cm-franja { grid-template-columns: 1fr 1fr; } .rec-cm-celda { border-left: 0; border-top: 1px solid var(--border); } }
+/* Compras vs consumo compacto: las seis cifras en una fila y el gráfico más bajo */
+.rec-cm-cc-compacto .drawer-datos { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.rec-cm-cc-compacto .drawer-dato { padding: 6px 10px; }
+.rec-cm-cc-compacto .drawer-dato span { font-size: 13.5px; }
+.rec-cm-cc-compacto .cc-graf { margin-top: 8px; }
+.rec-cm-cc-compacto .cc-graf svg { height: auto; aspect-ratio: 1000 / 130; }
+.rec-cm-cc-compacto .cc-leyenda { margin-top: 2px; }
+.rec-cm-cc-compacto .skeleton { height: 170px !important; }
+@media (max-width: 760px) { .rec-cm-cc-compacto .drawer-datos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* Historial de compras: ventana más ancha para que quepan las 8 columnas */
 .modal-xl.rec-cm-hist { max-width: 1080px; }
 .rec-cm-hist-tabla td, .rec-cm-hist-tabla th { padding: 8px 12px !important; white-space: nowrap; }
 .rec-cm-hist-tabla td:nth-child(2) { white-space: normal; min-width: 140px; }
 .rec-cm-hist-tabla tfoot td { background: #FDF3F1; border-top: 1px solid var(--border); }
 /* Consumo y compras — barras plegables y gráfico de precios */
-.rec-cm-pleg { margin: 12px 0 0; }
+.rec-cm-pleg { margin: 8px 0 0; }
+.rec-cm-pleg > summary { padding: 9px 14px; }
+.rec-cm-pleg .fx-envio-tit { font-size: 15px; }
+.rec-cm-pleg .fx-envio-ver { padding: 5px 12px; }
 .rec-cm-pleg[open] > summary { border-bottom: 0; }
 .rec-cm-pleg-cuerpo { border: 1px solid var(--border); border-top: 0; border-radius: 0 0 12px 12px; padding: 14px 16px; }
 .rec-cm-pleg-cuerpo .drawer-compras { margin: 0; }
