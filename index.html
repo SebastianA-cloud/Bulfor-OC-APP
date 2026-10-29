@@ -765,7 +765,7 @@
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), preparado, materia prima, hospital… (busca en todas las fechas)" onkeydown="if(event.key==='Enter')recBuscar()" oninput="recBuscarAlEscribir()" autocomplete="off">
+        <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), preparado, paciente, RUT, materia prima, hospital… (busca en todas las fechas)" onkeydown="if(event.key==='Enter')recBuscar()" oninput="recBuscarAlEscribir()" autocomplete="off">
       </div>
     </div>
     <div class="table-card oc-tabla tabla-centrada" id="rec-tabla-wrap">
@@ -15227,8 +15227,8 @@ function descargarPedidoExcel() {
 // El agente "BulforSync Recetario" del servidor lee Pharma_RM (solo lectura)
 // cada 30 minutos y sube a Supabase: materias primas, lotes, compras y cada RM
 // con su fórmula. Aquí solo se LEE esa copia (no se toca Pharma_RM).
-// Sin datos personales de pacientes ni médicos: solo el nombre cuando el
-// "paciente" es una institución (hospital).
+// Del paciente llega su nombre y RUT (o el nombre de la institución si es un
+// hospital); sin direcciones, teléfonos ni datos de médicos.
 let recResumen = null;
 let recBuscarData = null;
 let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
@@ -15428,7 +15428,7 @@ function recBuscarRender(q) {
       <td data-label="RM" class="mono" style="color:var(--accent);white-space:nowrap;font-weight:600">${escapeHtml(r.rm || ('#' + r.id_rp))}</td>
       <td data-label="Cantidad" style="white-space:nowrap">${recCantidadRm(r)}</td>
       <td data-label="Preparado" class="rec-col-preparado">${recPreparadoHtml(r)}</td>
-      <td data-label="Paciente / Hospital">${r.paciente ? `<b>${escapeHtml(r.paciente)}</b>` : r.institucion ? `<span style="color:var(--text-2);font-size:13px">${escapeHtml(r.institucion)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td data-label="Paciente / Hospital">${r.paciente ? `<b>${escapeHtml(r.paciente)}</b>${r.paciente_rut ? `<small class="rec-origen">${escapeHtml(rutConPuntos(r.paciente_rut))}</small>` : ''}` : r.institucion ? `<span style="color:var(--text-2);font-size:13px">${escapeHtml(r.institucion)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td data-label="Costo MP" style="white-space:nowrap">${recClp(r.costo)}</td>
       <td data-label="Avisos">${recAvisosRm(r)}</td>
     </tr>`).join('');
@@ -15592,6 +15592,7 @@ async function recAbrirRm(idDetalle) {
     <div class="modal-body">
       <table class="clinical-grid rec-rm-datos">
         <tr><td>Forma farmacéutica</td><td>${escapeHtml(r.forma || '—')} · ${recCantidadRm(r)}${env > 1 ? ' envases' : ''}</td></tr>
+        ${(() => { const f = (recBuscarData || []).find(x => x.id_rp_detalle === r.id_rp_detalle); return f?.paciente ? `<tr><td>Paciente</td><td><b>${escapeHtml(f.paciente)}</b>${f.paciente_rut ? ' · ' + escapeHtml(rutConPuntos(f.paciente_rut)) : ''}</td></tr>` : ''; })()}
         ${r.institucion ? `<tr><td>Institución</td><td>${escapeHtml(r.institucion)}</td></tr>` : ''}
         ${r.indicaciones ? `<tr><td>Indicaciones</td><td>${escapeHtml(r.indicaciones)}</td></tr>` : ''}
       </table>
