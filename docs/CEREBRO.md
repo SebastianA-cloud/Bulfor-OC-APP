@@ -164,6 +164,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 29-10-2026 — Excel de reasignación de lotes FIFO + cantidades raras (fuera del repo, entregado a Seba).
 - 29-10-2026 — Consumo y compras: "Compras vs consumo" oculto en Envases e insumos.
 - 29-10-2026 — Consumo y compras: sin "Costo actual" en la ficha; "Consumido" y "Usada en" abren el detalle del consumo del período (Por lote con aviso "usado de más" / Por RM, cada RM se abre). Título de columna ordenada en blanco. Revisión de consumos raros (ver Pendientes).
 - 29-10-2026 — Consumo y compras: ficha compacta (franja de 5 celdas, compras vs consumo en una fila) para que quepa sin scroll.
@@ -176,7 +177,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 - [ ] **Consumos raros en Consumo y compras** (revisado 29-10-2026, esperando decisión de Seba):
   - Envases e insumos: "Compras vs consumo" **oculto** (decisión de Seba 29-10). Más adelante se agregarán envases/potes/botellas a las preparaciones para poder calcular su consumo.
-  - [ ] Reasignación de lotes por orden de llegada (FIFO) para materias con lotes "usados de más": simulación en SQL pendiente (la consulta pidió confirmación en Supabase y no se respondió).
+  - Reasignación de lotes por orden de llegada (FIFO) hecha el 29-10 como **Excel entregado a Seba** (no se cambió nada en la base ni en Pharma_RM): 103 materias, 1.058 tramos, ~27.800 de 55.000 líneas RM con otro lote registrado. Método: parte del lote de la primera RM con datos (ene-2024); cada lote se gasta completo en orden de fecha y se pasa al siguiente que ya haya llegado. Se excluyen 265 "cantidades raras" (>25× la mediana de esa materia y >10× el p95; ej. RM 6376/25 con 900 g de coenzima Q10 en vez de 9 g). La consulta se hace en un bloque DO con tablas temporales en una sola llamada (cada execute_sql es una sesión nueva).
+  - [ ] Seba decide si corrige los lotes y las cantidades raras en Pharma_RM (es el registro oficial; la app solo copia).
   - Alcohol 70° y Crema no iónica: ingresos cada ~3 semanas de la propia Bulfor (elaboración propia que se vende directo), no se consumen en RM → no son compras sin uso.
   - Vaselina líquida: compras registradas en ml (25.950 a $4,5) pero su unidad de stock es Lt → compras y consumo en unidades distintas (corregir en Pharma_RM).
   - Omeprazol pellets 8,5%: Pharma registra el omeprazol (no el peso de pellets): 657 g ÷ 0,085 ≈ 7,7 kg de pellets vs 11 kg comprados.
