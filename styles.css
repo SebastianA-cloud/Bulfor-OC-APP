@@ -1806,3 +1806,14 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-prep-vertodas { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--text-3); flex-wrap: wrap; }
 .rec-prep-vertodas .btn-mp { font-size: 12.5px; padding: 5px 12px; cursor: pointer; }
 .rec-todas-sel { height: var(--control-h, 40px); border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: 500 13px var(--font); background: var(--surface); }
+
+/* Consumo y compras — ficha centrada (como la de OC) */
+.rec-cm-precios .rec-cm-dato { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; margin-bottom: 8px; }
+.rec-cm-precios .oc-info-total small { font-size: 12px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.rec-cm-lote { flex-direction: column; gap: 6px; font-size: 14px; }
+.rec-cm-lote .badge { margin-left: 4px; }
+/* Historial de compras: ventana más ancha para que quepan las 8 columnas */
+.modal-xl.rec-cm-hist { max-width: 1080px; }
+.rec-cm-hist-tabla td, .rec-cm-hist-tabla th { padding: 8px 12px !important; white-space: nowrap; }
+.rec-cm-hist-tabla td:nth-child(2) { white-space: normal; min-width: 140px; }
+.rec-cm-hist-tabla tfoot td { background: #FDF3F1; border-top: 1px solid var(--border); }
