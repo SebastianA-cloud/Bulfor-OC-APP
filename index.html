@@ -761,6 +761,20 @@
           <span class="search-icon">🔍</span>
           <input type="text" id="rec-prep-q" placeholder="Buscar por preparado, materia prima o fórmula (ej. captopril, omeprazol)…" oninput="recPrepFiltrar()" autocomplete="off">
         </div>
+        <select id="rec-prep-forma" onchange="recPrepFiltrar()" aria-label="Forma farmacéutica"><option value="">Todas las formas</option></select>
+        <select id="rec-prep-orden" onchange="recPrepSetOrden(this.value)" aria-label="Ordenar por">
+          <option value="nombre:1">Nombre (A → Z)</option>
+          <option value="nombre:-1">Nombre (Z → A)</option>
+          <option value="n_rm:-1">Más elaborados primero</option>
+          <option value="n_rm:1">Menos elaborados primero</option>
+          <option value="ultima:-1">Elaborados más recientemente</option>
+          <option value="ultima:1">Hace más tiempo sin elaborar</option>
+          <option value="hoy:-1">Costo hoy (mayor a menor)</option>
+          <option value="hoy:1">Costo hoy (menor a mayor)</option>
+          <option value="costo:-1">Costo última RM (mayor a menor)</option>
+          <option value="costo:1">Costo última RM (menor a mayor)</option>
+          <option value="forma:1">Forma farmacéutica</option>
+        </select>
       </div>
       <div id="rec-prep-cont"></div>
     </div>
@@ -16139,8 +16153,12 @@ function recCostosRenderFormulas() {
 // del proveedor (cruzada por N° de documento y fecha cercana).
 let recPrepData = null, recPrepF = [], recPrepPagina = 1, recProveedoresRec = null;
 let recPrepExtra = '';   // filtro que viene de tocar una tarjeta del resumen
+let recPrepOrden = { campo: 'nombre', dir: 1 };   // lo elige el selector o un clic en el título de la columna
 const REC_PREP_POR_PAGINA = 50;
-const recPrepCostos = {};   // id_rp_detalle de la última RM -> { costo, costo_actual }
+const recPrepCostos = {};
+const REC_PREP_COLUMNAS = [['nombre', 'Preparado'], ['forma', 'Forma'], ['n_rm', 'Veces elaborado'], ['ultima', 'Última vez'],
+  ['costo', 'Costo última RM', 'Lo que costaron las materias primas de la última RM al elaborarla'],
+  ['hoy', 'Costo hoy', 'Lo que costaría hoy la misma cantidad, con el último precio de compra']];   // id_rp_detalle de la última RM -> { costo, costo_actual }
 
 function recPrepInit() {
   if (!recPrepData) recPrepCargar(); else recPrepRender();
@@ -16151,8 +16169,10 @@ async function recPrepCargar() {
   try {
     const [datos, dic] = await Promise.all([recRpc('rec_preparados', {}), recCargarFormulasDic()]);
     const nombres = new Map(dic.map(d => [d.descripcion, d.nombre]));
-    recPrepData = (datos || []).map(p => ({ ...p, nombre: nombres.get(p.descripcion) || null }))
-      .sort((a, b) => claveOrdenNombre(a.nombre || a.descripcion).localeCompare(claveOrdenNombre(b.nombre || b.descripcion), 'es'));
+    recPrepData = (datos || []).map(p => ({ ...p, nombre: nombres.get(p.descripcion) || null }));
+    const formas = [...new Set(recPrepData.map(p => p.forma).filter(Boolean))].sort();
+    const sel = document.getElementById('rec-prep-forma');
+    if (sel) sel.innerHTML = '<option value="">Todas las formas</option>' + formas.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
   } catch (e) {
     document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>No se pudieron cargar los preparados: ${e.message}</p></div></div>`;
     return;
@@ -16163,9 +16183,11 @@ async function recPrepCargar() {
 function recPrepFiltrar() {
   if (!recPrepData) return;
   const q = (document.getElementById('rec-prep-q')?.value || '').trim();
+  const forma = document.getElementById('rec-prep-forma')?.value || '';
   const d30 = recCmHaceDias(30), d365 = recCmHaceDias(365);
   recPrepF = recPrepData.filter(p => {
     if (q && !coincideBusqueda(`${p.nombre || ''} ${p.descripcion} ${p.forma || ''}`, q)) return false;
+    if (forma && p.forma !== forma) return false;
     const f = String(p.ultima || '').slice(0, 10);
     if (recPrepExtra === '30d') return f >= d30;
     if (recPrepExtra === '1a') return !!f && f < d365;
@@ -16173,6 +16195,46 @@ function recPrepFiltrar() {
   });
   recPrepPagina = 1;
   recPrepRenderKpis();
+  recPrepOrdenar();
+}
+
+// ── Orden de la lista ──
+// Por costo hace falta el costo de todas las fórmulas (no solo de la página):
+// se piden de una vez (en grupos) la primera vez que se ordena por costo.
+function recPrepSetOrden(valor) {
+  const [campo, dir] = valor.split(':');
+  recPrepOrden = { campo, dir: Number(dir) };
+  recPrepPagina = 1;
+  recPrepOrdenar();
+}
+function recPrepClicColumna(campo) {
+  const dir = recPrepOrden.campo === campo ? -recPrepOrden.dir : (campo === 'nombre' || campo === 'forma' ? 1 : -1);
+  const sel = document.getElementById('rec-prep-orden');
+  if (sel && [...sel.options].some(o => o.value === `${campo}:${dir}`)) sel.value = `${campo}:${dir}`;
+  recPrepSetOrden(`${campo}:${dir}`);
+}
+async function recPrepOrdenar() {
+  const { campo, dir } = recPrepOrden;
+  if (campo === 'costo' || campo === 'hoy') {
+    const faltan = recPrepF.map(p => p.ultimo_id).filter(id => id && !recPrepCostos[id]);
+    if (faltan.length) {
+      document.getElementById('rec-prep-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Calculando el costo de ${recNum(faltan.length)} fórmulas…</p></div></div>`;
+      for (let i = 0; i < faltan.length; i += 150) await recPrepCargarCostos(faltan.slice(i, i + 150), true);
+    }
+  }
+  const nombre = p => claveOrdenNombre(p.nombre || p.descripcion);
+  const valor = p => campo === 'n_rm' ? Number(p.n_rm) || 0
+    : campo === 'ultima' ? String(p.ultima || '')
+    : campo === 'costo' ? recPrepCostos[p.ultimo_id]?.costo
+    : campo === 'hoy' ? recPrepCostos[p.ultimo_id]?.costo_actual
+    : campo === 'forma' ? String(p.forma || '') : nombre(p);
+  recPrepF.sort((a, b) => {
+    const va = valor(a), vb = valor(b);
+    const nulo = (va == null) - (vb == null);   // sin dato, siempre al final
+    if (nulo) return nulo;
+    const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'es');
+    return (c * dir) || nombre(a).localeCompare(nombre(b), 'es');
+  });
   recPrepRender();
 }
 
@@ -16225,9 +16287,10 @@ function recPrepRender() {
   const desde = (recPrepPagina - 1) * REC_PREP_POR_PAGINA;
   const pagina = recPrepF.slice(desde, desde + REC_PREP_POR_PAGINA);
   cont.innerHTML = `
-    <div class="table-card oc-tabla tabla-centrada">
+    <div class="table-card oc-tabla tabla-centrada rec-prep-tabla">
       <table>
-        <thead><tr><th>Preparado</th><th>Forma</th><th>Veces elaborado</th><th>Última vez</th><th title="Lo que costaron las materias primas de la última RM al elaborarla">Costo última RM</th><th title="Lo que costaría hoy la misma cantidad, con el último precio de compra">Costo hoy</th></tr></thead>
+        <colgroup><col style="width:38%"><col style="width:13%"><col style="width:10%"><col style="width:11%"><col style="width:13%"><col style="width:15%"></colgroup>
+        <thead><tr>${REC_PREP_COLUMNAS.map(([c, t, tip]) => `<th class="rec-th-orden" onclick="recPrepClicColumna('${c}')" title="${tip || 'Ordenar'}">${t}${recPrepOrden.campo === c ? (recPrepOrden.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
         <tbody>
           ${pagina.map((p, i) => `
             <tr class="oc-fila" onclick="recPrepAbrir(${desde + i})">
@@ -16255,7 +16318,7 @@ function recPrepRender() {
 }
 
 // Costos de la última RM de cada fórmula de la página (se piden solo los que faltan).
-async function recPrepCargarCostos(ids) {
+async function recPrepCargarCostos(ids, sinPintar) {
   if (!ids.length) return;
   try {
     const filas = await fetchAll('rec_rm_v', `select=id_rp_detalle,costo,costo_actual&id_rp_detalle=in.(${ids.join(',')})`);
@@ -16263,6 +16326,7 @@ async function recPrepCargarCostos(ids) {
   } catch (_) { /* se queda con "—" */ }
   ids.forEach(id => {
     if (!recPrepCostos[id]) recPrepCostos[id] = {};
+    if (sinPintar) return;
     const c1 = document.getElementById(`rec-prep-c1-${id}`), c2 = document.getElementById(`rec-prep-c2-${id}`);
     if (c1) c1.innerHTML = recPrepCostoHtml(id, 'costo');
     if (c2) c2.innerHTML = recPrepCostoHtml(id, 'actual');

@@ -1793,3 +1793,13 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-baja { color: var(--green); font-size: 11.5px; font-weight: 700; }
 .rec-prep-rms thead th { position: static !important; }
 #rec-prep-cont .rec-col-preparado { max-width: 380px; }
+
+/* Buscar RM · Por preparado: la tabla calza en el ancho de la página (sin scroll lateral) */
+.rec-prep-tabla table { table-layout: fixed; width: 100%; }
+.rec-prep-tabla th { white-space: normal !important; line-height: 1.25; }
+.rec-prep-tabla td { overflow-wrap: anywhere; }
+.rec-prep-tabla .rec-formula-corta { max-width: 100%; }
+#rec-prep-cont .rec-col-preparado { max-width: none; min-width: 0; }
+.rec-th-orden { cursor: pointer; user-select: none; }
+.rec-th-orden:hover { background: #3A3531 !important; }
+#rec-vista-prep .toolbar select { height: var(--control-h, 40px); border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: 500 13px var(--font); background: var(--surface); color: var(--text); }
