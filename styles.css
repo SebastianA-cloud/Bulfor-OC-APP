@@ -1703,7 +1703,7 @@ tr.letra-plegable:hover td { color: var(--accent); }
 .page .cob-anuladas .table-card table > thead th { position: static; }
 
 /* Chilexpress: colores de la marca (amarillo y azul) en sus botones */
-.btn-mp-cx { background: #FFF6CC; border-color: #F2D35C; color: #1F3B73; }
+.btn-mp-cx { background: #FFF6CC; border-color: #F2D35C; color: #1F3B73; cursor: pointer; font-family: var(--font); }
 .oc-envio-cx { background: #FFF8D6; border-color: #F2D35C; color: #1F3B73; }
 .oc-envio-cx:hover { background: #1F3B73; color: #fff; border-color: #1F3B73; }
 .fx-nuevo-ante-cx { color: #1F3B73; }

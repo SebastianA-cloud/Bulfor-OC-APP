@@ -5703,8 +5703,16 @@ const CX_CATEGORIAS = [
 ];
 let cxCategoriaActiva = 'todos', cxF = [], cxPage = 1, cxPeriodo = null;
 
-function urlRastreoChilexpress(ot) {
-  return `https://centrodeayuda.chilexpress.cl/seguimiento/${encodeURIComponent(String(ot || '').replace(/\D/g, ''))}`;
+// Chilexpress no deja abrir el seguimiento con la OT ya puesta (su página lo
+// bloquea por seguridad y muestra "No hemos encontrado datos"). Por eso el botón
+// copia la OT y abre su Centro de Ayuda: ahí se pega con Ctrl+V y Enter.
+const URL_RASTREO_CHILEXPRESS = 'https://centrodeayuda.chilexpress.cl/home';
+function abrirRastreoChilexpress(ot) {
+  const n = String(ot || '').replace(/\D/g, '');
+  // Primero se copia (mientras la app tiene el foco) y después se abre la pestaña.
+  try { navigator.clipboard.writeText(n).catch(() => {}); } catch (_) { /* sin portapapeles: igual se abre la página */ }
+  window.open(URL_RASTREO_CHILEXPRESS, '_blank', 'noopener');
+  toast(`OT ${n} copiada: en Chilexpress pégala en "Rastrea tu envío" con Ctrl+V y Enter.`);
 }
 function envioChilexpressDeFolio(folio) {
   const f = String(folio || '').replace(/\D/g, '');
@@ -5840,7 +5848,7 @@ function fichaEnvioChilexpress(id, lista) {
     titulo: String(e.orden_transporte || '—'),
     tituloMono: true,
     tituloCopiar: !!e.orden_transporte,
-    tituloExtra: (e.orden_transporte ? `<a class="btn-mp btn-mp-cx" href="${urlRastreoChilexpress(e.orden_transporte)}" target="_blank" rel="noopener" title="Abrir el seguimiento de esta OT en Chilexpress">Ver en Chilexpress <i class="ti ti-external-link"></i></a>` : '')
+    tituloExtra: (e.orden_transporte ? `<button class="btn-mp btn-mp-cx" onclick="abrirRastreoChilexpress(${panelEsc(JSON.stringify(String(e.orden_transporte)))})" title="Copia la OT y abre el seguimiento de Chilexpress (pégala con Ctrl+V)">Ver en Chilexpress <i class="ti ti-external-link"></i></button>` : '')
       + `<span class="panel-esquina">${entregado ? '<span class="badge badge-green">Entregado</span>' : cxEtiquetaEstado(e)}</span>`,
     sub: nombreHosp(e.hospital) || e.hospital || '',
     cuerpo: `<details class="fx-envio">
