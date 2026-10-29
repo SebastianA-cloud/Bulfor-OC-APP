@@ -16945,7 +16945,7 @@ function recCmRender() {
   const pagina = recCmF.slice(desde, desde + REC_CM_POR_PAGINA);
   const th = (campo, texto, derecha) => {
     const activa = recCmOrden.campo === campo;
-    return `<th onclick="recCmOrdenarPor('${campo}')" title="Ordenar por ${texto.toLowerCase()}" style="cursor:pointer;user-select:none;white-space:nowrap${derecha ? ';text-align:right' : ''}${activa ? ';color:var(--text)' : ''}">${texto} <span style="opacity:${activa ? 1 : .3}">${activa ? (recCmOrden.dir === 1 ? '▲' : '▼') : '↕'}</span></th>`;
+    return `<th onclick="recCmOrdenarPor('${campo}')" title="Ordenar por ${texto.toLowerCase()}" style="cursor:pointer;user-select:none;white-space:nowrap${derecha ? ';text-align:right' : ''}">${texto} <span style="opacity:${activa ? 1 : .3}">${activa ? (recCmOrden.dir === 1 ? '▲' : '▼') : '↕'}</span></th>`;
   };
   const abierta = recCmAbierta !== null ? recCmMaterias.find(m => m.id_producto === recCmAbierta) : null;
   cont.innerHTML = `
@@ -17013,8 +17013,9 @@ async function recCmCargarConsumo(id) {
   recCmConsumo[id] = 'cargando';
   try {
     const desde = new Date(Date.now() - 370 * 86400000).toISOString();
-    const filas = await fetchAll('rec_lineas', `select=fecha,cant_stock,id_rp_detalle&id_producto=eq.${id}&fecha=gte.${desde}&order=fecha.asc`);
-    recCmConsumo[id] = (filas || []).map(l => ({ d: recCmFechaCL(l.fecha), cant: Number(l.cant_stock) || 0, rm: l.id_rp_detalle }));
+    const filas = await fetchAll('rec_lineas', `select=fecha,cant_stock,id_rp_detalle,rm,institucion,id_lote,lote,vence,cantidad,unidad&id_producto=eq.${id}&fecha=gte.${desde}&order=fecha.asc`);
+    recCmConsumo[id] = (filas || []).map(l => ({ d: recCmFechaCL(l.fecha), cant: Number(l.cant_stock) || 0, rm: l.id_rp_detalle,
+      numRm: l.rm, inst: l.institucion, idLote: l.id_lote, lote: l.lote, vence: l.vence, dosis: l.cantidad, udosis: l.unidad }));
   } catch (e) {
     recCmConsumo[id] = 'error';
   }
@@ -17066,13 +17067,17 @@ function recCmCompVsConsHtml(m) {
   const dif = totC - totU;
   window._recCmTramos = tramos.map(t => ({ ...t, u }));
   const dato = (label, valor, extra = '') => `<div class="drawer-dato"><label>${label}</label><span${extra}>${valor}</span></div>`;
+  // Celdas que abren el detalle del consumo (por lote o por RM) del período elegido.
+  const datoBtn = (label, valor, vista, tip) => nRm
+    ? `<button class="drawer-dato rec-cm-dato-btn" onclick="recCmDetalleConsumo(${m.id_producto}, '${vista}')" title="${tip}"><label>${label} <em>ver detalle ›</em></label><span>${valor}</span></button>`
+    : dato(label, valor);
   return `
     <div class="drawer-datos">
       ${dato('Comprado', `<i class="cc-dot" style="background:var(--cc-compra)"></i>${num(totC)} ${u}`)}
-      ${dato('Consumido', `<i class="cc-dot" style="background:var(--cc-consumo)"></i>${num(totU)} ${u}`)}
+      ${datoBtn('Consumido', `<i class="cc-dot" style="background:var(--cc-consumo)"></i>${num(totU)} ${u}`, 'lotes', 'Ver qué lotes se usaron en el período')}
       ${dato('Diferencia', `${dif > 0 ? '+' : ''}${num(dif)} ${u}`, ` style="color:${dif < 0 ? 'var(--red)' : 'var(--text)'}" title="${dif < 0 ? 'Se consumió más de lo que se compró en el período' : 'Se compró igual o más de lo que se consumió'}"`)}
       ${dato('Consumo diario', `${num(diario)} ${u}`)}
-      ${dato('Usada en', `${recNum(nRm)} RM`)}
+      ${datoBtn('Usada en', `${recNum(nRm)} RM`, 'rm', 'Ver en qué RM se usó en el período')}
       ${dato('Lo comprado alcanza', diario > 0 && totC > 0 ? `${recNum(Math.round(totC / diario))} días` : '—', ' title="Lo comprado en el período dividido por el consumo diario"')}
     </div>
     ${totC || totU ? `<div class="mini-graf cc-graf" id="rec-cm-cc-graf">${recCmGraficoCCSvg(tramos)}</div>
@@ -17187,8 +17192,10 @@ function fichaMateriaRec(idProducto) {
   // Franja compacta: precios a la izquierda, último lote y vencimiento a la derecha.
   const celda = (t, v, sub = '') => `<div class="rec-cm-celda"><span>${t}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
   const franja = `<div class="rec-cm-franja">
-      ${celda('Costo actual', Number(m.precio_costo) ? recClpDec(m.precio_costo) + `<small>${u}</small>` : '—')}
-      ${celda('Último precio', ult ? recClpDec(ult.precio_compra) + `<small>${u}</small>` : '—', recCmVariacionHtml(m._variacion) || (ult ? 'primera compra' : ''))}
+      ${celda('Último precio', ult ? recClpDec(ult.precio_compra) + `<small>${u}</small>` : (Number(m.precio_costo) ? recClpDec(m.precio_costo) + `<small>${u}</small>` : '—'),
+        [recCmVariacionHtml(m._variacion) || (ult ? 'primera compra' : 'costo del recetario'),
+         ult && Number(m.precio_costo) && Math.abs(Number(m.precio_costo) - Number(ult.precio_compra)) >= 0.01
+           ? `<span class="rec-cm-difiere" title="El costo que usa el recetario para calcular las RM no es el último precio de compra">recetario usa ${recClpDec(m.precio_costo)}</span>` : ''].filter(Boolean).join(' · '))}
       ${celda('Promedio 12 meses', prom12 !== null ? recClpDec(prom12) + `<small>${u}</small>` : '—')}
       <div class="rec-cm-franja-lote" id="rec-cm-lote-${m.id_producto}">${recCmUltimoLoteHtml(m)}</div>
     </div>`;
@@ -17243,6 +17250,103 @@ async function recCmActivarFicha(id) {
   try { await recCmCargarLotes((recCmComprasPorMateria[id] || []).slice(0, 5)); } catch (_) { /* queda "sin lote" */ }
   const el = document.getElementById(`rec-cm-lote-${id}`);
   if (el) el.innerHTML = recCmUltimoLoteHtml(m);
+}
+
+// ── Detalle del consumo del período (ventana aparte) ──
+// "Por lote": qué lotes se usaron, cuánto de cada uno y en cuántas RM; si un
+// lote aparece usado más de lo que se compró de él, se avisa (suele pasar
+// cuando en Pharma_RM se sigue eligiendo un lote antiguo que ya se acabó).
+// "Por RM": cada RM que la usó, con su fecha, institución, cantidad y lote.
+let recCmDet = { id: null, vista: 'lotes' };
+function recCmDetalleConsumo(id, vista) {
+  const m = recCmMaterias.find(x => x.id_producto === id);
+  const cons = recCmConsumo[id];
+  if (!m || !Array.isArray(cons)) return;
+  recCmDet = { id, vista: vista || 'lotes' };
+  const per = REC_CM_PERIODOS.find(x => x.id === recCmPeriodo) || REC_CM_PERIODOS[1];
+  const tramos = recCmTramos(per);
+  const desde = tramos[0].ini, hasta = tramos[tramos.length - 1].fin;
+  const lineas = cons.filter(x => x.d >= desde && x.d <= hasta).slice().reverse();
+  const u = m.unidad_stock || '';
+  const num = n => recNum(n, n && Math.abs(n) < 10 ? 2 : 1);
+
+  // Por lote
+  const porLote = new Map();
+  lineas.forEach(l => {
+    const k = l.idLote || 'sin';
+    const g = porLote.get(k) || { lote: l.lote, vence: l.vence, idLote: l.idLote, cant: 0, rms: new Set(), pri: l.d, ult: l.d };
+    g.cant += l.cant; g.rms.add(l.rm);
+    if (l.d < g.pri) g.pri = l.d; if (l.d > g.ult) g.ult = l.d;
+    porLote.set(k, g);
+  });
+  const compradoLote = {};
+  (recCmComprasPorMateria[id] || []).forEach(c => { if (c.id_lote) compradoLote[c.id_lote] = (compradoLote[c.id_lote] || 0) + (Number(c.cantidad) || 0); });
+  // Uso total de cada lote (todo lo cargado, no solo el período) para el aviso.
+  const usoTotal = {};
+  cons.forEach(l => { if (l.idLote) usoTotal[l.idLote] = (usoTotal[l.idLote] || 0) + l.cant; });
+  const lotes = [...porLote.values()].sort((a, b) => b.ult.localeCompare(a.ult));
+  const tablaLotes = `<div class="table-card oc-tabla tabla-centrada rec-prep-rms rec-cm-hist-tabla" style="margin:0"><table>
+      <thead><tr><th>Lote</th><th>Vencimiento</th><th>Usado en el período</th><th>RM</th><th>Primer uso</th><th>Último uso</th><th>Comprado de este lote</th></tr></thead>
+      <tbody>${lotes.map(g => {
+        const comp = g.idLote ? compradoLote[g.idLote] : null;
+        const pasado = comp && usoTotal[g.idLote] > comp * 1.05;
+        return `<tr style="cursor:default">
+          <td style="font-family:var(--mono, monospace);font-size:12.5px">${escapeHtml(g.lote || 'sin lote')}</td>
+          <td>${g.vence ? fDate(g.vence) : '—'}</td>
+          <td style="font-weight:600">${num(g.cant)} ${escapeHtml(u)}</td>
+          <td>${recNum(g.rms.size)}</td>
+          <td>${fDate(g.pri)}</td><td>${fDate(g.ult)}</td>
+          <td>${comp ? `${num(comp)} ${escapeHtml(u)}${pasado ? ` <span class="badge badge-amber" title="En Pharma_RM este lote aparece usado ${num(usoTotal[g.idLote])} ${escapeHtml(u)} en el último año, más de lo que se compró de él: probablemente se está eligiendo un lote que ya se acabó">usado de más</span>` : ''}` : '<span style="color:var(--text-3)">sin compra registrada</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`;
+
+  // Por RM
+  const tablaRm = `<div class="table-card oc-tabla tabla-centrada rec-prep-rms rec-cm-hist-tabla" style="margin:0"><table>
+      <thead><tr><th>Fecha</th><th>RM</th><th>Paciente / Institución</th><th>Dosis</th><th>Cantidad usada</th><th>Lote</th></tr></thead>
+      <tbody>${lineas.map(l => `<tr class="oc-fila" onclick="recCmDetalleAbrirRm(${l.rm})" title="Abrir la RM">
+          <td>${fDate(l.d)}</td>
+          <td class="mono" style="color:var(--accent);font-weight:600">${escapeHtml(l.numRm || '—')}</td>
+          <td style="white-space:normal;font-size:13px">${escapeHtml(l.inst || '—')}</td>
+          <td>${l.dosis != null ? `${recNum(l.dosis, 2)} ${escapeHtml(l.udosis || '')}` : '—'}</td>
+          <td style="font-weight:600">${num(l.cant)} ${escapeHtml(u)}</td>
+          <td style="font-family:var(--mono, monospace);font-size:12.5px">${escapeHtml(l.lote || '—')}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+
+  document.getElementById('rec-cm-det-overlay')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rec-cm-det-overlay';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '1100';
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  const tab = (v, t) => `<button class="fpp-status-tab${recCmDet.vista === v ? ' active' : ''}" onclick="recCmDetalleConsumo(${id}, '${v}')">${t}</button>`;
+  modal.innerHTML = `
+    <div class="modal-shell modal-xl rec-cm-hist" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Consumo en RM · ${escapeHtml(per.label)} (${fDate(desde)} al ${fDate(hasta)})</div>
+          <div class="modal-title">${escapeHtml(m.nombre)}</div>
+          <div class="modal-sub">${num(lineas.reduce((t, l) => t + l.cant, 0))} ${escapeHtml(u)} en ${recNum(new Set(lineas.map(l => l.rm)).size)} RM · ${recNum(lotes.length)} lote${lotes.length === 1 ? '' : 's'}</div>
+        </div>
+        <button onclick="document.getElementById('rec-cm-det-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="fpp-status-tabs cc-tabs" style="margin-bottom:12px">${tab('lotes', `Por lote (${lotes.length})`)}${tab('rm', `Por RM (${new Set(lineas.map(l => l.rm)).size})`)}</div>
+        ${lineas.length ? (recCmDet.vista === 'rm' ? tablaRm : tablaLotes) : '<div class="panel-vacio">No se usó en este período.</div>'}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+// La RM se abre encima; al cerrarla vuelve a aparecer el detalle tal como estaba.
+function recCmDetalleAbrirRm(idDetalle) {
+  const det = document.getElementById('rec-cm-det-overlay');
+  if (det) det.style.display = 'none';
+  recAbrirRm(idDetalle);
+  const obs = new MutationObserver(() => {
+    if (document.getElementById('rec-rm-modal-overlay')) return;
+    obs.disconnect();
+    if (det && det.isConnected) det.style.display = '';
+  });
+  setTimeout(() => obs.observe(document.body, { childList: true }), 0);
 }
 
 // ── Historial completo de compras de una materia (ventana aparte) ──
@@ -17323,7 +17427,7 @@ function recCmGraficoSvg(compras, m) {
   const u = m && m.unidad_stock ? ' / ' + m.unidad_stock : '';
   const xs = compras.map(c => new Date(String(c.fecha).slice(0, 10) + 'T12:00:00').getTime());
   const ys = compras.map(c => Number(c.precio_compra) || 0);
-  const costo = Number(m && m.precio_costo) || null;
+  const costo = Number(m && m.precio_costo) && Math.abs(Number(m.precio_costo) - (ys[ys.length - 1] || 0)) >= 0.01 ? Number(m.precio_costo) : null;
   const todos = costo ? [...ys, costo] : ys;
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...todos), y1 = Math.max(...todos);
@@ -17376,7 +17480,7 @@ function recCmGraficoSvg(compras, m) {
         <text x="${sx(t).toFixed(1)}" y="${H - pb + 20}" text-anchor="middle" class="rec-cm-eje">${nombreMes(t)}</text>`).join('')}
       <line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="#CFCBC2"/>
       ${costo ? `<line x1="${pl}" x2="${W - pr}" y1="${sy(costo).toFixed(1)}" y2="${sy(costo).toFixed(1)}" stroke="var(--accent)" stroke-dasharray="6 5" stroke-width="1.5"/>
-        <text x="${W - pr + 8}" y="${(sy(costo) - 3).toFixed(1)}" class="rec-cm-eje" style="fill:var(--accent);font-weight:700">Costo actual</text>
+        <text x="${W - pr + 8}" y="${(sy(costo) - 3).toFixed(1)}" class="rec-cm-eje" style="fill:var(--accent);font-weight:700">Recetario</text>
         <text x="${W - pr + 8}" y="${(sy(costo) + 12).toFixed(1)}" class="rec-cm-eje" style="fill:var(--accent)">${recClpDec(costo)}</text>` : ''}
       <path d="${linea}" fill="none" stroke="#B9B4AA" stroke-width="1.5" stroke-linejoin="round"/>
       ${pts.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="${color(p.c.id_proveedor)}" stroke="#fff" stroke-width="2"/>`).join('')}
@@ -17388,7 +17492,7 @@ function recCmGraficoSvg(compras, m) {
     <div class="rec-cm-leyenda">
       ${orden.slice(0, REC_CM_COLORES_PROV.length).map(id => `<span><i style="background:${color(id)}"></i>${escapeHtml(recCmNombreProv(Number(id)) || recCmNombreProv(id) || 'Proveedor ' + id)} <small>(${cuenta[id]})</small></span>`).join('')}
       ${orden.length > REC_CM_COLORES_PROV.length ? '<span><i style="background:#9A968E"></i>Otros</span>' : ''}
-      ${costo ? '<span><i class="rec-cm-ley-linea"></i>Costo actual en el recetario</span>' : ''}
+      ${costo ? '<span><i class="rec-cm-ley-linea"></i>Costo que usa el recetario (distinto del último precio)</span>' : ''}
       <span style="color:var(--text-3)">Cada punto es una compra: precio pagado por ${m && m.unidad_stock ? escapeHtml(m.unidad_stock) : 'unidad'}.${compras.length >= 24 ? ' Últimas 24 compras.' : ''}</span>
     </div>`;
 }

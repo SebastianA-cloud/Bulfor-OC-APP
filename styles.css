@@ -1808,7 +1808,7 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-todas-sel { height: var(--control-h, 40px); border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: 500 13px var(--font); background: var(--surface); }
 
 /* Consumo y compras — ficha centrada (como la de OC) */
-.rec-cm-franja { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 12px; background: #FAF9F6; }
+.rec-cm-franja { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.6fr) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 12px; background: #FAF9F6; }
 .rec-cm-franja-lote { display: contents; }
 .rec-cm-celda { padding: 9px 14px; min-width: 0; border-left: 1px solid var(--border); }
 .rec-cm-franja > .rec-cm-celda:first-child { border-left: 0; }
@@ -1853,3 +1853,9 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-cm-leyenda i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .rec-cm-leyenda i.rec-cm-ley-linea { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed var(--accent); }
 @media (max-width: 760px) { .rec-cm-cifras { grid-template-columns: 1fr; } }
+.rec-cm-difiere { color: #A25E00; font-weight: 600; }
+/* Cifras de consumo que abren el detalle (por lote / por RM) */
+.rec-cm-dato-btn { text-align: left; font: inherit; color: inherit; border: 1px solid transparent; cursor: pointer; transition: border-color .15s, background .15s; }
+.rec-cm-dato-btn:hover { border-color: var(--accent); background: #FDF7F5; }
+.rec-cm-dato-btn label { cursor: pointer; }
+.rec-cm-dato-btn label em { font-style: normal; color: var(--accent); font-weight: 600; margin-left: 4px; }
