@@ -164,7 +164,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
-- 29-10-2026 — Excel de reasignación de lotes FIFO + cantidades raras (fuera del repo, entregado a Seba).
+- 29-10-2026 — Excel de reasignación de lotes FIFO v2 + lista de RM para revisar (fuera del repo, entregado a Seba).
 - 29-10-2026 — Consumo y compras: "Compras vs consumo" oculto en Envases e insumos.
 - 29-10-2026 — Consumo y compras: sin "Costo actual" en la ficha; "Consumido" y "Usada en" abren el detalle del consumo del período (Por lote con aviso "usado de más" / Por RM, cada RM se abre). Título de columna ordenada en blanco. Revisión de consumos raros (ver Pendientes).
 - 29-10-2026 — Consumo y compras: ficha compacta (franja de 5 celdas, compras vs consumo en una fila) para que quepa sin scroll.
@@ -177,7 +177,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 - [ ] **Consumos raros en Consumo y compras** (revisado 29-10-2026, esperando decisión de Seba):
   - Envases e insumos: "Compras vs consumo" **oculto** (decisión de Seba 29-10). Más adelante se agregarán envases/potes/botellas a las preparaciones para poder calcular su consumo.
-  - Reasignación de lotes por orden de llegada (FIFO) hecha el 29-10 como **Excel entregado a Seba** (no se cambió nada en la base ni en Pharma_RM): 103 materias, 1.058 tramos, ~27.800 de 55.000 líneas RM con otro lote registrado. Método: parte del lote de la primera RM con datos (ene-2024); cada lote se gasta completo en orden de fecha y se pasa al siguiente que ya haya llegado. Se excluyen 265 "cantidades raras" (>25× la mediana de esa materia y >10× el p95; ej. RM 6376/25 con 900 g de coenzima Q10 en vez de 9 g). La consulta se hace en un bloque DO con tablas temporales en una sola llamada (cada execute_sql es una sesión nueva).
+  - Reasignación de lotes por orden de llegada (FIFO) hecha el 29-10 como **Excel entregado a Seba** (v2; no se cambió nada en la base ni en Pharma_RM): 107 materias, 1.114 tramos, 25.100 de 56.891 líneas RM con otro lote registrado. Método: parte del lote de la primera RM con datos (ene-2024); cada lote se gasta completo en orden de fecha y se pasa al siguiente que ya haya llegado. Se excluyen solo 6 RM con cantidad errónea: 6376/25 (Q10 + lactosa, 100 cáps × 90 frascos en vez de 90 × 1) y ácido acético 2248/25, 2703/25, 2745/25, 2861/25, 3323/25 (descontado ×1000). Las demás "cantidades grandes" (≈250) se validaron contra el tamaño de la RM y son lotes grandes reales. La consulta se hace en un bloque DO con tablas temporales en una sola llamada (cada execute_sql es una sesión nueva; si el resultado es grande queda guardado en tool-results).
+  - [ ] Seba revisa en Pharma_RM: las 6 RM con error, 7 RM de La Florida (M.R.) con posible cantidad/frascos invertidos y 5 con dosis mal escrita (hoja "RM para revisar").
   - [ ] Seba decide si corrige los lotes y las cantidades raras en Pharma_RM (es el registro oficial; la app solo copia).
   - Alcohol 70° y Crema no iónica: ingresos cada ~3 semanas de la propia Bulfor (elaboración propia que se vende directo), no se consumen en RM → no son compras sin uso.
   - Vaselina líquida: compras registradas en ml (25.950 a $4,5) pero su unidad de stock es Lt → compras y consumo en unidades distintas (corregir en Pharma_RM).
