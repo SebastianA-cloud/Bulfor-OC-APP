@@ -16405,27 +16405,132 @@ async function recPrepAbrir(idx) {
   recPrepCargarRms(idx);
 }
 
-// Últimas 30 RM de la fórmula (la misma composición y forma); clic abre la ficha del RM.
+// Últimas 10 RM de la fórmula (la misma composición y forma); clic abre la ficha
+// del RM. "Ver todas" abre una ventana grande con todas sus elaboraciones.
+function recPrepFiltroRms(p) {
+  return `descripcion=eq.${encodeURIComponent(p.descripcion)}` + (p.forma ? `&forma=eq.${encodeURIComponent(p.forma)}` : '');
+}
+function recPrepFilaRm(r, volver) {
+  return `<tr class="oc-fila" onclick="navPush(()=>${volver});recAbrirRm(${r.id_rp_detalle})">
+    <td>${recFechaTs(r.fecha)}</td><td class="mono" style="color:var(--accent);font-weight:600">${escapeHtml(r.rm || '—')}</td>
+    <td style="white-space:nowrap">${recCantidadRm(r)}</td>
+    <td style="font-size:13px">${r.paciente ? `<b>${escapeHtml(r.paciente)}</b>` : `<span style="color:var(--text-2)">${escapeHtml(r.institucion || '—')}</span>`}</td>
+    <td style="white-space:nowrap">${recClp(r.costo)}</td></tr>`;
+}
+// Paciente de cada RM (columna de rec_rm; si aún no existe, se omite sin romper nada).
+async function recPrepAgregarPacientes(rms) {
+  try {
+    for (let i = 0; i < rms.length; i += 200) {
+      const ids = rms.slice(i, i + 200).map(r => r.id_rp_detalle).join(',');
+      const res = await sb(`rec_rm?select=id_rp_detalle,paciente_nombre&id_rp_detalle=in.(${ids})`);
+      if (!res.ok) return;
+      const m = new Map((await res.json()).map(x => [x.id_rp_detalle, x.paciente_nombre]));
+      rms.slice(i, i + 200).forEach(r => { r.paciente = m.get(r.id_rp_detalle) || null; });
+    }
+  } catch (_) { /* sin paciente */ }
+}
+const REC_PREP_COLS_RM = '<thead><tr><th>Fecha</th><th>RM</th><th>Cantidad</th><th>Paciente / Hospital</th><th>Costo MP</th></tr></thead>';
+
 async function recPrepCargarRms(idx) {
   const p = recPrepF[idx];
   const cont = document.getElementById('rec-prep-rms');
   if (!p || !cont) return;
   try {
-    const filtroForma = p.forma ? `&forma=eq.${encodeURIComponent(p.forma)}` : '';
-    const res = await sb(`rec_rm_v?select=id_rp_detalle,rm,fecha,institucion,cantidad,unidad,frascos,costo&descripcion=eq.${encodeURIComponent(p.descripcion)}${filtroForma}&order=fecha.desc&limit=30`);
+    const res = await sb(`rec_rm_v?select=id_rp_detalle,rm,fecha,institucion,cantidad,unidad,frascos,costo&${recPrepFiltroRms(p)}&order=fecha.desc&limit=10`);
     const rms = res.ok ? await res.json() : [];
+    await recPrepAgregarPacientes(rms);
     if (!document.getElementById('rec-prep-rms')) return;
-    cont.innerHTML = rms.length ? `<div class="table-card oc-tabla tabla-centrada rec-prep-rms"><table>
-        <thead><tr><th>Fecha</th><th>RM</th><th>Cantidad</th><th>Hospital</th><th>Costo MP</th></tr></thead><tbody>
-        ${rms.map(r => `<tr class="oc-fila" onclick="navPush(()=>recPrepAbrir(${idx}));recAbrirRm(${r.id_rp_detalle})">
-          <td>${recFechaTs(r.fecha)}</td><td class="mono" style="color:var(--accent);font-weight:600">${escapeHtml(r.rm || '—')}</td>
-          <td style="white-space:nowrap">${recCantidadRm(r)}</td><td style="font-size:13px;color:var(--text-2)">${escapeHtml(r.institucion || '—')}</td>
-          <td style="white-space:nowrap">${recClp(r.costo)}</td></tr>`).join('')}
-        </tbody></table></div>${p.n_rm > 30 ? `<p style="font-size:12px;color:var(--text-3);margin-top:6px">Se muestran las 30 más recientes de ${recNum(p.n_rm)}.</p>` : ''}`
+    cont.innerHTML = rms.length ? `<div class="table-card oc-tabla tabla-centrada rec-prep-rms"><table>${REC_PREP_COLS_RM}<tbody>
+        ${rms.map(r => recPrepFilaRm(r, `recPrepAbrir(${idx})`)).join('')}
+        </tbody></table></div>
+        ${p.n_rm > rms.length ? `<div class="rec-prep-vertodas"><span>Se muestran las ${rms.length} más recientes de ${recNum(p.n_rm)}.</span>
+          <button class="btn-mp" onclick="recPrepVerTodas(${idx})">Ver todas las elaboraciones (${recNum(p.n_rm)}) ›</button></div>` : ''}`
       : '<div class="panel-vacio">No encontré las RM de esta fórmula.</div>';
   } catch (e) {
     cont.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudieron cargar las RM: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+// ── Todas las elaboraciones de una fórmula (ventana grande) ──
+// Con filtro por año y búsqueda (RM, paciente u hospital), 20 por página.
+let recTodas = { idx: null, rms: [], pag: 1, anio: '', q: '' };
+async function recPrepVerTodas(idx) {
+  const p = recPrepF[idx];
+  if (!p) return;
+  document.getElementById('rec-prep-overlay')?.remove();
+  document.getElementById('rec-todas-overlay')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rec-todas-overlay';
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-shell modal-xl" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Todas las elaboraciones · ${escapeHtml(p.forma || 'sin forma')}</div>
+          <div class="modal-title">${escapeHtml(p.nombre || p.descripcion)}</div>
+          ${p.nombre ? `<div class="modal-sub" style="margin-top:2px">${escapeHtml(p.descripcion)}</div>` : ''}
+        </div>
+        <div class="modal-actions">
+          <button class="page-btn" onclick="recPrepAbrir(${idx})">‹ Volver al preparado</button>
+          <button onclick="document.getElementById('rec-todas-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="toolbar" style="margin-bottom:10px">
+          <div class="search-wrap"><span class="search-icon">🔍</span>
+            <input type="text" id="rec-todas-q" placeholder="Buscar RM, paciente u hospital…" oninput="recTodas.q=this.value;recTodas.pag=1;recTodasRender()" autocomplete="off"></div>
+          <select id="rec-todas-anio" onchange="recTodas.anio=this.value;recTodas.pag=1;recTodasRender()" class="rec-todas-sel"><option value="">Todos los años</option></select>
+        </div>
+        <div id="rec-todas-cont"><div class="empty"><p>Cargando ${recNum(p.n_rm)} elaboraciones…</p></div></div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const yaCargadas = recTodas.idx === idx && recTodas.rms.length ? recTodas.rms : null;
+  recTodas = { idx, rms: yaCargadas || [], pag: 1, anio: '', q: '' };
+  if (!yaCargadas) try {
+    const rms = await fetchAll('rec_rm_v', `select=id_rp_detalle,rm,fecha,institucion,cantidad,unidad,frascos,costo&${recPrepFiltroRms(p)}&order=fecha.desc`);
+    recTodas.rms = Array.isArray(rms) ? rms : [];
+    await recPrepAgregarPacientes(recTodas.rms);
+  } catch (e) {
+    const c = document.getElementById('rec-todas-cont');
+    if (c) c.innerHTML = `<div class="panel-vacio" style="color:var(--red)">No se pudieron cargar: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  const anios = [...new Set(recTodas.rms.map(r => String(r.fecha || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const sel = document.getElementById('rec-todas-anio');
+  if (sel) sel.innerHTML = '<option value="">Todos los años</option>' + anios.map(a => `<option value="${a}">${a}</option>`).join('');
+  recTodasRender();
+}
+function recTodasRender() {
+  const cont = document.getElementById('rec-todas-cont');
+  if (!cont) return;
+  const lista = recTodas.rms.filter(r => (!recTodas.anio || String(r.fecha || '').startsWith(recTodas.anio))
+    && (!recTodas.q || coincideBusqueda(`${r.rm || ''} ${r.paciente || ''} ${r.institucion || ''}`, recTodas.q)));
+  const porPag = 20, pags = Math.max(1, Math.ceil(lista.length / porPag));
+  recTodas.pag = Math.min(recTodas.pag, pags);
+  const desde = (recTodas.pag - 1) * porPag;
+  const costoTotal = lista.reduce((t, r) => t + (Number(r.costo) || 0), 0);
+  cont.innerHTML = lista.length ? `<div class="table-card oc-tabla tabla-centrada rec-prep-rms" style="margin:0"><table>${REC_PREP_COLS_RM}<tbody>
+      ${lista.slice(desde, desde + porPag).map(r => recPrepFilaRm(r, `recPrepVerTodasVolver()`)).join('')}
+    </tbody></table>
+    <div class="pagination"><span>${recNum(lista.length)} elaboraciones · costo MP total ${recClp(costoTotal)}</span>
+      <div class="page-btns">
+        <button class="page-btn" ${recTodas.pag <= 1 ? 'disabled' : ''} onclick="recTodas.pag--;recTodasRender()">‹</button>
+        <span style="font-size:12px;color:var(--text-2);padding:0 6px">página ${recTodas.pag} de ${pags}</span>
+        <button class="page-btn" ${recTodas.pag >= pags ? 'disabled' : ''} onclick="recTodas.pag++;recTodasRender()">›</button>
+      </div></div></div>`
+    : '<div class="panel-vacio">No hay elaboraciones con ese filtro.</div>';
+}
+// Volver a la ventana grande (desde la ficha de un RM) manteniendo filtros y página.
+function recPrepVerTodasVolver() {
+  const estado = { ...recTodas };
+  recPrepVerTodas(estado.idx).then(() => {
+    Object.assign(recTodas, { anio: estado.anio, q: estado.q, pag: estado.pag });
+    const q = document.getElementById('rec-todas-q'), a = document.getElementById('rec-todas-anio');
+    if (q) q.value = estado.q; if (a) a.value = estado.anio;
+    recTodasRender();
+  });
 }
 
 // Pesos con decimales solo cuando hacen falta (precios por gramo suelen ser < $10).
