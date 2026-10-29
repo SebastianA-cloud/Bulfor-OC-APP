@@ -5588,9 +5588,15 @@ function filtrarPorCategoriaFedex(categoria) {
 }
 
 // Facturas (documentos) de un envío: puede llevar más de una.
+// Documentos de un envío: cada número se busca como factura (33) y, si no hay,
+// como guía de despacho (52), porque algunos envíos salen con guía.
 function fedexDocsDeEnvio(e) {
   return parsearNumerosFactura(e.factura)
-    .map(n => documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === String(n).replace(/\D/g, '')))
+    .map(n => {
+      const folio = String(n).replace(/\D/g, '');
+      return documentosGdexpress.find(d => d.tipo_dte === '33' && String(d.folio) === folio)
+        || documentosGdexpress.find(d => d.tipo_dte === '52' && String(d.folio) === folio);
+    })
     .filter(Boolean);
 }
 
