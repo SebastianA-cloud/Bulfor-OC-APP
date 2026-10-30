@@ -8,7 +8,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 | Responsable | Tarea | Rama | Alcance | Estado / PR |
 |---|---|---|---|---|
-| Claude | Ordenar, quitar y agregar elementos menú por menú según Seba | Por confirmar; no cambiar su rama desde otra sesión | Menús y sus pantallas; navegación y estilos que requieran esos ajustes | En curso informado por Seba; menú exacto y PR por confirmar |
+| Claude | Ordenar, quitar y agregar elementos menú por menú según Seba | Una rama `claude/<menú>` por menú | Menús y sus pantallas; navegación y estilos que requieran esos ajustes | En curso; menú actual: Recetario › Consumo y compras |
+| Claude | Recetario › Consumo y compras (ficha centrada, último lote, historial de compras, detalle del consumo por lote/RM, envases sin consumo) | claude/consumo-compras | index.html: bloque `// ─── Compras de materias` (`recCm*`, `fichaMateriaRec`, `recCmHistorial`, `recCmDetalleConsumo`); styles.css: bloques `.rec-cm-*` al final; cerebro y registro | Aprobado por Seba el 30-10-2026; integrado en main mediante PR #2 |
 | Codex | Configurar coordinación y contexto compartido | codex/flujo-coordinacion | AGENTS.md, CLAUDE.md, docs/CEREBRO.md, este registro y plantilla de PR | Aprobado por Seba el 30-10-2026; integración mediante PR #1 |
 | Codex | Filtrar FedEx y Chilexpress por mes/año | codex/envios-por-mes | index.html: filterFedex y filterChilexpress; cerebro y registro | Integrado en main mediante PR #3 el 29-10-2026 |
 
