@@ -167,6 +167,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 30-10-2026 — Seba aprobó integrar PR #1 (coordinación completa) y #4 (aviso de rechazadas); #4 ya integrado. Se conserva el cerebro actualizado de main al resolver el cruce documental de #1. El filtro mensual de envíos está integrado por PR #3 desde el 29-10. Entradas anteriores marcadas «propuesto» son el estado histórico de la propuesta.
+
 - 30-10-2026 — **Propuesto en `codex/aviso-rechazadas-pendientes`, pendiente de aprobación:** el aviso de rechazos nuevos usa los mismos casos pendientes y fecha de seguimiento que «Por resolver». Excluye cadenas resueltas, históricos y vistos; espera la lectura de refacturas y actualiza el badge al terminar, evitando avisos transitorios. Sin cambios de datos.
 
 - 29-10-2026 — **Propuesto en `codex/envios-por-mes`, pendiente de aprobación:** FedEx y Chilexpress filtran todas las pestañas, contadores y búsquedas por mes/año de ingreso; selector siempre visible. Reemplaza la decisión anterior de mostrar pendientes/Todos de todos los meses. Pruebas con datos simulados, sin escrituras en Supabase.
