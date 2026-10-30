@@ -10358,7 +10358,12 @@ function guardarRechazadasVistas(set) {
 function rechazadasNuevas() {
   const vistas = rechazadasVistas();
   if (!vistas) return []; // primera vez: se marca todo como visto, no se avisa del histórico
-  return facturasRechazadas().filter(f => !vistas.has(String(f.factura)));
+  // No avisar antes de conocer las refacturas: un caso podría estar resuelto.
+  if (rzReemplazaA === null) return [];
+  return rechazadasCasos()
+    .filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c))
+    .map(c => c.ultimaRech)
+    .filter(f => f && !vistas.has(String(f.factura)));
 }
 
 // Marca todo lo que hay ahora como visto y apaga el aviso.
@@ -10368,6 +10373,7 @@ function marcarRechazadasComoVistas() {
 }
 
 function actualizarBadgeRechazadas() {
+  if (rzReemplazaA === null) void rzCargarReemplazos();
   const cantidad = rechazadasNuevas().length;
   const texto = cantidad > 3 ? '3+' : String(cantidad);
   [document.getElementById('badge-rechazadas'),
@@ -11160,10 +11166,12 @@ function badgeGestionRechazada(f) {
 // descripción del último producto (o por el reemplazo anotado a mano).
 let rechazadasCasoAbierto = null;
 let rzReemplazaA = null;   // folio nuevo → folio que reemplaza (leído del XML)
+let rzReemplazosCargando = false;
 
 async function rzCargarReemplazos() {
-  if (rzReemplazaA) return;
-  rzReemplazaA = {};
+  if (rzReemplazaA !== null || rzReemplazosCargando) return;
+  rzReemplazosCargando = true;
+  const reemplazos = {};
   try {
     const filas = await fetchAll('documentos_gdexpress', 'select=folio,xml_completo&tipo_dte=eq.33&xml_completo=ilike.*REEMPLAZA*');
     filas.forEach(r => {
@@ -11174,9 +11182,14 @@ async function rzCargarReemplazos() {
       let viejo = m[1];
       const doble = /^(\d+)\1$/.exec(viejo);   // número escrito dos veces por error (ej. 2225122251)
       if (doble) viejo = doble[1];
-      rzReemplazaA[String(r.folio)] = viejo;
+      reemplazos[String(r.folio)] = viejo;
     });
-  } catch (e) { /* sin reemplazos detectados: quedan los anotados a mano */ }
+    rzReemplazaA = reemplazos;
+  } catch (e) {
+    // Sin confirmar refacturas, no mostrar avisos que podrían ser falsos.
+    return;
+  } finally { rzReemplazosCargando = false; }
+  actualizarBadgeRechazadas();
   if (document.getElementById('page-facturas-rechazadas')?.classList.contains('active')) renderRechazadas();
   renderInicio();   // el aviso de Inicio cuenta los casos con los reemplazos ya leídos
 }

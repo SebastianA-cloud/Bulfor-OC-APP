@@ -167,6 +167,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 30-10-2026 — **Propuesto en `codex/aviso-rechazadas-pendientes`, pendiente de aprobación:** el aviso de rechazos nuevos usa los mismos casos pendientes y fecha de seguimiento que «Por resolver». Excluye cadenas resueltas, históricos y vistos; espera la lectura de refacturas y actualiza el badge al terminar, evitando avisos transitorios. Sin cambios de datos.
+
 - 29-10-2026 — **Propuesto en `codex/envios-por-mes`, pendiente de aprobación:** FedEx y Chilexpress filtran todas las pestañas, contadores y búsquedas por mes/año de ingreso; selector siempre visible. Reemplaza la decisión anterior de mostrar pendientes/Todos de todos los meses. Pruebas con datos simulados, sin escrituras en Supabase.
 - 29-10-2026 — Investigación Chilexpress: soporte informó que la API solo consulta OT creadas mediante integración (inicio 7); OT de sucursal (inicio 5) se consultan por portal. No se implementó la sincronización API.
 
