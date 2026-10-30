@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Codex: aviso de rechazadas pendientes, rama `codex/aviso-rechazadas-pendientes`; alcance: `rechazadasNuevas`, actualización del badge y carga de refacturas en index.html. En rama pendiente de revisión; no modifica el PR de Recetario de Claude.
+
 | Responsable | Tarea | Rama | Alcance | Estado / PR |
 |---|---|---|---|---|
 | Claude | Ordenar, quitar y agregar elementos menú por menú según Seba | Por confirmar; no cambiar su rama desde otra sesión | Menús y sus pantallas; navegación y estilos que requieran esos ajustes | En curso informado por Seba; menú exacto y PR por confirmar |
