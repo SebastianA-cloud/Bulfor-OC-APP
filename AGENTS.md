@@ -8,6 +8,23 @@ App web interna de Farmacia Bulfor (recetario magistral, Chile). La usa el equip
 
 Seba (dueño y Director Técnico) es quien pide los cambios. Trabaja solo desde la web (GitHub, Vercel, dashboard de Supabase), sin entorno local. Habla en español: responde en español y explica en lenguaje simple, sin jerga innecesaria.
 
+## Coordinación entre Claude y Codex (acuerdo de Seba, 29-10-2026)
+
+Estas reglas reemplazan cualquier indicación anterior de usar una rama compartida o pasar una rama directamente a main. El detalle y el registro de tareas están en `docs/COORDINACION.md`.
+
+1. Antes de empezar, leer este archivo, `docs/CEREBRO.md`, `docs/COORDINACION.md` y los PR abiertos. Revisar el estado remoto actual; no asumir que una conversación refleja lo último.
+2. Cada asistente trabaja en su propia rama y una rama por tarea: `claude/<tarea>` o `codex/<tarea>`. Crear desde main actualizado; continuar una rama anterior solo si corresponde a la misma tarea y se revisaron sus diferencias. No escribir en la rama del otro ni reutilizar `etapa2-uso-diario` como rama compartida.
+3. Registrar responsable, objetivo, rama, módulos/bloques o archivos, estado y PR en el registro de coordinación. Si la rama actual de Claude no está confirmada, no inventarla ni cambiarla por él.
+4. Claude está a cargo del orden y los ajustes de menús, menú por menú, según lo que Seba le vaya pidiendo. Codex no modifica esos módulos, la navegación ni sus estilos compartidos mientras estén en curso, salvo reparto explícito de Seba. No ampliar el encargo por iniciativa propia.
+5. Si ambas tareas necesitan el mismo archivo, delimitar bloques o funciones antes de editar. Si hay dependencia o solapamiento, trabajar en secuencia. Nunca resolver un conflicto borrando el trabajo del otro; revisar la intención de ambos cambios.
+6. Hacer commit y push solamente a la rama propia y abrir un PR hacia main. Incluir alcance, pruebas, vista previa verificada cuando exista, impacto en datos y actualización del cerebro.
+7. **Nunca escribir directamente en main, forzar su historial, integrar un PR ni activar auto-merge sin aprobación explícita de Seba para ese PR y su versión revisada.** Pedir cambios o aprobar un plan no autoriza a publicar. Si hay cambios posteriores que alteren lo aprobado, pedir nueva revisión.
+8. Antes de integrar un PR aprobado, revisar main actualizado, resolver conflictos en la rama propia y repetir las comprobaciones afectadas. Integrar a través del PR; no usar un push de rama a main como atajo.
+9. Actualizar Bitácora y Pendientes de `docs/CEREBRO.md` en el mismo PR. Distinguir siempre “propuesto/en rama” de “integrado en main”. Conservar los aportes del otro al actualizar documentación.
+10. La vista previa de Vercel no significa una base de pruebas: según el cerebro, Supabase es producción. Usar datos simulados para pruebas que escriban. Cambios de esquema/datos, sincronizaciones con escritura, DTE reales y despliegues de funciones requieren autorización específica según las reglas de este archivo.
+11. Al entregar: resumen simple, rama, PR, enlace de vista previa solo si se verificó, pruebas realizadas y pendientes. No inventar enlaces ni afirmar despliegues no comprobados.
+12. Las instrucciones no sincronizan automáticamente las conversaciones. Cada asistente debe releer GitHub al retomar; Seba comunica los cambios de reparto. No afirmar que Claude recibió un aviso si solo se actualizó el repositorio.
+
 ## Forma de trabajar
 
 1. **Nunca trabajes directo en `main`.** Cada cambio va en una rama nueva con nombre descriptivo (`mejora-buscador-oc`, `fix-fechas-facturas`).

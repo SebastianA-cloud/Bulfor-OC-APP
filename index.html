@@ -5613,9 +5613,10 @@ function filterFedex(soloTabla) {
   const buscando = !!(q && q.trim());
   if (!fedexPeriodo) { const hoy = new Date(); fedexPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() }; }
   const r = rangoDelAlcance('fedex', fedexPeriodo);
-  const usaMes = !buscando && fedexCategoriaActiva === 'entregado';
+  // Todas las categorías y la búsqueda respetan el mes seleccionado.
+  const usaMes = true;
   const delMes = f => !r || (fedexDiaChile(f) >= r.desde && fedexDiaChile(f) < r.hasta);
-  const base = buscando ? fedex.filter(f => coincideBusqueda(fedexTextoBusqueda(f), q)) : fedex;
+  const base = fedex.filter(f => delMes(f) && (!buscando || coincideBusqueda(fedexTextoBusqueda(f), q)));
   const sel = document.getElementById('fedex-periodo');
   if (sel) sel.style.visibility = usaMes ? '' : 'hidden';
   const cuenta = {};
@@ -5623,10 +5624,10 @@ function filterFedex(soloTabla) {
   document.getElementById('fedex-tabs').innerHTML = FEDEX_CATEGORIAS.map(c =>
     `<button class="fpp-status-tab${fedexCategoriaActiva===c.id?' active':''}" onclick="filtrarPorCategoriaFedex('${c.id}')">${c.label} <b>${cuenta[c.id]}</b></button>`
   ).join('');
-  const enCamino = fedex.filter(f => coincideCategoriaFedex(f, 'ruta')).length;
-  const retrasos = fedex.filter(f => coincideCategoriaFedex(f, 'retraso')).length;
+  const enCamino = base.filter(f => coincideCategoriaFedex(f, 'ruta')).length;
+  const retrasos = base.filter(f => coincideCategoriaFedex(f, 'retraso')).length;
   document.getElementById('fedex-resumen-compacto').innerHTML = q && q.trim()
-    ? `${base.length.toLocaleString('es-CL')} envío${base.length===1?' encontrado':'s encontrados'} en todas las fechas`
+    ? `${base.length.toLocaleString('es-CL')} envío${base.length===1?' encontrado':'s encontrados'} en el mes seleccionado`
     : `${enCamino} en camino` + (retrasos ? ` · <b style="color:var(--red)">${retrasos} con retraso</b>` : ' · sin retrasos');
 
   fedexF = base.filter(f => coincideCategoriaFedex(f, fedexCategoriaActiva) && (!usaMes || delMes(f)));
@@ -5761,17 +5762,14 @@ function cxCambiarMes(delta) {
 }
 function cxSetCategoria(c) { cxCategoriaActiva = c; filterChilexpress(); }
 
-// Igual que FedEx: el mes aplica a "Entregados" y "Todos"; "En camino" y
-// "Con problema" muestran todo lo pendiente. Con búsqueda, todas las fechas.
-// Solo "Entregados" se ve por mes (el selector de mes); "En camino",
-// "Con retraso/problema" y "Todos" muestran todos los meses.
+// Todas las categorías y la búsqueda respetan el mes seleccionado, igual que FedEx.
 function filterChilexpress() {
   if (!cxPeriodo) { const hoy = new Date(); cxPeriodo = { anio: String(hoy.getFullYear()), mes: hoy.getMonth() }; }
   const q = (document.getElementById('cx-search')?.value || '').trim();
   const r = { desde: `${cxPeriodo.anio}-${String(cxPeriodo.mes + 1).padStart(2, '0')}-01`, hasta: cxPeriodo.mes === 11 ? `${Number(cxPeriodo.anio) + 1}-01-01` : `${cxPeriodo.anio}-${String(cxPeriodo.mes + 2).padStart(2, '0')}-01` };
   const delMes = e => fedexDiaChile(e) >= r.desde && fedexDiaChile(e) < r.hasta;
-  const usaMes = !q && cxCategoriaActiva === 'entregado';
-  const base = q ? chilexpress.filter(e => coincideBusqueda(fedexTextoBusqueda(e), q)) : chilexpress;
+  const usaMes = true;
+  const base = chilexpress.filter(e => delMes(e) && (!q || coincideBusqueda(fedexTextoBusqueda(e), q)));
   const sel = document.getElementById('cx-periodo');
   if (sel) sel.style.visibility = usaMes ? '' : 'hidden';
   const tabs = document.getElementById('cx-tabs');
@@ -5779,10 +5777,10 @@ function filterChilexpress() {
     const n = base.filter(e => cxCoincideCategoria(e, c.id) && (q || c.id !== 'entregado' || delMes(e))).length;
     return `<button class="fpp-status-tab${cxCategoriaActiva === c.id ? ' active' : ''}" onclick="cxSetCategoria('${c.id}')">${c.label} <b>${n}</b></button>`;
   }).join('');
-  const enCamino = chilexpress.filter(e => cxCoincideCategoria(e, 'camino')).length;
-  const problemas = chilexpress.filter(e => cxCoincideCategoria(e, 'problema')).length;
+  const enCamino = base.filter(e => cxCoincideCategoria(e, 'camino')).length;
+  const problemas = base.filter(e => cxCoincideCategoria(e, 'problema')).length;
   const res = document.getElementById('cx-resumen');
-  if (res) res.innerHTML = q ? `${base.length} envío${base.length === 1 ? ' encontrado' : 's encontrados'} en todas las fechas`
+  if (res) res.innerHTML = q ? `${base.length} envío${base.length === 1 ? ' encontrado' : 's encontrados'} en el mes seleccionado`
     : `${enCamino} en camino` + (problemas ? ` · <b style="color:var(--red)">${problemas} con problema</b>` : '');
   const mayorFactura = e => Math.max(0, ...parsearNumerosFactura(e.factura).map(n => parseInt(String(n).replace(/\D/g, ''), 10) || 0));
   cxF = base.filter(e => cxCoincideCategoria(e, cxCategoriaActiva) && (!usaMes || delMes(e)))
@@ -10360,7 +10358,12 @@ function guardarRechazadasVistas(set) {
 function rechazadasNuevas() {
   const vistas = rechazadasVistas();
   if (!vistas) return []; // primera vez: se marca todo como visto, no se avisa del histórico
-  return facturasRechazadas().filter(f => !vistas.has(String(f.factura)));
+  // No avisar antes de conocer las refacturas: un caso podría estar resuelto.
+  if (rzReemplazaA === null) return [];
+  return rechazadasCasos()
+    .filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c))
+    .map(c => c.ultimaRech)
+    .filter(f => f && !vistas.has(String(f.factura)));
 }
 
 // Marca todo lo que hay ahora como visto y apaga el aviso.
@@ -10370,6 +10373,7 @@ function marcarRechazadasComoVistas() {
 }
 
 function actualizarBadgeRechazadas() {
+  if (rzReemplazaA === null) void rzCargarReemplazos();
   const cantidad = rechazadasNuevas().length;
   const texto = cantidad > 3 ? '3+' : String(cantidad);
   [document.getElementById('badge-rechazadas'),
@@ -11162,10 +11166,12 @@ function badgeGestionRechazada(f) {
 // descripción del último producto (o por el reemplazo anotado a mano).
 let rechazadasCasoAbierto = null;
 let rzReemplazaA = null;   // folio nuevo → folio que reemplaza (leído del XML)
+let rzReemplazosCargando = false;
 
 async function rzCargarReemplazos() {
-  if (rzReemplazaA) return;
-  rzReemplazaA = {};
+  if (rzReemplazaA !== null || rzReemplazosCargando) return;
+  rzReemplazosCargando = true;
+  const reemplazos = {};
   try {
     const filas = await fetchAll('documentos_gdexpress', 'select=folio,xml_completo&tipo_dte=eq.33&xml_completo=ilike.*REEMPLAZA*');
     filas.forEach(r => {
@@ -11176,9 +11182,14 @@ async function rzCargarReemplazos() {
       let viejo = m[1];
       const doble = /^(\d+)\1$/.exec(viejo);   // número escrito dos veces por error (ej. 2225122251)
       if (doble) viejo = doble[1];
-      rzReemplazaA[String(r.folio)] = viejo;
+      reemplazos[String(r.folio)] = viejo;
     });
-  } catch (e) { /* sin reemplazos detectados: quedan los anotados a mano */ }
+    rzReemplazaA = reemplazos;
+  } catch (e) {
+    // Sin confirmar refacturas, no mostrar avisos que podrían ser falsos.
+    return;
+  } finally { rzReemplazosCargando = false; }
+  actualizarBadgeRechazadas();
   if (document.getElementById('page-facturas-rechazadas')?.classList.contains('active')) renderRechazadas();
   renderInicio();   // el aviso de Inicio cuenta los casos con los reemplazos ya leídos
 }

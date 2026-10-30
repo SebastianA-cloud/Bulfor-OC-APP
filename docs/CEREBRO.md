@@ -26,20 +26,24 @@
 
 ## 2. Cómo se trabaja (resumen; detalle en AGENTS.md)
 
-1. Rama de trabajo actual: **`etapa2-uso-diario`** (rediseño "Etapa 2"). Se hace
-   commit + push a esa rama; Vercel genera la vista previa:
-   https://bulfor-oc-app-git-etapa2-uso-diario-bulfor-s-projects.vercel.app
-2. **Solo se pasa a `main` cuando Seba lo dice** ("pásalo a main"). Se hace con
-   `git push origin etapa2-uso-diario:main` (fast-forward; antes revisar que `main`
-   no tenga commits que la rama no tenga). Producción: https://bulfor-oc-app-theta.vercel.app
-3. Cada respuesta a Seba termina con: qué cambió, si está en rama o en main, link y
-   pasos para probar. Recordarle recargar con **Ctrl+F5** (el navegador guarda la versión vieja).
-4. Cambia solo lo que se pidió; lo demás, propónlo y espera su decisión.
-5. Comentarios del código en español, estilo explicativo (como el código existente).
-6. **Nunca** claves/tokens en el código (el repo es **público**). Solo la anon key de Supabase va en el navegador.
-7. Cambios de base de datos: explicar antes y esperar el "sí". Respaldo
-   `<tabla>_backup_AAAAMMDD` antes de cambios masivos. Tabla nueva = RLS + políticas.
-8. DTE: nunca producción ni documentos reales sin autorización explícita.
+1. Cada tarea va en una rama propia: `claude/<tarea>` o `codex/<tarea>`, desde main actualizado. No hay una rama compartida obligatoria; `etapa2-uso-diario` es una rama histórica/existente, no el destino automático de nuevos cambios.
+2. Todo cambio se propone mediante PR hacia main. **Main solo cambia con aprobación explícita de Seba para el PR y la versión revisada.** No push directo a main, no force-push ni auto-merge.
+3. Leer y mantener `docs/COORDINACION.md`: responsable, rama, alcance, estado y PR. Revisar los PR abiertos al retomar.
+4. **Reparto vigente:** Claude ordena y ajusta la aplicación menú por menú (quita, agrega y organiza según Seba). Codex prepara el flujo y la documentación; no modifica en paralelo esos menús ni la navegación o estilos compartidos sin reparto explícito.
+5. Si dos tareas afectan el mismo archivo grande, acordar bloques/funciones o hacerlas en secuencia. Actualizar la rama con main y comprobar los cambios antes de integrar; conservar el trabajo del otro.
+6. Actualizar esta Bitácora y Pendientes en cada PR, indicando si el cambio está en rama o integrado. Las conversaciones no se sincronizan solas: volver a leer GitHub.
+7. Entregar resumen, rama, PR, vista previa verificada y pasos para probar. Para cambios visuales, recordar Ctrl+F5.
+8. Cambiar solo lo solicitado; comentarios en español. Nunca claves/tokens en el código público; solo anon key de Supabase en el navegador.
+9. Supabase es producción también para las vistas previas, salvo configuración aislada verificada. Cambios de base de datos: explicar antes y esperar autorización específica; respaldo antes de cambios masivos; tablas nuevas con RLS y políticas.
+10. DTE reales, cambio a ambiente productivo y despliegues de funciones: autorización explícita. Las pruebas deben evitar escrituras reales.
+11. Hosting documentado: Vercel, proyecto `bulfor-oc-app`, equipo `bulfor-s-projects`. Obtener el enlace real del despliegue del PR; no deducirlo del nombre de la rama.
+
+
+### Accesos comprobados en esta sesión
+
+- GitHub: conexión operativa; creación de la rama `codex/flujo-coordinacion` verificada el 29-10-2026. Esto no autoriza cambios en main.
+- Supabase: conexión operativa; lectura del proyecto `Bulfor_OC_Project` (`uodijcksuqaaovohutkf`), estado `ACTIVE_HEALTHY`. No se modificaron datos ni esquema. El acceso puede depender de la sesión: comprobarlo al retomar, sin solicitar claves.
+- Vercel: el hosting está documentado, pero no se ha verificado acceso administrativo ni aislamiento de previews desde esta sesión.
 
 ## 3. Arquitectura
 
@@ -156,7 +160,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Documentos**: ficha con OC + botón Mercado Público, caja Cobranza pequeña y caja Estado SII/Envío; productos en tabla cuadriculada con Neto/IVA/Total solo bajo Precio y Total; rechazadas/anuladas = "No se cobra". Columna "Folio".
 - **Cobranza**: "Por factura" es la vista por defecto.
 - **Facturas rechazadas**: pestañas "Por resolver" (por defecto, ignora el mes) y "Resueltas"; se siguen solo rechazos desde 28-10-2026 (`RECHAZADAS_SEGUIR_DESDE`).
-- **FedEx / Chilexpress** (deben verse iguales): lista con columna Fecha (sin separaciones por día ni espacios), Hospital, OT, Factura, Estado, Recibió. "En camino/Con retraso/Con problema" y **"Todos" muestran todos los meses**; solo "Entregados" se ve por mes. Ficha angosta: OT + "Ver en …" (+ "Editar" en FedEx), estado en la esquina superior derecha **sin fechas**, "Qué se envió" plegable (Factura, Orden de compra, Productos, Total; sin fecha de emisión), "Ruta del envío" **horizontal** (Enviado → cada día en ruta con ciudad → Entregado). Sin total de factura, sin "enviado el" bajo el hospital, sin "Ingresado en la app". Si el número no es factura se busca como guía (52).
+- **FedEx / Chilexpress** (deben verse iguales): lista con columna Fecha (sin separaciones por día ni espacios), Hospital, OT, Factura, Estado, Recibió. "En camino/Con retraso/Con problema" y todas las pestañas y búsquedas respetan el mes/año de ingreso seleccionado. Ficha angosta: OT + "Ver en …" (+ "Editar" en FedEx), estado en la esquina superior derecha **sin fechas**, "Qué se envió" plegable (Factura, Orden de compra, Productos, Total; sin fecha de emisión), "Ruta del envío" **horizontal** (Enviado → cada día en ruta con ciudad → Entregado). Sin total de factura, sin "enviado el" bajo el hospital, sin "Ingresado en la app". Si el número no es factura se busca como guía (52).
 - **Elaboración**: vista Lista por defecto (Tablero disponible); lista con columna Fecha (sin separaciones), RM, Pago (Mesón/Transferencia/Por cancelar · Abono) y todo cabe a lo ancho; al crear orden el **pago y el tipo (total/abono) son obligatorios**; al elegir paciente existente se abre "Preparados anteriores" y se copia todo (incluida receta si vigente <1 año) **menos fecha/hora de retiro**; sección Recetario (N° RM) plegable y cerrada por defecto.
 - **Buscar RM**: lista por mes/año (sin "7/30/90 días"), se mantiene "Solo con lote vencido"; columnas Fecha (sin hora), RM, Cantidad, Preparado, Paciente/Hospital (nombre + RUT), Costo MP, Avisos. Nombre del preparado: a mano > factura/guía del RM > misma fórmula; **no mostrar** bajo el nombre de dónde salió (solo en el globo al pasar el mouse). "＋ Ponerle nombre" sugiere nombres con concentración recalculada. Ficha del RM sin contraseña ni N° interno, tablas centradas. Vista "Por preparado" (antes pantalla Preparados): orden por nombre/veces/fecha/costo/forma, filtro por forma, costo última RM vs costo hoy (▲▼ si cambia >5%), últimas 10 RM y "Ver todas".
 - **Consumo y compras**: la ficha de una materia se abre en la ventana grande del centro (como OC), no en panel lateral: arriba **una franja compacta** de 4 celdas (sin "Costo actual": en 449 de 471 materias es igual al último precio; si difiere se avisa "recetario usa $X" bajo el último precio y aparece la línea "Recetario" en el gráfico): último precio (▲▼), promedio 12 meses, último lote (con fecha y proveedor) y vencimiento (aviso Vencido / Vence en N días ≤90 / Vigente). Compras vs consumo con las 6 cifras en una fila y gráfico bajo a todo el ancho: **cerrada, la ficha cabe entera sin desplazarse**; solo se desplaza al abrir las barras. Abajo compras vs consumo y dos barras **plegables, cerradas por defecto**: "Historia de precios" (resumen en la barra; al abrir: cambio en el período, lo más barato y lo más caro con proveedor, gráfico con ejes de precio y meses, un punto por compra coloreado por proveedor y línea punteada del costo actual) y "Últimas compras" (10 más recientes + botón "Ver historial de compras (N)" → ventana con todas (fecha, proveedor, documento, lote, vencimiento, cantidad, precio unitario, costo y total).
@@ -164,17 +168,31 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
-- 29-10-2026 — Excel de reasignación de lotes FIFO v3 (por compra, saldo, lote activo, unidad dudosa)
+- 30-10-2026 — Seba aprobó integrar PR #1 (coordinación completa) y #4 (aviso de rechazadas); #4 ya integrado. Se conserva el cerebro actualizado de main al resolver el cruce documental de #1. El filtro mensual de envíos está integrado por PR #3 desde el 29-10. Entradas anteriores marcadas «propuesto» son el estado histórico de la propuesta.
+
+- 30-10-2026 — **Propuesto en `codex/aviso-rechazadas-pendientes`, pendiente de aprobación:** el aviso de rechazos nuevos usa los mismos casos pendientes y fecha de seguimiento que «Por resolver». Excluye cadenas resueltas, históricos y vistos; espera la lectura de refacturas y actualiza el badge al terminar, evitando avisos transitorios. Sin cambios de datos.
+
+- 29-10-2026 — **Propuesto en `claude/consumo-compras` (PR #2), pendiente de aprobación:** Consumo y compras (entradas siguientes) + Excel de reasignación de lotes FIFO v3 (por compra, saldo, lote activo, unidad dudosa)
 - 29-10-2026 — Excel de reasignación de lotes FIFO v2 + lista de RM para revisar (fuera del repo, entregado a Seba).
 - 29-10-2026 — Consumo y compras: "Compras vs consumo" oculto en Envases e insumos.
 - 29-10-2026 — Consumo y compras: sin "Costo actual" en la ficha; "Consumido" y "Usada en" abren el detalle del consumo del período (Por lote con aviso "usado de más" / Por RM, cada RM se abre). Título de columna ordenada en blanco. Revisión de consumos raros (ver Pendientes).
 - 29-10-2026 — Consumo y compras: ficha compacta (franja de 5 celdas, compras vs consumo en una fila) para que quepa sin scroll.
 - 29-10-2026 — Consumo y compras: Historia de precios y Últimas compras plegables; gráfico de precios rehecho (ejes, proveedores por color, costo actual, tres cifras de resumen).
-- 29-10-2026 — Consumo y compras: ficha centrada estilo OC con último lote y vencimiento (`rec_lotes`), e historial completo de compras en ventana aparte (rama `etapa2-uso-diario`, pendiente de pasar a main).
+- 29-10-2026 — Consumo y compras: ficha centrada estilo OC con último lote y vencimiento (`rec_lotes`), e historial completo de compras en ventana aparte.
+
+- 29-10-2026 — **Propuesto en `codex/envios-por-mes`, pendiente de aprobación:** FedEx y Chilexpress filtran todas las pestañas, contadores y búsquedas por mes/año de ingreso; selector siempre visible. Reemplaza la decisión anterior de mostrar pendientes/Todos de todos los meses. Pruebas con datos simulados, sin escrituras en Supabase.
+- 29-10-2026 — Investigación Chilexpress: soporte informó que la API solo consulta OT creadas mediante integración (inicio 7); OT de sucursal (inicio 5) se consultan por portal. No se implementó la sincronización API.
+
+- 29-10-2026 — **Propuesto en rama `codex/flujo-coordinacion`, pendiente de aprobación e integración:** flujo compartido Claude/Codex, ramas separadas por tarea, PR obligatorio y main solo con aprobación explícita de Seba. Se agrega `docs/COORDINACION.md` y plantilla de PR. Claude mantiene el trabajo menú por menú; Codex se limita a esta configuración documental.
+
 - 29-10-2026 — Buscar RM + Preparados unidos; nombres de preparados desde facturas/guías (tablas `rec_rm_nombres`, `rec_formulas_nombre`, vista `rec_rm_facturado`, función `rec_lista`); paciente (nombre + RUT) desde Pharma_RM (columnas en `rec_rm`, `rec_ingest` v2, agente v2). FedEx: `historial` + ruta horizontal + carga única de movimientos de 68 entregados; arreglo de fechas "solo día". Chilexpress igual a FedEx, botón que copia la OT, 2 envíos cargados a mano (guía 5480 Quillota, factura 22283 Serena). Pestaña "Todos" = todos los meses. Elaboración: lista sin separaciones, pago obligatorio, preparados anteriores del paciente, 10 órdenes antiguas sin pago → "Cancelado en meson".
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] Revisar y aprobar el PR del flujo `codex/flujo-coordinacion`; después, ambos asistentes deben releer las reglas de main antes de continuar. Hasta entonces, consultar la rama del flujo.
+- [ ] Confirmar con Seba/Claude el menú y la rama exactos en curso para completar el registro de coordinación. No inferirlos de ramas históricas.
+- [ ] Verificar en GitHub protección técnica de main y en Vercel el entorno de previews; esta entrega documenta el flujo, no configura esos ajustes externos.
 
 - [ ] **Consumos raros en Consumo y compras** (revisado 29-10-2026, esperando decisión de Seba):
   - Envases e insumos: "Compras vs consumo" **oculto** (decisión de Seba 29-10). Más adelante se agregarán envases/potes/botellas a las preparaciones para poder calcular su consumo.
