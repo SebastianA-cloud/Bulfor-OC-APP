@@ -172,7 +172,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 - 30-10-2026 — **Propuesto en `codex/aviso-rechazadas-pendientes`, pendiente de aprobación:** el aviso de rechazos nuevos usa los mismos casos pendientes y fecha de seguimiento que «Por resolver». Excluye cadenas resueltas, históricos y vistos; espera la lectura de refacturas y actualiza el badge al terminar, evitando avisos transitorios. Sin cambios de datos.
 
-- 29-10-2026 — **Propuesto en `claude/consumo-compras` (PR #2), pendiente de aprobación:** Consumo y compras (entradas siguientes) + Excel de reasignación de lotes FIFO v3 (por compra, saldo, lote activo, unidad dudosa)
+- 30-10-2026 — **Integrado en main mediante PR #2 (aprobado por Seba el 30-10-2026):** Consumo y compras (entradas siguientes) + Excel de reasignación de lotes FIFO v3 (por compra, saldo, lote activo, unidad dudosa)
 - 29-10-2026 — Excel de reasignación de lotes FIFO v2 + lista de RM para revisar (fuera del repo, entregado a Seba).
 - 29-10-2026 — Consumo y compras: "Compras vs consumo" oculto en Envases e insumos.
 - 29-10-2026 — Consumo y compras: sin "Costo actual" en la ficha; "Consumido" y "Usada en" abren el detalle del consumo del período (Por lote con aviso "usado de más" / Por RM, cada RM se abre). Título de columna ordenada en blanco. Revisión de consumos raros (ver Pendientes).
