@@ -4,11 +4,13 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Codex: aviso de rechazadas pendientes, rama `codex/aviso-rechazadas-pendientes`; alcance: `rechazadasNuevas`, actualización del badge y carga de refacturas en index.html. Integrado en main mediante PR #4 el 30-10-2026; no modifica el PR de Recetario de Claude.
+
 | Responsable | Tarea | Rama | Alcance | Estado / PR |
 |---|---|---|---|---|
 | Claude | Ordenar, quitar y agregar elementos menú por menú según Seba | Por confirmar; no cambiar su rama desde otra sesión | Menús y sus pantallas; navegación y estilos que requieran esos ajustes | En curso informado por Seba; menú exacto y PR por confirmar |
-| Codex | Configurar coordinación y contexto compartido | codex/flujo-coordinacion | AGENTS.md, CLAUDE.md, docs/CEREBRO.md, este registro y plantilla de PR | Propuesto en rama; consultar PR de esta rama; pendiente de aprobación de Seba |
-| Codex | Próxima tarea de aplicación | Sin asignar | Por definir con Seba; evitar el alcance activo de Claude | No iniciada |
+| Codex | Configurar coordinación y contexto compartido | codex/flujo-coordinacion | AGENTS.md, CLAUDE.md, docs/CEREBRO.md, este registro y plantilla de PR | Aprobado por Seba el 30-10-2026; integración mediante PR #1 |
+| Codex | Filtrar FedEx y Chilexpress por mes/año | codex/envios-por-mes | index.html: filterFedex y filterChilexpress; cerebro y registro | Integrado en main mediante PR #3 el 29-10-2026 |
 
 ## Ciclo de cada tarea
 
