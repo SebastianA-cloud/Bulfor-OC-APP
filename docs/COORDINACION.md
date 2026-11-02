@@ -4,6 +4,9 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Reparto de Seba (02-11-2026): Claude continúa Pharma_RM/lotes/stocks en `bulfor-recetario`; Codex asume los cambios de interfaz de la app. Esta tarea autoriza exclusivamente Recetario › Alertas de lotes.
+- Codex: propuesta de dos pestañas de Alertas de lotes, rama `codex/alertas-lotes-ux`; alcance: HTML de `page-rec-alertas`, estado y funciones `recAlertas*`/historial del mismo bloque, estilos solo bajo `#page-rec-alertas`, documentación. En preparación, sin cambios en datos ni main.
+
 - Codex: aviso de rechazadas pendientes, rama `codex/aviso-rechazadas-pendientes`; alcance: `rechazadasNuevas`, actualización del badge y carga de refacturas en index.html. Integrado en main mediante PR #4 el 30-10-2026; no modifica el PR de Recetario de Claude.
 
 | Responsable | Tarea | Rama | Alcance | Estado / PR |
