@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Codex · codex/buscar-orden-compra · etiqueta y buscador de Órdenes de compra en index.html · propuesta para revisión.
+
 - Codex · `codex/contraste-submenus` · Mejorar la visibilidad del desplegable de escritorio. Alcance: `#nav-submenu` en `styles.css` y documentación. Propuesto para revisión en PR.
 
 - Reparto de Seba (02-11-2026): Claude continúa Pharma_RM/lotes/stocks en `bulfor-recetario`; Codex asume los cambios de interfaz de la app. Esta tarea autoriza exclusivamente Recetario › Alertas de lotes.

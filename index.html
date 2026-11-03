@@ -80,7 +80,7 @@
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-oc-modulo">
-        <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Listado de OC</span></div>
+        <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Buscar orden de compra</span></div>
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
       </div>
@@ -366,8 +366,16 @@
   <!-- OC PAGE -->
   <div class="page" id="page-oc">
     <div class="page-header">
-      <div class="page-title">Órdenes de compra <span class="info-tip" tabindex="0" role="note" data-tip="Órdenes de compra que llegan desde Mercado Público. Haz clic en una para ver sus productos, sus facturas y de qué compra ágil o licitación viene. El buscador busca en todas las fechas.">i</span></div>
+      <div class="page-title">Buscar orden de compra <span class="info-tip" tabindex="0" role="note" data-tip="Órdenes de compra que llegan desde Mercado Público. Haz clic en una para ver sus productos, sus facturas y de qué compra ágil o licitación viene. El buscador busca en todas las fechas.">i</span></div>
       <div class="page-sub" id="oc-subtitle">Cargando datos…</div>
+    </div>
+    <label for="oc-search" style="display:block;font-weight:600;margin-bottom:6px">Buscar por número de orden</label>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input type="search" id="oc-search" placeholder="Número de orden, hospital, RUT o producto…" aria-describedby="oc-search-scope" oninput="filterOC()">
+      </div>
+      <span id="oc-search-scope" role="status" hidden>Resultados de todas las fechas</span>
     </div>
     <div class="fpp-toolbar-top">
       <div class="fpp-period">
@@ -379,10 +387,6 @@
       <div class="fpp-status-tabs" id="oc-atajos"></div>
     </div>
     <div class="toolbar">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="oc-search" placeholder="Buscar N° OC, COT, hospital, RUT o producto (en todas las fechas)…" oninput="filterOC()">
-      </div>
       <select id="oc-region" onchange="filterOC()"><option value="">Todas las regiones</option></select>
       <select id="oc-tipo" onchange="filterOC()"><option value="">Compra ágil y licitación</option><option value="AG">Compra ágil</option><option value="SE">Licitación</option></select>
       <button class="page-btn" id="oc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosOC()">✕ Limpiar filtros</button>
@@ -1949,7 +1953,7 @@ function rutDeHospital(nombreCrudo) {
   return mapaRutPorHospital[nombreCrudo] || mapaRutPorHospital[nombreHosp(nombreCrudo)] || '';
 }
 
-// ─── Listado de OC ─────────────────────────────────────────────────────────
+// ─── Buscar orden de compra ─────────────────────────────────────────────────────────
 // Sin texto en el buscador se ve el mes elegido; con texto se busca en TODAS
 // las fechas (así nunca hay que acordarse de cambiar a "Todo"). Los atajos de
 // arriba filtran por estado de facturación.
@@ -2018,6 +2022,7 @@ function ocBaseActual() {
 
 function filterOC() {
   const q = document.getElementById('oc-search').value;
+  document.getElementById('oc-search-scope').hidden = !q.trim();
   const reg = document.getElementById('oc-region').value;
   const tipo = document.getElementById('oc-tipo').value;
   const base = ocBaseActual().filter(r => {
@@ -18225,7 +18230,7 @@ showPage = function(id, el) {
 // idéntico para todos los botones, aunque algunos solo tengan un ítem.
 const SUBMENUS = {
   'oc-modulo': { items: [
-    { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Listado de OC', page: 'oc' },
+    { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Buscar orden de compra', page: 'oc' },
     { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
   ] },

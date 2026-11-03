@@ -168,6 +168,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- Propuesta en rama codex/buscar-orden-compra. Se prioriza la búsqueda por número y se muestra su alcance al escribir.
+
 - 03-11-2026 — **Propuesto en `codex/contraste-submenus`:** borde de marca, sombra más visible, texto de mayor contraste y resaltado al pasar el puntero o enfocar una opción del desplegable de escritorio.
 
 - 03-11-2026 — En rama `codex/alertas-lotes-ux`: Registros por revisar (Pendientes/Revisados) y Próximos vencimientos (30/60/90 días), búsqueda, bases internas y Excel. Los usos recientes no confirman existencias. Pruebas simuladas y revisión móvil. Pendiente aprobación de Seba.
