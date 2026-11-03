@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Codex · propuesta en `codex/hospitales-ux` · Hospitales. Apertura de ficha con teclado, quitar región conservando búsqueda y aclarar total en órdenes con IVA. Pendiente de revisión.
+
 - Codex · propuesta en `codex/mejorar-busqueda-oc` · Buscar orden de compra. Coincidencia exacta, ayuda bajo el campo y limpieza de filtros conservando el texto. Pendiente de revisión.
 
 - Codex · codex/buscar-orden-compra · etiqueta y buscador de Órdenes de compra en index.html · propuesta para revisión.

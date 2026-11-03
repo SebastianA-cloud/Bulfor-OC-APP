@@ -1887,3 +1887,22 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Acceso a la ficha desde el listado de hospitales */
+#page-hospitales .hosp-abrir-ficha {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+#page-hospitales .hosp-abrir-ficha:hover { text-decoration: underline; }
+#page-hospitales .hosp-abrir-ficha:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
