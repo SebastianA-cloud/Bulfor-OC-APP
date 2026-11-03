@@ -612,17 +612,19 @@
   <div class="page" id="page-hospitales">
     <div class="page-header">
       <div class="page-title">Hospitales</div>
-      <div class="page-sub">Resumen de ventas por cliente</div>
+      <div class="page-sub">Busca un hospital para ver sus órdenes de compra y los productos que compra.</div>
     </div>
+    <label for="hosp-search" style="display:block;font-weight:600;margin-bottom:6px">Buscar hospital</label>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="hosp-search" placeholder="Buscar hospital, región, comuna…" oninput="filterHosp()">
+        <input type="text" id="hosp-search" placeholder="Nombre o comuna…" aria-describedby="hosp-search-help" oninput="filterHosp()">
       </div>
       <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
       <button class="page-btn" id="hosp-limpiar" style="padding:8px 14px;white-space:nowrap" hidden onclick="quitarRegionHosp()">Quitar filtro de región</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="abrirNormalizacionHospitales()" title="Unificar nombres distintos que corresponden al mismo hospital"><i class="ti ti-settings" aria-hidden="true"></i> Normalizar nombres</button>
     </div>
+    <p id="hosp-search-help" style="margin:0 0 12px;color:var(--text-2)">Escribe parte del nombre o una comuna. Los resultados se actualizan al instante.</p>
     <div class="table-card">
       <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="hosp-info"></div>
       <div class="alfabetico-wrap">
