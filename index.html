@@ -373,10 +373,11 @@
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon" aria-hidden="true">🔍</span>
-        <input type="search" id="oc-search" placeholder="Número de orden, hospital, RUT o producto…" aria-describedby="oc-search-scope" oninput="filterOC()">
+        <input type="search" id="oc-search" placeholder="Número de orden, hospital, RUT o producto…" aria-describedby="oc-search-help oc-search-scope" oninput="filterOC()" onkeydown="ocBuscarConEnter(event)">
       </div>
       <span id="oc-search-scope" role="status" hidden>Resultados de todas las fechas</span>
     </div>
+    <p id="oc-search-help" style="margin:0 0 12px;color:var(--text-2)">Escribe o pega el número. Los resultados se actualizan al instante.</p>
     <div class="fpp-toolbar-top">
       <div class="fpp-period">
         <button class="fpp-period-btn" onclick="ocCambiarMes(-1)" title="Mes anterior">‹</button>
@@ -2035,13 +2036,30 @@ function filterOC() {
   document.getElementById('oc-atajos').innerHTML = OC_ATAJOS.map(([k, l]) =>
     `<button class="fpp-status-tab${ocAtajo === k ? ' active' : ''}" onclick="ocAtajo='${k}';filterOC()">${l} <b>${conteo[k]}</b></button>`).join('');
   ocF = ocAtajo === 'todas' ? base : base.filter(r => ocFacturacion(r) === ocAtajo);
-  document.getElementById('oc-limpiar').style.display = (q || reg || tipo || ocAtajo !== 'todas') ? 'inline-flex' : 'none';
+  const numero = q.trim().toUpperCase();
+  const esExacta = r => !!numero && String(r.codigooc || '').toUpperCase() === numero;
+  ocF = [...ocF.filter(esExacta), ...ocF.filter(r => !esExacta(r))];
+  const filtrosActivos = !!(reg || tipo || ocAtajo !== 'todas');
+  const limpiar = document.getElementById('oc-limpiar');
+  limpiar.hidden = !filtrosActivos;
+  limpiar.style.display = filtrosActivos ? 'inline-flex' : 'none';
+  limpiar.textContent = numero ? 'Quitar filtros y mantener la búsqueda' : 'Quitar filtros';
   updateStats(base);
   ocPage = 1; renderOC();
 }
 
+function ocBuscarConEnter(event) {
+  if (event.key !== 'Enter' || event.isComposing || event.repeat) return;
+  const numero = event.currentTarget.value.trim().toUpperCase();
+  if (!numero) return;
+  const exactas = ocF.filter(r => String(r.codigooc || '').toUpperCase() === numero);
+  if (exactas.length === 1) {
+    event.preventDefault();
+    ocAbrir(exactas[0].codigooc);
+  }
+}
+
 function limpiarFiltrosOC() {
-  document.getElementById('oc-search').value = '';
   document.getElementById('oc-region').value = '';
   document.getElementById('oc-tipo').value = '';
   ocAtajo = 'todas';
@@ -2475,11 +2493,16 @@ function renderOC() {
   document.getElementById('oc-info').textContent = `${total.toLocaleString('es-CL')} órdenes`;
   renderPages('oc-pages', total, pages, ocPage, 'goOC');
   if (!slice.length) {
-    const hayFiltro = document.getElementById('oc-limpiar').style.display !== 'none';
-    document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos órdenes con estos filtros.' : 'Todavía no hay órdenes registradas.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosOC()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td></tr>`;
+    const hayFiltro = !document.getElementById('oc-limpiar').hidden;
+    const busca = !!document.getElementById('oc-search').value.trim();
+    const mensaje = hayFiltro ? 'No encontramos órdenes con estos filtros.' : busca
+      ? 'No encontramos órdenes. Revisa el número o prueba con el nombre del hospital.'
+      : 'No hay órdenes en el período seleccionado.';
+    document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>${mensaje}</p>${hayFiltro ? `<button class="page-btn" onclick="limpiarFiltrosOC()">${busca ? 'Quitar filtros y mantener la búsqueda' : 'Quitar filtros'}</button>` : ''}</td></tr>`;
     return;
   }
   const abierta = panelPila[0]?.ocCodigo;
+  const numero = document.getElementById('oc-search').value.trim().toUpperCase();
   document.getElementById('oc-body').innerHTML = slice.map((r) => {
     const descripcion = productoPorOC[r.codigooc] || r.nombreoc || '';
     const origen = ocOrigen(r);
@@ -2488,7 +2511,7 @@ function renderOC() {
     const region = (r.region||'').replace(/^Región (de la |de los |del |de )?/i, '').replace('Metropolitana de Santiago', 'Metropolitana');
     return `
     <tr class="oc-fila${abierta === r.codigooc ? ' fila-abierta' : ''}" onclick="ocAbrir('${cod}')">
-      <td data-label="N° OC"><span class="mono oc-cod">${escapeHtml(r.codigooc||'')}</span>${origen ? `<small class="oc-origen">${origen.tipo === 'COT' ? 'COT' : 'Lic.'} ${escapeHtml(origen.codigo)}</small>` : ''}</td>
+      <td data-label="N° OC"><span class="mono oc-cod">${escapeHtml(r.codigooc||'')}</span>${numero && String(r.codigooc || '').toUpperCase() === numero ? '<small class="oc-origen">Coincidencia exacta</small>' : ''}${origen ? `<small class="oc-origen">${origen.tipo === 'COT' ? 'COT' : 'Lic.'} ${escapeHtml(origen.codigo)}</small>` : ''}</td>
       <td data-label="Fecha" class="col-sec" style="white-space:nowrap;color:var(--text-2)">${fDate(r.fechaenvio || r.fechaoc)}</td>
       <td data-label="Hospital" class="oc-hosp"><span>${escapeHtml(nombreHosp(r.hospital)||'')}</span><small>${escapeHtml(region)}</small></td>
       <td data-label="Descripción" class="col-sec" title="${escapeHtml(descripcion)}"><div class="oc-desc">${escapeHtml(descripcion)}</div></td>
