@@ -620,7 +620,7 @@
         <input type="text" id="hosp-search" placeholder="Buscar hospital, región, comuna…" oninput="filterHosp()">
       </div>
       <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
-      <button class="page-btn" id="hosp-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosHosp()">✕ Limpiar filtros</button>
+      <button class="page-btn" id="hosp-limpiar" style="padding:8px 14px;white-space:nowrap" hidden onclick="quitarRegionHosp()">Quitar filtro de región</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap;margin-left:auto" onclick="abrirNormalizacionHospitales()" title="Unificar nombres distintos que corresponden al mismo hospital"><i class="ti ti-settings" aria-hidden="true"></i> Normalizar nombres</button>
     </div>
     <div class="table-card">
@@ -630,7 +630,7 @@
           <table style="margin:0">
             <thead><tr>
               <th>Hospital</th><th>Región</th><th>N° OC</th>
-              <th>Primera compra</th><th>Última compra</th><th>Total comprado</th>
+              <th>Primera compra</th><th>Última compra</th><th>Total en órdenes (con IVA)</th>
             </tr></thead>
             <tbody id="hosp-body"></tbody>
           </table>
@@ -2348,12 +2348,11 @@ function filterHosp() {
     const s = `${nombreHosp(r.hospital)} ${r.hospital} ${r.region} ${r.comuna}`;
     return coincideBusqueda(s, q) && (!reg || r.region===reg);
   });
-  document.getElementById('hosp-limpiar').style.display = (q || reg) ? 'inline-flex' : 'none';
+  document.getElementById('hosp-limpiar').hidden = !reg;
   hospPage = 1; renderHosp();
 }
 
-function limpiarFiltrosHosp() {
-  document.getElementById('hosp-search').value = '';
+function quitarRegionHosp() {
   document.getElementById('hosp-region').value = '';
   filterHosp();
 }
@@ -5209,11 +5208,15 @@ function abrirGraficoPagoProv(id) {
 
 function renderHosp() {
   document.getElementById('hosp-info').textContent = `${hospF.length.toLocaleString('es-CL')} hospitales`;
-  const hayFiltro = document.getElementById('hosp-limpiar').style.display !== 'none';
-  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos hospitales con estos filtros.' : 'No encontramos hospitales.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosHosp()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
+  const hayRegion = !!document.getElementById('hosp-region').value;
+  const busca = !!document.getElementById('hosp-search').value.trim();
+  const mensaje = hayRegion ? 'No encontramos hospitales en la región seleccionada.' : busca
+    ? 'No encontramos hospitales. Prueba con parte del nombre o con la comuna.'
+    : 'No hay hospitales en el listado.';
+  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${mensaje}</p>${hayRegion ? '<button type="button" class="page-btn" onclick="quitarRegionHosp()">Quitar filtro de región</button>' : ''}</td>`;
   renderTablaAlfabetica('hosp-body', 'hosp-jump', hospF, r => nombreHosp(r.hospital) || r.hospital || '',
     (r, idx) => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs(window.__alfabeticoOrden['hosp-body'][${idx}].hospital)">
-      <td style="font-weight:500;max-width:240px;color:var(--accent)">${escapeHtml(nombreHosp(r.hospital)||'—')} ↗</td>
+      <td style="max-width:240px"><button type="button" class="hosp-abrir-ficha" onclick="event.stopPropagation();navReset();openHospitalOCs(window.__alfabeticoOrden['hosp-body'][${idx}].hospital)">${escapeHtml(nombreHosp(r.hospital)||'—')} <i class="ti ti-chevron-right" aria-hidden="true"></i></button></td>
       <td style="font-size:12px;color:var(--text-2)">${escapeHtml((r.region||'').replace('Región ',''))}</td>
       <td style="text-align:right;font-weight:500">${(r.numerooc||0).toLocaleString('es-CL')}</td>
       <td style="color:var(--text-2);font-size:12px">${fDate(r.primeracompra)}</td>
@@ -13578,7 +13581,7 @@ function fichaHospital(hospital) {
     sub: lugar,
     resumen: `<div class="hosp-cifras">
         <div><span>Órdenes de compra</span><b>${ocs.length.toLocaleString('es-CL')}</b></div>
-        <div><span>Total comprado (con IVA)</span><b>${clp(total)}</b></div>
+        <div><span>Total en órdenes (con IVA)</span><b>${clp(total)}</b></div>
         <div><span>Primera compra</span><b>${fDate(datos.primeracompra)}</b></div>
         <div><span>Última compra</span><b>${fDate(datos.ultimacompra)}</b></div>
       </div>`,
