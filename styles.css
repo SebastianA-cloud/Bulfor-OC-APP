@@ -749,6 +749,9 @@
   #nav-submenu .nav-back, #nav-submenu .nav-divider, #nav-submenu .nav-icon { display: none; }
   #nav-submenu .nav-item { display: flex; align-items: center; margin-bottom: 0; padding: 8px 12px; border-radius: 8px;
     font-size: 14px; font-weight: 600; color: var(--text); white-space: normal; cursor: pointer; }
+  #nav-submenu .nav-item + .nav-item { position: relative; }
+  #nav-submenu .nav-item + .nav-item::before { content: ''; position: absolute; top: -2px;
+    left: 12px; right: 12px; border-top: 1px solid #DCD4CB; pointer-events: none; }
   #nav-submenu .nav-item:hover,
   #nav-submenu .nav-item:focus-visible { background: var(--accent-light); color: var(--text); }
   #nav-submenu .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
