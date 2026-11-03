@@ -168,6 +168,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 03-11-2026 — **Propuesto en `codex/contraste-submenus`:** borde de marca, sombra más visible, texto de mayor contraste y resaltado al pasar el puntero o enfocar una opción del desplegable de escritorio.
+
 - 03-11-2026 — En rama `codex/alertas-lotes-ux`: Registros por revisar (Pendientes/Revisados) y Próximos vencimientos (30/60/90 días), búsqueda, bases internas y Excel. Los usos recientes no confirman existencias. Pruebas simuladas y revisión móvil. Pendiente aprobación de Seba.
 
 - 30-10-2026 — Seba aprobó integrar PR #1 (coordinación completa) y #4 (aviso de rechazadas); #4 ya integrado. Se conserva el cerebro actualizado de main al resolver el cruce documental de #1. El filtro mensual de envíos está integrado por PR #3 desde el 29-10. Entradas anteriores marcadas «propuesto» son el estado histórico de la propuesta.
@@ -191,6 +193,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] Revisar en vista previa el contraste del desplegable de escritorio antes de aprobar su integración.
 
 - [ ] Revisar y aprobar el PR del flujo `codex/flujo-coordinacion`; después, ambos asistentes deben releer las reglas de main antes de continuar. Hasta entonces, consultar la rama del flujo.
 - [ ] Confirmar con Seba/Claude el menú y la rama exactos en curso para completar el registro de coordinación. No inferirlos de ramas históricas.
