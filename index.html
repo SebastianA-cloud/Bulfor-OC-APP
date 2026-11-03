@@ -13574,7 +13574,9 @@ function fichaHospital(hospital) {
   if (!ocs.length) return null;
   const datos = hosp.find(h => h.hospital === hospital) || {};
   const grupos = hospAgruparProductos(ocs);
-  window.__hospFicha = { hospital, grupos };
+  const ficha = { hospital, grupos, vista: 'productos', consultas: { productos: '', ordenes: '' },
+    ordenes: [...ocs].sort((a, b) => String(b.fechaenvio || b.fechaoc || '').localeCompare(String(a.fechaenvio || a.fechaoc || ''))) };
+  window.__hospFicha = ficha;
   const total = ocs.reduce((t, r) => t + (Number(r.totaloc) || 0), 0);
   const lugar = [datos.comuna, datos.region].filter(x => x && x.trim() !== '*').join(' · ');
   return {
@@ -13587,32 +13589,66 @@ function fichaHospital(hospital) {
         <div><span>Primera compra</span><b>${fDate(datos.primeracompra)}</b></div>
         <div><span>Última compra</span><b>${fDate(datos.ultimacompra)}</b></div>
       </div>`,
-    cuerpo: `<div class="panel-h">Productos que compra <b class="hosp-cuenta">${grupos.length}</b></div>
-      <div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto o N° de OC…" oninput="hospFiltrarProductos(this.value)"></div>
-      <div class="hosp-productos" id="hosp-productos">${grupos.map((g, i) => `
-        <button class="hosp-producto" data-i="${i}" onclick="panelAbrir(fichaHospitalProducto(${i}), true)">
-          <span class="hosp-producto-nombre">${escapeHtml(g.nombre)}${g.variantes > 1 ? ` <small>${g.variantes} nombres distintos</small>` : ''}</span>
-          <span class="hosp-producto-oc"><b>${g.listaOC.length}</b> ${g.listaOC.length === 1 ? 'orden' : 'órdenes'}</span>
-          <span class="hosp-producto-fecha">Última: ${fDate(g.ultima)}</span>
-          <i class="ti ti-chevron-right"></i>
-        </button>`).join('')}
-        <div class="panel-vacio" id="hosp-sin-resultados" style="display:none">No hay productos ni OC con esa búsqueda.</div>
-      </div>`,
+    get cuerpo() {
+      const volver = document.getElementById('page-hospitales').classList.contains('active')
+        ? '<button type="button" class="panel-volver" onclick="panelCerrar()">← Volver a Hospitales</button>' : '';
+      const pestañas = [['productos', 'Productos que compra'], ['ordenes', 'Órdenes de compra']];
+      return `${volver}<div class="fpp-status-tabs" role="group" aria-label="Contenido de la ficha del hospital">
+        ${pestañas.map(([vista, label]) => `<button type="button" class="fpp-status-tab${ficha.vista === vista ? ' active' : ''}" aria-pressed="${ficha.vista === vista}" onclick="hospCambiarVista('${vista}')">${label}</button>`).join('')}
+      </div><div id="hosp-ficha-vista">${hospVistaHtml(ficha)}</div>`;
+    },
   };
 }
 
-function hospFiltrarProductos(q) {
-  const f = window.__hospFicha;
-  if (!f) return;
-  let visibles = 0;
-  document.querySelectorAll('#hosp-productos .hosp-producto').forEach(el => {
-    const g = f.grupos[Number(el.dataset.i)];
-    const ok = coincideBusqueda(`${g.nombre} ${Object.keys(g.nombres).join(' ')} ${g.listaOC.join(' ')}`, q);
-    el.style.display = ok ? '' : 'none';
-    if (ok) visibles++;
+function hospCambiarVista(vista) {
+  const ficha = window.__hospFicha;
+  if (ficha.vista === vista) return;
+  ficha.vista = vista;
+  const botones = document.querySelectorAll('#panel-lateral [aria-label="Contenido de la ficha del hospital"] button');
+  botones.forEach((boton, i) => {
+    const activo = i === (vista === 'productos' ? 0 : 1);
+    boton.classList.toggle('active', activo);
+    boton.setAttribute('aria-pressed', activo);
   });
-  const vacio = document.getElementById('hosp-sin-resultados');
-  if (vacio) vacio.style.display = visibles ? 'none' : '';
+  document.getElementById('hosp-ficha-vista').innerHTML = hospVistaHtml(ficha);
+}
+
+function hospVistaHtml(ficha) {
+  const productos = ficha.vista === 'productos';
+  const q = ficha.consultas[ficha.vista];
+  return `<label for="hosp-ficha-buscar" class="panel-h">${productos ? 'Buscar producto' : 'Buscar por número de orden'}</label>
+    <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true">🔍</span>
+      <input id="hosp-ficha-buscar" type="text" value="${escapeHtml(q)}" oninput="hospBuscarEnFicha(this.value)">
+    </div>
+    <div id="hosp-ficha-resultados">${hospResultadosHtml(ficha)}</div>`;
+}
+
+function hospBuscarEnFicha(q) {
+  const ficha = window.__hospFicha;
+  ficha.consultas[ficha.vista] = q;
+  document.getElementById('hosp-ficha-resultados').innerHTML = hospResultadosHtml(ficha);
+}
+
+function hospResultadosHtml(ficha) {
+  const q = ficha.consultas[ficha.vista];
+  if (ficha.vista === 'productos') {
+    const filas = ficha.grupos.map((g, i) => {
+      if (!coincideBusqueda(`${g.nombre} ${Object.keys(g.nombres).join(' ')}`, q)) return '';
+      return `<button type="button" class="hosp-producto" onclick="panelAbrir(fichaHospitalProducto(${i}), true)">
+        <span class="hosp-producto-nombre">${escapeHtml(g.nombre)}${g.variantes > 1 ? ` <small>${g.variantes} nombres distintos</small>` : ''}</span>
+        <span class="hosp-producto-oc"><b>${g.listaOC.length}</b> ${g.listaOC.length === 1 ? 'orden' : 'órdenes'}</span>
+        <span class="hosp-producto-fecha">Última: ${fDate(g.ultima)}</span>
+        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      </button>`;
+    }).join('');
+    return filas ? `<div class="hosp-productos">${filas}</div>` : '<div class="panel-vacio">No hay productos con esa búsqueda.</div>';
+  }
+  const filas = ficha.ordenes.filter(r => coincideBusqueda(String(r.codigooc || ''), q));
+  if (!filas.length) return '<div class="panel-vacio">No hay órdenes con ese número.</div>';
+  return `<table class="hosp-oc-tabla"><thead><tr><th>Número de orden</th><th>Fecha</th><th>Facturación</th><th>Total (con IVA)</th></tr></thead><tbody>
+    ${filas.map(r => `<tr><td><button type="button" class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
+      <td>${fDate(r.fechaenvio || r.fechaoc)}</td><td>${OC_FACT_BADGE[ocFacturacion(r)] || ''}</td><td class="oc-monto">${clp(r.totaloc)}</td></tr>`).join('')}
+    </tbody></table>`;
 }
 
 // Filtra la lista de OC de un producto (por N°, fecha o monto).
