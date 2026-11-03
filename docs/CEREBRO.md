@@ -168,6 +168,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- Codex · propuesta en `codex/estadisticas-ux` · Estadísticas de órdenes de compra. Informes agrupados, controles de teclado y alcance de los datos visible. Pendiente de revisión.
+
 - Codex · propuesta en `codex/hospitales-ux` · Hospitales. Apertura de ficha con teclado, quitar región conservando búsqueda y aclarar total en órdenes con IVA. Pendiente de revisión.
 
 - Codex · propuesta en `codex/mejorar-busqueda-oc` · Buscar orden de compra. Coincidencia exacta, ayuda bajo el campo y limpieza de filtros conservando el texto. Pendiente de revisión.
