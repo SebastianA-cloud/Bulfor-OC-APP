@@ -812,23 +812,50 @@
   </div>
 
   <div class="page" id="page-rec-alertas">
+    <style>
+      #page-rec-alertas .rec-al-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}
+      #page-rec-alertas .rec-al-controls .search-box{flex:1;min-width:200px}
+      #page-rec-alertas .rec-al-controls input{width:100%;box-sizing:border-box;height:48px;border:1px solid var(--border);border-radius:12px;background:var(--surface,#fff);padding:0 16px;font:inherit;color:var(--text)}
+      #page-rec-alertas label{display:flex;gap:8px;align-items:center;color:var(--text-2);font-size:13px}
+      #page-rec-alertas .rec-al-tabla{overflow-x:auto}
+      #page-rec-alertas table{width:100%}
+      #page-rec-alertas .rec-al-tabla td{white-space:normal;vertical-align:middle}
+      #page-rec-alertas .rec-al-link{border:0;background:none;color:var(--accent);font:inherit;cursor:pointer;padding:3px 0;text-align:inherit;text-decoration:underline;text-underline-offset:3px}
+      #page-rec-alertas .rec-al-tabla small{display:block;color:var(--text-3);font-size:12px}
+      #page-rec-alertas .rec-al-subtabs{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0;color:var(--text-2);font-size:13px}
+      #page-rec-alertas .rec-al-subtabs .fpp-status-tab{border:1px solid var(--border);border-radius:8px}
+      #page-rec-alertas .rec-al-rms{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+      #page-rec-alertas .rec-al-preventivo{border:1px solid var(--border);border-radius:12px;margin-top:20px;padding:16px;background:var(--surface,#fff)}
+      #page-rec-alertas .rec-al-preventivo summary{cursor:pointer;font-weight:600;color:var(--amber)}
+      #page-rec-alertas .rec-al-preventivo p{font-size:13px;color:var(--text-2);margin:14px 0}
+      #page-rec-alertas .page-btn:disabled{opacity:.5;cursor:default}
+      @media(max-width:650px){#page-rec-alertas .rec-al-controls{align-items:stretch}#page-rec-alertas .rec-al-controls .search-box{flex-basis:100%}#page-rec-alertas .toolbar{align-items:stretch}#page-rec-alertas .fpp-status-tabs{max-width:100%;overflow:auto}#page-rec-alertas table{min-width:0}#page-rec-alertas .rec-al-tabla{overflow:visible}#page-rec-alertas .rec-al-rms{justify-content:flex-end}}
+    </style>
     <div class="page-header">
       <div class="page-title">Alertas de lotes</div>
-      <div class="page-sub">Lotes vencidos registrados al elaborar y lotes en uso por vencer</div>
+      <div class="page-sub">Revisa los registros y anticipa vencimientos con la información del recetario</div>
     </div>
     <div id="rec-estado-alertas"></div>
     <div class="toolbar">
       <div class="fpp-status-tabs" id="rec-alertas-tabs"></div>
-      <span id="rec-alertas-dias-wrap" style="display:none">
-        <select onchange="recAlertasSetDias(this.value)">
-          <option value="30">Últimos 30 días</option>
-          <option value="90" selected>Últimos 90 días</option>
-          <option value="365">Último año</option>
+      <label id="rec-alertas-dias-wrap">Período
+        <select aria-label="Período de registros" onchange="recAlertasSetDias(this.value)">
+          <option value="30">Últimos 30 días</option><option value="90" selected>Últimos 90 días</option><option value="365">Último año</option>
         </select>
-      </span>
-      <button class="page-btn" style="white-space:nowrap" onclick="recHistorial=null;recAlertasInit(true)">↻ Actualizar</button>
+      </label>
+      <label id="rec-alertas-horizonte-wrap" style="display:none">Vencen en
+        <select aria-label="Horizonte de vencimientos" onchange="recAlertasHorizonte=Number(this.value);recAlertasRender()">
+          <option value="30">30 días</option><option value="60" selected>60 días</option><option value="90">90 días</option>
+        </select>
+      </label>
+      <button class="page-btn" onclick="recHistorial=null;recAlertasInit(true)">↻ Actualizar</button>
     </div>
-    <div id="rec-alertas-cont"></div>
+    <div class="rec-al-controls">
+      <div class="search-box"><input id="rec-alertas-buscar" aria-label="Buscar por materia o lote" placeholder="Buscar por materia prima o lote…" oninput="recAlertasFiltrar()"></div>
+      <label>Mostrar <select id="rec-alertas-bases" onchange="recAlertasFiltrar()"><option value="todas">Todas las materias</option><option value="materias">Sin bases internas</option><option value="internas">Solo bases internas</option></select></label>
+      <button class="page-btn" id="rec-alertas-exportar" onclick="recAlertasExportar()" disabled>Descargar Excel</button>
+    </div>
+    <div id="rec-alertas-cont" aria-live="polite"></div>
   </div>
 
   <div class="page" id="page-rec-materias">
@@ -15271,7 +15298,7 @@ function descargarPedidoExcel() {
 // hospital); sin direcciones, teléfonos ni datos de médicos.
 let recResumen = null;
 let recBuscarData = null;
-let recAlertasTab = 'corregir', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
+let recAlertasTab = 'historial', recAlertasDias = 90, recLotesUso = null, recHistorial = null, recLoteActivo = {};
 // RM con lote vencido que alguien marcó como revisados (tabla rec_lotes_revisados):
 // se ocultan del historial. Clave "id_rp_detalle|lote".
 let recRevisados = new Set(), recVerRevisados = false, recHistGrupos = [], recHistAbiertos = new Set();
@@ -15690,176 +15717,177 @@ async function recAbrirRm(idDetalle) {
 }
 
 // ── ALERTAS DE LOTES ───────────────────────────────────────────────────────
-async function recAlertasInit(forzar) {
-  recPintarEstado('rec-estado-alertas');
-  if (!recLotesUso || forzar) {
-    document.getElementById('rec-alertas-cont').innerHTML = `<div class="table-card"><div class="empty"><p>Revisando lotes…</p></div></div>`;
-    recLotesUso = await recRpc('rec_lotes_en_uso', { p_dias: 120 });
-    // Si el lote sigue activo en Pharma_RM (dato que sincroniza el agente):
-    // el aviso preventivo se apaga en cuanto el lote vencido se desactiva.
-    const ids = [...new Set(recLotesUso.filter(l => l.id_lote && l.dias_para_vencer !== null && l.dias_para_vencer < 0).map(l => l.id_lote))];
-    recLoteActivo = {};
-    if (ids.length) {
-      const filas = await fetchAll('rec_lotes', `select=id_lote,activo&id_lote=in.(${ids.join(',')})`);
-      (Array.isArray(filas) ? filas : []).forEach(f => { recLoteActivo[f.id_lote] = f.activo; });
-    }
+// Alertas: registros históricos y prevención usan alcances distintos.
+// El uso reciente y el estado activo NO confirman existencia física.
+let recAlertasHorizonte = 60, recAlertasBusqueda = '', recAlertasBases = 'todas';
+let recAlertasCarga = 0, recAlertasExportarFilas = [];
+let recAlertasCargando = false;
+// Lectura paginada propia: una carga fallida no puede parecer "sin alertas".
+async function recAlertasLeer(tabla, query) {
+  const filas = [];
+  for (let inicio = 0; ; inicio += 1000) {
+    const res = await sb(`${tabla}?${query}`, { headers: { Range: `${inicio}-${inicio + 999}` } });
+    if (!res.ok) throw new Error('No se pudieron leer las alertas.');
+    const pagina = await res.json();
+    if (!Array.isArray(pagina)) throw new Error('Respuesta de alertas no válida.');
+    filas.push(...pagina);
+    if (pagina.length < 1000) return filas;
   }
-  if (recAlertasTab === 'historial' && (!recHistorial || forzar)) await recCargarHistorial();
-  recAlertasRender();
 }
-
-async function recCargarHistorial() {
+async function recAlertasInit(forzar) {
+  const carga = ++recAlertasCarga;
+  recAlertasCargando = true;
+  recAlertasExportarFilas = [];
+  document.getElementById('rec-alertas-exportar').disabled = true;
+  recPintarEstado('rec-estado-alertas');
+  const cont = document.getElementById('rec-alertas-cont');
+  cont.innerHTML = '<div class="table-card"><div class="empty"><p>Revisando registros y vencimientos…</p></div></div>';
+  try {
+    if (!recLotesUso || forzar) {
+      const lotes = await recAlertasLeer('rpc/rec_lotes_en_uso', 'p_dias=120');
+      if (carga !== recAlertasCarga) return;
+      const ids = [...new Set(lotes.filter(l => l.id_lote && l.dias_para_vencer !== null && Number(l.dias_para_vencer) < 0).map(l => l.id_lote))];
+      const activos = ids.length ? await recAlertasLeer('rec_lotes', `select=id_lote,activo&id_lote=in.(${ids.join(',')})`) : [];
+      if (carga !== recAlertasCarga) return;
+      recLotesUso = lotes;
+      recLoteActivo = Object.fromEntries((Array.isArray(activos) ? activos : []).map(x => [x.id_lote, x.activo]));
+    }
+    if (!recHistorial || forzar) await recCargarHistorial(carga);
+    if (carga !== recAlertasCarga) return;
+    recAlertasCargando = false;
+    recAlertasRender();
+  } catch (_) {
+    if (carga !== recAlertasCarga) return;
+    recAlertasCargando = false;
+    recAlertasExportarFilas = [];
+    document.getElementById('rec-alertas-exportar').disabled = true;
+    cont.innerHTML = '<div class="table-card"><div class="empty"><p>No se pudieron cargar las alertas. Pulsa Actualizar para volver a intentarlo.</p></div></div>';
+  }
+}
+async function recCargarHistorial(carga = recAlertasCarga) {
   const desde = recHaceDias(recAlertasDias - 1);
   const [hist, rev] = await Promise.all([
-    fetchAll('rec_lineas', `select=id_rp_detalle,rm,fecha,materia,lote,vence,institucion&lote_vencido=is.true&fecha=gte.${desde}&order=fecha.desc`),
-    fetchAll('rec_lotes_revisados', 'select=id_rp_detalle,lote'),
+    recAlertasLeer('rec_lineas', `select=id_rp_detalle,id_producto,rm,fecha,materia,lote,vence&lote_vencido=is.true&fecha=gte.${desde}&order=fecha.desc`),
+    recAlertasLeer('rec_lotes_revisados', 'select=id_rp_detalle,lote'),
   ]);
+  if (carga !== recAlertasCarga) return;
   recHistorial = Array.isArray(hist) ? hist : [];
   recRevisados = new Set((Array.isArray(rev) ? rev : []).map(r => `${r.id_rp_detalle}|${r.lote}`));
 }
-
-function recAlertasSetTab(t) { recAlertasTab = t; recAlertasInit(false); }
+function recAlertasSetTab(t) { recAlertasTab = t === 'vencer' ? 'vencer' : 'historial'; recAlertasRender(); }
 async function recAlertasSetDias(d) { recAlertasDias = Number(d); recHistorial = null; await recAlertasInit(false); }
-
-function recAlertasRender() {
-  const lotes = recLotesUso || [];
-  // "Vencido" se mide contra la FECHA DEL RM (hora de Chile), igual que la
-  // columna lote_vencido de rec_lineas que usan el historial y el aviso del
-  // menú. dias_para_vencer viene contado contra HOY, así que solo sirve para
-  // saber si el lote ya venció a la fecha actual.
-  const diaRm = f => f ? new Date(f).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : '';
-  const vencidoAlUsar = l => !!(l.vence && l.ultimo_uso && String(l.vence).slice(0, 10) < diaRm(l.ultimo_uso));
-  // Corregir: el último RM quedó registrado con un lote que ya estaba vencido ese día.
-  const corregir = lotes.filter(vencidoAlUsar);
-  // Preventivo: el lote estaba vigente cuando se usó, pero ya venció hoy y
-  // sigue activo en Pharma_RM; deja de aparecer en cuanto se desactiva.
-  const desactivar = lotes.filter(l => !vencidoAlUsar(l) && l.dias_para_vencer !== null && l.dias_para_vencer < 0
-    && recLoteActivo[l.id_lote] !== false);
-  const porVencer = lotes.filter(l => l.dias_para_vencer !== null && l.dias_para_vencer >= 0 && l.dias_para_vencer <= 60)
-    .sort((a, b) => a.dias_para_vencer - b.dias_para_vencer);
-  const tabs = [
-    { id: 'corregir', label: `Corregir en Pharma_RM (${corregir.length})` + (desactivar.length ? ` · ${desactivar.length} por desactivar` : '') },
-    { id: 'vencer', label: `Por vencer en 60 días (${porVencer.length})` },
-    { id: 'historial', label: 'Historial de RM con lote vencido' },
-  ];
-  document.getElementById('rec-alertas-tabs').innerHTML = recTabsHtml(tabs, recAlertasTab, 'recAlertasSetTab');
-  document.getElementById('rec-alertas-dias-wrap').style.display = recAlertasTab === 'historial' ? '' : 'none';
-  const cont = document.getElementById('rec-alertas-cont');
-
-  if (recAlertasTab === 'corregir') {
-    const loteNuevoHtml = l => l.lote_nuevo ? `<span class="mono">${escapeHtml(l.lote_nuevo)}</span> <span style="font-size:11px;color:var(--text-2)">vence ${fDate(l.lote_nuevo_vence)} · comprado ${fDate(l.lote_nuevo_compra)}</span>` : '<span style="color:var(--text-3);font-size:12px">No hay compras recientes registradas</span>';
-    // Aviso preventivo (ámbar): no es un error de registro, solo hay que
-    // desactivar el lote vencido en Pharma_RM y pasar al más nuevo.
-    const preventivo = !desactivar.length ? '' : `
-      <div class="rec-nota" style="background:var(--amber-light);color:var(--amber);margin-top:${corregir.length ? '18px' : '0'}"><b>⚠ Aviso preventivo · desactivar en Pharma_RM.</b> El último lote usado estaba vigente el día del RM, pero <b>ya venció hoy</b>. No hay nada que corregir en los RM: desactiva el lote en Pharma_RM y usa el lote más nuevo en la próxima elaboración.</div>
-      <div class="table-card farm-grilla" style="border:1px solid #E9B949"><table><thead><tr>
-        <th>Materia prima</th><th>Lote a desactivar</th><th>Venció</th><th>Último RM (lote vigente ese día)</th><th>Lote más nuevo comprado</th>
-      </tr></thead><tbody>
-      ${desactivar.map(l => `<tr>
-        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}${recEsInterno(l.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
-        <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
-        <td data-label="Venció" style="color:var(--amber);font-weight:600;white-space:nowrap">${fDate(l.vence)}<div style="font-size:11px;font-weight:400">hace ${recNum(-l.dias_para_vencer)} días</div></td>
-        <td data-label="Último RM" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(l.ultimo_rm || '')}')">${escapeHtml(l.ultimo_rm || '—')}</a><div style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</div></td>
-        <td data-label="Lote nuevo">${loteNuevoHtml(l)}</td>
-      </tr>`).join('')}
-      </tbody></table></div>`;
-    if (!corregir.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ninguna materia prima se está registrando con un lote vencido.</p></div></div>${preventivo}`; return; }
-    cont.innerHTML = `
-      <div class="rec-nota">Materias primas cuyo <b>último uso</b> (últimos 120 días) quedó registrado con un lote que <b>ya estaba vencido el día del RM</b>. Para que salga de esta lista: en Pharma_RM <b>edita el último RM</b> y cambia el lote por el que realmente se usó (normalmente el más nuevo), y <b>desactiva el lote vencido</b> para que no se vuelva a ofrecer. Si de verdad se usó ese lote, hay que retirarlo.</div>
-      <div class="table-card farm-grilla"><table><thead><tr>
-        <th>Materia prima</th><th>Lote que se está registrando</th><th>Venció</th><th>Último RM</th><th style="text-align:right" title="RM de esta materia prima (últimos 120 días) registrados con un lote ya vencido el día del RM">RM con lote vencido</th><th>Lote más nuevo comprado</th>
-      </tr></thead><tbody>
-      ${corregir.map(l => `<tr>
-        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}</td>
-        <td data-label="Lote"><span class="mono">${escapeHtml(l.lote || '—')}</span>${recLoteActivo[l.id_lote] === true ? '<div style="font-size:11px;color:var(--red)">sigue activo en Pharma_RM</div>' : recLoteActivo[l.id_lote] === false ? '<div style="font-size:11px;color:var(--text-3)">ya desactivado</div>' : ''}</td>
-        <td data-label="Venció" style="color:var(--red);font-weight:600;white-space:nowrap">${fDate(l.vence)}<div style="font-size:11px;font-weight:400">hace ${recNum(-l.dias_para_vencer)} días</div></td>
-        <td data-label="Último RM" style="white-space:nowrap"><a style="cursor:pointer;color:var(--accent)" onclick="recAbrirRmPorNumero('${escapeHtml(l.ultimo_rm || '')}')">${escapeHtml(l.ultimo_rm || '—')}</a><div style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</div></td>
-        <td data-label="RM con lote vencido" style="text-align:right">${recNum(l.usos_vencido)} de ${recNum(l.usos)}</td>
-        <td data-label="Lote nuevo">${loteNuevoHtml(l)}</td>
-      </tr>`).join('')}
-      </tbody></table></div>${preventivo}`;
-    return;
-  }
-
-  if (recAlertasTab === 'vencer') {
-    if (!porVencer.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>Ningún lote en uso vence en los próximos 60 días.</p></div></div>`; return; }
-    cont.innerHTML = `
-      <div class="rec-nota">Lote que se está usando hoy en cada materia prima y que vence en los próximos 60 días. Las bases internas (lotes RO/RM: agua preservada, jarabe simple, cremas base) duran poco por diseño: solo hay que preparar la siguiente a tiempo.</div>
-      <div class="table-card farm-grilla"><table><thead><tr>
-        <th>Materia prima</th><th>Lote en uso</th><th>Vence</th><th style="text-align:right">Días</th><th>Último uso</th><th style="text-align:right">RM (120 días)</th>
-      </tr></thead><tbody>
-      ${porVencer.map(l => `<tr>
-        <td data-label="Materia prima" style="font-weight:500">${escapeHtml(l.materia)}${recEsInterno(l.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
-        <td data-label="Lote" class="mono">${escapeHtml(l.lote || '—')}</td>
-        <td data-label="Vence" style="white-space:nowrap">${fDate(l.vence)}</td>
-        <td data-label="Días" style="text-align:right;font-weight:600;color:${l.dias_para_vencer <= 15 ? 'var(--red)' : 'var(--amber)'}">${l.dias_para_vencer}</td>
-        <td data-label="Último uso" style="white-space:nowrap">${escapeHtml(l.ultimo_rm || '')} <span style="font-size:11px;color:var(--text-3)">${recFechaTs(l.ultimo_uso)}</span></td>
-        <td data-label="RM" style="text-align:right">${recNum(l.usos)}</td>
-      </tr>`).join('')}
-      </tbody></table></div>`;
-    return;
-  }
-
-  // Historial agrupado por materia + lote. Los RM marcados como revisados
-  // salen de la lista (se pueden ver aparte con "Ver revisados").
-  const esRevisado = l => recRevisados.has(`${l.id_rp_detalle}|${l.lote}`);
-  const pendientes = (recHistorial || []).filter(l => !esRevisado(l));
-  const nRevisados = new Set((recHistorial || []).filter(esRevisado).map(l => `${l.id_rp_detalle}|${l.lote}`)).size;
-  const fuente = recVerRevisados ? (recHistorial || []).filter(esRevisado) : pendientes;
-  const grupos = {};
-  fuente.forEach(l => {
-    const k = `${l.materia}|${l.lote}`;
-    if (!grupos[k]) grupos[k] = { materia: l.materia, lote: l.lote, vence: l.vence, rms: [], ultimo: l.fecha, maxDias: 0 };
-    const g = grupos[k];
-    if (!g.rms.find(x => x.id === l.id_rp_detalle)) g.rms.push({ id: l.id_rp_detalle, rm: l.rm, fecha: l.fecha, materia: l.materia });
-    if (new Date(l.fecha) > new Date(g.ultimo)) g.ultimo = l.fecha;
-    const dias = Math.floor((new Date(l.fecha) - new Date(l.vence + 'T00:00:00')) / 86400000);
-    if (dias > g.maxDias) g.maxDias = dias;
-  });
-  const lista = Object.values(grupos).sort((a, b) => b.rms.length - a.rms.length);
-  recHistGrupos = lista;
-  const totalRm = new Set(fuente.map(l => l.id_rp_detalle)).size;
-  const esEditor = sesionActual?.rol === 'editor';
-  const toggleRev = nRevisados || recVerRevisados
-    ? `<a style="cursor:pointer;color:var(--accent);white-space:nowrap" onclick="recVerRevisados=!recVerRevisados;recAlertasRender()">${recVerRevisados ? '← Volver a los pendientes' : `Ver revisados (${nRevisados})`}</a>` : '';
-  if (!lista.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>${recVerRevisados ? 'No hay RM marcados como revisados en este período.' : 'No hay RM con lote vencido pendientes en este período.'}</p>${toggleRev ? `<p>${toggleRev}</p>` : ''}</div></div>`; return; }
-  cont.innerHTML = `
-    <div class="rec-nota" style="display:flex;gap:12px;justify-content:space-between;align-items:baseline;flex-wrap:wrap"><span>${recVerRevisados
-      ? `<b>${totalRm} RM</b> marcados como revisados. No se muestran en el historial; con "Desmarcar" vuelven a aparecer.`
-      : `<b>${totalRm} RM</b> del período quedaron registrados con al menos un lote vencido. Agrupado por materia prima y lote. Si ya lo corregiste en Pharma_RM (y el RM es antiguo, el cambio no vuelve a sincronizarse) o decidiste dejarlo así, usa <b>Marcar revisado</b>.`}</span>${toggleRev}</div>
-    <div class="table-card farm-grilla"><table><thead><tr>
-      <th>Materia prima</th><th>Lote</th><th>Venció</th><th style="text-align:right">RM</th><th>Último uso</th><th style="text-align:right">Días vencido (máx.)</th><th>RM afectados</th>${esEditor ? '<th></th>' : ''}
-    </tr></thead><tbody>
-    ${lista.map((g, i) => `<tr>
-      <td data-label="Materia prima" style="font-weight:500">${escapeHtml(g.materia)}${recEsInterno(g.lote) ? ' <span class="badge badge-gray">base interna</span>' : ''}</td>
-      <td data-label="Lote" class="mono">${escapeHtml(g.lote || '')}</td>
-      <td data-label="Venció" style="white-space:nowrap">${fDate(g.vence)}</td>
-      <td data-label="RM" style="text-align:right;font-weight:600">${g.rms.length}</td>
-      <td data-label="Último uso" style="white-space:nowrap">${recFechaTs(g.ultimo)}</td>
-      <td data-label="Días vencido" style="text-align:right;color:var(--red)">${recNum(g.maxDias)}</td>
-      <td data-label="RM afectados" style="font-size:12px;white-space:normal;line-height:1.7">${(() => {
-        // Se muestran 8; "+N más" despliega el resto (y "ver menos" los vuelve a ocultar).
-        const k = `${g.materia}|${g.lote}`, abierto = recHistAbiertos.has(k);
-        const rms = abierto ? g.rms : g.rms.slice(0, 8);
-        const toggle = g.rms.length > 8 ? `<a style="cursor:pointer;color:var(--text-2);text-decoration:underline;white-space:nowrap" onclick="recHistToggle('${escapeHtml(k).replace(/'/g, "\\'")}')">${abierto ? 'ver menos' : `+${g.rms.length - 8} más`}</a>` : '';
-        return rms.map(x => `<a style="cursor:pointer;color:var(--accent);margin-right:6px;white-space:nowrap;display:inline-block" onclick="recAbrirRm(${x.id})">${escapeHtml(x.rm || ('#' + x.id))}</a>`).join('') + toggle;
-      })()}</td>
-      ${esEditor ? `<td style="white-space:nowrap;text-align:right"><button class="page-btn" onclick="recMarcarRevisado(${i}, ${!recVerRevisados})">${recVerRevisados ? 'Desmarcar' : '✓ Marcar revisado'}</button></td>` : ''}
-    </tr>`).join('')}
-    </tbody></table></div>`;
-}
-
-function recHistToggle(k) {
-  recHistAbiertos.has(k) ? recHistAbiertos.delete(k) : recHistAbiertos.add(k);
+function recAlertasFiltrar() {
+  recAlertasBusqueda = document.getElementById('rec-alertas-buscar').value;
+  recAlertasBases = document.getElementById('rec-alertas-bases').value;
   recAlertasRender();
 }
+function recAlertasCoincide(l) {
+  const interna = recEsInterno(l.lote);
+  return (recAlertasBases === 'todas' || (recAlertasBases === 'internas' ? interna : !interna))
+    && coincideBusqueda(`${l.materia || ''} ${l.lote || ''}`, recAlertasBusqueda.trim());
+}
+function recAlertasDatos() {
+  const hist = (recHistorial || []).filter(recAlertasCoincide);
+  const revisado = l => recRevisados.has(`${l.id_rp_detalle}|${l.lote}`);
+  const porVencer = (recLotesUso || []).filter(l => recAlertasCoincide(l)
+    && l.dias_para_vencer !== null && l.dias_para_vencer !== ''
+    && Number(l.dias_para_vencer) >= 0 && Number(l.dias_para_vencer) <= recAlertasHorizonte)
+    .sort((a, b) => Number(a.dias_para_vencer) - Number(b.dias_para_vencer));
+  const desactivar = (recLotesUso || []).filter(l => recAlertasCoincide(l)
+    && l.dias_para_vencer !== null && l.dias_para_vencer !== '' && Number(l.dias_para_vencer) < 0
+    && recLoteActivo[l.id_lote] !== false);
+  return { pendientes: hist.filter(l => !revisado(l)), revisados: hist.filter(revisado), porVencer, desactivar };
+}
+function recAlertasMateriaHtml(l) {
+  const id = Number(l.id_producto);
+  const nombre = escapeHtml(l.materia || 'Sin nombre');
+  return (Number.isSafeInteger(id) && id > 0 ? `<button class="rec-al-link" onclick="recAlertasAbrirMateria(${id})">${nombre}</button>` : nombre)
+    + (recEsInterno(l.lote) ? ' <span class="badge badge-gray">Base interna</span>' : '');
+}
+async function recAlertasAbrirMateria(id) {
+  try {
+    if (!recCmMaterias) await recCmCargar();
+    if (!(recCmMaterias || []).some(m => m.id_producto === id)) { toast('No se encontró la ficha de esta materia.', 'err'); return; }
+    recCmAbrir(id);
+  } catch (_) { toast('No se pudo abrir la ficha de la materia.', 'err'); }
+}
+function recAlertasRender() {
+  if (recAlertasCargando) return;
+  const d = recAlertasDatos();
+  document.getElementById('rec-alertas-tabs').innerHTML = recTabsHtml([
+    { id: 'historial', label: `Registros por revisar (${new Set(d.pendientes.map(x => x.id_rp_detalle)).size} RM)` },
+    { id: 'vencer', label: `Próximos vencimientos (${d.porVencer.length})` },
+  ], recAlertasTab, 'recAlertasSetTab');
+  document.getElementById('rec-alertas-dias-wrap').style.display = recAlertasTab === 'historial' ? '' : 'none';
+  document.getElementById('rec-alertas-horizonte-wrap').style.display = recAlertasTab === 'vencer' ? '' : 'none';
+  document.querySelector('#rec-alertas-horizonte-wrap select').value = String(recAlertasHorizonte);
+  const cont = document.getElementById('rec-alertas-cont');
+  const empty = texto => `<div class="table-card"><div class="empty"><p>${texto}</p></div></div>`;
+  const formatoRm = (l, i) => l.ultimo_rm ? `<button class="rec-al-link" onclick="recAlertasAbrirUltimo(${i})">${escapeHtml(l.ultimo_rm)}</button><small>${recFechaTs(l.ultimo_uso)}</small>` : 'Sin fecha de uso';
+  if (recAlertasTab === 'vencer') {
+    recHistGrupos = [];
+    recAlertasExportarFilas = d.porVencer.map(l => ({ Materia: l.materia, Lote: String(l.lote || ''), Vence: l.vence || '', 'Días restantes': Number(l.dias_para_vencer), 'Último RM': l.ultimo_rm || '', 'Último uso': l.ultimo_uso || '', Existencia: 'Sin confirmar', Tipo: recEsInterno(l.lote) ? 'Base interna' : 'Materia prima' }));
+    const tabla = !d.porVencer.length ? empty('No se encontraron lotes próximos a vencer con estos filtros, entre los usos registrados en los últimos 120 días.') : `
+      <div class="table-card rec-al-tabla"><table class="tabla-centrada"><thead><tr><th>Materia prima</th><th>Lote</th><th>Vence</th><th>Plazo</th><th>Último uso registrado</th><th>Existencia</th></tr></thead><tbody>
+      ${d.porVencer.map((l, i) => `<tr><td>${recAlertasMateriaHtml(l)}</td><td class="mono">${escapeHtml(l.lote || '—')}</td><td>${fDate(l.vence)}</td><td><span class="badge ${Number(l.dias_para_vencer) <= 15 ? 'badge-red' : 'badge-amber'}">${Number(l.dias_para_vencer) === 0 ? 'Vence hoy' : 'En ' + Number(l.dias_para_vencer) + ' días'}</span></td><td>${formatoRm(l, i)}</td><td><span class="badge badge-gray">Sin confirmar</span></td></tr>`).join('')}
+      </tbody></table></div>`;
+    const preventivo = !d.desactivar.length ? '' : `<details class="rec-al-preventivo"><summary>Vencidos con estado activo o sin confirmar (${d.desactivar.length})</summary><p>Verificar en bodega y con el responsable. Estar activo o haberse usado antes no demuestra que aún quede producto. No se corrigen RM ni se cambia de lote desde esta pantalla.</p><div class="rec-al-tabla"><table class="tabla-centrada"><thead><tr><th>Materia</th><th>Lote</th><th>Venció</th><th>Estado registrado</th></tr></thead><tbody>${d.desactivar.map(l => `<tr><td>${recAlertasMateriaHtml(l)}</td><td class="mono">${escapeHtml(l.lote || '—')}</td><td>${fDate(l.vence)}</td><td>${recLoteActivo[l.id_lote] === true ? 'Activo' : 'Sin confirmar'}</td></tr>`).join('')}</tbody></table></div></details>`;
+    cont.innerHTML = `<div class="rec-nota">Lotes con uso registrado en los últimos <b>120 días</b> que vencen en los próximos <b>${recAlertasHorizonte} días</b>. <b>Existencia en bodega sin confirmar</b>; esta lista no es un inventario. Las bases internas pueden tener ciclos cortos de elaboración.</div>${tabla}${preventivo}`;
+  } else {
+    const fuente = recVerRevisados ? d.revisados : d.pendientes;
+    const grupos = new Map();
+    fuente.forEach(l => {
+      const k = JSON.stringify([l.id_producto || l.materia, l.lote, l.vence]);
+      if (!grupos.has(k)) grupos.set(k, { ...l, rms: [], ultimo: l.fecha });
+      const g = grupos.get(k);
+      if (!g.rms.some(x => x.id === l.id_rp_detalle)) g.rms.push({ id: l.id_rp_detalle, rm: l.rm, fecha: l.fecha });
+      if (String(l.fecha) > String(g.ultimo)) g.ultimo = l.fecha;
+    });
+    recHistGrupos = [...grupos.values()].sort((a, b) => String(b.ultimo).localeCompare(String(a.ultimo)));
+    const n = new Set(fuente.map(l => l.id_rp_detalle)).size;
+    const editor = sesionActual?.rol === 'editor';
+    const sub = `<div class="rec-al-subtabs">${recTabsHtml([
+      { id: 'pendientes', label: `Pendientes (${new Set(d.pendientes.map(l => l.id_rp_detalle)).size})` },
+      { id: 'revisados', label: `Revisados (${new Set(d.revisados.map(l => l.id_rp_detalle)).size})` },
+    ], recVerRevisados ? 'revisados' : 'pendientes', 'recAlertasSetRevision')}<span>${n} RM · ${recHistGrupos.length} grupos de materia y lote</span></div>`;
+    recAlertasExportarFilas = recHistGrupos.flatMap(g => g.rms.map(r => ({ Materia: g.materia, Lote: String(g.lote || ''), Vencimiento: g.vence || '', RM: r.rm || '', Fecha: r.fecha || '', Revisión: recVerRevisados ? 'Revisado' : 'Pendiente' })));
+    const tabla = !recHistGrupos.length ? empty(`No se encontraron registros ${recVerRevisados ? 'revisados' : 'pendientes'} en el período y con los filtros seleccionados.`) : `<div class="table-card rec-al-tabla"><table class="tabla-centrada"><thead><tr><th>Materia prima</th><th>Lote</th><th>Vencimiento registrado</th><th>RM afectadas</th><th>Último registro</th>${editor ? '<th>Revisión</th>' : ''}</tr></thead><tbody>
+      ${recHistGrupos.map((g, i) => {
+        const key = JSON.stringify([g.id_producto || g.materia, g.lote, g.vence]);
+        const abiertos = recHistAbiertos.has(key);
+        const rms = abiertos ? g.rms : g.rms.slice(0, 8);
+        return `<tr><td>${recAlertasMateriaHtml(g)}</td><td class="mono">${escapeHtml(g.lote || '—')}</td><td>${fDate(g.vence)}</td><td><div class="rec-al-rms">${rms.map(r => Number.isSafeInteger(Number(r.id)) ? `<button class="rec-al-link" onclick="recAbrirRm(${Number(r.id)})">${escapeHtml(r.rm || '#' + r.id)}</button>` : escapeHtml(r.rm || '—')).join(' ')}${g.rms.length > 8 ? `<button class="rec-al-link" onclick="recAlertasToggleGrupo(${i})">${abiertos ? 'Ver menos' : '+' + (g.rms.length - 8) + ' más'}</button>` : ''}</div></td><td>${recFechaTs(g.ultimo)}</td>${editor ? `<td><button class="page-btn" onclick="recMarcarRevisado(${i},${!recVerRevisados})">${recVerRevisados ? 'Volver a pendientes' : 'Marcar revisado'}</button></td>` : ''}</tr>`;
+      }).join('')}</tbody></table></div>`;
+    cont.innerHTML = `<div class="rec-nota">RM que quedaron <b>registradas</b> con un lote vencido a la fecha de elaboración, en los últimos <b>${recAlertasDias} días</b>. Verificar el lote realmente utilizado con el responsable. Marcar revisado <b>no corrige Pharma_RM ni confirma que el caso esté resuelto</b>; los cambios antiguos pueden no haberse sincronizado.</div>${sub}${tabla}`;
+  }
+  cont.querySelectorAll('table').forEach(tabla => {
+    const etiquetas = [...tabla.querySelectorAll('thead th')].map(th => th.textContent);
+    tabla.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.dataset.label = etiquetas[i] || ''));
+  });
+  document.getElementById('rec-alertas-exportar').disabled = !recAlertasExportarFilas.length;
+}
+function recAlertasSetRevision(t) { recVerRevisados = t === 'revisados'; recAlertasRender(); }
+function recAlertasAbrirUltimo(i) { const l = recAlertasDatos().porVencer[i]; if (l?.ultimo_rm) recAbrirRmPorNumero(l.ultimo_rm); }
+function recAlertasToggleGrupo(i) {
+  const g = recHistGrupos[i]; if (!g) return;
+  recHistToggle(JSON.stringify([g.id_producto || g.materia, g.lote, g.vence]));
+}
+function recHistToggle(k) { recHistAbiertos.has(k) ? recHistAbiertos.delete(k) : recHistAbiertos.add(k); recAlertasRender(); }
+function recAlertasExportar() {
+  if (!recAlertasExportarFilas.length) return;
+  const hoja = XLSX.utils.json_to_sheet(recAlertasExportarFilas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, recAlertasTab === 'vencer' ? 'Vencimientos' : 'Registros');
+  XLSX.writeFile(libro, `Alertas_lotes_${recAlertasTab === 'vencer' ? 'vencimientos' : recVerRevisados ? 'revisados' : 'pendientes'}_${fechaLocalISO()}.xlsx`);
+}
+
 
 // Marca (o desmarca) como revisados todos los RM de un grupo materia + lote
 // del historial. Solo guarda la marca en rec_lotes_revisados: no toca Pharma_RM.
 async function recMarcarRevisado(i, marcar) {
   const g = recHistGrupos[i];
   if (!g) return;
-  if (marcar && !confirm(`¿Marcar como revisados los ${g.rms.length} RM de ${g.materia} (lote ${g.lote})? Dejarán de aparecer en el historial.`)) return;
+  if (marcar && !confirm(`¿Marcar como revisados los ${g.rms.length} RM de ${g.materia} (lote ${g.lote})? Pasarán a Revisados; esto no corrige Pharma_RM ni confirma resolución.`)) return;
   try {
     let res;
     if (marcar) {
