@@ -29,7 +29,7 @@
 1. Cada tarea va en una rama propia: `claude/<tarea>` o `codex/<tarea>`, desde main actualizado. No hay una rama compartida obligatoria; `etapa2-uso-diario` es una rama histórica/existente, no el destino automático de nuevos cambios.
 2. Todo cambio se propone mediante PR hacia main. **Main solo cambia con aprobación explícita de Seba para el PR y la versión revisada.** No push directo a main, no force-push ni auto-merge.
 3. Leer y mantener `docs/COORDINACION.md`: responsable, rama, alcance, estado y PR. Revisar los PR abiertos al retomar.
-4. **Reparto vigente:** Claude ordena y ajusta la aplicación menú por menú (quita, agrega y organiza según Seba). Codex prepara el flujo y la documentación; no modifica en paralelo esos menús ni la navegación o estilos compartidos sin reparto explícito.
+4. **Reparto vigente:** Codex trabaja en la interfaz de la app. Claude continúa con lotes y stocks en Pharma_RM.
 5. Si dos tareas afectan el mismo archivo grande, acordar bloques/funciones o hacerlas en secuencia. Actualizar la rama con main y comprobar los cambios antes de integrar; conservar el trabajo del otro.
 6. Actualizar esta Bitácora y Pendientes en cada PR, indicando si el cambio está en rama o integrado. Las conversaciones no se sincronizan solas: volver a leer GitHub.
 7. Entregar resumen, rama, PR, vista previa verificada y pasos para probar. Para cambios visuales, recordar Ctrl+F5.
@@ -167,6 +167,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 03-11-2026 — En rama `codex/alertas-lotes-ux`: Registros por revisar (Pendientes/Revisados) y Próximos vencimientos (30/60/90 días), búsqueda, bases internas y Excel. Los usos recientes no confirman existencias. Pruebas simuladas y revisión móvil. Pendiente aprobación de Seba.
 
 - 30-10-2026 — Seba aprobó integrar PR #1 (coordinación completa) y #4 (aviso de rechazadas); #4 ya integrado. Se conserva el cerebro actualizado de main al resolver el cruce documental de #1. El filtro mensual de envíos está integrado por PR #3 desde el 29-10. Entradas anteriores marcadas «propuesto» son el estado histórico de la propuesta.
 
