@@ -168,6 +168,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- Codex · propuesta en `codex/mejorar-busqueda-oc` · Buscar orden de compra. Coincidencia exacta, ayuda bajo el campo y limpieza de filtros conservando el texto. Pendiente de revisión.
+
 - Propuesta en rama codex/buscar-orden-compra. Se prioriza la búsqueda por número y se muestra su alcance al escribir.
 
 - 03-11-2026 — **Propuesto en `codex/contraste-submenus`:** borde de marca, sombra más visible, texto de mayor contraste y resaltado al pasar el puntero o enfocar una opción del desplegable de escritorio.

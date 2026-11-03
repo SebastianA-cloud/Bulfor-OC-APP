@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- Codex · propuesta en `codex/mejorar-busqueda-oc` · Buscar orden de compra. Coincidencia exacta, ayuda bajo el campo y limpieza de filtros conservando el texto. Pendiente de revisión.
+
 - Codex · codex/buscar-orden-compra · etiqueta y buscador de Órdenes de compra en index.html · propuesta para revisión.
 
 - Codex · `codex/contraste-submenus` · Mejorar la visibilidad del desplegable de escritorio. Alcance: `#nav-submenu` en `styles.css` y documentación. Propuesto para revisión en PR.
