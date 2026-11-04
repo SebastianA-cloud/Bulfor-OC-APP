@@ -4,7 +4,7 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
-- 04-11-2026 · Codex · `codex/guias-cot-20261104` · Guías por facturar, centrado en COT. Alcance: entrada SUBMENUS, página propia, guias-cot.js y guias-cot.css, documentación. Seba autorizó tablas RLS, carga inicial 2026 y conexión real; revisión Claude y aprobación explícita de este PR antes de merge. PR anterior #14 no se integrará. Estado: iniciado.
+- 04-11-2026 · Codex · `codex/guias-cot-20261104` · Guías por facturar, centrado en COT. Alcance: entrada en SUBMENUS y pantalla `page-guias-cot` de index.html, módulos `guias-cot.js` y `guias-cot.css`, `docs/GUIAS_COT.md` y cerebro. Autorizadas y creadas dos tablas nuevas RLS; histórico 2026 cargado (82 guías / 8 grupos); parser de correo de junio y render de datos simulados probados sin escritura. PR #14 cerrado sin merge. Estado: propuesta lista para PR, pendiente revisión de Claude, vista previa verificable y aprobación explícita de Seba antes de integrar.
 
 - 04-11-2026 · Codex · propuesta en `codex/factura-ux`. Factura: buscar cliente por nombre, ayuda para orden, errores enlazados a secciones y revisión/edición antes de emitir. Validación y emisión existentes conservadas; pruebas con datos simulados. Pendiente PR y revisión de Seba.
 
