@@ -10,7 +10,7 @@ const gcNorm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').tr
 const gcRut=d=>String(d.rut_hospital||'').trim();
 const gcHospital=d=>nombreHosp(d.hospital||'')||d.hospital||'';
 const gcKey=d=>gcRut(d)||gcNorm(gcHospital(d));
-const gcNum=d=>Number(d&&d.monto_total!=null?d.monto_total:d&&d.monto)||0;
+const gcNum=d=>Number(d&&d.monto_total!=null?d.monto_total:Math.round(Number(d&&d.monto||0)*1.19))||0;
 const gcNet=d=>Number(d&&d.monto)||0;
 const gcGuides=()=>documentosGdexpress.filter(d=>String(d.tipo_dte)==='52');
 const gcInvoices=()=>documentosGdexpress.filter(d=>String(d.tipo_dte)==='33');
@@ -69,7 +69,9 @@ function gcGroups(y=gcState.year,m=gcState.month){
  const groups=new Map();
  guides.forEach(g=>{
    const cot=byCot.get(byLink.get(String(g.id)))||null;
-   const ocCode=String(g.orden_compra_ref||'').trim()||(gcGetOc(cot)?.codigooc||'');
+   const historicalInvoice=cot?.nota?.match(/FACTURA_HISTORICA:(\d+)/)?.[1];
+   const pastInvoice=historicalInvoice&&gcInvoices().find(f=>String(f.folio)===historicalInvoice&&gcSameHospital(f,g));
+   const ocCode=String(g.orden_compra_ref||'').trim()||(gcGetOc(cot)?.codigooc||'')||(pastInvoice?.orden_compra_ref||'');
    const key=cot?'cot-'+cot.id:ocCode?'oc-'+ocCode:'sin';
    if(!groups.has(key))groups.set(key,{key,cot,oc:ocCode,guides:[]});
    groups.get(key).guides.push(g);
@@ -78,7 +80,7 @@ function gcGroups(y=gcState.year,m=gcState.month){
    const invoice=gcInvoice(g);
    const stage=invoice?'facturada':g.oc?'conoc':g.cot?'encot':'sincot';
    const dates=g.guides.map(x=>gcDate(x.fecha_emision)).sort();
-   return {...g,invoice,stage,amount:g.guides.reduce((s,d)=>s+gcNum(d),0),dates,half:gcPeriod(g.guides[0]).half};
+   return {...g,invoice,stage,amount:g.guides.reduce((s,d)=>s+gcNum(d),0),dates,half:g.cot?.quincena||gcPeriod(g.guides[0]).half};
  }).sort((a,b)=>a.half-b.half||a.dates[0].localeCompare(b.dates[0]));
 }
 function gcGoDocument(id){
@@ -110,7 +112,7 @@ function gcGroupHtml(g){
  const paid=p&&p.fecha_pago?'Pagada '+gcDateDisplay(p.fecha_pago):'Sin pago registrado';
  const first=g.guides[0],shown=gcState.expanded.has(g.key)?g.guides:g.guides.slice(0,4);
  const label=g.cot?.numero_cot|| (g.cot?'COT histórica sin N°':g.oc?'Guías con OC':'Sin COT');
- const note=String(g.cot?.nota||'').replace(/FACTURA_HISTORICA:\d+/g,'').trim();
+ const note=String(g.cot?.nota||'').replace(/FACTURA_HISTORICA:\d+/g,'').replace(/^\s*[|;]\s*/,'').trim();
  let html='<section class="gc-group"><div class="gc-group-head"><div><b>'+gcEsc(label)+'</b><div class="gc-muted">Mes '+g.half+' · '+gcDateDisplay(g.dates[0])+' a '+gcDateDisplay(g.dates[g.dates.length-1])+' · '+g.guides.length+' guías</div></div><strong>'+gcMoney(g.amount)+'</strong></div>';
  html+='<div class="gc-flow"><span class="'+(g.cot?'gc-done':'gc-warn')+'">COT '+gcEsc(g.cot?.numero_cot||'—')+'</span><span>→</span><span class="'+(g.oc?'gc-done':'gc-muted')+'">OC '+gcEsc(g.oc||'—')+'</span><span>→</span><span class="'+(g.invoice?'gc-done':'gc-muted')+'">Factura '+gcDocLink(g.invoice)+'</span><span>→</span><span class="'+(p?.fecha_pago?'gc-done':'gc-muted')+'">'+gcEsc(paid)+'</span></div>';
  html+='<table class="gc-table"><thead><tr><th>Fecha</th><th>Guía</th><th>Neto</th><th>Total con IVA</th></tr></thead><tbody>';
