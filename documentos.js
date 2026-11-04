@@ -846,6 +846,10 @@ function dteRender(t) {
 
   const conocido = dteListaClientes().find(c => c.rut === s.rut);
   const cliente = `
+    ${t === 33 ? `<label class="dte-campo"><span>Buscar cliente por nombre</span>
+      <input type="text" class="dte-in" id="dte-33-cliente-nombre" placeholder="Escribe parte del nombre del cliente" aria-describedby="dte-33-cliente-ayuda" oninput="dteBuscarClienteNombre(this.value)">
+      </label><p id="dte-33-cliente-ayuda" class="dte-sub">Elige un resultado para cargar su RUT y los datos de su última factura o guía. También puedes ingresar el RUT directamente.</p>
+      <div id="dte-33-clientes-nombre"></div>` : ''}
     <div class="dte-grid dte-grid-cli">
       <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
         <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
@@ -875,6 +879,7 @@ function dteRender(t) {
       </div>`;
 
   const refs = `
+      ${t === 33 ? `<p class="dte-sub">${dteRutValido(s.rut) ? (ocs.length ? 'Escribe o pega el número de orden. La lista ofrece las órdenes registradas para este RUT. Revisa los productos y cantidades antes de continuar.' : 'No hay órdenes registradas para este RUT. Puedes escribir una referencia manual y completar su fecha.') : 'Selecciona primero el cliente para consultar sus órdenes de compra.'}</p>` : ''}
       ${s.refs.length ? `<div class="dte-tabla dte-refs">
         <div class="dte-th">Tipo de documento <b>*</b></div><div class="dte-th">N° / Folio <b>*</b></div><div class="dte-th">Fecha <b>*</b></div><div class="dte-th">Razón</div><div></div>
         ${s.refs.map((r, i) => `
@@ -946,7 +951,7 @@ function dteRender(t) {
           <div><span>Neto</span><b id="dte-${t}-neto">${dteClp(tot.neto)}</b></div>
           <div><span>IVA 19%</span><b id="dte-${t}-iva">${dteClp(tot.iva)}</b></div>
           <div class="dte-total"><span>Total</span><b id="dte-${t}-total">${dteClp(tot.total)}</b></div>
-          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> ${multi ? dteMultiTextoSiguiente(false) : 'Revisar y emitir'}</button>
+          <button class="dte-btn-principal" onclick="dteEmitir(${t})"><i class="ti ti-eye-check"></i> ${multi ? dteMultiTextoSiguiente(false) : t === 33 ? 'Revisar factura' : 'Revisar y emitir'}</button>
           ${multi ? dteMultiBotonesAside() : `<button class="dte-btn" onclick="dteGuardarComoBorrador(${t})"><i class="ti ti-device-floppy"></i> Guardar borrador</button>
           <button class="dte-btn dte-btn-suave" onclick="dteLimpiar(${t})"><i class="ti ti-eraser"></i> Empezar de nuevo</button>`}
           ${modo}
@@ -1015,6 +1020,32 @@ function dteVerXml(t) {
   const xml = dteXml(s).replace(/></g, '>\n<');
   dteModal(`XML de la ${DTE_NOMBRES[s.tipo]}`, `${err.length ? `<div class="dte-aviso-caja">Falta completar: ${dteEsc(err.join(', '))}.</div>` : ''}
     <pre class="dte-xml">${dteEsc(xml)}</pre>`);
+}
+
+function dteBuscarClienteNombre(consulta) {
+  const cont = document.getElementById('dte-33-clientes-nombre');
+  const q = consulta.trim();
+  if (q.length < 2) { cont.innerHTML = ''; return; }
+  const clientes = dteListaClientes().filter(c => coincideBusqueda(c.nombre, q)).slice(0, 8);
+  cont.innerHTML = clientes.length
+    ? clientes.map(c => `<button type="button" class="dte-btn dte-cliente-resultado" onclick="dteElegirCliente(33,'${dteAttr(c.rut)}')"><b>${dteEsc(c.nombre)}</b> · ${dteEsc(c.rut)}</button>`).join('')
+    : '<p role="status" class="dte-sub">No encontramos clientes con ese nombre. Prueba con otra parte del nombre o ingresa el RUT.</p>';
+}
+
+function dteSeccionError(mensaje) {
+  if (/^referencia /.test(mensaje)) return 'oc';
+  if (/producto/.test(mensaje)) return 'prod';
+  if (/fecha de emisión|factura que se reemplaza/.test(mensaje)) return 'doc';
+  return 'cli';
+}
+
+function dteCorregirFactura(seccion) {
+  document.getElementById('dte-modal-overlay')?.remove();
+  const cont = document.getElementById('dte-33-sec-' + seccion);
+  if (!cont) return;
+  cont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const control = cont.querySelector('input:not([disabled]),select:not([disabled]),button');
+  control?.focus({ preventScroll: true });
 }
 
 function dteEmitir(t) { dteVistaPrevia(t); }
@@ -1219,11 +1250,12 @@ function dteVistaPrevia(t) {
   const xml = dteXml(s).replace(/></g, '>\n<');
   dteModal(`Vista previa de la ${DTE_NOMBRES[s.tipo]}`, `
     ${dteModoHtml()}
-    ${err.length ? `<div class="dte-aviso-caja">Falta completar antes de enviar: ${dteEsc(err.join(', '))}.</div>` : ''}
+     ${t === 33 ? `<p class="dte-info">Revisa el cliente, las referencias, los productos, las cantidades y el total antes de emitir.</p>` : ''}
+    ${err.length ? (t === 33 ? `<div class="dte-aviso-caja"><b>Completa estos datos para poder emitir la factura</b><ul>${err.map(mensaje => `<li><button type="button" class="dte-error-enlace" onclick="dteCorregirFactura('${dteSeccionError(mensaje)}')">Revisar ${dteEsc(mensaje)}</button></li>`).join('')}</ul></div>` : `<div class="dte-aviso-caja">Falta completar antes de enviar: ${dteEsc(err.join(', '))}.</div>`) : ''}
     ${dteTabs('dtevp', [['det', 'Detalles del documento', dteDetallesHtml(s)], ['doc', 'Ver documento', `<div class="dte-papel">${dteHojaHtml(s, 0)}</div>`], ['xml', 'Ver XML', `<pre class="dte-xml">${dteEsc(xml)}</pre>`]])}`,
     `<button class="dte-btn" style="width:auto;padding:0 16px" onclick="dteImprimirHoja(dteHojaHtml(dteEstado[${t}],0))"><i class="ti ti-printer"></i> Imprimir vista previa</button>
-     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">Cancelar</button>
-     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="${t === DTE_MULTI ? 'dteMultiMarcarLista()' : `dteEnviar(${t})`}">${t === DTE_MULTI ? dteMultiTextoSiguiente(true) : '<i class="ti ti-send"></i> Enviar'}</button>`);
+     <button class="dte-btn" style="width:auto;padding:0 16px" onclick="document.getElementById('dte-modal-overlay').remove()">${t === 33 ? 'Volver a editar' : 'Cancelar'}</button>
+     <button class="dte-btn-principal" style="width:auto;padding:0 22px;margin:0" ${err.length ? 'disabled title="Completa los campos que faltan"' : ''} onclick="${t === DTE_MULTI ? 'dteMultiMarcarLista()' : `dteEnviar(${t})`}">${t === DTE_MULTI ? dteMultiTextoSiguiente(true) : t === 33 ? '<i class="ti ti-send"></i> Emitir factura' : '<i class="ti ti-send"></i> Enviar'}</button>`);
 }
 
 // Documento ya emitido: se muestra e imprime el PDF de GDExpress tal cual
