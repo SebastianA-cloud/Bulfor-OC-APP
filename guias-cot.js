@@ -20,10 +20,18 @@ const gcEditor=()=>sesionActual&&sesionActual.rol==='editor';
 const gcSameHospital=(a,b)=>!!(a&&b&&(gcRut(a)&&gcRut(a)===gcRut(b)||gcNorm(gcHospital(a))===gcNorm(gcHospital(b))));
 const gcPeriod=d=>({month:gcDate(d.fecha_emision).slice(0,7),half:Number(gcDate(d.fecha_emision).slice(8,10))<=15?1:2});
 const gcMonthKey=(y,m)=>String(y)+'-'+String(m+1).padStart(2,'0');
+// Solo los clientes con guías en el año que se está viendo (los de años anteriores
+// ya están facturados), con su cantidad, de más a menos guías. El hospital elegido
+// se mantiene en la lista aunque ese año no tenga guías.
 function gcHospitals(){
- const m=new Map();
- gcGuides().forEach(d=>{const k=gcKey(d);if(k&&!m.has(k))m.set(k,{id:k,name:gcHospital(d)});});
- return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'es'));
+ const m=new Map(),anio=String(gcState.year);
+ gcGuides().forEach(d=>{
+   const k=gcKey(d);if(!k)return;
+   if(!m.has(k))m.set(k,{id:k,name:gcHospital(d),n:0});
+   if(gcDate(d.fecha_emision).startsWith(anio))m.get(k).n++;
+ });
+ return [...m.values()].filter(h=>h.n>0||h.id===gcState.hospital)
+   .sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,'es'));
 }
 function gcSelected(d){
  return gcState.hospital==='todos'?!gcNorm(gcHospital(d)).includes('ROBERTO DEL RIO'):gcKey(d)===gcState.hospital;
@@ -141,7 +149,7 @@ function gcRender(){
  const el=document.getElementById('gc-content');if(!el)return;
  const y=gcState.year,m=gcState.month,groups=y===2025?[]:gcGroups();
  const opts=[{id:'todos',name:'Todos (sin Roberto del Río)'},...gcHospitals()];
- const selectors=opts.map(h=>'<option value="'+gcEsc(h.id)+'"'+(h.id===gcState.hospital?' selected':'')+'>'+gcEsc(h.name)+'</option>').join('');
+ const selectors=opts.map(h=>'<option value="'+gcEsc(h.id)+'"'+(h.id===gcState.hospital?' selected':'')+'>'+gcEsc(h.name)+(h.n!=null?' ('+h.n+' guías en '+y+')':'')+'</option>').join('');
  let html='<div class="gc-toolbar"><div class="gc-controls"><select aria-label="Hospital" onchange="gcHospitalSelect(this.value)">'+selectors+'</select><div class="gc-month-picker"><button onclick="gcMonthSelect(-1)">‹</button><b>'+gcMonths[m]+' '+y+'</b><button onclick="gcMonthSelect(1)">›</button></div></div><div class="gc-controls"><button class="page-btn" onclick="gcExcel()">Descargar Excel</button>';
  if(gcEditor()||gcState.demo)html+='<button class="gc-primary" onclick="gcRegister()">Registrar COT (pegar correo)</button>';
  if(gcState.demo)html+='<span class="gc-demo">Vista simulada: no guarda datos</span>';
