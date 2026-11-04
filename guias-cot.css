@@ -54,3 +54,6 @@
 .gc-demo{font-size:12px;color:#8e4d1c}
 @media(max-width:950px){#page-guias-cot .gc-months{grid-template-columns:repeat(6,minmax(0,1fr))}#page-guias-cot .gc-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){#page-guias-cot .gc-cards{grid-template-columns:1fr 1fr}#page-guias-cot .gc-card{padding:10px}#page-guias-cot .gc-card strong{font-size:16px}#page-guias-cot .gc-controls select{width:100%;min-width:0}#page-guias-cot .gc-months{grid-template-columns:repeat(4,minmax(0,1fr))}#page-guias-cot .gc-group{overflow-x:auto}}
+
+.gc-form .gc-primary{border:0;border-radius:9px;background:#c0392b;color:white;font-weight:650;padding:11px 16px;cursor:pointer}
+.gc-form .gc-primary:disabled{opacity:.5;cursor:not-allowed}
