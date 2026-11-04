@@ -124,7 +124,7 @@ function gcGroupHtml(g){
  const first=g.guides[0],shown=gcState.expanded.has(g.key)?g.guides:g.guides.slice(0,4);
  const label=g.cot?.numero_cot||gcCotOcNumber(gcGetOc(g.cot)||{})|| (g.cot?'COT histórica sin N°':g.oc?'Guías con OC':'Sin COT');
  const note=String(g.cot?.nota||'').replace(/FACTURA_HISTORICA:\d+/g,'').replace(/^\s*[|;]\s*/,'').trim();
- let html='<section class="gc-group"><div class="gc-group-head"><div><b>'+gcEsc(label)+'</b><div class="gc-muted">Mes '+g.half+' · '+gcDateDisplay(g.dates[0])+' a '+gcDateDisplay(g.dates[g.dates.length-1])+' · '+g.guides.length+' guías</div></div><strong>'+gcMoney(g.amount)+'</strong></div>';
+ let html='<section class="gc-group"><div class="gc-group-head"><div><b>'+gcEsc(label)+'</b><div class="gc-muted">'+gcEsc(gcMonths[Number(g.dates[0].slice(5,7))-1]||'Mes')+' '+g.half+' · '+gcDateDisplay(g.dates[0])+' a '+gcDateDisplay(g.dates[g.dates.length-1])+' · '+g.guides.length+' guías</div></div><strong>'+gcMoney(g.amount)+'</strong></div>';
  html+='<div class="gc-flow"><span class="'+(g.cot?'gc-done':'gc-warn')+'">COT '+gcEsc(g.cot?.numero_cot||'—')+'</span><span>→</span><span class="'+(g.oc?'gc-done':'gc-muted')+'">OC '+gcEsc(g.oc||'—')+'</span><span>→</span><span class="'+(g.invoice?'gc-done':'gc-muted')+'">Factura '+gcDocLink(g.invoice)+'</span><span>→</span><span class="'+(p?.fecha_pago?'gc-done':'gc-muted')+'">'+gcEsc(paid)+'</span></div>';
  html+='<table class="gc-table"><thead><tr><th>Fecha</th><th>Guía</th><th>Neto</th><th>Total con IVA</th></tr></thead><tbody>';
  shown.forEach(d=>{html+='<tr><td>'+gcDateDisplay(d.fecha_emision)+'</td><td>'+gcDocLink(d)+'</td><td>'+gcMoney(gcNet(d))+'</td><td>'+gcMoney(gcNum(d))+'</td></tr>';});
@@ -164,6 +164,11 @@ async function gcInit(){
      const r=await Promise.all([fetchAll('guias_cot','select=*&order=creado_en.asc'),fetchAll('guias_cot_detalle','select=*')]);
      gcState.cots=r[0];gcState.links=r[1];
    }
+   if(!gcState.demo&&!gcState.mesElegido){
+     const ult=gcGuides().filter(gcSelected).map(d=>gcDate(d.fecha_emision)).sort().pop();
+     if(ult){gcState.year=Number(ult.slice(0,4));gcState.month=Number(ult.slice(5,7))-1;}
+     gcState.mesElegido=true;
+   }
    gcState.loaded=true;gcRender();
    if(!gcState.demo)gcFetchXml();
  }catch(e){if(el)el.textContent='No se pudo cargar el seguimiento. Revisa tu conexión e inténtalo nuevamente.';console.error('Guías COT:',e);}
@@ -172,7 +177,9 @@ async function gcInit(){
 // No se incluye XML en la carga general de la aplicación.
 async function gcFetchXml(){
  try{
-   const all=await fetchAll('documentos_gdexpress','select=id,xml_completo&tipo_dte=eq.33&fecha_emision=gte.2026-01-01');
+   // Solo se piden las facturas cuyo XML cita una guía (referencia tipo 52): son pocas
+   // (~80) en vez de todas las de 2026 (~2.300, unos 25 MB).
+   const all=await fetchAll('documentos_gdexpress','select=id,xml_completo&tipo_dte=eq.33&fecha_emision=gte.2026-01-01&xml_completo=ilike.'+encodeURIComponent('*TpoDocRef>52<*'));
    all.forEach(d=>{if(d.xml_completo)gcState.xml.set(String(d.id),d.xml_completo);});
    if(document.getElementById('page-guias-cot')?.classList.contains('active'))gcRender();
  }catch(e){console.warn('No se pudieron consultar las referencias XML de facturas. Se conserva vínculo por OC.',e);}
@@ -203,7 +210,10 @@ function gcRegister(){
 function gcAnalyze(){
  const input=document.getElementById('gc-email');if(!input)return;
  const parsed=gcParseEmail(input.value);
- const found=parsed.lines.map(line=>({...line,guide:gcGuides().find(g=>gcSelected(g)&&String(g.folio)===line.folio&&gcDate(g.fecha_emision)===line.date)}));
+ const found=parsed.lines.map(line=>{
+   const guide=gcGuides().find(g=>gcSelected(g)&&String(g.folio)===line.folio)||null;
+   return {...line,guide,otraFecha:!!(guide&&line.date&&gcDate(guide.fecha_emision)!==line.date)};
+ });
  const missing=found.filter(x=>!x.guide),duplicate=found.filter(x=>!gcState.demo&&x.guide&&gcState.links.some(l=>String(l.guia_documento_id)===String(x.guide.id)));
  const ids=found.filter(x=>x.guide).map(x=>String(x.guide.id));
  const repeated=ids.length!==new Set(ids).size;
@@ -213,10 +223,15 @@ function gcAnalyze(){
  let html='<label>Número de COT (puede quedar vacío hasta recibir la OC)</label><input id="gc-number" value="'+gcEsc(parsed.number)+'" placeholder="Ej.: 812030-1038-COT26">';
  html+='<label>Valor total de COT, con IVA</label><input id="gc-amount" type="number" min="1" value="'+parsed.amount+'" oninput="gcCheckDifference()">';
  html+='<label>Fecha de vencimiento</label><input id="gc-expiration" type="date" value="'+parsed.expiration+'">';
+ const base=found.find(x=>x.guide)?.guide;
+ const mesBase=base?gcDate(base.fecha_emision).slice(0,7):'';
+ const yaHay=base?gcState.cots.some(c=>String(c.periodo_mes||'').slice(0,7)===mesBase&&c.rut_hospital===gcRut(base)):false;
+ html+='<label>Grupo del mes</label><select id="gc-half"><option value="1"'+(yaHay?'':' selected')+'>'+(base?gcMonths[Number(mesBase.slice(5,7))-1]:'Mes')+' 1</option><option value="2"'+(yaHay?' selected':'')+'>'+(base?gcMonths[Number(mesBase.slice(5,7))-1]:'Mes')+' 2</option></select>';
  html+='<table class="gc-table"><thead><tr><th>Guía</th><th>Correo</th><th>Base real</th></tr></thead><tbody>';
- found.forEach(x=>{html+='<tr><td>'+gcEsc(x.folio)+'</td><td>'+gcMoney(x.amount)+'</td><td>'+(x.guide?gcMoney(gcNum(x.guide)):'No encontrada')+'</td></tr>';});
+ found.forEach(x=>{html+='<tr><td>'+gcEsc(x.folio)+(x.otraFecha?' <small class="gc-muted">(en la base: '+gcDateDisplay(x.guide.fecha_emision)+')</small>':'')+'</td><td>'+gcMoney(x.amount)+'</td><td>'+(x.guide?gcMoney(gcNum(x.guide)):'No encontrada')+'</td></tr>';});
  html+='</tbody></table><div id="gc-diff"></div>';
- if(missing.length)html+='<p class="gc-alert">No se encontraron '+missing.length+' guías con ese folio, fecha y hospital. Corrige los datos antes de guardar.</p>';
+ if(missing.length)html+='<p class="gc-alert">No se encontraron '+missing.length+' guías con ese número en este hospital. Corrige los datos antes de guardar.</p>';
+ if(found.some(x=>x.otraFecha))html+='<p class="gc-alert">'+found.filter(x=>x.otraFecha).length+' guías tienen en la base una fecha distinta a la del correo (se muestra al lado). Se puede guardar igual.</p>';
  if(duplicate.length)html+='<p class="gc-alert">'+duplicate.length+' guías ya están asociadas a una COT.</p>';
  if(repeated)html+='<p class="gc-alert">Hay una guía repetida en el texto.</p>';
  html+='<label>Nota (obligatoria cuando los montos no coinciden)</label><textarea id="gc-note" rows="3"></textarea>';
@@ -240,10 +255,13 @@ async function gcSave(){
  if(!Number.isSafeInteger(amount)||amount<=0){toast('Indica un monto válido en pesos.','err');return;}
  if(amount!==draft.sum&&!note){toast('Escribe una nota que explique la diferencia.','err');return;}
  const base=draft.found[0].guide,period=gcPeriod(base);
- if(draft.found.some(x=>!gcSameHospital(x.guide,base)||gcPeriod(x.guide).month!==period.month||gcPeriod(x.guide).half!==period.half)){
-   toast('Esta COT contiene guías de distintos hospitales o quincenas. Revísalas.','err');return;
+ if(draft.found.some(x=>!gcSameHospital(x.guide,base))){
+   toast('Esta COT contiene guías de distintos hospitales. Revísalas.','err');return;
  }
- const cot={numero_cot:number,rut_hospital:gcRut(base),hospital:gcHospital(base),monto_total:amount,fecha_vencimiento:expiration,periodo_mes:period.month+'-01',quincena:period.half,nota:note};
+ if(draft.found.some(x=>gcPeriod(x.guide).month!==period.month))
+   toast('Ojo: la COT tiene guías de más de un mes. Se guarda en el mes de la primera guía.');
+ const half=Number(document.getElementById('gc-half')?.value)===2?2:1;
+ const cot={numero_cot:number,rut_hospital:gcRut(base),hospital:gcHospital(base),monto_total:amount,fecha_vencimiento:expiration,periodo_mes:period.month+'-01',quincena:half,nota:note};
  let createdId=null;
  try{
    const r=await sb('guias_cot',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(cot)});
