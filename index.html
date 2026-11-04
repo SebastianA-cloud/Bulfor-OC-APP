@@ -1433,6 +1433,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
+<script src="guias-cot.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -1904,7 +1905,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); if (gcState.loaded) gcRender(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
     // En segundo plano: cambia la descripción de las OC ya facturadas por los productos de su factura.
     cargarNombresFacturaPorOC().then(() => { recalcularProductoPorOC(); renderOC(); }).catch(() => {});
     await rrhhListo; rrhhInit();
@@ -19063,6 +19064,5 @@ async function instalarApp() {
   }, true);
 })();
 </script>
-<script src="guias-cot.js"></script>
 </body>
 </html>
