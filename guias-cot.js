@@ -141,7 +141,7 @@ function gcRender(){
  const opts=[{id:'todos',name:'Todos (sin Roberto del Río)'},...gcHospitals()];
  const selectors=opts.map(h=>'<option value="'+gcEsc(h.id)+'"'+(h.id===gcState.hospital?' selected':'')+'>'+gcEsc(h.name)+'</option>').join('');
  let html='<div class="gc-toolbar"><div class="gc-controls"><select aria-label="Hospital" onchange="gcHospitalSelect(this.value)">'+selectors+'</select><div class="gc-month-picker"><button onclick="gcMonthSelect(-1)">‹</button><b>'+gcMonths[m]+' '+y+'</b><button onclick="gcMonthSelect(1)">›</button></div></div><div class="gc-controls"><button class="page-btn" onclick="gcExcel()">Descargar Excel</button>';
- if(gcEditor()&&!gcState.demo)html+='<button class="gc-primary" onclick="gcRegister()">Registrar COT (pegar correo)</button>';
+ if(gcEditor()||gcState.demo)html+='<button class="gc-primary" onclick="gcRegister()">Registrar COT (pegar correo)</button>';
  if(gcState.demo)html+='<span class="gc-demo">Vista simulada: no guarda datos</span>';
  html+='</div></div><div class="gc-year"><div class="gc-muted">'+y+' · Estado por mes de despacho</div><div class="gc-months">';
  gcMonths.forEach((label,i)=>{const state=gcStageMonth(y,i);html+='<button class="gc-month gc-month-'+state+(i===m?' gc-current':'')+'" onclick="gcJump('+i+')"><b>'+label.slice(0,3)+'</b><small>'+({facturado:'Facturado',parcial:'Parcial',sincot:'Sin COT',futuro:'Futuro',vacio:'Sin guías'}[state])+'</small></button>';});
@@ -194,7 +194,7 @@ function gcParseEmail(text){
    number:cot?cot[1].toUpperCase():'',lines};
 }
 function gcRegister(){
- if(!gcEditor()||gcState.demo)return;
+ if(!gcEditor()&&!gcState.demo)return;
  gcState.editId=null;
  panelAbrir({antetitulo:'FACTURAS DE VENTA',titulo:'Registrar COT (pegar correo)',
    sub:'Pega el texto del hospital para encontrar guías y comparar el monto real.',
@@ -204,7 +204,7 @@ function gcAnalyze(){
  const input=document.getElementById('gc-email');if(!input)return;
  const parsed=gcParseEmail(input.value);
  const found=parsed.lines.map(line=>({...line,guide:gcGuides().find(g=>gcSelected(g)&&String(g.folio)===line.folio&&gcDate(g.fecha_emision)===line.date)}));
- const missing=found.filter(x=>!x.guide),duplicate=found.filter(x=>x.guide&&gcState.links.some(l=>String(l.guia_documento_id)===String(x.guide.id)));
+ const missing=found.filter(x=>!x.guide),duplicate=found.filter(x=>!gcState.demo&&x.guide&&gcState.links.some(l=>String(l.guia_documento_id)===String(x.guide.id)));
  const ids=found.filter(x=>x.guide).map(x=>String(x.guide.id));
  const repeated=ids.length!==new Set(ids).size;
  const sum=found.reduce((s,x)=>s+(x.guide?gcNum(x.guide):0),0);
@@ -220,7 +220,7 @@ function gcAnalyze(){
  if(duplicate.length)html+='<p class="gc-alert">'+duplicate.length+' guías ya están asociadas a una COT.</p>';
  if(repeated)html+='<p class="gc-alert">Hay una guía repetida en el texto.</p>';
  html+='<label>Nota (obligatoria cuando los montos no coinciden)</label><textarea id="gc-note" rows="3"></textarea>';
- html+='<button class="gc-primary" onclick="gcSave()" '+(!found.length||missing.length||duplicate.length||repeated?'disabled':'')+'>Guardar COT</button>';
+ html+='<button class="gc-primary" onclick="gcSave()" '+(!found.length||missing.length||duplicate.length||repeated||gcState.demo?'disabled':'')+'>'+(gcState.demo?'Simulación: no se guarda':'Guardar COT')+'</button>';
  node.innerHTML=html;gcCheckDifference();
 }
 function gcCheckDifference(){
