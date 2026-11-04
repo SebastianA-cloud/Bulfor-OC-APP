@@ -1,6 +1,6 @@
 // Guías por facturar (COT). Aislado de los otros menús.
 // Los datos reales se consultan con la sesión existente y RLS.
-const gcState={year:2026,month:4,hospital:'65075485-9',cots:[],links:[],xml:new Map(),loaded:false,expanded:new Set(),demo:false,editId:null};
+const gcState={year:2026,month:4,hospital:'65075485-9',cots:[],links:[],xml:new Map(),loaded:false,expanded:new Set(),demo:new URLSearchParams(location.search).get('guias_demo')==='1',editId:null};
 const gcMonths=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const gcEsc=v=>escapeHtml(v==null?'':String(v));
 const gcMoney=n=>'$ '+Math.round(Number(n)||0).toLocaleString('es-CL');
@@ -12,8 +12,8 @@ const gcHospital=d=>nombreHosp(d.hospital||'')||d.hospital||'';
 const gcKey=d=>gcRut(d)||gcNorm(gcHospital(d));
 const gcNum=d=>Number(d&&d.monto_total!=null?d.monto_total:Math.round(Number(d&&d.monto||0)*1.19))||0;
 const gcNet=d=>Number(d&&d.monto)||0;
-const gcGuides=()=>documentosGdexpress.filter(d=>String(d.tipo_dte)==='52');
-const gcInvoices=()=>documentosGdexpress.filter(d=>String(d.tipo_dte)==='33');
+const gcGuides=()=>(gcState.demo?gcState.demoGuides:documentosGdexpress).filter(d=>String(d.tipo_dte)==='52');
+const gcInvoices=()=>(gcState.demo?gcState.demoInvoices:documentosGdexpress).filter(d=>String(d.tipo_dte)==='33');
 const gcEditor=()=>sesionActual&&sesionActual.rol==='editor';
 const gcSameHospital=(a,b)=>!!(a&&b&&(gcRut(a)&&gcRut(a)===gcRut(b)||gcNorm(gcHospital(a))===gcNorm(gcHospital(b))));
 const gcPeriod=d=>({month:gcDate(d.fecha_emision).slice(0,7),half:Number(gcDate(d.fecha_emision).slice(8,10))<=15?1:2});
@@ -148,7 +148,8 @@ async function gcInit(){
  if(gcState.loaded){gcRender();return;}
  const el=document.getElementById('gc-content');if(el)el.textContent='Cargando guías y COT…';
  try{
-   if(!gcState.demo){
+   if(gcState.demo){gcLoadDemo();}
+   else{
      const r=await Promise.all([fetchAll('guias_cot','select=*&order=creado_en.asc'),fetchAll('guias_cot_detalle','select=*')]);
      gcState.cots=r[0];gcState.links=r[1];
    }
@@ -290,4 +291,17 @@ function gcExcel(){
    XLSX.utils.book_append_sheet(book,ws,name);
  });
  XLSX.writeFile(book,'Guias_por_facturar_'+gcMonthKey(gcState.year,gcState.month)+'.xlsx');
+}
+
+// Vista simulada, aislada del servidor. Se activa con ?guias_demo=1#guias-cot.
+function gcLoadDemo(){
+ const amounts=[106446,6009500,160234,310709,56287,147025];
+ const dates=['2026-06-02','2026-06-04','2026-06-05','2026-06-08','2026-06-09','2026-06-10'];
+ gcState.demoGuides=amounts.map((amount,i)=>({id:95000+i,folio:String(5396+i),tipo_dte:'52',fecha_emision:dates[i],
+   rut_hospital:'65075485-9',hospital:'Hospital Clínico La Florida',monto:Math.round(amount/1.19),monto_total:amount,orden_compra_ref:null}));
+ gcState.demoInvoices=[];
+ gcState.cots=[{id:99001,numero_cot:'812030-1038-COT26',rut_hospital:'65075485-9',hospital:'Hospital Clínico La Florida',
+   monto_total:6790201,fecha_vencimiento:'2026-11-02',periodo_mes:'2026-06-01',quincena:1,nota:null}];
+ gcState.links=gcState.demoGuides.map(g=>({cot_id:99001,guia_documento_id:g.id}));
+ gcState.year=2026;gcState.month=5;gcState.hospital='65075485-9';
 }
