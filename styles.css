@@ -1919,3 +1919,14 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 #stats-content .stats-informe:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #stats-content .stats-informe small { display: block; color: var(--text-2); margin-top: 3px; }
 #stat-modal-overlay .stats-alcance { margin: 0 0 12px; color: var(--text-2); }
+
+/* Consulta de precios y clientes */
+.pv-buscar-label { display: block; font-weight: 600; margin: 0 0 6px; }
+.pv-ayuda { margin: 0 0 14px; color: var(--text-2); }
+.pv-abrir {
+  border: 0; border-radius: 4px; background: transparent; color: var(--accent);
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+  padding: 6px; min-height: 32px;
+}
+.pv-abrir:hover { text-decoration: underline; }
+.pv-abrir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

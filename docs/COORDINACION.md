@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- 04-11-2026 · Codex · propuesta en `codex/precios-ux`. Precios: búsqueda etiquetada, acceso por teclado, filtro de clientes en ficha que conserva consulta al volver, resumen del último precio sin IVA y regresos explícitos. PR y revisión pendientes.
+
 - Codex · propuesta en `codex/estadisticas-ux` · Estadísticas de órdenes de compra. Informes agrupados, controles de teclado y alcance de los datos visible. Pendiente de revisión.
 
 - Codex · propuesta en `codex/hospitales-ux` · Hospitales. Apertura de ficha con teclado, quitar región conservando búsqueda y aclarar total en órdenes con IVA. Pendiente de revisión.

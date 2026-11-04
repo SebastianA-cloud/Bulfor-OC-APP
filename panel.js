@@ -156,7 +156,7 @@ function panelPintar() {
   const anterior = panelPila.length > 1 ? panelPila[panelPila.length - 2] : null;
   const nav = f.navegacion && !anterior ? f.navegacion : null;
   const arriba = anterior
-    ? `<button class="panel-volver" onclick="panelVolver()"><i class="ti ti-arrow-left"></i> Volver a ${panelEsc(anterior.titulo)}</button>`
+    ? `<button class="panel-volver" onclick="panelVolver()"><i class="ti ti-arrow-left"></i> Volver a ${panelEsc(anterior.etiquetaVolver || anterior.titulo)}</button>`
     : `<span class="panel-pos">${panelEsc(nav?.texto || '')}</span>`;
   const flechas = nav ? `
       <button class="panel-btn-ico" title="Anterior (↑)" ${nav.anterior ? `onclick="panelAcciones.${accion(nav.anterior)}()"` : 'disabled'}><i class="ti ti-arrow-up"></i></button>

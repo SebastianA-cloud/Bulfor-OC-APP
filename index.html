@@ -491,12 +491,14 @@
       <button onclick="preciosIrA('cliente')">Por cliente</button>
     </div>
     <div class="fpp-resumen" id="fp-items-resumen" style="display:none"></div>
+    <label for="fp-items-search" class="pv-buscar-label">Buscar producto</label>
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="fp-items-search" placeholder="Buscar producto…" oninput="filterFacturaItems()">
+        <input type="text" id="fp-items-search" placeholder="Nombre del producto…" aria-label="Buscar producto" aria-describedby="pv-buscar-ayuda" oninput="filterFacturaItems()">
       </div>
     </div>
+    <p id="pv-buscar-ayuda" class="pv-ayuda">Escribe parte del nombre. Abre un producto para consultar sus clientes y precios facturados.</p>
     <div id="fp-items-cargando" style="display:none">
       <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
       <div class="skeleton" style="height:38px;margin-bottom:6px"></div>
@@ -532,11 +534,11 @@
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="fp-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesFacturas()">
+        <input type="text" id="fp-clientes-search" placeholder="Nombre o RUT…" aria-label="Buscar cliente por nombre o RUT" oninput="filterClientesFacturas()">
       </div>
       <div class="search-wrap">
         <span class="search-icon">📦</span>
-        <input type="text" id="fp-clientes-producto" placeholder="…a los que les vendimos este producto" oninput="filterClientesFacturas()">
+        <input type="text" id="fp-clientes-producto" placeholder="Producto vendido a ese cliente…" aria-label="Filtrar clientes por producto vendido" oninput="filterClientesFacturas()">
       </div>
       <button class="page-btn" id="fp-clientes-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosClientesFacturas()">✕ Limpiar filtros</button>
     </div>
@@ -3782,12 +3784,12 @@ function renderFacturaItems() {
   // 5% 250 ml, glacial…) se ven al abrirlo. Si tiene una sola, la fila es ella.
   renderTablaAlfabetica('fp-items-body', 'fp-items-jump', sustanciasDePrecios(facturaProductosUnicosF), p => p.nombre,
     (p, idx) => p.presentaciones ? `<tr onclick="navReset();abrirFilaPrecios(${idx})" style="cursor:pointer">
-      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗ <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.presentaciones.length} presentaciones</small></td>
+      <td style="font-weight:500;color:#185FA5"><button type="button" class="pv-abrir" onclick="event.stopPropagation();navReset();abrirFilaPrecios(${idx})">${escapeHtml(p.nombre)} ›</button> <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.presentaciones.length} presentaciones</small></td>
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-3);white-space:nowrap">Ver presentaciones ›</td>
     </tr>` : `<tr onclick="navReset();abrirFilaPrecios(${idx})" style="cursor:pointer">
-      <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
+      <td style="font-weight:500;color:#185FA5"><button type="button" class="pv-abrir" onclick="event.stopPropagation();navReset();abrirFilaPrecios(${idx})">${escapeHtml(p.nombre)} ›</button>${p.alias && p.alias.size > 1 ? ` <small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${p.alias.size} nombres distintos ${infoTip([...p.alias].join(' · '))}</small>` : ''}</td>
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
@@ -3909,13 +3911,15 @@ function fichaSustanciaPrecios(idx) {
   if (!s || !s.presentaciones) return null;
   window.__pvPresentaciones = s.presentaciones;
   return {
+    etiquetaVolver: 'presentaciones',
     antetitulo: 'Producto',
     titulo: s.nombre,
     sub: `${s.presentaciones.length} presentaciones · ${s.facturas.toLocaleString('es-CL')} facturas · ${clp(s.totalFacturado)} neto`,
+    acciones: '<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button>',
     cuerpo: `<div class="panel-h">Presentaciones — clic para ver clientes y precios</div>
       <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Presentación</th><th style="text-align:right">Facturas</th><th>Última venta</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Rango</th></tr></thead><tbody>
         ${s.presentaciones.map((p, i) => `<tr class="pv-fila" onclick="panelAbrir(fichaProductoVenta(window.__pvPresentaciones[${i}].nombre), true)">
-          <td><span class="panel-link">${escapeHtml(p.nombre)}</span>${p.alias && p.alias.size > 1 ? ' ' + infoTip('Nombres que se juntaron aquí: ' + [...p.alias].join(' · ')) : ''}</td>
+          <td><button type="button" class="pv-abrir" onclick="event.stopPropagation();panelAbrir(fichaProductoVenta(window.__pvPresentaciones[${i}].nombre), true)">${escapeHtml(p.nombre)} ›</button>${p.alias && p.alias.size > 1 ? ' ' + infoTip('Nombres que se juntaron aquí: ' + [...p.alias].join(' · ')) : ''}</td>
           <td style="text-align:right">${p.facturas}</td><td>${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
           <td class="oc-monto">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <small class="pv-unidad">/ ${escapeHtml(p.ultimaUnidad)}</small>` : ''}</td>
           <td class="oc-monto" style="font-weight:400;color:var(--text-2)">${p.precioMin != null && p.precioMin !== p.precioMax ? `${clp(p.precioMin)} – ${clp(p.precioMax)}` : '—'}</td></tr>`).join('')}
@@ -4166,8 +4170,10 @@ function fichaProductoVenta(nombreProducto) {
   window.__pvClientes = clientes;
   const lista = (window.__alfabeticoOrden && window.__alfabeticoOrden['fp-items-body']) || [];
   const idx = lista.findIndex(p => p.nombre === nombreProducto && !p.presentaciones);
+  const estado = { consulta: '' };
   const alias = prod.alias && prod.alias.size > 1 ? [...prod.alias] : null;
   return {
+    etiquetaVolver: 'clientes',
     antetitulo: 'Producto',
     titulo: nombreProducto,
     tituloExtra: alias ? infoTip('Nombres que se juntaron aquí: ' + alias.join(' · ')) : '',
@@ -4178,15 +4184,36 @@ function fichaProductoVenta(nombreProducto) {
         <div><span>Último precio unitario</span><b>${prod.ultimoPrecio != null ? clp(prod.ultimoPrecio) : '—'}${prod.ultimaUnidad ? ` <small>/ ${escapeHtml(prod.ultimaUnidad)}</small>` : ''}</b></div>
         <div><span>Rango de precios</span><b>${prod.precioMin != null ? (prod.precioMin === prod.precioMax ? clp(prod.precioMin) : `${clp(prod.precioMin)} – ${clp(prod.precioMax)}`) : '—'}</b></div>
       </div>`,
-    acciones: `<button class="page-btn" onclick="abrirPrecioCosto(${panelEsc(JSON.stringify(nombreProducto))})">💰 Precio costo</button>`,
-    cuerpo: `<div class="panel-h">Clientes — clic para ver el historial de precios</div>
-      <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Cliente</th><th style="text-align:right">Facturas</th><th>Última venta</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Total facturado</th></tr></thead><tbody>
-        ${clientes.map((c, i) => `<tr class="pv-fila" onclick="panelAbrir(fichaHistorialVenta(${panelEsc(JSON.stringify(nombreProducto))}, window.__pvClientes[${i}].cliente), true)">
-          <td><span class="panel-link">${escapeHtml(c.cliente)}</span></td><td style="text-align:right">${c.docs.size}</td><td>${fDate(c.ultima)}</td>
-          <td class="oc-monto">${c.precio != null ? clp(c.precio) : '—'}${c.unidad ? ` <small class="pv-unidad">/ ${escapeHtml(c.unidad)}</small>` : ''}</td><td class="oc-monto" style="font-weight:500">${clp(c.total)}</td></tr>`).join('')}
-      </tbody></table>`,
+    acciones: `<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button><button class="page-btn" onclick="abrirPrecioCosto(${panelEsc(JSON.stringify(nombreProducto))})">💰 Precio costo</button>`,
+    get cuerpo() {
+      window.__pvClientes = clientes;
+      window.__pvBuscarClientes = estado;
+      return `<div class="panel-h">Elige un cliente para ver su historial de precios</div>
+        <label for="pv-cliente-buscar" class="pv-buscar-label">Buscar cliente</label>
+        <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true">🔍</span>
+          <input id="pv-cliente-buscar" type="text" value="${escapeHtml(estado.consulta)}" placeholder="Nombre del cliente…" oninput="pvBuscarClientes(this.value)" aria-describedby="pv-cliente-ayuda"></div>
+        <p id="pv-cliente-ayuda" class="pv-ayuda">Escribe parte del nombre. Los precios son unitarios, sin IVA y corresponden a la unidad indicada.</p>
+        <div id="pv-clientes-resultados">${pvClientesHtml(nombreProducto, clientes, estado.consulta)}</div>`;
+    },
     navegacion: idx === -1 ? null : navegacionPrecios(idx),
   };
+}
+
+function pvClientesHtml(producto, clientes, consulta) {
+  const visibles = clientes.map((c, i) => ({ c, i })).filter(({ c }) => coincideBusqueda(c.cliente, consulta));
+  if (!visibles.length) return '<div class="panel-vacio" role="status">No hay clientes con ese nombre. Prueba con una parte del nombre.</div>';
+  return `<p role="status">${visibles.length} clientes</p><table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Cliente</th><th>Facturas</th><th>Última venta</th><th>Último precio (sin IVA)</th><th>Total facturado (sin IVA)</th></tr></thead><tbody>
+    ${visibles.map(({ c, i }) => `<tr><td><button type="button" class="pv-abrir" onclick="panelAbrir(fichaHistorialVenta(${panelEsc(JSON.stringify(producto))}, window.__pvClientes[${i}].cliente), true)">${escapeHtml(c.cliente)} ›</button></td>
+      <td>${c.docs.size}</td><td>${fDate(c.ultima)}</td><td class="oc-monto">${c.precio != null ? clp(c.precio) : '—'}${c.unidad ? ` / ${escapeHtml(c.unidad)}` : ''}</td><td class="oc-monto">${clp(c.total)}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function pvBuscarClientes(consulta) {
+  const ficha = panelPila[panelPila.length - 1];
+  const estado = window.__pvBuscarClientes;
+  if (!estado || !ficha) return;
+  estado.consulta = consulta;
+  document.getElementById('pv-clientes-resultados').innerHTML = pvClientesHtml(ficha.titulo, window.__pvClientes, consulta);
 }
 
 // Historial de precios de un producto a un cliente: cada factura con su
@@ -4196,10 +4223,17 @@ function fichaHistorialVenta(nombreProducto, clienteNombre) {
     .sort((a, b) => (b.doc.fecha_emision || '').localeCompare(a.doc.fecha_emision || '') || Number(b.doc.folio) - Number(a.doc.folio));
   const docsLista = ventas.map(v => v.doc);
   window.__pvDocs = docsLista;
+  const ultima = ventas[0];
   return {
     antetitulo: clienteNombre,
     titulo: nombreProducto,
     sub: `Historial de precios · ${ventas.length} ${ventas.length === 1 ? 'venta' : 'ventas'}`,
+    resumen: ultima ? `<div class="hosp-cifras">
+      <div><span>Último precio facturado (sin IVA)</span><b>${ultima.item.precio_unitario != null ? clp(ultima.item.precio_unitario) : '—'}</b><small>${escapeHtml(ultima.item.unidad || 'Unidad sin registrar')}</small></div>
+      <div><span>Fecha de la última factura</span><b>${fDate(ultima.doc.fecha_emision)}</b></div>
+      <div><span>Factura</span><button type="button" class="oc-folio" onclick="panelAbrir(fichaDocumento(${ultima.doc.id}, window.__pvDocs), true)">N° ${escapeHtml(String(ultima.doc.folio))} ›</button></div>
+    </div>` : '',
+    acciones: '<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button>',
     cuerpo: ventas.length ? `<table class="hosp-oc-tabla"><thead><tr><th>N° factura</th><th>Fecha de emisión</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unitario (neto)</th><th style="text-align:right">Total del producto</th></tr></thead><tbody>
         ${ventas.map(({ item, doc }, i) => `<tr><td><button class="oc-folio" onclick="panelAbrir(fichaDocumento(${doc.id}, window.__pvDocs), true)">N° ${escapeHtml(String(doc.folio))} ›</button></td>
           <td>${doc.fecha_emision ? fDate(doc.fecha_emision) : '—'}</td>
