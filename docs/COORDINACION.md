@@ -4,6 +4,8 @@ Acuerdo indicado por Seba el 29-10-2026. Leer junto a AGENTS.md / CLAUDE.md y do
 
 ## Registro vigente
 
+- 04-11-2026 · Codex · propuesta en `codex/factura-ux`. Factura: buscar cliente por nombre, ayuda para orden, errores enlazados a secciones y revisión/edición antes de emitir. Validación y emisión existentes conservadas; pruebas con datos simulados. Pendiente PR y revisión de Seba.
+
 - 04-11-2026 · Codex · propuesta en `codex/precios-ux`. Precios: búsqueda etiquetada, acceso por teclado, filtro de clientes en ficha que conserva consulta al volver, resumen del último precio sin IVA y regresos explícitos. PR y revisión pendientes.
 
 - Codex · propuesta en `codex/estadisticas-ux` · Estadísticas de órdenes de compra. Informes agrupados, controles de teclado y alcance de los datos visible. Pendiente de revisión.
