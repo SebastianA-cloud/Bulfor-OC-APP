@@ -28,8 +28,13 @@ function gcSelected(d){
 }
 function gcCotOcNumber(o){return String(o.nombreoc||'').match(/\b(\d{5,8}-\d+-COT\d{2})\b/i)?.[1]?.toUpperCase()||'';}
 function gcGetOc(cot){
- if(!cot||!cot.numero_cot)return null;
- return oc.find(o=>gcCotOcNumber(o)===gcNorm(cot.numero_cot)&&(!o.rut_hospital||!cot.rut_hospital||o.rut_hospital===cot.rut_hospital))||null;
+ if(!cot)return null;
+ if(cot.numero_cot)return oc.find(o=>gcCotOcNumber(o)===gcNorm(cot.numero_cot)&&(!o.rut_hospital||!cot.rut_hospital||o.rut_hospital===cot.rut_hospital))||null;
+ // Históricos: la factura ya verificada da la OC, y nombreoc da la COT.
+ const invoice=cot.nota?.match(/FACTURA_HISTORICA:(\d+)/)?.[1];
+ if(!invoice)return null;
+ const f=gcInvoices().find(x=>String(x.folio)===invoice&&gcRut(x)===cot.rut_hospital);
+ return f?.orden_compra_ref?oc.find(o=>gcNorm(o.codigooc)===gcNorm(f.orden_compra_ref))||null:null;
 }
 function gcRefs(xml){
  if(!xml)return [];
@@ -109,9 +114,9 @@ function gcHospitalSelect(id){gcState.hospital=id;gcRender();}
 function gcToggle(key){gcState.expanded.has(key)?gcState.expanded.delete(key):gcState.expanded.add(key);gcRender();}
 function gcGroupHtml(g){
  const p=gcPayment(g.invoice);
- const paid=p&&p.fecha_pago?'Pagada '+gcDateDisplay(p.fecha_pago):'Sin pago registrado';
+ const paid=p&&p.fecha_pago?'Pagada '+gcDateDisplay(p.fecha_pago):p&&/pagad|cancelad/i.test(p.estado_pago||'')?'Pagada (fecha no registrada)':'Sin pago registrado';
  const first=g.guides[0],shown=gcState.expanded.has(g.key)?g.guides:g.guides.slice(0,4);
- const label=g.cot?.numero_cot|| (g.cot?'COT histórica sin N°':g.oc?'Guías con OC':'Sin COT');
+ const label=g.cot?.numero_cot||gcCotOcNumber(gcGetOc(g.cot)||{})|| (g.cot?'COT histórica sin N°':g.oc?'Guías con OC':'Sin COT');
  const note=String(g.cot?.nota||'').replace(/FACTURA_HISTORICA:\d+/g,'').replace(/^\s*[|;]\s*/,'').trim();
  let html='<section class="gc-group"><div class="gc-group-head"><div><b>'+gcEsc(label)+'</b><div class="gc-muted">Mes '+g.half+' · '+gcDateDisplay(g.dates[0])+' a '+gcDateDisplay(g.dates[g.dates.length-1])+' · '+g.guides.length+' guías</div></div><strong>'+gcMoney(g.amount)+'</strong></div>';
  html+='<div class="gc-flow"><span class="'+(g.cot?'gc-done':'gc-warn')+'">COT '+gcEsc(g.cot?.numero_cot||'—')+'</span><span>→</span><span class="'+(g.oc?'gc-done':'gc-muted')+'">OC '+gcEsc(g.oc||'—')+'</span><span>→</span><span class="'+(g.invoice?'gc-done':'gc-muted')+'">Factura '+gcDocLink(g.invoice)+'</span><span>→</span><span class="'+(p?.fecha_pago?'gc-done':'gc-muted')+'">'+gcEsc(paid)+'</span></div>';
