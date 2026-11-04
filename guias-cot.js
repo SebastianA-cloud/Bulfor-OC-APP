@@ -163,3 +163,129 @@ async function gcFetchXml(){
    if(document.getElementById('page-guias-cot')?.classList.contains('active'))gcRender();
  }catch(e){console.warn('No se pudieron consultar las referencias XML de facturas. Se conserva vínculo por OC.',e);}
 }
+
+
+// Reconoce textos de correo como el enviado por La Florida. No lee el buzón.
+function gcParseEmail(text){
+ const amount=/\b(?:valor|monto(?:\s+total)?)\s*:?\s*\$?\s*([\d.]+)/i.exec(text);
+ const expiration=/\bvence(?:\s+el)?\s+(\d{2})[-/](\d{2})[-/](\d{4})/i.exec(text);
+ const cot=/\b(\d{5,8}-\d+-COT\d{2})\b/i.exec(text);
+ const lines=[];
+ text.split(/\r?\n/).forEach(line=>{
+   const match=/^\s*(\d{2})[-/](\d{2})[-/](\d{4})\s+(\d{4,8})\s+\$?\s*([\d.]+)/.exec(line);
+   if(match)lines.push({date:match[3]+'-'+match[2]+'-'+match[1],folio:match[4],amount:Number(match[5].replace(/\./g,''))});
+ });
+ return {amount:amount?Number(amount[1].replace(/\./g,'')):0,
+   expiration:expiration?expiration[3]+'-'+expiration[2]+'-'+expiration[1]:'',
+   number:cot?cot[1].toUpperCase():'',lines};
+}
+function gcRegister(){
+ if(!gcEditor()||gcState.demo)return;
+ gcState.editId=null;
+ panelAbrir({antetitulo:'FACTURAS DE VENTA',titulo:'Registrar COT (pegar correo)',
+   sub:'Pega el texto del hospital para encontrar guías y comparar el monto real.',
+   cuerpo:'<div class="gc-form"><label>Texto del correo</label><textarea id="gc-email" rows="10" placeholder="Valor $ 6.790.201.- vence el 02-11-2026"></textarea><div class="gc-actions"><button class="gc-primary" onclick="gcAnalyze()">Reconocer guías</button></div><div id="gc-parsed"></div></div>'},true);
+}
+function gcAnalyze(){
+ const input=document.getElementById('gc-email');if(!input)return;
+ const parsed=gcParseEmail(input.value);
+ const found=parsed.lines.map(line=>({...line,guide:gcGuides().find(g=>gcSelected(g)&&String(g.folio)===line.folio&&gcDate(g.fecha_emision)===line.date)}));
+ const missing=found.filter(x=>!x.guide),duplicate=found.filter(x=>x.guide&&gcState.links.some(l=>String(l.guia_documento_id)===String(x.guide.id)));
+ const ids=found.filter(x=>x.guide).map(x=>String(x.guide.id));
+ const repeated=ids.length!==new Set(ids).size;
+ const sum=found.reduce((s,x)=>s+(x.guide?gcNum(x.guide):0),0);
+ gcState.draft={...parsed,found,missing,duplicate,repeated,sum};
+ const node=document.getElementById('gc-parsed');
+ let html='<label>Número de COT (puede quedar vacío hasta recibir la OC)</label><input id="gc-number" value="'+gcEsc(parsed.number)+'" placeholder="Ej.: 812030-1038-COT26">';
+ html+='<label>Valor total de COT, con IVA</label><input id="gc-amount" type="number" min="1" value="'+parsed.amount+'" oninput="gcCheckDifference()">';
+ html+='<label>Fecha de vencimiento</label><input id="gc-expiration" type="date" value="'+parsed.expiration+'">';
+ html+='<table class="gc-table"><thead><tr><th>Guía</th><th>Correo</th><th>Base real</th></tr></thead><tbody>';
+ found.forEach(x=>{html+='<tr><td>'+gcEsc(x.folio)+'</td><td>'+gcMoney(x.amount)+'</td><td>'+(x.guide?gcMoney(gcNum(x.guide)):'No encontrada')+'</td></tr>';});
+ html+='</tbody></table><div id="gc-diff"></div>';
+ if(missing.length)html+='<p class="gc-alert">No se encontraron '+missing.length+' guías con ese folio, fecha y hospital. Corrige los datos antes de guardar.</p>';
+ if(duplicate.length)html+='<p class="gc-alert">'+duplicate.length+' guías ya están asociadas a una COT.</p>';
+ if(repeated)html+='<p class="gc-alert">Hay una guía repetida en el texto.</p>';
+ html+='<label>Nota (obligatoria cuando los montos no coinciden)</label><textarea id="gc-note" rows="3"></textarea>';
+ html+='<button class="gc-primary" onclick="gcSave()" '+(!found.length||missing.length||duplicate.length||repeated?'disabled':'')+'>Guardar COT</button>';
+ node.innerHTML=html;gcCheckDifference();
+}
+function gcCheckDifference(){
+ const draft=gcState.draft;if(!draft)return;
+ const amount=Number(document.getElementById('gc-amount')?.value)||0;
+ const diff=draft.sum-amount,el=document.getElementById('gc-diff');if(!el)return;
+ el.className='gc-diff '+(!diff?'gc-diff-ok':'gc-diff-warn');
+ el.textContent=!diff?'Coincide: '+gcMoney(draft.sum)+' ('+draft.found.length+' guías)':'Diferencia de '+gcMoney(Math.abs(diff))+' ('+(diff>0?'guías superan COT':'COT supera guías')+'). Puedes guardar con una nota.';
+}
+async function gcSave(){
+ if(!gcEditor()||gcState.demo)return;
+ const draft=gcState.draft;if(!draft||draft.missing.length||draft.duplicate.length||draft.repeated||!draft.found.length)return;
+ const amount=Number(document.getElementById('gc-amount')?.value);
+ const number=document.getElementById('gc-number')?.value.trim().toUpperCase()||null;
+ const expiration=document.getElementById('gc-expiration')?.value||null;
+ const note=document.getElementById('gc-note')?.value.trim()||null;
+ if(!Number.isSafeInteger(amount)||amount<=0){toast('Indica un monto válido en pesos.','err');return;}
+ if(amount!==draft.sum&&!note){toast('Escribe una nota que explique la diferencia.','err');return;}
+ const base=draft.found[0].guide,period=gcPeriod(base);
+ if(draft.found.some(x=>!gcSameHospital(x.guide,base)||gcPeriod(x.guide).month!==period.month||gcPeriod(x.guide).half!==period.half)){
+   toast('Esta COT contiene guías de distintos hospitales o quincenas. Revísalas.','err');return;
+ }
+ const cot={numero_cot:number,rut_hospital:gcRut(base),hospital:gcHospital(base),monto_total:amount,fecha_vencimiento:expiration,periodo_mes:period.month+'-01',quincena:period.half,nota:note};
+ let createdId=null;
+ try{
+   const r=await sb('guias_cot',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(cot)});
+   if(!r.ok)throw new Error('No se pudo crear la COT. Verifica el número y los permisos.');
+   const data=await r.json();createdId=data[0]?.id;
+   if(!createdId)throw new Error('No se recibió el identificador de la COT.');
+   const links=draft.found.map(x=>({cot_id:createdId,guia_documento_id:x.guide.id}));
+   const lr=await sb('guias_cot_detalle',{method:'POST',body:JSON.stringify(links)});
+   if(!lr.ok)throw new Error('No se pudieron vincular las guías (quizás ya pertenecen a otra COT).');
+   gcState.loaded=false;gcState.draft=null;panelCerrar();await gcInit();toast('COT registrada con '+links.length+' guías.');
+ }catch(e){
+   if(createdId){
+     const undo=await sb('guias_cot?id=eq.'+createdId,{method:'DELETE'});
+     if(!undo.ok)console.error('La COT quedó sin vinculación. Requiere revisión: ',createdId);
+   }
+   toast(e.message||'No se pudo registrar','err');
+ }
+}
+function gcEdit(id){
+ if(!gcEditor())return;
+ const cot=gcState.cots.find(c=>Number(c.id)===Number(id));if(!cot)return;
+ panelAbrir({antetitulo:'FACTURAS DE VENTA',titulo:'Editar COT',
+   sub:'La lista de guías queda intacta. Para corregir una asociación errónea debes borrar la COT completa.',
+   cuerpo:'<div class="gc-form"><label>Número</label><input id="gc-edit-number" value="'+gcEsc(cot.numero_cot||'')+'"><label>Monto con IVA</label><input id="gc-edit-amount" type="number" value="'+Number(cot.monto_total)+'"><label>Vencimiento</label><input id="gc-edit-exp" type="date" value="'+(cot.fecha_vencimiento||'')+'"><label>Nota</label><textarea id="gc-edit-note">'+gcEsc(cot.nota||'')+'</textarea><button class="gc-primary" onclick="gcSaveEdit('+Number(cot.id)+')">Guardar</button></div>'},true);
+}
+async function gcSaveEdit(id){
+ if(!gcEditor())return;
+ const row={numero_cot:document.getElementById('gc-edit-number').value.trim().toUpperCase()||null,monto_total:Number(document.getElementById('gc-edit-amount').value),
+   fecha_vencimiento:document.getElementById('gc-edit-exp').value||null,nota:document.getElementById('gc-edit-note').value.trim()||null};
+ if(!Number.isSafeInteger(row.monto_total)||row.monto_total<=0){toast('Monto no válido','err');return;}
+ const res=await sb('guias_cot?id=eq.'+id,{method:'PATCH',body:JSON.stringify(row)});
+ if(!res.ok){toast('No se pudo guardar la edición','err');return;}
+ panelCerrar();gcState.loaded=false;await gcInit();toast('COT actualizada');
+}
+async function gcDelete(id){
+ if(!gcEditor())return;
+ if(!await confirmModal('Se eliminará esta COT y se liberarán sus guías. ¿Confirmas?',{textoOk:'Eliminar COT'}))return;
+ const res=await sb('guias_cot?id=eq.'+id,{method:'DELETE'});
+ if(!res.ok){toast('No se pudo borrar la COT','err');return;}
+ gcState.loaded=false;await gcInit();toast('COT eliminada');
+}
+function gcExcel(){
+ if(typeof XLSX==='undefined'){toast('No está disponible la descarga Excel.','err');return;}
+ const book=XLSX.utils.book_new(),stages=[['sincot','Sin COT'],['encot','En COT'],['conoc','Con OC'],['facturada','Facturada']];
+ const groups=gcState.year===2025?[]:gcGroups(),hospital=gcState.hospital==='todos'?'Todos salvo Roberto del Río':gcHospitals().find(h=>h.id===gcState.hospital)?.name||gcState.hospital;
+ stages.forEach(([stage,name])=>{
+   const rows=[['Hospital',hospital],['Período',gcMonths[gcState.month]+' '+gcState.year],['Emitido',new Date().toLocaleDateString('es-CL')],[],['Fecha guía','N° guía','Monto neto','Total con IVA','COT','OC','Factura']];
+   let net=0,total=0;
+   groups.filter(g=>g.stage===stage).forEach(g=>g.guides.forEach(d=>{
+     const n=gcNet(d),t=gcNum(d);net+=n;total+=t;
+     rows.push([gcDateDisplay(d.fecha_emision),String(d.folio),n,t,g.cot?.numero_cot||'',g.oc||'',g.invoice?.folio||'']);
+   }));
+   rows.push(['TOTAL','',net,total,'','','']);
+   const ws=XLSX.utils.aoa_to_sheet(rows);
+   ws['!cols']=[{wch:17},{wch:14},{wch:18},{wch:19},{wch:25},{wch:23},{wch:14}];
+   XLSX.utils.book_append_sheet(book,ws,name);
+ });
+ XLSX.writeFile(book,'Guias_por_facturar_'+gcMonthKey(gcState.year,gcState.month)+'.xlsx');
+}
