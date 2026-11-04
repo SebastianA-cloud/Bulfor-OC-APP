@@ -12,7 +12,9 @@ const gcHospital=d=>nombreHosp(d.hospital||'')||d.hospital||'';
 const gcKey=d=>gcRut(d)||gcNorm(gcHospital(d));
 const gcNum=d=>Number(d&&d.monto_total!=null?d.monto_total:Math.round(Number(d&&d.monto||0)*1.19))||0;
 const gcNet=d=>Number(d&&d.monto)||0;
-const gcGuides=()=>(gcState.demo?gcState.demoGuides:documentosGdexpress).filter(d=>String(d.tipo_dte)==='52');
+// Las guías rechazadas por el SII (estado_aceptacion 'N', como en el resto de la app)
+// no se despacharon de verdad: no cuentan en ninguna etapa ni al registrar una COT.
+const gcGuides=()=>(gcState.demo?gcState.demoGuides:documentosGdexpress).filter(d=>String(d.tipo_dte)==='52'&&d.estado_aceptacion!=='N');
 const gcInvoices=()=>(gcState.demo?gcState.demoInvoices:documentosGdexpress).filter(d=>String(d.tipo_dte)==='33');
 const gcEditor=()=>sesionActual&&sesionActual.rol==='editor';
 const gcSameHospital=(a,b)=>!!(a&&b&&(gcRut(a)&&gcRut(a)===gcRut(b)||gcNorm(gcHospital(a))===gcNorm(gcHospital(b))));
