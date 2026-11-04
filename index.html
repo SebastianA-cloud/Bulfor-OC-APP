@@ -4154,6 +4154,9 @@ function fichaProductoVenta(nombreProducto) {
   const ventas = ventasDeProducto(nombreProducto);
   if (!ventas.length) return null;
   const prod = facturaProductosUnicos.find(p => p.nombre === nombreProducto) || {};
+  const ultimaVenta = [...ventas].sort((a, b) =>
+    String(b.doc.fecha_emision || '').localeCompare(String(a.doc.fecha_emision || '')) ||
+    Number(b.doc.folio) - Number(a.doc.folio))[0];
   const total = ventas.reduce((t, v) => t + Number(v.item.monto_item || 0), 0);
   const docs = new Set(ventas.map(v => v.doc.id));
   // Por cliente: facturas, último precio y última fecha.
@@ -4177,22 +4180,25 @@ function fichaProductoVenta(nombreProducto) {
     antetitulo: 'Producto',
     titulo: nombreProducto,
     tituloExtra: alias ? infoTip('Nombres que se juntaron aquí: ' + alias.join(' · ')) : '',
-    sub: `${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}${alias ? ' · ' + alias.length + ' nombres distintos' : ''}`,
-    resumen: `<div class="hosp-cifras">
-        <div><span>Facturas</span><b>${docs.size.toLocaleString('es-CL')}</b></div>
-        <div><span>Total facturado (neto)</span><b>${clp(total)}</b></div>
-        <div><span>Último precio unitario</span><b>${prod.ultimoPrecio != null ? clp(prod.ultimoPrecio) : '—'}${prod.ultimaUnidad ? ` <small>/ ${escapeHtml(prod.ultimaUnidad)}</small>` : ''}</b></div>
-        <div><span>Rango de precios</span><b>${prod.precioMin != null ? (prod.precioMin === prod.precioMax ? clp(prod.precioMin) : `${clp(prod.precioMin)} – ${clp(prod.precioMax)}`) : '—'}</b></div>
-      </div>`,
+    sub: `Precios facturados sin IVA · ${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}${alias ? ' · ' + alias.length + ' nombres distintos' : ''}`,
+    resumen: `<div class="pv-ultimo-resumen">
+      <div><span>Último precio facturado, sin IVA</span><b>${ultimaVenta.item.precio_unitario != null ? clp(ultimaVenta.item.precio_unitario) : '—'}</b><small>Por ${escapeHtml((ultimaVenta.item.unidad || '').trim() || 'unidad sin registrar')}</small></div>
+      <div><span>Cliente de esa venta</span><b>${escapeHtml(clienteDeDoc(ultimaVenta.doc))}</b><small>${fDate(ultimaVenta.doc.fecha_emision)}</small></div>
+    </div>`,
+    pie: `<details class="pv-historico"><summary>Resumen histórico · ${docs.size.toLocaleString('es-CL')} facturas</summary>
+      <p>Total facturado sin IVA: <b>${clp(total)}</b></p>
+      <p>Rango de precios unitarios registrados: <b>${prod.precioMin != null ? (prod.precioMin === prod.precioMax ? clp(prod.precioMin) : `${clp(prod.precioMin)} – ${clp(prod.precioMax)}`) : '—'}</b></p>
+      <p>Comprueba la unidad de cada registro antes de comparar precios.</p>
+    </details>`,
     acciones: `<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button><button class="page-btn" onclick="abrirPrecioCosto(${panelEsc(JSON.stringify(nombreProducto))})">💰 Precio costo</button>`,
     get cuerpo() {
       window.__pvClientes = clientes;
       window.__pvBuscarClientes = estado;
-      return `<div class="panel-h">Elige un cliente para ver su historial de precios</div>
+      return `
         <label for="pv-cliente-buscar" class="pv-buscar-label">Buscar cliente</label>
         <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true">🔍</span>
           <input id="pv-cliente-buscar" type="text" value="${escapeHtml(estado.consulta)}" placeholder="Nombre del cliente…" oninput="pvBuscarClientes(this.value)" aria-describedby="pv-cliente-ayuda"></div>
-        <p id="pv-cliente-ayuda" class="pv-ayuda">Escribe parte del nombre. Los precios son unitarios, sin IVA y corresponden a la unidad indicada.</p>
+        <p id="pv-cliente-ayuda" class="pv-ayuda">Elige un cliente para consultar sus precios y facturas. Puedes buscar por parte del nombre.</p>
         <div id="pv-clientes-resultados">${pvClientesHtml(nombreProducto, clientes, estado.consulta)}</div>`;
     },
     navegacion: idx === -1 ? null : navegacionPrecios(idx),
@@ -4202,10 +4208,13 @@ function fichaProductoVenta(nombreProducto) {
 function pvClientesHtml(producto, clientes, consulta) {
   const visibles = clientes.map((c, i) => ({ c, i })).filter(({ c }) => coincideBusqueda(c.cliente, consulta));
   if (!visibles.length) return '<div class="panel-vacio" role="status">No hay clientes con ese nombre. Prueba con una parte del nombre.</div>';
-  return `<p role="status">${visibles.length} clientes</p><table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Cliente</th><th>Facturas</th><th>Última venta</th><th>Último precio (sin IVA)</th><th>Total facturado (sin IVA)</th></tr></thead><tbody>
-    ${visibles.map(({ c, i }) => `<tr><td><button type="button" class="pv-abrir" onclick="panelAbrir(fichaHistorialVenta(${panelEsc(JSON.stringify(producto))}, window.__pvClientes[${i}].cliente), true)">${escapeHtml(c.cliente)} ›</button></td>
-      <td>${c.docs.size}</td><td>${fDate(c.ultima)}</td><td class="oc-monto">${c.precio != null ? clp(c.precio) : '—'}${c.unidad ? ` / ${escapeHtml(c.unidad)}` : ''}</td><td class="oc-monto">${clp(c.total)}</td></tr>`).join('')}
+  return `<p role="status">${visibles.length} clientes</p><table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Cliente</th><th>Último precio sin IVA</th><th>Unidad</th><th>Fecha</th><th>Historial</th></tr></thead><tbody>
+    ${visibles.map(({ c, i }) => `<tr><td>${escapeHtml(c.cliente)}</td>
+      <td class="oc-monto"><b>${c.precio != null ? clp(c.precio) : '—'}</b></td>
+      <td>${escapeHtml(c.unidad || 'Sin registrar')}</td><td>${fDate(c.ultima)}</td>
+      <td><button type="button" class="pv-abrir" aria-label="Ver historial de ${escapeHtml(c.cliente)}" onclick="panelAbrir(fichaHistorialVenta(${panelEsc(JSON.stringify(producto))}, window.__pvClientes[${i}].cliente), true)">Ver historial ›</button></td></tr>`).join('')}
     </tbody></table>`;
+
 }
 
 function pvBuscarClientes(consulta) {
