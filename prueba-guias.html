@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prueba de Guías por facturar — Bulfor</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="guias-facturacion.css"><style>body{display:block}.demo-main{margin:0 auto!important;padding:24px;max-width:1200px}.demo-cabecera{background:#fff3dc;color:#634300;padding:16px 24px;border-bottom:1px solid #d6b566}.demo-cabecera p{margin:6px 0}.demo-cabecera button{margin-top:8px}.page{padding:0!important} @media(max-width:640px){.demo-main{padding:16px}}</style></head><body><header class="demo-cabecera"><b>Demostración · datos ficticios</b><p>Puedes asociar y retirar guías, cambiar período, OC y COT, y ver el historial. Los cambios duran hasta recargar esta página; no se conectan a la base real.</p><p>Para probar: abre la factura 900002, selecciona Asociar guías y elige 800003 y 800004 como Enero 2.</p><button class="page-btn" onclick="location.reload()">Reiniciar ejemplo</button><p id="demo-estado" role="status"></p></header><main class="demo-main">  <div class="page active" id="page-guias-facturacion">
+    <div class="page-header"><div class="page-title">Guías por facturar</div><div class="page-sub" id="gf-resumen">Cruza guías y facturas por hospital y período de despacho.</div></div>
+    <div class="gf-controles">
+      <label>Hospital<select id="gf-hospital" onchange="gf.listo=false;gf.error='';gfRender()"></select></label>
+      <label>Año de despacho<input id="gf-anio" type="number" min="2000" max="2100" onchange="gf.listo=false;gf.error='';gfRender()"></label>
+      <button class="page-btn" id="gf-cargar" onclick="gfCargar()">Revisar guías</button>
+    </div>
+    <div class="gf-controles">
+      <label>Mes de despacho<select id="gf-mes" onchange="gf.mes=this.value;gf.pagina=1;gfRender()"><option value="">Todo el año</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select></label>
+      <label>Vista<select id="gf-vista" onchange="gf.vista=this.value;gf.pagina=1;gfRender()"><option value="facturas">Facturas y guías asociadas</option><option value="pendientes">Guías sin factura / por revisar</option></select></label>
+      <label>Buscar<input id="gf-buscar" type="search" placeholder="Factura, guía, OC, COT o período…" oninput="gf.pagina=1;gfRender()"></label>
+    </div>
+    <p>El período corresponde al despacho. Las facturas sin guías ni período confirmado se muestran por fecha de emisión como “Por definir”.</p>
+    <p id="gf-aviso" class="gf-alerta" role="alert" hidden></p>
+    <div id="gf-resultados"></div>
+  </div>
+</main><script src="panel.js"></script><script src="guias-facturacion.js"></script><script src="guias-demo.js"></script></body></html>

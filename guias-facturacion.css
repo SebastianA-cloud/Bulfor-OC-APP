@@ -1,0 +1,26 @@
+/* Alcance propio del seguimiento de guías y sus fichas. */
+.gf-controles {display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin:16px 0}
+.gf-controles label,.gf-ficha label {display:flex;flex-direction:column;gap:6px;font-weight:600}
+.gf-controles input,.gf-controles select,.gf-ficha input:not([type=checkbox]) {padding:10px;border:1px solid #c8c3bd;border-radius:7px;background:white;color:#292623;min-height:40px;max-width:100%}
+.gf-controles label:first-child {flex:1;min-width:190px}
+.gf-controles select {max-width:100%}
+.gf-alerta {padding:12px;background:#fff3dc;color:#714b00;border:1px solid #e7c880;border-radius:7px}
+.gf-tabla {overflow:auto;max-width:100%;background:white;border:1px solid #e7e1db;border-radius:10px}
+.gf-tabla table {width:100%;border-collapse:collapse}
+.gf-tabla th {background:#292623;color:white;padding:12px}
+.gf-tabla td {padding:12px;border-bottom:1px solid #e7e1db}
+.gf-fila {cursor:pointer}
+.gf-fila:hover,.gf-fila:focus {background:#fae9e6;outline:2px solid #c0392b;outline-offset:-2px}
+.gf-link {border:0;background:none;color:#a32f23;text-decoration:underline;cursor:pointer;font:inherit;padding:5px}
+.gf-paginas,.gf-acciones {display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.gf-ficha details {margin:18px 0;border:1px solid #ddd4cb;border-radius:8px;padding:14px}
+.gf-ficha summary {cursor:pointer;font-weight:700;color:#a32f23}
+.gf-ficha .gf-form-grid {display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.gf-ficha input {box-sizing:border-box}
+.gf-ficha>label {margin:12px 0}
+.gf-seleccion {max-height:320px;overflow:auto;border:1px solid #ddd4cb;border-radius:8px;padding:8px}
+.gf-seleccion label {display:block;font-weight:400;padding:9px;border-bottom:1px solid #eee}
+.gf-seleccion [hidden] {display:none}
+.gf-historial {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+#gf-guardar-error {color:#a32f23;font-weight:bold}
+@media(max-width:640px){.gf-controles{display:grid;grid-template-columns:1fr}.gf-controles label:first-child{min-width:0}.gf-controles input,.gf-controles select{width:100%;box-sizing:border-box}.gf-ficha .gf-form-grid{grid-template-columns:1fr}.gf-tabla table{min-width:650px}}

@@ -18,6 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="guias-facturacion.css">
 
 </head>
 <body>
@@ -655,6 +656,23 @@
 
 
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
+  <!-- GUÍAS POR FACTURAR -->
+  <div class="page" id="page-guias-facturacion">
+    <div class="page-header"><div class="page-title">Guías por facturar</div><div class="page-sub" id="gf-resumen">Cruza guías y facturas por hospital y período de despacho.</div></div>
+    <div class="gf-controles">
+      <label>Hospital<select id="gf-hospital" onchange="gf.listo=false;gf.error='';gfRender()"></select></label>
+      <label>Año de despacho<input id="gf-anio" type="number" min="2000" max="2100" onchange="gf.listo=false;gf.error='';gfRender()"></label>
+      <button class="page-btn" id="gf-cargar" onclick="gfCargar()">Revisar guías</button>
+    </div>
+    <div class="gf-controles">
+      <label>Mes de despacho<select id="gf-mes" onchange="gf.mes=this.value;gf.pagina=1;gfRender()"><option value="">Todo el año</option><option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select></label>
+      <label>Vista<select id="gf-vista" onchange="gf.vista=this.value;gf.pagina=1;gfRender()"><option value="facturas">Facturas y guías asociadas</option><option value="pendientes">Guías sin factura / por revisar</option></select></label>
+      <label>Buscar<input id="gf-buscar" type="search" placeholder="Factura, guía, OC, COT o período…" oninput="gf.pagina=1;gfRender()"></label>
+    </div>
+    <p>El período corresponde al despacho. Las facturas sin guías ni período confirmado se muestran por fecha de emisión como “Por definir”.</p>
+    <p id="gf-aviso" class="gf-alerta" role="alert" hidden></p>
+    <div id="gf-resultados"></div>
+  </div>
   <div class="page" id="page-facturas">
     <div class="page-header">
       <div class="page-title">Documentos <span class="info-tip" tabindex="0" role="note" data-tip="Facturas, guías de despacho y notas de crédito emitidas. El total facturado es facturas menos notas de crédito del mes, igual que el Registro de Ventas del SII. El buscador busca en todas las fechas, también por producto.">i</span></div>
@@ -1425,6 +1443,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
+<script src="guias-facturacion.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -1896,7 +1915,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); gfInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
     // En segundo plano: cambia la descripción de las OC ya facturadas por los productos de su factura.
     cargarNombresFacturaPorOC().then(() => { recalcularProductoPorOC(); renderOC(); }).catch(() => {});
     await rrhhListo; rrhhInit();
@@ -18364,6 +18383,7 @@ const SUBMENUS = {
   ] },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guías por facturar', page: 'guias-facturacion' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Cobranza', page: 'pagos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
@@ -18551,6 +18571,7 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pageEl = document.getElementById('page-'+id);
   if (pageEl) pageEl.classList.add('active');
+  if (id === 'guias-facturacion') gfInit();
   if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
