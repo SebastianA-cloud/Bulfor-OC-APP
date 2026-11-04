@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
 <link rel="stylesheet" href="styles.css">
 
+<link rel="stylesheet" href="guias-cot.css">
 </head>
 <body>
 
@@ -117,6 +118,7 @@
       </div>
       <div class="nav-subgroup" id="subgroup-facturas">
         <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Documentos</span></div>
+        <div class="nav-item nav-subitem" data-page="guias-cot" onclick="seleccionarSubpagina('facturas','guias-cot',this)"><span>Guías por facturar</span></div>
         <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Cobranza</span></div>
         <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
         <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
@@ -677,6 +679,12 @@
       <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
     </div>
     <div id="doc-contenido"></div>
+  </div>
+
+  <!-- Guías por facturar: pantalla centrada en COT, sin cambios a otros módulos. -->
+  <div class="page" id="page-guias-cot">
+    <div class="page-header"><div class="page-title">Guías por facturar</div><div class="page-sub">Seguimiento de COT, órdenes de compra, facturación y pagos por mes de despacho.</div></div>
+    <div id="gc-content"></div>
   </div>
 
   <div class="page" id="page-chilexpress">
@@ -1425,6 +1433,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
+<script src="guias-cot.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -1896,7 +1905,7 @@ async function init() {
     document.getElementById('syncDot').style.background = '#2D6A4F';
     document.getElementById('syncText').textContent = 'Conectado';
     await sincronizarFacturasPagoDesdeGdexpress();
-    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
+    populateFilters(); ocInit(); renderItems(); renderHosp(); renderEstadisticas(); filterPacientes(); pagosInit(); renderGraficosPagos(); rechazadasInit(); docInit(); if (gcState.loaded) gcRender(); fppInit(); renderGraficosPagosProv(); fedexInit(); oeInit(); renderInicio(); pintarTodosLosAlcances();
     // En segundo plano: cambia la descripción de las OC ya facturadas por los productos de su factura.
     cargarNombresFacturaPorOC().then(() => { recalcularProductoPorOC(); renderOC(); }).catch(() => {});
     await rrhhListo; rrhhInit();
@@ -18364,6 +18373,7 @@ const SUBMENUS = {
   ] },
   'facturas': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guías por facturar', page: 'guias-cot' },
     { icon: '<i class="ti ti-cash"></i>', label: 'Cobranza', page: 'pagos' },
     { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
@@ -18552,6 +18562,7 @@ function showPage(id, el) {
   const pageEl = document.getElementById('page-'+id);
   if (pageEl) pageEl.classList.add('active');
   if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
+  if (id === 'guias-cot') gcInit();
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
   // agrupa Por producto y Por cliente): así queda marcado en las dos.

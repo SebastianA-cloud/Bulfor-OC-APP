@@ -156,6 +156,9 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 8. Decisiones de diseño ya tomadas (respetarlas)
 
+- **Guías por facturar (04-11-2026, autorizado por Seba):** centro COT, no factura. Se enlazan manualmente COT→guías; OC por `ordenes_compra.nombreoc`, factura por referencia 52 del XML o misma OC, y pago desde `facturas_pago`. Agrupar por mes del despacho, preservar grupos históricos verificados aun si exceden 15 días. No reutilizar PR #14 (cerrado sin integrar). Solo dos tablas nuevas (`guias_cot`, `guias_cot_detalle`), RLS editor/autenticado. La guía 5392 queda sin COT. Ver `docs/GUIAS_COT.md`.
+
+
 - **Estilo general** (Etapa 2): listas como Órdenes de compra/Facturas: tabla centrada, títulos oscuros fijos, selector mes/año `‹ ›`, páginas de 15, fichas en ventana grande con cajas (`doc-caja`).
 - **Documentos**: ficha con OC + botón Mercado Público, caja Cobranza pequeña y caja Estado SII/Envío; productos en tabla cuadriculada con Neto/IVA/Total solo bajo Precio y Total; rechazadas/anuladas = "No se cobra". Columna "Folio".
 - **Cobranza**: "Por factura" es la vista por defecto.
@@ -167,6 +170,10 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 04-11-2026 · Claude · **Integrado en main mediante PR #16 (aprobado por Seba el 04-11-2026; reemplaza al #15, que se cierra sin integrar):** correcciones de la revisión del PR #15: (1) se quita el bloqueo por quincenas de calendario al guardar una COT (los grupos del hospital no las respetan: Enero 1 va del 05 al 26); solo se exige el mismo hospital y se avisa si hay guías de meses distintos; (2) grupos nombrados "Junio 1"/"Mayo 2" en vez de "Mes 1"; (3) al registrar se elige si la COT es la 1 o la 2 del mes (por defecto 1 si es la primera del hospital en ese mes); (4) solo se descargan los XML de facturas que citan guías (~40 en 2026, antes ~2.300 y 25 MB); (5) la guía se busca por número y hospital, y si la fecha del correo no coincide solo se avisa; (6) abre en el último mes con guías del hospital; (7) las guías rechazadas (`estado_aceptacion = 'N'`) no se cuentan (en La Florida 2026: 5265, 5279, 5309, 5311, 5321, 5347, 5391, 5395, 5427, 5431, 5447, 5450, 5459); (8) el selector de hospital muestra solo los clientes con guías en el año que se está viendo (en 2026: 11), con su cantidad y de más a menos. Probado con datos simulados, sin escrituras.
+- 04-11-2026 · Codex · En `codex/guias-cot-20261104`: submenú Guías por facturar centrado en COT; filtro hospital/mes/año, tarjetas de etapas, grupos y detalle, pega correo con comparación, edición/borrado de COT, Excel de cuatro etapas y navegación a ficha. Dos tablas creadas con RLS tras autorización; histórico de 2026 cargado en Supabase bajo nueva aprobación total de Seba: 8 grupos, 82 guías, suma verificada con facturas (5392 excluida). Script JS probado con texto exacto de junio (6 guías, $6.790.201), sintaxis y vista simulada; vista previa Vercel y navegador real pendientes. Rama no integrada; PR #15 abierto para revisión de Claude antes de que Seba lo apruebe. Vercel informó despliegue completado, sin prueba visual de navegador.
+
 
 - 04-11-2026 · Codex · propuesta en `codex/factura-ux`. Factura: buscar cliente por nombre, ayuda para orden, errores enlazados a secciones y revisión/edición antes de emitir. Validación y emisión existentes conservadas; pruebas con datos simulados. Pendiente PR y revisión de Seba.
 
@@ -205,6 +212,10 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] Guías por facturar: la nota de la guía 5392 sigue escrita en el código (`folio==='5392'`); idealmente pasarla a un dato (nota por guía) en una mejora futura.
+- [ ] **Guías por facturar**: verificar vista previa Vercel, aspecto en notebook/móvil y registro COT con un editor de pruebas sin modificar registros reales. Claude revisa el PR nuevo; Seba aprueba explícitamente ese PR antes de merge. Revisar COT sin número cuando llegue OC: no deducir vinculaciones ambiguas por monto.
+
 
 - [ ] Revisar en vista previa el contraste del desplegable de escritorio antes de aprobar su integración.
 
