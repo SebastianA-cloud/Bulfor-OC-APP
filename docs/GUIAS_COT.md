@@ -1,6 +1,6 @@
 # Guías por facturar — implementación COT (04-11-2026)
 
-**Estado:** propuesta en rama `codex/guias-cot-20261104`. No integrada a main. El PR #14 fue cerrado, sin integración. Requiere revisión de Claude y aprobación explícita de Seba para integrar.
+**Estado:** propuesta en rama `codex/guias-cot-20261104`, PR #15 (https://github.com/SebastianA-cloud/Bulfor-OC-APP/pull/15). No integrada a main. El PR #14 fue cerrado, sin integración. Requiere revisión de Claude y aprobación explícita de Seba para integrar.
 
 ## Qué hace
 
@@ -38,8 +38,9 @@ Se conservan los grupos «Enero 1», «Febrero 1» y «Marzo 1» aprobados, aun 
 
 ## Pendientes para revisión de Claude y Seba
 
+- Vercel reportó un despliegue completado (GitHub status). URL de rama: https://bulfor-oc-app-git-codex-guias-cot-20261104-bulfor-s-projects.vercel.app/ . No se verificó respuesta HTTP ni apertura visual desde este entorno.
 - Probar visualmente la vista previa real en escritorio y móvil (no confundir compilación/construcción de la rama con prueba visual).
 - Verificar con usuario editor y viewer los permisos de acceso y guardado, sin usar un registro real de prueba sobre las guías históricas.
 - Revisar posibles coincidencias múltiples de facturas por OC: si hay ambigüedad no asociar automáticamente.
-- Las COT sin número pueden completarse a partir de una OC solo si existe identificación determinística; sin ese identificador no vincular por montos parecidos.
+- Las COT sin número pueden mostrarse con el número de COT de una OC solo si coincide de forma única el hospital y el total exacto; si hay varias OC iguales, no se vinculan automáticamente. Esta resolución se calcula al leer, sin modificar el número guardado.
 - Aún no se integra a main. Claude revisa primero y Seba aprueba expresamente el PR concreto.
