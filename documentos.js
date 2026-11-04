@@ -1022,13 +1022,13 @@ function dteVerXml(t) {
     <pre class="dte-xml">${dteEsc(xml)}</pre>`);
 }
 
-function dteBuscarClienteNombre(consulta) {
-  const cont = document.getElementById('dte-33-clientes-nombre');
+function dteBuscarClienteNombre(consulta, t = 33) {
+  const cont = document.getElementById(`dte-${t}-clientes-nombre`);
   const q = consulta.trim();
   if (q.length < 2) { cont.innerHTML = ''; return; }
   const clientes = dteListaClientes().filter(c => coincideBusqueda(c.nombre, q)).slice(0, 8);
   cont.innerHTML = clientes.length
-    ? clientes.map(c => `<button type="button" class="dte-btn dte-cliente-resultado" onclick="dteElegirCliente(33,'${dteAttr(c.rut)}')"><b>${dteEsc(c.nombre)}</b> · ${dteEsc(c.rut)}</button>`).join('')
+    ? clientes.map(c => `<button type="button" class="dte-btn dte-cliente-resultado" onclick="dteElegirCliente(${t},'${dteAttr(c.rut)}')"><b>${dteEsc(c.nombre)}</b> · ${dteEsc(c.rut)}</button>`).join('')
     : '<p role="status" class="dte-sub">No encontramos clientes con ese nombre. Prueba con otra parte del nombre o ingresa el RUT.</p>';
 }
 
@@ -1407,6 +1407,11 @@ function dteMultiElegirHtml() {
   const conocido = dteListaClientes().find(c => c.rut === s.rut);
   const rutOk = dteRutValido(s.rut);
   const cliente = `
+    <label class="dte-campo"><span>Buscar cliente por nombre</span>
+      <input type="text" class="dte-in" placeholder="Escribe parte del nombre del cliente" aria-describedby="dte-multi-cliente-ayuda" oninput="dteBuscarClienteNombre(this.value,${t})">
+    </label>
+    <p id="dte-multi-cliente-ayuda" class="dte-sub">Elige un cliente para cargar sus datos y seleccionar sus órdenes de compra. También puedes ingresar su RUT.</p>
+    <div id="dte-${t}-clientes-nombre"></div>
     <div class="dte-grid dte-grid-cli">
       <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
         <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
@@ -1455,7 +1460,7 @@ function dteMultiOcsHtml() {
   const filas = lista.slice(0, MAX).map(o => {
     const marcada = m.sel.some(x => x.oc === o.codigooc);
     return `<tr class="dte-borr-fila${marcada ? ' dte-msel-fila' : ''}" onclick="dteMultiMarcar('${dteAttr(o.codigooc)}')">
-      <td><input type="checkbox" ${marcada ? 'checked' : ''} tabindex="-1"></td>
+      <td><input type="checkbox" aria-label="Seleccionar orden ${dteAttr(o.codigooc)}" ${marcada ? 'checked' : ''} onclick="event.stopPropagation()" onchange="dteMultiMarcar('${dteAttr(o.codigooc)}',true)"></td>
       <td><b>${dteEsc(o.codigooc)}</b></td>
       <td>${dteDmy(dteFechaCL(o.fechaoc))}</td>
       <td style="text-align:right">${dteClp(o.totaloc)}</td></tr>`;
@@ -1491,17 +1496,28 @@ function dteMultiBuscar(v) {
   if (c) c.innerHTML = dteMultiOcsHtml();
 }
 function dteMultiCambioSel() { dteMultiGuardar(); dteMultiRender(); }
-function dteMultiMarcar(cod) {
+function dteMultiMarcar(cod, conservarFoco = false) {
   const m = dteMulti;
   const i = m.sel.findIndex(x => x.oc === cod);
   if (i >= 0) m.sel.splice(i, 1);
   else {
     const o = dteOcsDelRut(m.base.rut).find(o => o.codigooc === cod);
     const completa = o && dteMultiOcCompleta(o);
-    if (completa && !confirm(`La OC ${cod} ya está facturada completa (${dteClp(completa.facturado)} de ${dteClp(completa.total)}). ¿Agregarla igual?`)) return;
+    if (completa && !confirm(`La OC ${cod} ya está facturada completa (${dteClp(completa.facturado)} de ${dteClp(completa.total)}). ¿Agregarla igual?`)) {
+      if (conservarFoco) {
+        const control = [...document.querySelectorAll('#dte-multi input[type="checkbox"]')]
+          .find(input => input.getAttribute('aria-label') === 'Seleccionar orden ' + cod);
+        if (control) control.checked = false;
+      }
+      return;
+    }
     m.sel.push({ oc: cod, fecha: o ? dteFechaCL(o.fechaoc) : '' });
   }
   dteMultiCambioSel();
+  if (conservarFoco) {
+    const controles = document.querySelectorAll('#dte-multi input[type="checkbox"]');
+    [...controles].find(control => control.getAttribute('aria-label') === 'Seleccionar orden ' + cod)?.focus();
+  }
 }
 function dteMultiAgregarManual() {
   const m = dteMulti;
@@ -1568,8 +1584,8 @@ function dteMultiProgresoHtml() {
 const dteMultiQuedanOtras = () => dteMulti.facturas.some((f, i) => i !== dteMulti.actual && (f.estado === 'pendiente' || f.estado === 'error'));
 function dteMultiTextoSiguiente(enModal) {
   if (!dteMulti) return '';
-  if (enModal) return dteMultiQuedanOtras() ? '<i class="ti ti-arrow-right"></i> Lista: pasar a la siguiente' : '<i class="ti ti-checks"></i> Lista: ir a emitir todas';
-  return dteMultiQuedanOtras() ? 'Revisar y pasar a la siguiente' : 'Revisar y terminar';
+  if (enModal) return dteMultiQuedanOtras() ? '<i class="ti ti-arrow-right"></i> Dejar lista y continuar' : '<i class="ti ti-checks"></i> Dejar lista y revisar el conjunto';
+  return 'Revisar esta factura';
 }
 
 function dteMultiBotonesAside() {
@@ -1577,7 +1593,7 @@ function dteMultiBotonesAside() {
   if (!f) return '';
   const listas = dteMulti.facturas.filter(x => x.estado === 'lista').length;
   return `<button class="dte-btn" onclick="dteMultiSaltar()"><i class="ti ti-player-skip-forward"></i> Saltar esta ${f.oc ? 'OC' : 'factura'}</button>
-    ${listas ? `<button class="dte-btn" onclick="dteMultiIrARevisar()"><i class="ti ti-checks"></i> Ir a emitir (${listas} lista${listas === 1 ? '' : 's'})</button>` : ''}
+    ${listas ? `<button class="dte-btn" onclick="dteMultiIrARevisar()"><i class="ti ti-checks"></i> Revisar conjunto (${listas} lista${listas === 1 ? '' : 's'})</button>` : ''}
     <button class="dte-btn dte-btn-suave" onclick="dteMultiTerminar()"><i class="ti ti-x"></i> Terminar facturación múltiple</button>`;
 }
 
@@ -1643,6 +1659,12 @@ function dteMultiRevisarHtml() {
   const m = dteMulti;
   const porEmitir = m.facturas.filter(f => f.estado === 'lista' || f.estado === 'error');
   const total = porEmitir.reduce((a, f) => a + dteTotales(f.form).total, 0);
+  const estados = [
+    ['pendiente', 'Por preparar'], ['lista', 'Listas'], ['error', 'Con error para reintentar'],
+    ['saltada', 'Excluidas'], ['emitida', 'Ya emitidas'],
+  ];
+  const resumenEstados = estados.map(([estado, nombre]) =>
+    `<span class="dte-mestado"><b>${m.facturas.filter(f => f.estado === estado).length}</b> ${nombre}</span>`).join('');
   const enviando = dteMultiEmitiendo >= 0;
   const filas = m.facturas.map((f, i) => {
     const lineas = f.form.det.filter(d => d.nombre.trim()).length;
@@ -1661,17 +1683,19 @@ function dteMultiRevisarHtml() {
   }).join('');
   const conError = m.facturas.filter(f => f.estado === 'error').length;
   return `<div class="dte-card">
-    <h3 class="dte-h">Revisar y emitir · ${dteEsc(m.base.recep.rzn || m.base.rut)}</h3>
+    <h3 class="dte-h">Revisar conjunto · ${dteEsc(m.base.recep.rzn || m.base.rut)}</h3>
+    <div class="dte-mresumen" role="group" aria-label="Estado de las facturas">${resumenEstados}</div>
+    <p class="dte-sub">Se emitirán las facturas listas y se reintentarán las que tienen error. Las pendientes y excluidas quedan fuera de este envío.</p>
     ${dteModoServidor && dteModoServidor.ambiente !== 'P' ? '<div class="dte-modo dte-modo-t"><b>HOMOLOGACIÓN (pruebas)</b> · los documentos no son reales.</div>' : ''}
     ${conError && !enviando ? `<div class="dte-aviso-caja">${conError} factura${conError === 1 ? '' : 's'} no se pudo emitir. Revisa el motivo, corrígela con “Editar” y vuelve a apretar “Enviar y emitir”.</div>` : ''}
     <div class="dte-borr-tabla dte-mfin"><table>
       <thead><tr><th>#</th><th>OC</th><th>Detalle</th><th style="text-align:right">Total</th><th>Estado</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table></div>
     <div class="dte-mrev-pie">
-      <div>${porEmitir.length ? `Se van a emitir <b>${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'}</b> por <b>${dteClp(total)}</b>.` : 'No quedan facturas por emitir.'}</div>
+      <div>${porEmitir.length ? `Se van a emitir <b>${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'}</b> por <b>${dteClp(total)} con IVA</b>.` : 'No quedan facturas por emitir.'}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="dte-btn dte-btn-suave" onclick="dteMultiTerminar()" ${enviando ? 'disabled' : ''}>Terminar</button>
-        <button class="dte-btn-principal" onclick="dteMultiEmitirTodas()" ${porEmitir.length && !enviando ? '' : 'disabled'}>${enviando ? '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Emitiendo…' : `<i class="ti ti-send"></i> Enviar y emitir${porEmitir.length > 1 ? ' todas' : ''}`}</button>
+        <button class="dte-btn-principal" onclick="dteMultiEmitirTodas()" ${porEmitir.length && !enviando ? '' : 'disabled'}>${enviando ? '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Emitiendo…' : `<i class="ti ti-send"></i> Emitir ${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'}`}</button>
       </div>
     </div></div>`;
 }
