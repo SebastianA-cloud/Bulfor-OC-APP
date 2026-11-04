@@ -15,7 +15,7 @@ const gcNet=d=>Number(d&&d.monto)||0;
 // Las guías rechazadas por el SII (estado_aceptacion 'N', como en el resto de la app)
 // no se despacharon de verdad: no cuentan en ninguna etapa ni al registrar una COT.
 const gcGuides=()=>(gcState.demo?gcState.demoGuides:documentosGdexpress).filter(d=>String(d.tipo_dte)==='52'&&d.estado_aceptacion!=='N');
-const gcInvoices=()=>(gcState.demo?gcState.demoInvoices:documentosGdexpress).filter(d=>String(d.tipo_dte)==='33');
+const gcInvoices=()=>(gcState.demo?gcState.demoInvoices:documentosGdexpress).filter(d=>String(d.tipo_dte)==='33'&&d.estado_aceptacion!=='N');
 const gcEditor=()=>sesionActual&&sesionActual.rol==='editor';
 const gcSameHospital=(a,b)=>!!(a&&b&&(gcRut(a)&&gcRut(a)===gcRut(b)||gcNorm(gcHospital(a))===gcNorm(gcHospital(b))));
 const gcPeriod=d=>({month:gcDate(d.fecha_emision).slice(0,7),half:Number(gcDate(d.fecha_emision).slice(8,10))<=15?1:2});
@@ -195,6 +195,82 @@ async function gcFetchXml(){
  }catch(e){console.warn('No se pudieron consultar las referencias XML de facturas. Se conserva vínculo por OC.',e);}
 }
 
+
+// ── Estado de cada guía para otras pantallas (Documentos) ──
+// Mismo criterio que este menú, guía por guía: Rechazada, Facturada (histórico
+// 2025 o con su factura), Con OC, En COT o Sin COT. Así "guías por facturar"
+// baja sola a medida que llegan las OC y se emiten las facturas.
+let gcBase=null, gcEstadoCache=null, gcEstadoFirma='';
+// Carga una sola vez las COT, sus guías y los XML de facturas que citan guías.
+function gcAsegurarDatos(){
+ if(gcState.demo)return Promise.resolve();
+ if(!gcBase)gcBase=(async()=>{
+   if(!gcState.loaded){
+     const r=await Promise.all([fetchAll('guias_cot','select=*&order=creado_en.asc'),fetchAll('guias_cot_detalle','select=*')]);
+     gcState.cots=r[0];gcState.links=r[1];
+   }
+   await gcFetchXml();
+   gcState.datosBase=true;
+ })().catch(e=>{gcBase=null;throw e;});
+ return gcBase;
+}
+function gcDatosListos(){return !!(gcState.datosBase||gcState.loaded);}
+function gcEstados(){
+ const firma=[gcState.cots.length,gcState.links.length,gcState.xml.size,documentosGdexpress.length,oc.length,
+   gcState.cots.map(c=>c.id+':'+(c.numero_cot||'')).join(',')].join('|');
+ if(gcEstadoCache&&firma===gcEstadoFirma)return gcEstadoCache;
+ // Guía citada en el XML de una factura (referencia tipo 52), por hospital.
+ const porRef=new Map();
+ gcInvoices().forEach(f=>{const x=gcState.xml.get(String(f.id));if(x)gcRefs(x).forEach(folio=>porRef.set(gcRut(f)+'|'+folio,f));});
+ // Facturas vigentes de cada OC.
+ const porOc=new Map();
+ gcInvoices().forEach(f=>{const k=gcNorm(f.orden_compra_ref);if(k){if(!porOc.has(k))porOc.set(k,[]);porOc.get(k).push(f);}});
+ const byLink=new Map(gcState.links.map(l=>[String(l.guia_documento_id),String(l.cot_id)]));
+ const byCot=new Map(gcState.cots.map(c=>[String(c.id),c]));
+ const ocDeCot=new Map();
+ const mapa=new Map();
+ documentosGdexpress.filter(d=>String(d.tipo_dte)==='52').forEach(g=>{
+   if(g.estado_aceptacion==='N'){mapa.set(g.id,{etapa:'rechazada'});return;}
+   if(gcDate(g.fecha_emision)<'2026-01-01'){mapa.set(g.id,{etapa:'historico'});return;}
+   const cot=byCot.get(byLink.get(String(g.id)))||null;
+   let factura=null;
+   const hist=cot?.nota?.match(/FACTURA_HISTORICA:(\d+)/)?.[1];
+   if(hist)factura=gcInvoices().find(f=>String(f.folio)===hist&&gcSameHospital(f,g))||null;
+   if(!factura)factura=porRef.get(gcRut(g)+'|'+String(g.folio))||null;
+   let ocCod=String(g.orden_compra_ref||'').trim();
+   if(!ocCod&&cot){
+     if(!ocDeCot.has(cot.id))ocDeCot.set(cot.id,gcGetOc(cot)?.codigooc||'');
+     ocCod=ocDeCot.get(cot.id);
+   }
+   if(!factura&&ocCod){const fs=porOc.get(gcNorm(ocCod))||[];if(fs.length)factura=fs[0];}
+   if(!ocCod&&factura)ocCod=factura.orden_compra_ref||'';
+   mapa.set(g.id,{etapa:factura?'facturada':ocCod?'conoc':cot?'encot':'sincot',factura,oc:ocCod,cot});
+ });
+ gcEstadoCache=mapa;gcEstadoFirma=firma;
+ return mapa;
+}
+function gcEstadoGuia(d){return gcDatosListos()?gcEstados().get(d.id)||null:null;}
+// Etiqueta para la lista de Documentos.
+function gcBadgeGuia(d){
+ const e=gcEstadoGuia(d);
+ if(!e)return '<span class="badge badge-gray">Calculando…</span>';
+ if(e.etapa==='rechazada')return '';
+ if(e.etapa==='historico')return '<span class="badge badge-green" title="Guía de 2025: se considera facturada">Facturada (2025)</span>';
+ if(e.etapa==='facturada')return '<span class="badge badge-green" title="Factura '+gcEsc(e.factura.folio)+'">Facturada · F '+gcEsc(e.factura.folio)+'</span>';
+ if(e.etapa==='conoc')return '<span class="badge badge-amber" title="OC '+gcEsc(e.oc)+'">Con OC, sin factura</span>';
+ if(e.etapa==='encot')return '<span class="badge badge-blue" title="'+gcEsc(e.cot?.numero_cot||'COT sin número')+'">En COT</span>';
+ return '<span class="badge badge-red">Sin COT</span>';
+}
+// Resumen para Documentos: lo que de verdad falta facturar, por etapa.
+function gcResumenGuias(lista){
+ const t={sincot:0,encot:0,conoc:0};let listo=true;
+ lista.filter(d=>String(d.tipo_dte)==='52').forEach(d=>{const e=gcEstadoGuia(d);if(!e){listo=false;return;}if(t[e.etapa]!=null)t[e.etapa]+=montoTotalDoc(d);});
+ if(!listo)return ' · guías por facturar: calculando…';
+ const total=t.sincot+t.encot+t.conoc;
+ if(!total)return '';
+ const partes=[['sin COT',t.sincot],['en COT',t.encot],['con OC sin factura',t.conoc]].filter(x=>x[1]).map(x=>x[0]+' '+clp(x[1]));
+ return ' · guías por facturar '+clp(total)+' ('+partes.join(' · ')+')';
+}
 
 // Reconoce textos de correo como el enviado por La Florida. No lee el buzón.
 function gcParseEmail(text){
