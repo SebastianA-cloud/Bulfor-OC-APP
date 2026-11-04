@@ -156,6 +156,9 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 8. Decisiones de diseño ya tomadas (respetarlas)
 
+- **Guías por facturar (04-11-2026, autorizado por Seba):** centro COT, no factura. Se enlazan manualmente COT→guías; OC por `ordenes_compra.nombreoc`, factura por referencia 52 del XML o misma OC, y pago desde `facturas_pago`. Agrupar por mes del despacho, preservar grupos históricos verificados aun si exceden 15 días. No reutilizar PR #14 (cerrado sin integrar). Solo dos tablas nuevas (`guias_cot`, `guias_cot_detalle`), RLS editor/autenticado. La guía 5392 queda sin COT. Ver `docs/GUIAS_COT.md`.
+
+
 - **Estilo general** (Etapa 2): listas como Órdenes de compra/Facturas: tabla centrada, títulos oscuros fijos, selector mes/año `‹ ›`, páginas de 15, fichas en ventana grande con cajas (`doc-caja`).
 - **Documentos**: ficha con OC + botón Mercado Público, caja Cobranza pequeña y caja Estado SII/Envío; productos en tabla cuadriculada con Neto/IVA/Total solo bajo Precio y Total; rechazadas/anuladas = "No se cobra". Columna "Folio".
 - **Cobranza**: "Por factura" es la vista por defecto.
@@ -167,6 +170,9 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 04-11-2026 · Codex · En `codex/guias-cot-20261104`: submenú Guías por facturar centrado en COT; filtro hospital/mes/año, tarjetas de etapas, grupos y detalle, pega correo con comparación, edición/borrado de COT, Excel de cuatro etapas y navegación a ficha. Dos tablas creadas con RLS tras autorización; histórico de 2026 cargado en Supabase bajo nueva aprobación total de Seba: 8 grupos, 82 guías, suma verificada con facturas (5392 excluida). Script JS probado con texto exacto de junio (6 guías, $6.790.201), sintaxis y vista simulada; vista previa Vercel y navegador real pendientes. Rama no integrada, Claude revisará el PR nuevo antes de que Seba lo apruebe.
+
 
 - 04-11-2026 · Codex · propuesta en `codex/factura-ux`. Factura: buscar cliente por nombre, ayuda para orden, errores enlazados a secciones y revisión/edición antes de emitir. Validación y emisión existentes conservadas; pruebas con datos simulados. Pendiente PR y revisión de Seba.
 
@@ -205,6 +211,9 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] **Guías por facturar**: verificar vista previa Vercel, aspecto en notebook/móvil y registro COT con un editor de pruebas sin modificar registros reales. Claude revisa el PR nuevo; Seba aprueba explícitamente ese PR antes de merge. Revisar COT sin número cuando llegue OC: no deducir vinculaciones ambiguas por monto.
+
 
 - [ ] Revisar en vista previa el contraste del desplegable de escritorio antes de aprobar su integración.
 
