@@ -32,9 +32,15 @@ function gcGetOc(cot){
  if(cot.numero_cot)return oc.find(o=>gcCotOcNumber(o)===gcNorm(cot.numero_cot)&&(!o.rut_hospital||!cot.rut_hospital||o.rut_hospital===cot.rut_hospital))||null;
  // Históricos: la factura ya verificada da la OC, y nombreoc da la COT.
  const invoice=cot.nota?.match(/FACTURA_HISTORICA:(\d+)/)?.[1];
- if(!invoice)return null;
- const f=gcInvoices().find(x=>String(x.folio)===invoice&&gcRut(x)===cot.rut_hospital);
- return f?.orden_compra_ref?oc.find(o=>gcNorm(o.codigooc)===gcNorm(f.orden_compra_ref))||null:null;
+ if(invoice){
+   const f=gcInvoices().find(x=>String(x.folio)===invoice&&gcRut(x)===cot.rut_hospital);
+   return f?.orden_compra_ref?oc.find(o=>gcNorm(o.codigooc)===gcNorm(f.orden_compra_ref))||null:null;
+ }
+ // Solo completar número desde OC si la coincidencia de hospital y monto es única.
+ // Si hay dos OC posibles, no inventar una asociación.
+ const candidates=oc.filter(o=>gcCotOcNumber(o)&&Number(o.totaloc)===Number(cot.monto_total)
+   &&(gcNorm(gcHospital(o))===gcNorm(cot.hospital)||String(o.rut_hospital||'')===cot.rut_hospital));
+ return candidates.length===1?candidates[0]:null;
 }
 function gcRefs(xml){
  if(!xml)return [];
