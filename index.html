@@ -11424,7 +11424,11 @@ function renderRechazadas(soloTabla) {
   const busca = c => !q || coincideBusqueda(`${c.hospital} ${c.nodos.map(n => n.folio || '').join(' ')} ${c.ultimaRech?.rut_hospital || ''}`, q);
   const porResolver = todos.filter(c => c.estado !== 'resuelta' && !rzSinSeguimiento(c) && busca(c));
   const historial = todos.filter(c => busca(c) && (q || delMes(c)));
-  const resueltas = historial.filter(c => c.estado === 'resuelta');
+  // El historial del mes incluye también los casos "Sin seguimiento" (rechazos
+  // anteriores al RECHAZADAS_SEGUIR_DESDE que se regularizaron fuera de la app).
+  // Antes quedaban fuera de las dos pestañas y no se veían en ninguna parte
+  // (ej. la 22324 de octubre, anulada con la NC 1322).
+  const resueltas = historial.filter(c => c.estado === 'resuelta' || rzSinSeguimiento(c));
   const conMes = rechazadasEstadoActivo !== 'por_resolver' && !q;
   const selPeriodo = document.getElementById('rechazadas-periodo');
   if (selPeriodo) selPeriodo.style.display = conMes ? '' : 'none';
