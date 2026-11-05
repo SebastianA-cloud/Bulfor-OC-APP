@@ -216,6 +216,18 @@
       </div>
     </div>
 
+    <div class="nav-section-label">Administración</div>
+
+    <div class="nav-group" data-modulo="admin">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('admin', true)" title="Usuarios y permisos">
+        <span class="nav-icon"><i class="ti ti-users-group" aria-hidden="true"></i></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Usuarios y permisos</span>
+      </div>
+      <div class="nav-subgroup" id="subgroup-admin">
+        <div class="nav-item nav-subitem" data-page="usuarios" onclick="seleccionarSubpagina('admin','usuarios',this)"><span>Usuarios y permisos</span></div>
+      </div>
+    </div>
+
   </div>
 </nav>
 
@@ -258,6 +270,9 @@
   </div>
   <div class="tab-item" data-modulo="rrhh" onclick="mostrarModulo('rrhh')">
     <i class="ti ti-users" aria-hidden="true"></i><span>RRHH</span>
+  </div>
+  <div class="tab-item" data-modulo="admin" onclick="mostrarModulo('admin')">
+    <i class="ti ti-users-group" aria-hidden="true"></i><span>Usuarios</span>
   </div>
 </nav>
 
@@ -310,10 +325,21 @@
   <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
   <div class="modulos-grupo">Personas</div>
   <div class="modulo-tab" data-modulo="rrhh" onclick="mostrarModulo('rrhh')"><i class="ti ti-users"></i><span>Recursos humanos</span></div>
+  <div class="modulos-grupo">Administración</div>
+  <div class="modulo-tab" data-modulo="admin" onclick="mostrarModulo('admin')"><i class="ti ti-users-group"></i><span>Usuarios y permisos</span></div>
 </nav>
 <div class="nav" id="nav-submenu"></div>
 
 <main class="main">
+
+  <!-- USUARIOS Y PERMISOS (solo administrador; ver permisos.js) -->
+  <div class="page" id="page-usuarios">
+    <div class="page-header">
+      <div class="page-title">Usuarios y permisos</div>
+      <div class="page-sub">Qué menús ve cada cuenta. Marca o desmarca y se guarda al instante; la persona lo ve al volver a entrar o al actualizar</div>
+    </div>
+    <div id="usr-contenido"></div>
+  </div>
 
   <!-- INICIO PAGE -->
   <div class="page active" id="page-inicio">
@@ -1434,6 +1460,7 @@
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
+<script src="permisos.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -18298,7 +18325,10 @@ function renderMateriasPrimas() {
 }
 
 showPage = function(id, el) {
+  // Página que la cuenta no tiene en su perfil (enlace guardado, historial): a Inicio.
+  if (!paginaPermitida(id)) { irAInicio(); return; }
   _showPageOriginal(id, el);
+  if (id === 'usuarios') usrInit();
   if (id === 'farmacia-movimientos') {
     if (!document.getElementById('farmacia-tab-compra').classList.contains('active') &&
         !document.getElementById('farmacia-tab-venta').classList.contains('active') &&
@@ -18410,6 +18440,10 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-id-badge-2"></i>', label: 'Personal', page: 'rrhh-personal' },
     { icon: '<i class="ti ti-beach"></i>', label: 'Vacaciones', page: 'rrhh-vacaciones' },
   ] },
+  // Solo el administrador (permisos.js).
+  'admin': { items: [
+    { icon: '<i class="ti ti-users-group"></i>', label: 'Usuarios y permisos', page: 'usuarios' },
+  ] },
 };
 
 // Módulo (menú) al que pertenece una página, según el menú lateral. Las
@@ -18470,7 +18504,7 @@ function toggleSubbloque(el) {
 // post-importación, etc.) navega directo, como antes.
 function mostrarModulo(modulo, soloExpandir) {
   const config = SUBMENUS[modulo];
-  if (!config) return;
+  if (!config || !moduloPermitido(modulo)) return;
 
   const grupo = document.querySelector(`.nav-group[data-modulo="${modulo}"]`);
   const esMultiItem = config.items.length > 1;
@@ -18483,7 +18517,9 @@ function mostrarModulo(modulo, soloExpandir) {
   }
   if (esMultiItem && grupo) grupo.classList.add('abierto');
 
-  const pagina = ultimaSubpagina[modulo] || config.items[0].page;
+  let pagina = ultimaSubpagina[modulo] || config.items[0].page;
+  // Si la cuenta no ve esa página, abre la primera del menú que sí ve.
+  if (!paginaPermitida(pagina)) pagina = primeraPaginaPermitida(modulo);
   ultimaSubpagina[modulo] = pagina;
 
   const subitemEl = grupo ? grupo.querySelector(`.nav-subitem[data-page="${pagina}"]`) : null;
@@ -18497,6 +18533,7 @@ function mostrarModulo(modulo, soloExpandir) {
 // un ítem del acordeón de escritorio, o en una pestaña móvil), sin volver
 // a togglear el acordeón — a diferencia de mostrarModulo().
 function seleccionarSubpagina(modulo, pagina, el) {
+  if (!paginaPermitida(pagina)) { irAInicio(); return; }
   modulo = moduloDePagina(pagina) || modulo;
   ultimaSubpagina[modulo] = pagina;
   showPage(pagina, el);
@@ -18535,7 +18572,7 @@ function renderNavSubmenuMobile(modulo, pagina) {
   const config = modulo ? SUBMENUS[modulo] : null;
   if (!config) { cont.innerHTML = ''; return; }
   let html = '', grupoAnterior = null;
-  config.items.forEach(it => {
+  config.items.filter(it => paginaPermitida(it.page)).forEach(it => {
     const grupo = GRUPO_PAGINA[it.page] || null;
     if (grupo && grupo !== grupoAnterior) html += `<span class="submenu-sep">${grupo}</span>`;
     grupoAnterior = grupo;
@@ -18702,7 +18739,8 @@ function renderInicioKpis() {
   const semana = fpp ? fpp.filter(f => categoriaFPP(f) === 'pending' && f.fecha_vencimiento && f.fecha_vencimiento >= hoy && f.fecha_vencimiento <= en7) : [];
   const porDigitar = Array.isArray(ordenesElaboracion) && ordenesElaboracion.length ? ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length : null;
   const nuevas = Array.isArray(solicitudesWeb) && solicitudesWeb.length ? solicitudesWeb.filter(x => x.estado === 'Nueva').length : null;
-  const tarjeta = (titulo, icono, tono, valor, sub, modulo, pagina) => `
+  // Solo las tarjetas de menús que la cuenta ve.
+  const tarjeta = (titulo, icono, tono, valor, sub, modulo, pagina) => !paginaPermitida(pagina) ? '' : `
     <button class="kpi" onclick="irAModuloPagina('${modulo}','${pagina}')">
       <div class="kpi-top"><span class="kpi-ico ${tono}"><i class="ti ${icono}"></i></span>${titulo}</div>
       <div class="kpi-val">${valor}</div>
@@ -18724,7 +18762,7 @@ function renderInicio() {
   renderInicioKpis();
   const cont = document.getElementById('inicio-atencion');
   if (!cont) return;
-  const items = [];
+  let items = [];
 
   if (Array.isArray(ordenesElaboracion) && ordenesElaboracion.length) {
     const n = ordenesElaboracion.filter(o => o.estado_digitacion === 'Por digitar').length;
@@ -18758,6 +18796,8 @@ function renderInicio() {
     if (n > 0) items.push({ texto: `${n} envío${n===1?'':'s'} con retraso`, tipo: 'warn', modulo: 'fedex', pagina: 'fedex' });
   }
 
+  // Solo avisos de menús que la cuenta ve.
+  items = items.filter(it => paginaPermitida(it.pagina));
   if (!items.length) {
     cont.innerHTML = '<div class="inicio-atencion-vacio">No hay tareas urgentes.</div>';
     return;
@@ -18860,7 +18900,15 @@ function mostrarPantallaLogin(mensaje) {
   }
 }
 
-function arrancarApp() {
+async function arrancarApp() {
+  // Primero el perfil: qué menús ve esta cuenta (permisos.js).
+  await cargarPerfil();
+  if (perfilActual && perfilActual.activo === false) {
+    borrarSesion();
+    mostrarPantallaLogin('Esta cuenta está desactivada. Habla con Sebastián.');
+    return;
+  }
+  aplicarPermisosNav();
   document.getElementById('login-overlay').style.display = 'none';
   const cont = document.getElementById('usuario-sesion');
   cont.style.display = 'flex';
