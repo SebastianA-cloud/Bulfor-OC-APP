@@ -117,10 +117,11 @@ function usrRender() {
       <button class="btn-mp" onclick="usrNueva()"><i class="ti ti-user-plus"></i> Nueva cuenta</button>
     </div>
     <div class="table-card oc-tabla tabla-centrada"><table>
-      <thead><tr><th>Nombre</th><th>Correo</th><th>Menús</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Correo</th><th>Menús</th><th>Estado</th></tr></thead>
       <tbody>${usrLista.map(u => `
         <tr class="oc-fila" onclick="usrAbrir('${u.user_id}')">
           <td style="font-weight:600">${escapeHtml(u.nombre || '—')}</td>
+          <td>${u.usuario ? escapeHtml(u.usuario) : '<span style="color:var(--text-3)">sin usuario</span>'}</td>
           <td>${escapeHtml(u.email)}</td>
           <td>${u.es_admin ? '<span class="badge badge-blue">Administrador · ve todo</span>' : `${usrTodasLasPaginas().filter(x => (u.paginas || []).includes(x)).length} de ${usrTodasLasPaginas().length} páginas`}</td>
           <td>${u.activo ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-gray">Desactivada</span>'}</td>
@@ -145,11 +146,12 @@ function usrFicha(u) {
   return {
     antetitulo: 'Usuarios y permisos',
     titulo: u.nombre || u.email,
-    sub: `${escapeHtml(u.email)} · ${u.activo ? 'Activa' : 'Desactivada'}`,
+    sub: `Usuario: ${escapeHtml(u.usuario || 'sin usuario')} · ${escapeHtml(u.email)} · ${u.activo ? 'Activa' : 'Desactivada'}`,
     angosto: true,
     cuerpo: `
       <div class="usr-acciones">
         <button class="page-btn" onclick="usrRenombrar('${u.user_id}')"><i class="ti ti-pencil"></i> Cambiar nombre</button>
+        <button class="page-btn" onclick="usrCambiarUsuario('${u.user_id}')"><i class="ti ti-at"></i> Cambiar usuario</button>
         ${u.es_admin ? '' : `<button class="page-btn" onclick="usrActivar('${u.user_id}', ${!u.activo})">${u.activo ? '<i class="ti ti-user-off"></i> Desactivar cuenta' : '<i class="ti ti-user-check"></i> Reactivar cuenta'}</button>`}
       </div>
       ${u.es_admin ? '<div class="panel-vacio">Administrador: ve todos los menús, incluido Usuarios y permisos.</div>'
@@ -228,7 +230,8 @@ function usrNueva() {
     sub: 'La cuenta queda sin menús: después marcas qué puede ver.',
     cuerpo: `<div class="usr-form">
       <label>Nombre<input id="usr-n-nombre" placeholder="Ej.: María Pérez"></label>
-      <label>Correo (lo que va antes de @farmaciabulfor.cl es su usuario para entrar)<input id="usr-n-email" type="email" placeholder="nombre@farmaciabulfor.cl"></label>
+      <label>Correo<input id="usr-n-email" type="email" placeholder="nombre@farmaciabulfor.cl"></label>
+      <label>Usuario para entrar (sin espacios, ej.: maria)<input id="usr-n-usuario" autocapitalize="none" spellcheck="false" placeholder="maria"></label>
       <label>Contraseña inicial (mínimo 8 caracteres)<input id="usr-n-pass" type="text"></label>
       <button class="btn-mp" onclick="usrCrear(this)"><i class="ti ti-user-plus"></i> Crear cuenta</button>
     </div>`,
@@ -244,7 +247,34 @@ async function usrCrear(btn) {
   try {
     const r = await usrFuncion({ accion: 'crear', nombre, email, password });
     usrLista.push(r.perfil);
+    const usuario = usrNormalizarUsuario(document.getElementById('usr-n-usuario').value) || usrNormalizarUsuario(email.split('@')[0]);
+    if (usuario) await usrGuardarUsuario(r.perfil, usuario);
     toast('Cuenta creada. Ahora marca qué menús puede ver.');
     usrRender(); panelAbrir(usrFicha(r.perfil));
   } catch (e) { toast(e.message, 'err'); btn.disabled = false; }
+}
+
+// ─── Usuario para entrar (perfiles.usuario) ─────────────────────────────────
+// Es lo que se escribe en el login en vez del correo. Único, en minúsculas,
+// solo letras, números, punto, guion y guion bajo.
+const usrNormalizarUsuario = t => String(t || '').trim().toLowerCase();
+const USR_FORMATO_USUARIO = /^[a-z0-9._-]{2,40}$/;
+
+async function usrGuardarUsuario(u, usuario) {
+  if (!USR_FORMATO_USUARIO.test(usuario)) { toast('Usuario no válido: usa solo letras, números, punto o guion (sin espacios ni tildes).', 'err'); return false; }
+  const res = await sb(`perfiles?user_id=eq.${u.user_id}`, { method: 'PATCH', body: JSON.stringify({ usuario, actualizado_en: new Date().toISOString() }) });
+  if (!res.ok) { toast(res.status === 409 ? `El usuario "${usuario}" ya lo tiene otra cuenta.` : 'No se pudo guardar el usuario.', 'err'); return false; }
+  u.usuario = usuario;
+  return true;
+}
+
+async function usrCambiarUsuario(id) {
+  const u = usrLista.find(x => x.user_id === id);
+  if (!u) return;
+  const nuevo = prompt('Usuario para entrar de ' + (u.nombre || u.email) + ' (sin espacios):', u.usuario || '');
+  if (nuevo == null) return;
+  const usuario = usrNormalizarUsuario(nuevo);
+  if (!usuario || usuario === u.usuario) return;
+  if (await usrGuardarUsuario(u, usuario)) toast('Usuario actualizado: ahora entra con "' + usuario + '"');
+  usrRender(); panelAbrir(usrFicha(u));
 }

@@ -18832,21 +18832,42 @@ function correoDeUsuario(texto) {
   if (!t || t.includes('@')) return t;
   return (ALIAS_LOGIN[t] || t) + DOMINIO_LOGIN;
 }
-// Lista del desplegable del login — se mantiene a mano (no hay forma de
-// leer la lista real de usuarios desde el navegador, ni la debería haber,
-// por seguridad). Cada vez que se crea una cuenta nueva, se agrega acá
-// también, para que aparezca en el desplegable del login.
-const USUARIOS_CONOCIDOS = [
-  'sebastian',
-  'genoveva',
-  'christian',
-];
+// Cada cuenta tiene su usuario en `perfiles.usuario` (lo pone el administrador
+// en Usuarios y permisos). Al entrar se pregunta a Supabase qué correo le
+// corresponde (`correo_de_usuario`), así sirve también para correos que no son
+// @farmaciabulfor.cl. Si no lo encuentra, se usa la regla de arriba.
+async function resolverCorreoLogin(texto) {
+  const t = String(texto || '').trim().toLowerCase();
+  if (!t || t.includes('@')) return t;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/correo_de_usuario`, {
+      method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_usuario: t }),
+    });
+    const correo = res.ok ? await res.json() : null;
+    if (correo) return correo;
+  } catch (_) {}
+  return correoDeUsuario(t);
+}
+// Desplegable del login: los usuarios que ya entraron en este equipo (no se
+// publica la lista de cuentas, por seguridad), más las cuentas de siempre.
+const USUARIOS_BASE = ['sebastian', 'genoveva', 'christian'];
+function usuariosDelEquipo() {
+  let l = [];
+  try { l = JSON.parse(localStorage.getItem('bulfor_usuarios_equipo') || '[]'); } catch (_) {}
+  return [...new Set([...l, ...USUARIOS_BASE])];
+}
+function recordarUsuarioEnEquipo(u) {
+  u = String(u || '').trim().toLowerCase();
+  if (!u || u.includes('@')) return;
+  try { localStorage.setItem('bulfor_usuarios_equipo', JSON.stringify([u, ...usuariosDelEquipo().filter(x => x !== u && !USUARIOS_BASE.includes(x))])); } catch (_) {}
+}
 
 function mostrarListaUsuariosLogin() {
   const input = document.getElementById('login-email');
   const cont = document.getElementById('login-usuarios-lista');
   const q = input.value.trim().toLowerCase();
-  const opciones = USUARIOS_CONOCIDOS.filter(u => u.toLowerCase().includes(q));
+  const opciones = usuariosDelEquipo().filter(u => u.toLowerCase().includes(q));
   if (!opciones.length) { cont.style.display = 'none'; return; }
   cont.innerHTML = opciones.map(u => `
     <div onmousedown="event.preventDefault();elegirUsuarioLogin('${u}')"
@@ -18876,7 +18897,8 @@ async function manejarLogin(event) {
   btn.textContent = 'Ingresando…';
   const usuario = document.getElementById('login-email').value.trim();
   try {
-    await iniciarSesion(correoDeUsuario(usuario), document.getElementById('login-password').value);
+    await iniciarSesion(await resolverCorreoLogin(usuario), document.getElementById('login-password').value);
+    recordarUsuarioEnEquipo(usuario);
     if (document.getElementById('login-recordar').checked) {
       localStorage.setItem('bulfor_correo_recordado', usuario);
     } else {
