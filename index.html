@@ -32,10 +32,10 @@
     </div>
     <form id="login-form" onsubmit="return manejarLogin(event)">
       <div class="login-field" style="position:relative">
-        <label>Correo</label>
+        <label>Usuario</label>
         <div class="login-input-wrap">
-          <i class="ti ti-mail" aria-hidden="true"></i>
-          <input type="email" id="login-email" required autocomplete="username" placeholder="tu@farmaciabulfor.cl"
+          <i class="ti ti-user" aria-hidden="true"></i>
+          <input type="text" id="login-email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej.: genoveva"
                  onfocus="mostrarListaUsuariosLogin()" oninput="mostrarListaUsuariosLogin()">
         </div>
         <div id="login-usuarios-lista" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(26,25,23,.12);z-index:20;overflow:hidden"></div>
@@ -1500,7 +1500,7 @@ async function iniciarSesion(email, password) {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error_description || data.msg || 'Correo o contraseña incorrectos.');
+  if (!res.ok) throw new Error(res.status === 400 ? 'Usuario o contraseña incorrectos.' : (data.error_description || data.msg || 'No se pudo iniciar sesión.'));
   const rol = data.user?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
   guardarSesion({
     access_token: data.access_token,
@@ -18821,14 +18821,25 @@ actualizarRelojSistema();
 setInterval(actualizarRelojSistema, 30000);
 
 // ─── Arranque de la app: primero hay que estar logueado ────────────────────
-// Lista de correos con cuenta creada — se mantiene a mano (no hay forma de
+// Se entra con el nombre de usuario: lo que va antes de @farmaciabulfor.cl
+// ("genoveva" = genoveva@farmaciabulfor.cl). Supabase sigue usando el correo;
+// la app lo arma sola. Si alguien escribe el correo completo, también sirve.
+const DOMINIO_LOGIN = '@farmaciabulfor.cl';
+// Usuarios cuyo correo no es exactamente "usuario@farmaciabulfor.cl".
+const ALIAS_LOGIN = { 'sebastian': 'sebastian.a' };
+function correoDeUsuario(texto) {
+  const t = String(texto || '').trim().toLowerCase();
+  if (!t || t.includes('@')) return t;
+  return (ALIAS_LOGIN[t] || t) + DOMINIO_LOGIN;
+}
+// Lista del desplegable del login — se mantiene a mano (no hay forma de
 // leer la lista real de usuarios desde el navegador, ni la debería haber,
 // por seguridad). Cada vez que se crea una cuenta nueva, se agrega acá
 // también, para que aparezca en el desplegable del login.
 const USUARIOS_CONOCIDOS = [
-  'sebastian.a@farmaciabulfor.cl',
-  'genoveva@farmaciabulfor.cl',
-  'christian@farmaciabulfor.cl',
+  'sebastian',
+  'genoveva',
+  'christian',
 ];
 
 function mostrarListaUsuariosLogin() {
@@ -18863,11 +18874,11 @@ async function manejarLogin(event) {
   err.style.display = 'none';
   btn.disabled = true;
   btn.textContent = 'Ingresando…';
-  const correo = document.getElementById('login-email').value.trim();
+  const usuario = document.getElementById('login-email').value.trim();
   try {
-    await iniciarSesion(correo, document.getElementById('login-password').value);
+    await iniciarSesion(correoDeUsuario(usuario), document.getElementById('login-password').value);
     if (document.getElementById('login-recordar').checked) {
-      localStorage.setItem('bulfor_correo_recordado', correo);
+      localStorage.setItem('bulfor_correo_recordado', usuario);
     } else {
       localStorage.removeItem('bulfor_correo_recordado');
     }
@@ -18882,8 +18893,13 @@ async function manejarLogin(event) {
 }
 
 function precargarCorreoRecordado() {
-  const correo = localStorage.getItem('bulfor_correo_recordado');
+  let correo = localStorage.getItem('bulfor_correo_recordado');
   if (correo) {
+    // Los que quedaron recordados con correo completo se muestran como usuario.
+    if (correo.toLowerCase().endsWith(DOMINIO_LOGIN)) {
+      const local = correo.slice(0, -DOMINIO_LOGIN.length).toLowerCase();
+      correo = Object.keys(ALIAS_LOGIN).find(k => ALIAS_LOGIN[k] === local) || local;
+    }
     document.getElementById('login-email').value = correo;
     document.getElementById('login-recordar').checked = true;
     document.getElementById('login-password').focus();

@@ -228,7 +228,7 @@ function usrNueva() {
     sub: 'La cuenta queda sin menús: después marcas qué puede ver.',
     cuerpo: `<div class="usr-form">
       <label>Nombre<input id="usr-n-nombre" placeholder="Ej.: María Pérez"></label>
-      <label>Correo<input id="usr-n-email" type="email" placeholder="nombre@farmaciabulfor.cl"></label>
+      <label>Correo (lo que va antes de @farmaciabulfor.cl es su usuario para entrar)<input id="usr-n-email" type="email" placeholder="nombre@farmaciabulfor.cl"></label>
       <label>Contraseña inicial (mínimo 8 caracteres)<input id="usr-n-pass" type="text"></label>
       <button class="btn-mp" onclick="usrCrear(this)"><i class="ti ti-user-plus"></i> Crear cuenta</button>
     </div>`,
