@@ -1037,6 +1037,24 @@
     </div>
   </div>
 
+  <div class="page" id="page-materias-primas">
+    <div class="page-header">
+      <div class="page-title">Materias primas</div>
+      <div class="page-sub">Cuánto entró por compras, cuánto salió por ventas y cuánto queda en stock.</div>
+    </div>
+    <div class="toolbar" style="gap:8px;flex-wrap:wrap">
+      <input type="text" id="mp-search" placeholder="Buscar materia prima…" oninput="renderMateriasPrimas()" style="min-width:220px">
+      <select id="mp-dias" onchange="renderMateriasPrimas()">
+        <option value="30">Últimos 30 días</option>
+        <option value="90" selected>Últimos 90 días</option>
+        <option value="365">Último año</option>
+        <option value="0">Todo el historial</option>
+      </select>
+    </div>
+    <div id="mp-resumen"></div>
+    <div id="mp-tabla"></div>
+    <div id="mp-detalle"></div>
+  </div>
   <div class="page" id="page-solicitudes-web">
     <div class="page-header">
       <div class="page-title">Solicitudes Web</div>
@@ -18299,6 +18317,10 @@ function renderMateriasPrimas() {
 
 showPage = function(id, el) {
   _showPageOriginal(id, el);
+  if (id === 'materias-primas') {
+    renderMateriasPrimas();
+    refrescarDatosFarmacia().then(() => renderMateriasPrimas());
+  }
   if (id === 'farmacia-movimientos') {
     if (!document.getElementById('farmacia-tab-compra').classList.contains('active') &&
         !document.getElementById('farmacia-tab-venta').classList.contains('active') &&
@@ -18391,6 +18413,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-flask"></i>', label: 'Órdenes', page: 'elaboracion' },
     { icon: '<i class="ti ti-stethoscope"></i>', label: 'Pacientes', page: 'pacientes' },
     { icon: '<i class="ti ti-world"></i>', label: 'Solicitudes Web', page: 'solicitudes-web' },
+    { icon: '<i class="ti ti-package"></i>', label: 'Materias primas', page: 'materias-primas' },
   ] },
   'recetario-modulo': { items: [
     { icon: '<i class="ti ti-search"></i>', label: 'Buscar RM', page: 'rec-buscar' },
