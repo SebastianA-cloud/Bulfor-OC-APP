@@ -17877,7 +17877,10 @@ async function recPintarSeccionOE(oeId, editando) {
     </div>
     <div style="font-size:11px;color:var(--text-3);margin-top:6px">Es el número que sale como "Rp: RM7070/26" en la orden de fabricación de Pharma_RM (no el de la etiqueta).</div>
     <div id="oe-rm-cand-${oeId}" style="margin-top:10px;font-size:12px;color:var(--text-3)">Buscando RM parecidos de esos días…</div>`;
-  const cand = await recRpc('rec_oe_candidatos', { p_fecha: o.fecha_orden, p_texto: o.indicacion || '', p_limite: 5 });
+  // Con el paciente de la orden, los RM de ese mismo paciente quedan primero.
+  const pacOE = o.paciente_id ? pacientes.find(p => p.id === o.paciente_id) : null;
+  const cand = await recRpc('rec_oe_candidatos', { p_fecha: o.fecha_orden, p_texto: o.indicacion || '', p_limite: 5,
+    p_paciente: pacOE?.nombre || null, p_rut: pacOE?.rut || null });
   const cc = document.getElementById(`oe-rm-cand-${oeId}`);
   if (!cc) return;
   if (!cand.length) { cc.textContent = 'No encontré RM parecidos en el recetario para esos días.'; return; }
@@ -17885,6 +17888,7 @@ async function recPintarSeccionOE(oeId, editando) {
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;color:var(--text)">
       <div style="min-width:0">
         <b class="mono">${escapeHtml(c.rm || '—')}</b> · ${escapeHtml(c.forma || '')} · ${recCantidadRm(c)} · <span style="color:var(--text-3)">${recFechaHora(c.fecha)}</span>
+        <div style="margin-top:2px">${c.paciente ? `<i class="ti ti-user" aria-hidden="true"></i> ${escapeHtml(c.paciente)}` : c.institucion ? `<i class="ti ti-building-hospital" aria-hidden="true"></i> ${escapeHtml(c.institucion)}` : '<span style="color:var(--text-3)">Sin paciente en Pharma_RM</span>'}${c.mismo_paciente ? ' <span class="badge badge-green">Mismo paciente</span>' : ''}</div>
         <div style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.descripcion || '')}</div>
         ${c.ya_asignado ? '<div style="color:var(--amber)">Ya está anotado en otra orden</div>' : ''}
       </div>
