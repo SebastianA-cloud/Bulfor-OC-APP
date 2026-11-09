@@ -2,7 +2,8 @@
 Competencia en licitaciones — Etapa 0 (prueba, solo lectura).
 
 Descarga los archivos mensuales de "Datos Abiertos" de ChileCompra (licitaciones)
-y arma un Excel para comparar los precios de Bulfor con los de la competencia.
+y arma un Excel para comparar los precios de Bulfor con los de la competencia,
+SOLO en los productos donde ofertó Bulfor.
 
 ¿Por qué Datos Abiertos y no la API de Mercado Público?
   La API solo dice quién GANÓ cada producto. Los archivos mensuales de Datos
@@ -111,8 +112,10 @@ def numero(serie):
 
 
 def leer_mes(ruta):
-    """Lee el CSV del ZIP y deja solo las licitaciones donde participó Bulfor o
-    algún competidor (con TODAS sus ofertas, también las de otras empresas)."""
+    """Lee el CSV del ZIP y deja solo los productos (líneas) donde ofertó Bulfor,
+    con TODAS las ofertas de esos productos (también las de otras empresas).
+    Lo que la competencia ofertó donde Bulfor no participó se descarta (pedido
+    de Seba, 09-11-2026)."""
     with zipfile.ZipFile(ruta) as z:
         nombre_csv = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
         with z.open(nombre_csv) as f:
@@ -121,9 +124,9 @@ def leer_mes(ruta):
                 sep=";", dtype=str, usecols=lambda c: c in COLUMNAS,
                 on_bad_lines="skip",
             )
-    seguidas = df["RutProveedor"].isin(NOMBRES.keys())
-    codigos = set(df.loc[seguidas, "CodigoExterno"])
-    df = df[df["CodigoExterno"].isin(codigos)].copy()
+    linea = df["CodigoExterno"] + "|" + df["Codigoitem"].astype(str)
+    lineas_bulfor = set(linea[df["RutProveedor"] == RUT_BULFOR])
+    df = df[linea.isin(lineas_bulfor)].copy()
     for c in NUMERICAS:
         if c in df:
             df[c] = numero(df[c])
@@ -179,69 +182,89 @@ def datos_linea(df):
     return df.drop_duplicates("clave_linea").set_index("clave_linea")[list(cols)].rename(columns=cols)
 
 
-def hoja_cara_a_cara(df, ganadores, base):
-    """Líneas donde ofertó Bulfor y al menos un competidor: precio de cada uno
-    lado a lado, ganador y diferencia."""
-    seg = df[df["RutProveedor"].isin(NOMBRES.keys()) & df["Estado Oferta"].ne("Rechazada")]
+def hoja_nuestras_ofertas(df, ganadores, base):
+    """Una fila por producto donde ofertó Bulfor: nuestro precio, el de cada
+    competidor seguido (vacío si no ofertó), quién ganó y a qué precio."""
+    acep = df[df["Estado Oferta"].ne("Rechazada")]
+    seg = acep[acep["RutProveedor"].isin(NOMBRES.keys())]
     precios = seg.pivot_table(index="clave_linea", columns="Empresa", values="Precio unitario", aggfunc="min")
-    con_bulfor = precios["Bulfor"].notna() if "Bulfor" in precios else pd.Series(False, index=precios.index)
-    comp_cols = [n for n in COMPETIDORES.values() if n in precios.columns]
-    con_comp = precios[comp_cols].notna().any(axis=1)
-    precios = precios[con_bulfor & con_comp]
-    orden = ["Bulfor"] + comp_cols
+    orden = ["Bulfor"] + list(COMPETIDORES.values())
     precios = precios.reindex(columns=orden)
+    # El precio de Bulfor se muestra aunque la oferta haya sido rechazada.
+    propias = df[df["RutProveedor"] == RUT_BULFOR]
+    precios["Bulfor"] = propias.groupby("clave_linea")["Precio unitario"].min()
     precios.columns = [f"Precio {c}" for c in precios.columns]
-    out = base.join(precios, how="inner").join(ganadores)
-    out["Bulfor ganó"] = out["Ganador"].fillna("").str.contains("BULFOR")
+    estado_bulfor = (propias.drop_duplicates("clave_linea").set_index("clave_linea")["Estado Oferta"]
+                     .rename("Estado oferta Bulfor"))
+    compitio = seg[seg["RutProveedor"] != RUT_BULFOR].groupby("clave_linea")["Empresa"].agg(
+        lambda s: ", ".join(dict.fromkeys(s)))
+    out = (base.join(precios, how="inner").join(estado_bulfor)
+               .join(compitio.rename("Competidores seguidos presentes")).join(ganadores))
+    out["Resultado Bulfor"] = out["Ganador"].fillna("").map(
+        lambda g: "Ganó" if "BULFOR" in g else ("Perdió" if g else "Sin adjudicar"))
     out["Bulfor vs ganador (%)"] = ((out["Precio Bulfor"] / out["Precio ganador"] - 1) * 100).round(1)
     return out.sort_values(["Fecha publicación", "Licitación", "N° línea"], ascending=[False, True, True])
 
 
-def hoja_ofertas_de(df, ganadores, base, empresa_rut):
-    """Todas las líneas donde ofertó una empresa, con su precio y el ganador."""
-    propias = df[df["RutProveedor"] == empresa_rut]
-    cols = propias.set_index("clave_linea")[["Precio unitario", "Cantidad Ofertada", "Estado Oferta", "Seleccionada"]]
-    cols = cols[~cols.index.duplicated()]
-    cols = cols.rename(columns={"Precio unitario": "Precio ofertado", "Seleccionada": "Ganó"})
-    out = base.join(cols, how="inner").join(ganadores)
-    out["Ofertado vs ganador (%)"] = ((out["Precio ofertado"] / out["Precio ganador"] - 1) * 100).round(1)
-    return out.sort_values(["Fecha publicación", "Licitación", "N° línea"], ascending=[False, True, True])
+def comparar_con_bulfor(df, nuestras, rut):
+    """Cómo le fue a una empresa en los productos donde también ofertó Bulfor."""
+    o = df[(df["RutProveedor"] == rut) & df["Estado Oferta"].ne("Rechazada")]
+    precio = o.groupby("clave_linea")["Precio unitario"].min()
+    comunes = nuestras.loc[nuestras.index.intersection(precio.index)]
+    p = precio.loc[comunes.index]
+    adj = int((comunes["Resultado Bulfor"] != "Sin adjudicar").sum())
+    ganados = df[(df["RutProveedor"] == rut) & df["Seleccionada"]]["clave_linea"].nunique()
+    fila = {
+        "Licitaciones en común": comunes["Licitación"].nunique(),
+        "Productos en común": len(comunes),
+        "Productos ya adjudicados": adj,
+        "Productos que ganó": ganados,
+        "% ganados (de los adjudicados)": round(100 * ganados / adj, 1) if adj else None,
+        "Bulfor le ganó": int((comunes["Resultado Bulfor"] == "Ganó").sum()),
+    }
+    if len(comunes):
+        fila["Veces más barato que Bulfor"] = int((p < comunes["Precio Bulfor"]).sum())
+        fila["Veces más caro que Bulfor"] = int((p > comunes["Precio Bulfor"]).sum())
+        fila["Mismo precio"] = int((p == comunes["Precio Bulfor"]).sum())
+        fila["Diferencia mediana vs Bulfor (%)"] = round(((p / comunes["Precio Bulfor"] - 1) * 100).median(), 1)
+        fila["Última vez (publicación)"] = comunes["Fecha publicación"].max()
+    return fila
 
 
-def hoja_resumen(df, cara):
-    """Una fila por empresa: cuánto participa, cuánto gana y cómo le va contra Bulfor."""
-    filas = []
-    acep = df[df["Estado Oferta"].ne("Rechazada")]
-    bulfor_lic = set(df.loc[df["RutProveedor"] == RUT_BULFOR, "CodigoExterno"])
-    for rut, nombre in NOMBRES.items():
-        o = df[df["RutProveedor"] == rut]
-        if o.empty:
-            filas.append({"Empresa": nombre, "RUT": rut})
-            continue
-        lineas = o["clave_linea"].nunique()
-        ganadas = o.loc[o["Seleccionada"], "clave_linea"].nunique()
-        fila = {
-            "Empresa": nombre, "RUT": rut,
-            "Razón social": o["RazonSocialProveedor"].iloc[0],
-            "Licitaciones en que ofertó": o["CodigoExterno"].nunique(),
-            "Líneas ofertadas": lineas,
-            "Líneas ganadas": ganadas,
-            "% líneas ganadas": round(100 * ganadas / lineas, 1) if lineas else None,
-            "Organismos distintos": o["NombreOrganismo"].nunique(),
-            "Última oferta (publicación)": o["Fecha publicación"].max(),
-        }
-        if rut != RUT_BULFOR:
-            col = f"Precio {nombre}"
-            comunes = cara[cara[col].notna()] if col in cara else cara.iloc[0:0]
-            fila["Licitaciones en común con Bulfor"] = len(set(o["CodigoExterno"]) & bulfor_lic)
-            fila["Líneas cara a cara con Bulfor"] = len(comunes)
-            if len(comunes):
-                fila["Veces más barato que Bulfor"] = int((comunes[col] < comunes["Precio Bulfor"]).sum())
-                fila["Veces más caro que Bulfor"] = int((comunes[col] > comunes["Precio Bulfor"]).sum())
-                dif = (comunes[col] / comunes["Precio Bulfor"] - 1) * 100
-                fila["Diferencia mediana vs Bulfor (%)"] = round(dif.median(), 1)
-        filas.append(fila)
+def hoja_resumen(df, nuestras):
+    """Bulfor y cada competidor seguido, contando SOLO los productos donde ofertó Bulfor."""
+    adj = int((nuestras["Resultado Bulfor"] != "Sin adjudicar").sum())
+    gan = int((nuestras["Resultado Bulfor"] == "Ganó").sum())
+    filas = [{
+        "Empresa": "Bulfor", "RUT": RUT_BULFOR,
+        "Licitaciones en común": nuestras["Licitación"].nunique(),
+        "Productos en común": len(nuestras),
+        "Productos ya adjudicados": adj,
+        "Productos que ganó": gan,
+        "% ganados (de los adjudicados)": round(100 * gan / adj, 1) if adj else None,
+    }]
+    for rut, nombre in COMPETIDORES.items():
+        filas.append({"Empresa": nombre, "RUT": rut, **comparar_con_bulfor(df, nuestras, rut)})
     return pd.DataFrame(filas)
+
+
+def hoja_frecuentes(df, nuestras, minimo_productos=5):
+    """TODAS las empresas que ofertaron en productos de Bulfor, ordenadas por
+    cuántas veces se cruzaron con nosotros. Sirve para descubrir competidores
+    que no estaban en la lista."""
+    otras = df[df["RutProveedor"] != RUT_BULFOR]
+    conteo = otras.groupby("RutProveedor")["clave_linea"].nunique()
+    filas = []
+    for rut in conteo[conteo >= minimo_productos].index:
+        razon = otras.loc[otras["RutProveedor"] == rut, "RazonSocialProveedor"].iloc[0]
+        fantasia = otras.loc[otras["RutProveedor"] == rut, "NombreProveedor"].iloc[0]
+        filas.append({"Empresa": razon, "Nombre de fantasía": fantasia, "RUT": rut,
+                      "Ya seguido": "Sí" if rut in COMPETIDORES else "",
+                      **comparar_con_bulfor(df, nuestras, rut)})
+    out = pd.DataFrame(filas)
+    # Se cuentan solo ofertas aceptadas (una oferta rechazada no compitió de verdad).
+    out = out[out["Productos en común"] >= minimo_productos]
+    return out.sort_values(["Productos en común", "Licitaciones en común"], ascending=False)
 
 
 def hoja_leeme(desde, hasta, meses_ok, meses_faltan, df):
@@ -252,23 +275,25 @@ def hoja_leeme(desde, hasta, meses_ok, meses_faltan, df):
         ("Meses incluidos", ", ".join(meses_ok)),
         ("Meses sin archivo todavía", ", ".join(meses_faltan) or "—"),
         ("Fuente", "Datos Abiertos ChileCompra, archivo mensual de licitaciones (una fila por oferta)."),
+        ("Qué incluye", "SOLO los productos donde ofertó Bulfor, con lo que ofertaron las demás empresas en "
+                        "esos mismos productos. No incluye ofertas de la competencia donde Bulfor no participó."),
         ("Licitaciones incluidas", df["CodigoExterno"].nunique()),
         ("", ""),
         ("Hojas", ""),
-        ("Resumen", "Una fila por empresa: participación, líneas ganadas y comparación con Bulfor."),
-        ("Cara a cara", "Productos donde ofertó Bulfor y al menos un competidor: precio de cada uno, ganador y diferencia."),
-        ("Ofertas Bulfor", "Todo lo que ofertó Bulfor, con el ganador y su precio."),
-        ("Ofertas <competidor>", "Todo lo que ofertó cada competidor (también donde Bulfor no participó)."),
-        ("Todas las ofertas", "Detalle completo de las licitaciones donde participó Bulfor (todas las empresas)."),
+        ("Resumen", "Bulfor y los competidores seguidos (Insuval, Bioformula, RP Farma, Zapata)."),
+        ("Competidores frecuentes", "Todas las empresas que se cruzaron con Bulfor en 5 productos o más, "
+                                    "de más a menos frecuente. Para descubrir competidores que faltan en la lista."),
+        ("Nuestras ofertas", "Una fila por producto ofertado por Bulfor: nuestro precio, el de cada competidor "
+                             "seguido (vacío si no ofertó), quién ganó y a qué precio."),
+        ("Todas las ofertas", "Las mismas líneas, con una fila por cada empresa que ofertó."),
         ("", ""),
         ("Ojo al leer", ""),
-        ("Precios", "Precio unitario NETO ofertado, tal como viene en Mercado Público. Revisar la columna Unidad: "
-                    "un mismo producto puede pedirse por frasco, por kilo, etc."),
+        ("Precios", "Precio unitario NETO ofertado, tal como viene en Mercado Público. Revisar la columna Unidad."),
+        ("Unidades distintas", "Algunos comparan por comprimido y otros por frasco (ej. primidona: $58 vs $2.340). "
+                               "Por eso se usa la diferencia MEDIANA, que no se deja llevar por esos casos."),
         ("Ganar ≠ más barato", "La adjudicación es por puntaje (precio, plazo, experiencia...). Hay líneas que gana "
                                "una oferta que no es la más barata."),
-        ("Unidades distintas", "Algunos comparan por comprimido y otros por frasco (ej. primidona: $58 vs $2.340). "
-                               "Por eso el Resumen usa la diferencia MEDIANA, que no se deja llevar por esos casos."),
-        ("Meses recientes", "Las licitaciones aún no cerradas o no adjudicadas no muestran ganador."),
+        ("Sin adjudicar", "Licitaciones aún abiertas, en evaluación, desiertas o revocadas: no tienen ganador."),
         ("Compra Ágil y trato directo", "No vienen en este archivo (son otros procesos)."),
         ("Zapata", "Hay dos proveedores posibles: Zagopharm (González, Zapata y Cía.) y Juan Daniel Zapata. "
                    "Se incluyen ambos hasta confirmar cuál corresponde."),
@@ -320,7 +345,7 @@ def main():
             continue
         partes.append(df_mes)
         ok.append(etiqueta)
-        print(f"{etiqueta}: {df_mes['CodigoExterno'].nunique()} licitaciones con Bulfor o competidores", file=sys.stderr)
+        print(f"{etiqueta}: {df_mes['CodigoExterno'].nunique()} licitaciones donde ofertó Bulfor", file=sys.stderr)
 
     if not partes:
         sys.exit("No se pudo leer ningún mes.")
@@ -328,24 +353,20 @@ def main():
     ganadores = tabla_ganadores(df)
     base = datos_linea(df)
 
-    cara = hoja_cara_a_cara(df, ganadores, base)
-    hojas = [("Léeme", hoja_leeme(args.desde, args.hasta, ok, faltan, df)),
-             ("Resumen", hoja_resumen(df, cara)),
-             ("Cara a cara", cara),
-             ("Ofertas Bulfor", hoja_ofertas_de(df, ganadores, base, RUT_BULFOR))]
-    for rut, nombre in COMPETIDORES.items():
-        hojas.append((f"Ofertas {nombre}", hoja_ofertas_de(df, ganadores, base, rut)))
+    nuestras = hoja_nuestras_ofertas(df, ganadores, base)
 
-    # Detalle completo, solo de licitaciones donde participó Bulfor.
-    lic_bulfor = set(df.loc[df["RutProveedor"] == RUT_BULFOR, "CodigoExterno"])
-    det = df[df["CodigoExterno"].isin(lic_bulfor)]
-    det = det.set_index("clave_linea")[["RazonSocialProveedor", "RutProveedor", "Empresa", "Precio unitario",
-                                        "Cantidad Ofertada", "Estado Oferta", "Seleccionada"]]
+    # Detalle: todas las empresas que ofertaron en los productos de Bulfor.
+    det = df.set_index("clave_linea")[["RazonSocialProveedor", "RutProveedor", "Empresa", "Precio unitario",
+                                       "Cantidad Ofertada", "Estado Oferta", "Seleccionada"]]
     det = base.join(det, how="inner").rename(columns={"RazonSocialProveedor": "Proveedor", "Seleccionada": "Ganó"})
     det = det.sort_values(["Fecha publicación", "Licitación", "N° línea", "Precio unitario"],
                           ascending=[False, True, True, True])
-    hojas.append(("Todas las ofertas", det))
 
+    hojas = [("Léeme", hoja_leeme(args.desde, args.hasta, ok, faltan, df)),
+             ("Resumen", hoja_resumen(df, nuestras)),
+             ("Competidores frecuentes", hoja_frecuentes(df, nuestras)),
+             ("Nuestras ofertas", nuestras),
+             ("Todas las ofertas", det)]
     escribir_excel(args.salida, hojas)
     print(f"Listo: {args.salida}", file=sys.stderr)
 
