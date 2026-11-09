@@ -49,10 +49,10 @@ COMPETIDORES = {
     "77.768.990-8": "Insuval",          # FARMACEUTICA INSUVAL S.A.
     "76.030.398-4": "Bioformula",       # FARMACEUTICA BIOFORMULA LIMITADA
     "96.776.130-3": "RP Farma",         # COMERCIAL EL PRADO S A (nombre de fantasía "Rpfarma")
-    # "Zapata": en los datos hay dos proveedores posibles; se incluyen ambos
-    # hasta que Seba confirme cuál es (o si son los dos).
-    "76.019.191-4": "Zapata (Zagopharm)",  # GONZALEZ, ZAPATA Y COMPANIA LIMITADA ("ZAGOPHARM")
-    "5.923.094-8": "Zapata (Juan D.)",     # JUAN DANIEL ZAPATA ZAPATA
+    "5.923.094-8": "Zapata",            # JUAN DANIEL ZAPATA ZAPATA
+    # Zagopharm es OTRA empresa (Seba, 09-11-2026), no es "Zapata" aunque su
+    # razón social lo diga. Se deja como competidor aparte.
+    "76.019.191-4": "Zagopharm",        # GONZALEZ, ZAPATA Y COMPANIA LIMITADA ("ZAGOPHARM")
 }
 
 NOMBRES = {RUT_BULFOR: "Bulfor", **COMPETIDORES}
@@ -280,7 +280,7 @@ def hoja_leeme(desde, hasta, meses_ok, meses_faltan, df):
         ("Licitaciones incluidas", df["CodigoExterno"].nunique()),
         ("", ""),
         ("Hojas", ""),
-        ("Resumen", "Bulfor y los competidores seguidos (Insuval, Bioformula, RP Farma, Zapata)."),
+        ("Resumen", "Bulfor y los competidores seguidos (Insuval, Bioformula, RP Farma, Zapata y Zagopharm)."),
         ("Competidores frecuentes", "Todas las empresas que se cruzaron con Bulfor en 5 productos o más, "
                                     "de más a menos frecuente. Para descubrir competidores que faltan en la lista."),
         ("Nuestras ofertas", "Una fila por producto ofertado por Bulfor: nuestro precio, el de cada competidor "
@@ -295,8 +295,8 @@ def hoja_leeme(desde, hasta, meses_ok, meses_faltan, df):
                                "una oferta que no es la más barata."),
         ("Sin adjudicar", "Licitaciones aún abiertas, en evaluación, desiertas o revocadas: no tienen ganador."),
         ("Compra Ágil y trato directo", "No vienen en este archivo (son otros procesos)."),
-        ("Zapata", "Hay dos proveedores posibles: Zagopharm (González, Zapata y Cía.) y Juan Daniel Zapata. "
-                   "Se incluyen ambos hasta confirmar cuál corresponde."),
+        ("Zapata y Zagopharm", "Zapata = Juan Daniel Zapata Zapata (5.923.094-8). Zagopharm (González, Zapata y Cía., "
+                               "76.019.191-4) es otra empresa y va en su propia columna."),
     ]
     return pd.DataFrame(lineas, columns=["Tema", "Detalle"])
 
