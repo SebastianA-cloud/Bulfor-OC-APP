@@ -1,0 +1,21 @@
+name: Carga inicial competencia (temporal, se borra después de usar)
+
+on:
+  push:
+    branches: [claude/cool-mccarthy-tuo8kr]
+    paths: [.github/workflows/carga_inicial_competencia.yml]
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests supabase pandas
+      - name: Carga enero 2025 a hoy
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python competencia_licitaciones.py --supabase --desde 2025-01

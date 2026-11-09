@@ -1,0 +1,40 @@
+name: Competencia en licitaciones (Datos Abiertos ChileCompra)
+
+# Guarda en Supabase (lic_lineas / lic_ofertas) los productos donde ofertó
+# Bulfor y lo que ofertó cada empresa. Solo vuelve a leer los últimos 3 meses:
+# ChileCompra actualiza esos archivos a medida que se adjudican las licitaciones.
+on:
+  schedule:
+    - cron: '17 11 * * 1'  # lunes 11:17 UTC (~8:17 hora Chile)
+  workflow_dispatch:
+    inputs:
+      desde:
+        description: 'Recargar desde AAAA-MM (vacío = solo últimos 3 meses)'
+        required: false
+        default: ''
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase pandas
+
+      - name: Guardar en Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: solo en GitHub Secrets
+          DESDE: ${{ github.event.inputs.desde }}
+        run: |
+          if [ -n "$DESDE" ]; then
+            python competencia_licitaciones.py --supabase --desde "$DESDE"
+          else
+            python competencia_licitaciones.py --supabase --meses-recientes 3
+          fi

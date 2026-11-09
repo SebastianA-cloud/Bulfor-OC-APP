@@ -327,6 +327,107 @@ def escribir_excel(ruta, hojas):
                         fila[0].number_format = "#,##0.##"
 
 
+# ─── Guardar en Supabase (Etapa 1) ──────────────────────────────────────────
+# Tablas: lic_lineas (un producto donde ofertó Bulfor) y lic_ofertas (cada
+# empresa que ofertó en ese producto). La lista de competidores a mostrar vive
+# en lic_competidores y la edita la app; aquí se guardan TODAS las ofertas de
+# los productos de Bulfor, así agregar un competidor no requiere recargar.
+
+def _txt(v):
+    if v is None or (isinstance(v, float) and pd.isna(v)) or v is pd.NaT:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return str(v)
+
+
+def _num(v):
+    try:
+        return None if pd.isna(v) else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def filas_para_base(df):
+    """Convierte las ofertas en filas para lic_lineas y lic_ofertas."""
+    lin = df.drop_duplicates("clave_linea")
+    lineas = []
+    for _, r in lin.iterrows():
+        n = _num(r.get("Correlativo"))
+        lineas.append({
+            "clave": r["clave_linea"], "licitacion": r["CodigoExterno"],
+            "codigo_item": str(r["Codigoitem"]), "n_linea": int(n) if n is not None else None,
+            "fecha_publicacion": _txt(r["Fecha publicación"]), "fecha_adjudicacion": _txt(r["Fecha adjudicación"]),
+            "estado": _txt(r.get("Estado")), "organismo": _txt(r.get("NombreOrganismo")),
+            "unidad_compradora": _txt(r.get("NombreUnidad")), "region": _txt(r.get("RegionUnidad")),
+            "tipo": _txt(r.get("Tipo")), "codigo_onu": _txt(r.get("CodigoProductoONU")),
+            "producto_generico": _txt(r.get("Nombre producto genrico")), "descripcion": _txt(r.get("Producto")),
+            "unidad_medida": _txt(r.get("UnidadMedida")), "cantidad": _num(r.get("Cantidad")),
+            "link": _txt(r.get("Link")),
+        })
+    ofertas = []
+    for _, r in df.drop_duplicates(["clave_linea", "RutProveedor"]).iterrows():
+        if not isinstance(r["RutProveedor"], str):
+            continue
+        ofertas.append({
+            "clave_linea": r["clave_linea"], "rut_proveedor": r["RutProveedor"],
+            "proveedor": _txt(r.get("RazonSocialProveedor")), "nombre_fantasia": _txt(r.get("NombreProveedor")),
+            "precio_unitario": _num(r.get("Precio unitario")), "cantidad_ofertada": _num(r.get("Cantidad Ofertada")),
+            "moneda": _txt(r.get("Moneda de la Oferta")), "estado_oferta": _txt(r.get("Estado Oferta")),
+            "seleccionada": bool(r["Seleccionada"]),
+        })
+    return lineas, ofertas
+
+
+def guardar_en_supabase(lineas, ofertas):
+    """Upsert en lotes (no borra nada). Requiere SUPABASE_URL y SUPABASE_KEY
+    (service_role, en GitHub Secrets; nunca en el código)."""
+    from supabase import create_client
+    cli = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+    ahora = pd.Timestamp.now(tz="UTC").isoformat()
+    for tabla, filas, clave in (("lic_lineas", lineas, "clave"),
+                                ("lic_ofertas", ofertas, "clave_linea,rut_proveedor")):
+        for i in range(0, len(filas), 500):
+            lote = [{**f, "actualizado_en": ahora} for f in filas[i:i + 500]]
+            cli.table(tabla).upsert(lote, on_conflict=clave).execute()
+        print(f"{tabla}: {len(filas)} filas guardadas", file=sys.stderr)
+
+
+def escribir_sql(ruta, lineas, ofertas, por_archivo=400):
+    """Genera archivos .sql con INSERT ... ON CONFLICT (para cargas manuales).
+    Devuelve la lista de archivos."""
+    import json
+
+    def lit(v):
+        if v is None:
+            return "null"
+        if isinstance(v, bool):
+            return "true" if v else "false"
+        if isinstance(v, (int, float)):
+            return repr(v)
+        return "'" + str(v).replace("'", "''") + "'"
+
+    archivos = []
+    for tabla, filas, conflicto in (("lic_lineas", lineas, "clave"),
+                                    ("lic_ofertas", ofertas, "clave_linea, rut_proveedor")):
+        if not filas:
+            continue
+        cols = list(filas[0].keys())
+        upd = ", ".join(f"{c} = excluded.{c}" for c in cols if c not in conflicto.replace(" ", "").split(","))
+        for n, i in enumerate(range(0, len(filas), por_archivo)):
+            valores = ",\n".join("(" + ", ".join(lit(f[c]) for c in cols) + ")" for f in filas[i:i + por_archivo])
+            sql = (f"insert into public.{tabla} ({', '.join(cols)}) values\n{valores}\n"
+                   f"on conflict ({conflicto}) do update set {upd}, actualizado_en = now();\n")
+            nombre = f"{ruta}_{tabla}_{n:03d}.sql"
+            with open(nombre, "w", encoding="utf-8") as f:
+                f.write(sql)
+            archivos.append(nombre)
+    return archivos
+
+
 def main():
     hoy = date.today()
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -334,9 +435,16 @@ def main():
     p.add_argument("--hasta", default=f"{hoy.year}-{hoy.month:02d}")
     p.add_argument("--cache", default="lic-da", help="carpeta donde se guardan los ZIP descargados")
     p.add_argument("--salida", default=f"competencia_licitaciones_{hoy.isoformat()}.xlsx")
+    p.add_argument("--supabase", action="store_true",
+                   help="guardar en Supabase (lic_lineas / lic_ofertas) en vez de generar Excel")
+    p.add_argument("--sql", metavar="PREFIJO", help="generar archivos .sql para una carga manual")
+    p.add_argument("--meses-recientes", type=int, default=None,
+                   help="procesar solo los últimos N meses (la sincronización semanal usa 3)")
     args = p.parse_args()
 
     meses = meses_entre(args.desde, args.hasta)
+    if args.meses_recientes:
+        meses = meses[-args.meses_recientes:]
     recientes = set(meses[-3:])  # se vuelven a descargar: ChileCompra los actualiza
     partes, ok, faltan = [], [], []
     for anio, mes in meses:
@@ -356,6 +464,16 @@ def main():
     if not partes:
         sys.exit("No se pudo leer ningún mes.")
     df = preparar(pd.concat(partes, ignore_index=True))
+
+    if args.supabase or args.sql:
+        lineas, ofertas = filas_para_base(df)
+        if args.sql:
+            for a in escribir_sql(args.sql, lineas, ofertas):
+                print(a, file=sys.stderr)
+        if args.supabase:
+            guardar_en_supabase(lineas, ofertas)
+        return
+
     ganadores = tabla_ganadores(df)
     base = datos_linea(df)
 
