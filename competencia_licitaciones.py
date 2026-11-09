@@ -193,9 +193,11 @@ def hoja_nuestras_ofertas(df, ganadores, base):
     seg = acep[acep["RutProveedor"].isin(NOMBRES.keys())]
     precios = seg.pivot_table(index="clave_linea", columns="Empresa", values="Precio unitario", aggfunc="min")
     orden = ["Bulfor"] + list(COMPETIDORES.values())
-    precios = precios.reindex(columns=orden)
-    # El precio de Bulfor se muestra aunque la oferta haya sido rechazada.
+    # Siempre TODOS los productos de Bulfor (también donde nuestra oferta fue
+    # rechazada y ningún competidor seguido ofertó).
     propias = df[df["RutProveedor"] == RUT_BULFOR]
+    precios = precios.reindex(index=propias["clave_linea"].unique(), columns=orden)
+    # El precio de Bulfor se muestra aunque la oferta haya sido rechazada.
     precios["Bulfor"] = propias.groupby("clave_linea")["Precio unitario"].min()
     precios.columns = [f"Precio {c}" for c in precios.columns]
     estado_bulfor = (propias.drop_duplicates("clave_linea").set_index("clave_linea")["Estado Oferta"]
