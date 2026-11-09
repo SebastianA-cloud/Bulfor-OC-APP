@@ -70,7 +70,7 @@ El código está dividido con comentarios `// ─── TÍTULO ───`. Busc
 | Módulo (menú) | Páginas (`page-…`) | Dónde buscar |
 |---|---|---|
 | Inicio | `inicio` | `Pantalla Inicio: "Requiere atención"` |
-| Órdenes de compra | `oc`, `hospitales`, `estadisticas` | `Listado de OC`, `RENDER OC`, `Ficha de un hospital`, `STATS` |
+| Órdenes de compra | `oc`, `hospitales`, `estadisticas`, `competencia` | `Listado de OC`, `RENDER OC`, `Ficha de un hospital`, `STATS`; Competencia en licitaciones: `competencia.js` / `competencia.css` (todo `cmp*`) |
 | Precios | `facturas-productos` | `Precios: productos base`, `Precios → Por cliente`, `grupoDeProductos` |
 | Creación de documentos | `doc-factura`, `doc-multiple`, `doc-guia`, `doc-nc` | `documentos.js` |
 | Facturas de venta | `facturas` (Documentos), `pagos` (Cobranza), `facturas-rechazadas`, `pagos-graficos` | `BUSCADOR DE DOCUMENTOS`, `Ficha de un documento`, `SEGUIMIENTO PAGO DE FACTURAS`, `Cobranza por cliente`, `FACTURAS RECHAZADAS`, `Casos de facturas rechazadas`, `GRÁFICOS DE PAGOS` |
@@ -121,6 +121,7 @@ RLS en todo. Patrón de políticas: `leer_autenticados` (select, authenticated) 
 
 | Área | Tablas / vistas / funciones principales |
 |---|---|
+| Competencia en licitaciones (09-11-2026) | `lic_lineas` (un producto donde ofertó Bulfor; clave `licitacion|codigo_item`), `lic_ofertas` (cada empresa que ofertó ese producto; PK clave_linea+rut_proveedor; `seleccionada` = ganó), `lic_competidores` (lista a seguir, editable por editores). Lectura: autenticados. `lic_lineas`/`lic_ofertas` solo las escribe la sincronización (service key) |
 | OC Mercado Público | `ordenes_compra`, `items_oc`, `hospitales`, `hospitales_maestro` (nombre estándar + RUT), `productos`, `diccionario_normalizacion`, `equivalencias_costo` |
 | Documentos emitidos (GDExpress) | `documentos_gdexpress` (tipo_dte 33 factura, 52 guía, 61 NC; `xml_completo`, `orden_compra_ref`, `estado_aceptacion`), `documentos_gdexpress_items` (**`codigo_tipo`='RM' + `codigo_valor`= N° de RM** del producto magistral), `dte_borradores` |
 | Cobranza | `facturas_pago`, `feriados`, `sync_estado` |
@@ -143,7 +144,7 @@ esperando una confirmación que no llega. En ese caso se le entrega a Seba un ar
 | Qué | Dónde corre | Frecuencia | Notas |
 |---|---|---|---|
 | OC Mercado Público (`actualizar_oc_final.py`) | GitHub Actions | cada 2 h | |
-| Competencia en licitaciones (`competencia_licitaciones.py`) | Manual (Etapa 0) | — | Solo lectura: descarga Datos Abiertos de ChileCompra y genera Excel. Sin escritura en Supabase. |
+| Competencia en licitaciones (`competencia_licitaciones.py --supabase`) | GitHub Actions (`competencia_licitaciones.yml`) | lunes 11:17 UTC | Descarga Datos Abiertos de ChileCompra (`transparenciachc.blob.core.windows.net/lic-da/{año}-{mes}.zip`) y hace upsert de los últimos 3 meses en `lic_lineas`/`lic_ofertas` (no borra). Botón manual con "desde AAAA-MM" para recargar. Sin argumentos genera el Excel. Datos con ~1 mes de desfase. |
 | `sincronizar_gdexpress.py` | GitHub Actions | cada 2 h (:20) | **Ojo:** hoy su código trae facturas RECIBIDAS de proveedores (GRUPO=R), igual que `sincronizar_facturas_recibidas.py`; parece una copia antigua. Revisar si sobra (no tocar sin consultar a Seba). |
 | Documentos emitidos (`sincronizar_documentos_gdexpress.py`) | GitHub Actions | cada 2 h (:35) + **rápida cada 15 min** (`sincronizar_documentos_rapido.yml`, últimos 3 días) | Al final llama `rec_formulas_refrescar()` |
 | Facturas recibidas (`sincronizar_facturas_recibidas.py`) | GitHub Actions | cada 2 h (:50) | |
@@ -172,6 +173,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 09-11-2026 · Claude · **En rama `claude/cool-mccarthy-tuo8kr` (PR abierto, no integrado):** Competencia en licitaciones, **Etapas 1 y 2** (autorizadas por Seba: "haz todo tú"). **Aplicado en Supabase con autorización:** tablas `lic_lineas`, `lic_ofertas`, `lic_competidores` con RLS (sin avisos nuevos del linter) y carga inicial ene-2025 a oct-2026 (786 productos, 68 licitaciones, 2.600 ofertas; Bulfor ganó 156) hecha con un workflow temporal desde la rama, ya borrado. Sincronización semanal `competencia_licitaciones.yml` (solo corre cuando esté en main). En la app: Órdenes de compra › **Competencia en licitaciones** (`competencia.js`/`competencia.css`, en index.html solo el menú, la página `page-competencia`, `SUBMENUS`, el `<script>`/`<link>` y `cmpInit()` en `showPage`): pestañas Resumen (KPI + tabla por competidor, clic → sus productos), Nuestras ofertas (buscador, filtros resultado/año/competidor, Excel) con ficha por producto (todas las ofertas y "otras veces que ofertamos este producto" por palabras clave de la descripción) y Competidores (seguir/ocultar, quitar, agregar desde "otras empresas que se cruzan con Bulfor"; solo editores). Probado con los datos reales interceptados (sin Supabase), 1280 px y celular. **Ojo:** el contenedor se llama `cmp-contenido` a propósito: un div vacío sin "contenido" en el id queda envuelto en la cabecera fija (`envolverCabeceras`).
 
 - 09-11-2026 · Claude · **En rama `claude/cool-mccarthy-tuo8kr` (no integrado):** Competencia en licitaciones, **Etapa 0** (prueba, solo lectura). Script nuevo `competencia_licitaciones.py`: descarga los archivos mensuales de Datos Abiertos de ChileCompra (`transparenciachc.blob.core.windows.net/lic-da/{año}-{mes}.zip`, una fila por oferta, agrupados por mes de publicación; ~15 MB c/u) y genera un Excel con Resumen, Cara a cara, Ofertas por empresa y Todas las ofertas. **No escribe en Supabase.** Hallazgo: la API de Mercado Público solo trae al ganador; las ofertas perdedoras solo están en Datos Abiertos; documentos de los oferentes solo en la ficha web. RUT Bulfor 76.186.755-5. Competidores (Seba): Insuval 77.768.990-8, Bioformula 76.030.398-4, RP Farma = Comercial El Prado S.A. 96.776.130-3 ("Rpfarma"), Zapata = Juan Daniel Zapata Zapata 5.923.094-8 (confirmado por Seba). Zagopharm (González, Zapata y Cía. 76.019.191-4) es **otra empresa**, no confundir; queda como competidor aparte. Seba agregó a la lista fija Alphalab 76.451.127-1, Salcobrand 76.031.071-9 y Reccius 94.593.000-4. Ene-2025 a oct-2026: Bulfor ofertó en 68 licitaciones (786 líneas, ganó 156); Insuval en 665. Excel entregado a Seba. **Ajuste (mismo día, a pedido de Seba):** el Excel incluye solo los productos donde ofertó Bulfor (786 productos en 68 licitaciones, incluidas las ofertas rechazadas), con lo que ofertó la competencia en esos mismos productos; se agregó la hoja "Competidores frecuentes" (todas las empresas que se cruzaron con Bulfor en ≥5 productos). Los que más se repiten y no estaban en la lista: Alphalab (445 productos, gana 64%), Salcobrand (269), Reccius (248), Qualimed (26).
 
@@ -223,7 +226,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 10. Pendientes
 
-- [ ] **Competencia en licitaciones** (Etapa 0 entregada como Excel): Seba revisa si el Excel sirve (lista fija: Insuval, Bioformula, RP Farma, Zapata, Zagopharm, Alphalab, Salcobrand, Reccius). Después: Etapa 1 (tablas en Supabase + sincronización mensual en GitHub Actions; requiere autorización), Etapa 2 (módulo en la app; Seba lo quiere dentro de la app; coordinar interfaz con Codex), Etapa 3 (equivalencias de productos entre hospitales, alertas, enlaces a actas). Ojo: unidades distintas entre ofertas (comprimido vs frasco) distorsionan comparaciones de precio.
+- [ ] **Competencia en licitaciones**: Seba prueba la vista previa y aprueba el PR. Al integrar: dar acceso a la página `competencia` a las cuentas que la necesiten (Administración › Usuarios y permisos; el administrador ya la ve) y confirmar el primer lunes que corra `competencia_licitaciones.yml`. Ideas para después (Etapa 3): equivalencias de productos entre hospitales, alertas de adjudicación, enlaces a actas, Compra Ágil. Ojo: unidades distintas entre ofertas (comprimido vs frasco) distorsionan comparaciones de precio.
 
 - [ ] Perfiles: al crear una cuenta nueva, agregar su correo a `USUARIOS_CONOCIDOS` (lista del login en index.html) si se quiere que aparezca en el desplegable; no es necesario para entrar.
 - [ ] Perfiles: si algún día se quiere bloqueo real de datos por perfil ("nivel B"), hay que llevar los permisos a las políticas RLS de cada tabla.
