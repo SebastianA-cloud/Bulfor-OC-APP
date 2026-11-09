@@ -53,6 +53,10 @@ COMPETIDORES = {
     # Zagopharm es OTRA empresa (Seba, 09-11-2026), no es "Zapata" aunque su
     # razón social lo diga. Se deja como competidor aparte.
     "76.019.191-4": "Zagopharm",        # GONZALEZ, ZAPATA Y COMPANIA LIMITADA ("ZAGOPHARM")
+    # Agregados por Seba (09-11-2026) tras ver la hoja "Competidores frecuentes".
+    "76.451.127-1": "Alphalab",         # ALPHALAB SPA
+    "76.031.071-9": "Salcobrand",       # SALCOBRAND S.A
+    "94.593.000-4": "Reccius",          # FARMACEUTICA RECCIUS SPA
 }
 
 NOMBRES = {RUT_BULFOR: "Bulfor", **COMPETIDORES}
@@ -280,7 +284,7 @@ def hoja_leeme(desde, hasta, meses_ok, meses_faltan, df):
         ("Licitaciones incluidas", df["CodigoExterno"].nunique()),
         ("", ""),
         ("Hojas", ""),
-        ("Resumen", "Bulfor y los competidores seguidos (Insuval, Bioformula, RP Farma, Zapata y Zagopharm)."),
+        ("Resumen", "Bulfor y los competidores seguidos (Insuval, Bioformula, RP Farma, Zapata, Zagopharm, Alphalab, Salcobrand y Reccius)."),
         ("Competidores frecuentes", "Todas las empresas que se cruzaron con Bulfor en 5 productos o más, "
                                     "de más a menos frecuente. Para descubrir competidores que faltan en la lista."),
         ("Nuestras ofertas", "Una fila por producto ofertado por Bulfor: nuestro precio, el de cada competidor "
