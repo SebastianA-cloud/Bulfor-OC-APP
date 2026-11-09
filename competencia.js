@@ -276,7 +276,8 @@ function cmpPalabrasClave(texto, max = 2) {
 
 // ─── Ficha de un producto ───────────────────────────────────────────────────
 // Todas las ofertas de ese producto (de menor a mayor precio) y el historial:
-// otras veces que Bulfor ofertó el mismo producto genérico (código ONU).
+// otras veces que Bulfor ofertó el mismo producto (mismas palabras clave en
+// la descripción; el código ONU es demasiado general para esto).
 function cmpAbrirFicha(clave) {
   const l = cmpState.lineas.find(x => x.clave === clave);
   if (!l) return;
