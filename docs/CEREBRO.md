@@ -143,6 +143,7 @@ esperando una confirmación que no llega. En ese caso se le entrega a Seba un ar
 | Qué | Dónde corre | Frecuencia | Notas |
 |---|---|---|---|
 | OC Mercado Público (`actualizar_oc_final.py`) | GitHub Actions | cada 2 h | |
+| Competencia en licitaciones (`competencia_licitaciones.py`) | Manual (Etapa 0) | — | Solo lectura: descarga Datos Abiertos de ChileCompra y genera Excel. Sin escritura en Supabase. |
 | `sincronizar_gdexpress.py` | GitHub Actions | cada 2 h (:20) | **Ojo:** hoy su código trae facturas RECIBIDAS de proveedores (GRUPO=R), igual que `sincronizar_facturas_recibidas.py`; parece una copia antigua. Revisar si sobra (no tocar sin consultar a Seba). |
 | Documentos emitidos (`sincronizar_documentos_gdexpress.py`) | GitHub Actions | cada 2 h (:35) + **rápida cada 15 min** (`sincronizar_documentos_rapido.yml`, últimos 3 días) | Al final llama `rec_formulas_refrescar()` |
 | Facturas recibidas (`sincronizar_facturas_recibidas.py`) | GitHub Actions | cada 2 h (:50) | |
@@ -171,6 +172,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 09-11-2026 · Claude · **En rama `claude/cool-mccarthy-tuo8kr` (no integrado):** Competencia en licitaciones, **Etapa 0** (prueba, solo lectura). Script nuevo `competencia_licitaciones.py`: descarga los archivos mensuales de Datos Abiertos de ChileCompra (`transparenciachc.blob.core.windows.net/lic-da/{año}-{mes}.zip`, una fila por oferta, agrupados por mes de publicación; ~15 MB c/u) y genera un Excel con Resumen, Cara a cara, Ofertas por empresa y Todas las ofertas. **No escribe en Supabase.** Hallazgo: la API de Mercado Público solo trae al ganador; las ofertas perdedoras solo están en Datos Abiertos; documentos de los oferentes solo en la ficha web. RUT Bulfor 76.186.755-5. Competidores (Seba): Insuval 77.768.990-8, Bioformula 76.030.398-4, RP Farma = Comercial El Prado S.A. 96.776.130-3 ("Rpfarma"), Zapata = por confirmar entre Zagopharm (González, Zapata y Cía. 76.019.191-4) y Juan Daniel Zapata Zapata 5.923.094-8. Ene-2025 a oct-2026: Bulfor ofertó en 68 licitaciones (786 líneas, ganó 156); Insuval en 665. Excel entregado a Seba.
 
 - 06-11-2026 · Claude · **Integrado en main mediante PR #23 (aprobado por Seba el 06-11-2026):** Órdenes de elaboración › Elegir RM: cada sugerencia muestra el paciente de Pharma_RM (`rec_rm.paciente_nombre`) o la institución, y los RM del mismo paciente de la orden (por RUT o por al menos 2 palabras del nombre) suben primero con la etiqueta "Mismo paciente". **Aplicado en Supabase con autorización de Seba:** `rec_oe_candidatos` acepta `p_paciente` y `p_rut` (opcionales; sin ellos funciona igual que antes) y devuelve `paciente` y `mismo_paciente`. Con las 15 órdenes de oct–nov que ya tenían RM, el correcto queda primero en 12 (antes 8). Probado con datos simulados.
 - 05-11-2026 · Claude · **Integrado en main mediante PR #20 (aprobado por Seba el 05-11-2026):** usuario para entrar guardado por cuenta. **Aplicado en Supabase con autorización de Seba:** columna `perfiles.usuario` (única, formato a-z0-9._-) con sebastian, genoveva, christian y javiera (javiera.bulboa@gmail.com), y función `correo_de_usuario`. En la app, el login busca el correo por usuario (sirve para correos que no son @farmaciabulfor.cl; si no lo encuentra, usa la regla anterior). Usuarios y permisos muestra el usuario, permite cambiarlo y pedirlo al crear una cuenta. El desplegable del login muestra los usuarios que ya entraron en ese equipo, más los tres de siempre; no se publica la lista de cuentas. Probado con datos simulados.
@@ -219,6 +222,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] **Competencia en licitaciones** (Etapa 0 entregada como Excel): Seba confirma cuál "Zapata" es y revisa si el Excel sirve. Después: Etapa 1 (tablas en Supabase + sincronización mensual en GitHub Actions; requiere autorización), Etapa 2 (módulo en la app; Seba lo quiere dentro de la app; coordinar interfaz con Codex), Etapa 3 (equivalencias de productos entre hospitales, alertas, enlaces a actas). Ojo: unidades distintas entre ofertas (comprimido vs frasco) distorsionan comparaciones de precio.
 
 - [ ] Perfiles: al crear una cuenta nueva, agregar su correo a `USUARIOS_CONOCIDOS` (lista del login en index.html) si se quiere que aparezca en el desplegable; no es necesario para entrar.
 - [ ] Perfiles: si algún día se quiere bloqueo real de datos por perfil ("nivel B"), hay que llevar los permisos a las políticas RLS de cada tabla.
