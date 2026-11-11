@@ -495,6 +495,33 @@
   </div>
 
   <!-- PRODUCTOS DE FACTURAS PAGE -->
+  <div class="page" id="page-precios-catalogo">
+    <div class="page-header">
+      <div class="page-title">Catálogo de precios</div>
+      <div class="page-sub">Un nombre por producto, con el precio por unidad y por envase de cada venta (en construcción: letras ya revisadas)</div>
+    </div>
+    <div id="cat-lista">
+      <div class="scope-toggle cat-letras" id="cat-letras" role="group" aria-label="Filtrar por letra" style="margin-bottom:12px"></div>
+      <label for="cat-buscar" class="pv-buscar-label">Buscar producto</label>
+      <div class="toolbar"><div class="search-wrap"><span class="search-icon">🔍</span>
+        <input type="text" id="cat-buscar" placeholder="Nombre o código (P-0001)…" oninput="catRenderLista()"></div></div>
+      <div id="cat-cargando" style="display:none">
+        <div class="skeleton" style="height:38px;margin-bottom:6px"></div><div class="skeleton" style="height:38px;margin-bottom:6px"></div><div class="skeleton" style="height:38px;width:80%"></div>
+      </div>
+      <div class="table-card">
+        <div style="padding:8px 16px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)" id="cat-info"></div>
+        <div class="cat-tabla-wrap"><table style="margin:0">
+          <thead><tr><th>Producto</th><th class="cat-num">Neto típico por unidad</th><th class="cat-num">Neto típico por envase</th><th class="cat-num">Último precio</th><th class="cat-num">Ventas</th><th class="cat-num">Hospitales</th></tr></thead>
+          <tbody id="cat-body"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div id="cat-ficha" style="display:none">
+      <button class="btn-volver-graficos" onclick="catVolver()"><i class="ti ti-arrow-left"></i> Volver al catálogo</button>
+      <div id="cat-ficha-cuerpo"></div>
+    </div>
+  </div>
+
   <div class="page" id="page-facturas-productos">
     <div class="page-header">
       <div class="page-title">Precios</div>
@@ -1450,6 +1477,7 @@
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
+<script src="catalogo.js"></script>
 <script src="permisos.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
@@ -18356,6 +18384,7 @@ showPage = function(id, el) {
   if (id === 'facturas-productos') {
     cargarProductosFacturas();
   }
+  if (id === 'precios-catalogo') catInit();
   if (id === 'facturas-prov-productos') {
     cargarProductosFacturasProveedor();
   }
@@ -18390,6 +18419,7 @@ const SUBMENUS = {
   // entra directo; "Por cliente" es la otra vista de la misma pantalla.
   'precios': { items: [
     { icon: '<i class="ti ti-tag"></i>', label: 'Precios', page: 'facturas-productos' },
+    { icon: '<i class="ti ti-list-details"></i>', label: 'Catálogo', page: 'precios-catalogo' },
   ] },
   // Facturas Bulfor: consulta y cobranza, y abajo la creación de documentos
   // (antes era un menú aparte). Los gráficos no salen en el submenú

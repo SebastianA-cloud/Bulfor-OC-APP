@@ -1966,3 +1966,18 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .btn-volver-graficos { justify-self: start; width: auto; margin-top: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px; color: var(--accent); border-color: var(--accent); background: var(--surface); }
 .btn-volver-graficos:hover { background: var(--accent); color: #fff; }
+
+/* ─── Catálogo de precios (Precios › Catálogo) ─── */
+.cat-tabla-wrap { overflow-x: auto; }
+.cat-fila { cursor: pointer; }
+.cat-fila:hover td { background: var(--surface-2, #FAF9F6); }
+.cat-nombre { font-weight: 600; }
+.cat-cod { font-size: 11px; color: var(--text-2); }
+.cat-iva { font-size: 11px; color: var(--text-3, #9A968E); }
+.cat-num { text-align: right; white-space: nowrap; }
+.cat-letras { flex-wrap: wrap; }
+.cat-ficha-tit { font-size: 20px; font-weight: 700; margin: 12px 0 2px; }
+.cat-raro td { background: #FFF4C2; }
+.cat-sinoc { font-size: 11px; background: #F1EFEA; color: var(--text-2); border-radius: 6px; padding: 1px 6px; }
+.page .table-card .cat-tabla-wrap table > thead th { position: static; }
+.cat-tabla-wrap td:first-child { white-space: nowrap; }
