@@ -1962,4 +1962,7 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 
 /* ─── Botones de gráficos dentro de Cobranza y Facturas por pagar ────────── */
 /* Mismo aspecto que los demás botones de la barra (Descargar Excel, etc.). */
-.btn-volver-graficos { margin-top: 8px; padding: 6px 12px; font-size: 12px; }
+/* "Volver" de los gráficos: botón chico y visible bajo el título (no una barra a lo ancho). */
+.btn-volver-graficos { justify-self: start; width: auto; margin-top: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px; color: var(--accent); border-color: var(--accent); background: var(--surface); }
+.btn-volver-graficos:hover { background: var(--accent); color: #fff; }
