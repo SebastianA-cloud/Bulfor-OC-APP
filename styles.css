@@ -1959,3 +1959,7 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .usr-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); }
 .usr-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--surface, #fff); color: var(--text); }
 .usr-form .btn-mp { align-self: flex-start; }
+
+/* ─── Botones de gráficos dentro de Cobranza y Facturas por pagar ────────── */
+/* Mismo aspecto que los demás botones de la barra (Descargar Excel, etc.). */
+.btn-volver-graficos { margin-top: 8px; padding: 6px 12px; font-size: 12px; }

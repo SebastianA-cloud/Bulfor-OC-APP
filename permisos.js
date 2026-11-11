@@ -56,7 +56,7 @@ function moduloPermitido(modulo) {
 
 function primeraPaginaPermitida(modulo) {
   const cfg = SUBMENUS[modulo];
-  return cfg ? (cfg.items.find(it => paginaPermitida(it.page)) || {}).page : null;
+  return cfg ? (cfg.items.find(it => !it.oculto && paginaPermitida(it.page)) || {}).page : null;
 }
 
 // Esconde del menú lateral, de las pestañas de arriba, de la barra del celular
@@ -64,6 +64,9 @@ function primeraPaginaPermitida(modulo) {
 function aplicarPermisosNav() {
   document.querySelectorAll('.nav-subitem[data-page]').forEach(n =>
     n.classList.toggle('sin-permiso', !paginaPermitida(n.dataset.page)));
+  // Botones que abren otra página (Gráficos de cobros en Cobranza, etc.).
+  document.querySelectorAll('[data-page-btn]').forEach(n =>
+    n.classList.toggle('sin-permiso', !paginaPermitida(n.dataset.pageBtn)));
   document.querySelectorAll('[onclick^="mostrarModulo("]').forEach(n => {
     const m = /mostrarModulo\('([^']+)'/.exec(n.getAttribute('onclick'));
     if (!m) return;
@@ -128,9 +131,11 @@ function usrRender() {
         </tr>`).join('')}</tbody></table></div>`;
 }
 
+// Páginas de creación de documentos (dentro de Facturas Bulfor): "Borradores" va con ellas.
+const USR_PAGINAS_DOCUMENTOS = ['doc-factura', 'doc-multiple', 'doc-guia', 'doc-nc'];
 const usrTodasLasPaginas = () => Object.entries(SUBMENUS).filter(([m]) => m !== 'admin').flatMap(([, c]) => c.items.map(it => it.page));
-const USR_NOMBRE_MODULO = { 'oc-modulo': 'Órdenes de compra', 'precios': 'Precios', 'documentos': 'Creación de documentos',
-  'facturas': 'Facturas de venta', 'proveedores': 'Facturas de proveedores', 'fedex': 'FedEx', 'chilexpress': 'Chilexpress',
+const USR_NOMBRE_MODULO = { 'oc-modulo': 'Órdenes de compra', 'precios': 'Precios',
+  'facturas': 'Facturas Bulfor', 'proveedores': 'Facturas de proveedores', 'fedex': 'FedEx', 'chilexpress': 'Chilexpress',
   'elaboracion': 'Elaboración', 'recetario-modulo': 'Recetario', 'farmacia-modulo': 'Control farmacia', 'rrhh': 'Recursos humanos' };
 
 function usrFicha(u) {
@@ -141,7 +146,7 @@ function usrFicha(u) {
         onchange="usrMarcarModulo('${u.user_id}','${m}',this.checked)"> <b>${escapeHtml(USR_NOMBRE_MODULO[m] || m)}</b></label>
       ${cfg.items.length > 1 ? `<div class="usr-paginas">${cfg.items.map(it => `
         <label><input type="checkbox" data-page="${it.page}" ${tiene.has(it.page) ? 'checked' : ''}
-          onchange="usrMarcarPagina('${u.user_id}','${it.page}',this.checked)"> ${escapeHtml(it.label)}</label>`).join('')}</div>` : ''}
+          onchange="usrMarcarPagina('${u.user_id}','${it.page}',this.checked)"> ${escapeHtml(it.label)}${it.oculto ? ' <small>(botón)</small>' : ''}</label>`).join('')}</div>` : ''}
     </div>`).join('');
   return {
     antetitulo: 'Usuarios y permisos',
@@ -181,7 +186,7 @@ function usrMarcarPagina(id, pagina, marcado) {
   const s = new Set(u.paginas || []);
   marcado ? s.add(pagina) : s.delete(pagina);
   // "Borradores" va siempre junto con Creación de documentos.
-  const docs = SUBMENUS.documentos.items.map(it => it.page);
+  const docs = USR_PAGINAS_DOCUMENTOS;
   docs.some(p => s.has(p)) ? s.add('doc-borradores') : s.delete('doc-borradores');
   usrGuardarPaginas(id, [...s]);
 }
@@ -190,7 +195,7 @@ function usrMarcarModulo(id, modulo, marcado) {
   if (!u) return;
   const s = new Set(u.paginas || []);
   SUBMENUS[modulo].items.forEach(it => marcado ? s.add(it.page) : s.delete(it.page));
-  if (modulo === 'documentos') marcado ? s.add('doc-borradores') : s.delete('doc-borradores');
+  if (modulo === 'facturas') marcado ? s.add('doc-borradores') : s.delete('doc-borradores');
   usrGuardarPaginas(id, [...s]);
 }
 

@@ -174,7 +174,7 @@ async function dteAbrirBorrador(id) {
       && !confirm(`Tienes una ${DTE_NOMBRES[t]} a medio escribir que no está guardada como borrador. ¿Reemplazarla por este borrador?`)) return;
   dteEstado[t] = { ...dteNuevo(t), ...b.datos, borradorId: b.id };
   dteGuardarBorrador(t);
-  irAModuloPagina('documentos', DTE_PAGINAS[t]);
+  irAModuloPagina('facturas', DTE_PAGINAS[t]);
 }
 
 async function dteQuitarDeBorradores(id) {
@@ -251,7 +251,7 @@ function dteFabActualizar(pagina) {
     fab.id = 'dte-fab';
     fab.className = 'dte-fab';
     fab.title = 'Borradores';
-    fab.onclick = () => irAModuloPagina('documentos', 'doc-borradores');
+    fab.onclick = () => irAModuloPagina('facturas', 'doc-borradores');
     document.body.appendChild(fab);
   }
   fab.innerHTML = `<i class="ti ti-files"></i><span class="dte-fab-n">${n}</span>`;
@@ -285,7 +285,7 @@ function dteFacturarOC(o) {
   s.refs = [{ ...dteRefNueva(), folio: o.codigo, fecha: dteFechaCL(o.fecha) }];
   dteEstado[33] = s;
   dteGuardarBorrador(33);
-  irAModuloPagina('documentos', 'doc-factura');
+  irAModuloPagina('facturas', 'doc-factura');
   if (o.rut) dteBuscarRut(33, o.rut);
 }
 
@@ -301,7 +301,7 @@ function dteRefacturar(o) {
   s.refs = o.oc ? [{ ...dteRefNueva(), folio: String(o.oc).trim(), fecha: ordenOC ? dteFechaCL(ordenOC.fechaoc) : '' }] : [];
   dteEstado[33] = s;
   dteGuardarBorrador(33);
-  irAModuloPagina('documentos', 'doc-factura');
+  irAModuloPagina('facturas', 'doc-factura');
   // Se copian todos los datos de la factura rechazada; si no está, al menos el cliente.
   if (s.refact.folio) dteCopiarFactura(33, s.refact.folio, true).then(() => { if (!s.det.some(d => d.nombre) && o.rut) dteBuscarRut(33, o.rut); });
   else if (o.rut) dteBuscarRut(33, o.rut);

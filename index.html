@@ -94,34 +94,24 @@
       </div>
     </div>
 
-    <div class="nav-group" data-modulo="documentos">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('documentos', true)" title="Creación de documentos">
-        <span class="nav-icon"><i class="ti ti-file-plus" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Creación de documentos</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-documentos">
-        <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('documentos','doc-factura',this)"><span>Factura</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-multiple" onclick="seleccionarSubpagina('documentos','doc-multiple',this)"><span>Facturación múltiple</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('documentos','doc-guia',this)"><span>Guía de despacho</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('documentos','doc-nc',this)"><span>Nota de crédito</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-borradores" onclick="seleccionarSubpagina('documentos','doc-borradores',this)" style="display:none"><span>Borradores</span></div>
-      </div>
-    </div>
-
     <div class="nav-group" data-modulo="facturas">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas de venta">
+      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas Bulfor">
         <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas de venta</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas Bulfor</span>
         <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
         <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
       </div>
       <div class="nav-subgroup" id="subgroup-facturas">
-        <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Documentos</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscar documentos</span></div>
         <div class="nav-item nav-subitem" data-page="guias-cot" onclick="seleccionarSubpagina('facturas','guias-cot',this)"><span>Guías por facturar</span></div>
         <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Cobranza</span></div>
         <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
-        <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)"><span>Gráficos de cobros</span></div>
+        <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)" style="display:none"><span>Gráficos de cobros</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('facturas','doc-factura',this)"><span>Factura</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-multiple" onclick="seleccionarSubpagina('facturas','doc-multiple',this)"><span>Facturación múltiple</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('facturas','doc-guia',this)"><span>Guía de despacho</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('facturas','doc-nc',this)"><span>Nota de crédito</span></div>
+        <div class="nav-item nav-subitem" data-page="doc-borradores" onclick="seleccionarSubpagina('facturas','doc-borradores',this)" style="display:none"><span>Borradores</span></div>
       </div>
     </div>
 
@@ -134,7 +124,7 @@
       <div class="nav-subgroup" id="subgroup-proveedores">
         <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('proveedores','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
         <div class="nav-item nav-subitem" data-page="facturas-prov-productos" onclick="seleccionarSubpagina('proveedores','facturas-prov-productos',this)"><span>Productos</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('proveedores','facturas-prov-graficos',this)"><span>Gráficos de pagos</span></div>
+        <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('proveedores','facturas-prov-graficos',this)" style="display:none"><span>Gráficos de pagos</span></div>
       </div>
     </div>
 
@@ -241,11 +231,8 @@
   <div class="tab-item" data-modulo="precios" onclick="mostrarModulo('precios')">
     <i class="ti ti-tag" aria-hidden="true"></i><span>Precios</span>
   </div>
-  <div class="tab-item" data-modulo="documentos" onclick="mostrarModulo('documentos')">
-    <i class="ti ti-file-plus" aria-hidden="true"></i><span>Documentos</span>
-  </div>
   <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')" style="position:relative">
-    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Ventas</span>
+    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
     <span id="badge-rechazadas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
   </div>
   <div class="tab-item" data-modulo="proveedores" onclick="mostrarModulo('proveedores')">
@@ -313,8 +300,7 @@
   <div class="modulos-grupo">Compras y ventas</div>
   <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
   <div class="modulo-tab" data-modulo="precios" onclick="mostrarModulo('precios')"><i class="ti ti-tag"></i><span>Precios</span></div>
-  <div class="modulo-tab" data-modulo="documentos" onclick="mostrarModulo('documentos')"><i class="ti ti-file-plus"></i><span>Creación de documentos</span></div>
-  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas de venta</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
+  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas Bulfor</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
   <div class="modulo-tab" data-modulo="proveedores" onclick="mostrarModulo('proveedores')"><i class="ti ti-receipt"></i><span>Facturas de proveedores</span></div>
   <div class="modulos-grupo">Seguimiento de envíos</div>
   <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>FedEx</span></div>
@@ -356,7 +342,7 @@
           <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span><span>Órdenes de compra</span>
         </div>
         <div class="inicio-acceso" onclick="mostrarModulo('facturas')">
-          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas de venta</span>
+          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas Bulfor</span>
         </div>
         <div class="inicio-acceso" onclick="mostrarModulo('fedex')">
           <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>FedEx</span>
@@ -624,6 +610,7 @@
       <button class="page-btn" id="fpp-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosFPP()">✕ Limpiar filtros</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="descargarExcelFPP()"><i class="ti ti-download" aria-hidden="true"></i> Descargar Excel</button>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="abrirGestionProveedores()"><i class="ti ti-building-bank" aria-hidden="true"></i> Cuentas de proveedores</button>
+      <button class="page-btn btn-graficos" data-page-btn="facturas-prov-graficos" style="padding:8px 14px;white-space:nowrap" onclick="irAModuloPagina('proveedores','facturas-prov-graficos')"><i class="ti ti-chart-pie" aria-hidden="true"></i> Gráficos de pagos</button>
     </div>
 
     <div id="fpp-bulk-bar" class="fpp-bulk-bar" style="display:none">
@@ -685,7 +672,7 @@
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
     <div class="page-header">
-      <div class="page-title">Documentos <span class="info-tip" tabindex="0" role="note" data-tip="Facturas, guías de despacho y notas de crédito emitidas. El total facturado es facturas menos notas de crédito del mes, igual que el Registro de Ventas del SII. El buscador busca en todas las fechas, también por producto.">i</span></div>
+      <div class="page-title">Buscar documentos <span class="info-tip" tabindex="0" role="note" data-tip="Facturas, guías de despacho y notas de crédito emitidas. El total facturado es facturas menos notas de crédito del mes, igual que el Registro de Ventas del SII. El buscador busca en todas las fechas, también por producto.">i</span></div>
       <div class="page-sub" id="doc-resumen"></div>
     </div>
     <div class="fpp-toolbar-top">
@@ -1176,6 +1163,7 @@
       </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
       <input type="file" id="pagos-file-listado" accept=".xlsm,.xlsx" style="display:none" onchange="importarListadoPagos(this.files[0])">
+      <button class="page-btn btn-graficos" style="padding:8px 14px;white-space:nowrap" data-page-btn="pagos-graficos" onclick="irAModuloPagina('facturas','pagos-graficos')"><i class="ti ti-chart-bar" aria-hidden="true"></i> Gráficos de cobros</button>
     </div>
     <div id="pagos-import-log" style="display:none;margin-bottom:14px"></div>
     <div id="pagos-contenido"></div>
@@ -1184,6 +1172,7 @@
   <div class="page" id="page-pagos-graficos">
     <div class="page-header">
       <div class="page-title">Gráficos de cobros</div>
+      <button class="page-btn btn-volver-graficos" onclick="irAModuloPagina('facturas','pagos')"><i class="ti ti-arrow-left" aria-hidden="true"></i> Volver a Cobranza</button>
       <div class="page-sub">Cuánto se debe, cuánto se demoran en pagar y quién paga más</div>
     </div>
     <div class="stats gp-kpis" id="gp-kpis"></div>
@@ -1261,6 +1250,7 @@
   <div class="page" id="page-facturas-prov-graficos">
     <div class="page-header">
       <div class="page-title">Gráficos de pagos</div>
+      <button class="page-btn btn-volver-graficos" onclick="irAModuloPagina('proveedores','facturas-por-pagar')"><i class="ti ti-arrow-left" aria-hidden="true"></i> Volver a Facturas por pagar</button>
       <div class="page-sub">Facturas Proveedor — quién cobramos al día, quién se atrasa y cuánto les debemos hoy</div>
     </div>
     <div id="pagos-graficos-prov-layout" style="display:flex;gap:16px;align-items:flex-start">
@@ -18401,23 +18391,25 @@ const SUBMENUS = {
   'precios': { items: [
     { icon: '<i class="ti ti-tag"></i>', label: 'Precios', page: 'facturas-productos' },
   ] },
-  'documentos': { items: [
+  // Facturas Bulfor: consulta y cobranza, y abajo la creación de documentos
+  // (antes era un menú aparte). Los gráficos no salen en el submenú
+  // (oculto: true): se abren con un botón dentro de Cobranza / Facturas por
+  // pagar, pero siguen aquí para los permisos y los enlaces directos.
+  'facturas': { items: [
+    { icon: '<i class="ti ti-search"></i>', label: 'Buscar documentos', page: 'facturas' },
+    { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guías por facturar', page: 'guias-cot' },
+    { icon: '<i class="ti ti-cash"></i>', label: 'Cobranza', page: 'pagos' },
+    { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
+    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos', oculto: true },
     { icon: '<i class="ti ti-file-invoice"></i>', label: 'Factura', page: 'doc-factura' },
     { icon: '<i class="ti ti-files"></i>', label: 'Facturación múltiple', page: 'doc-multiple' },
     { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guía de despacho', page: 'doc-guia' },
     { icon: '<i class="ti ti-receipt-refund"></i>', label: 'Nota de crédito', page: 'doc-nc' },
   ] },
-  'facturas': { items: [
-    { icon: '<i class="ti ti-search"></i>', label: 'Documentos', page: 'facturas' },
-    { icon: '<i class="ti ti-truck-delivery"></i>', label: 'Guías por facturar', page: 'guias-cot' },
-    { icon: '<i class="ti ti-cash"></i>', label: 'Cobranza', page: 'pagos' },
-    { icon: '<i class="ti ti-ban"></i>', label: 'Facturas rechazadas', page: 'facturas-rechazadas' },
-    { icon: '<i class="ti ti-chart-bar"></i>', label: 'Gráficos de cobros', page: 'pagos-graficos' },
-  ] },
   'proveedores': { items: [
     { icon: '<i class="ti ti-report-money"></i>', label: 'Facturas por pagar', page: 'facturas-por-pagar' },
     { icon: '<i class="ti ti-building-store"></i>', label: 'Productos', page: 'facturas-prov-productos' },
-    { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos de pagos', page: 'facturas-prov-graficos' },
+    { icon: '<i class="ti ti-chart-pie"></i>', label: 'Gráficos de pagos', page: 'facturas-prov-graficos', oculto: true },
   ] },
   'fedex': { items: [{ icon: '<i class="ti ti-truck"></i>', label: 'FedEx', page: 'fedex' }] },
   'chilexpress': { items: [{ icon: '<i class="ti ti-package"></i>', label: 'Chilexpress', page: 'chilexpress' }] },
@@ -18566,7 +18558,10 @@ function irAInicio() {
 // Pestañas horizontales fijas arriba, solo visibles en celular (≤640px).
 // En escritorio el sidebar usa el acordeón inline de #nav-modulos.
 // Agrupa las páginas de un módulo dentro de la barra de páginas (escritorio).
-const GRUPO_PAGINA = {};
+const GRUPO_PAGINA = {
+  'doc-factura': 'Creación de documentos', 'doc-multiple': 'Creación de documentos',
+  'doc-guia': 'Creación de documentos', 'doc-nc': 'Creación de documentos', 'doc-borradores': 'Creación de documentos',
+};
 // Páginas que comparte un mismo ítem (la vista "Por cliente" de Precios).
 const ALT_PAGINA = { 'facturas-productos': 'facturas-clientes' };
 
@@ -18576,7 +18571,7 @@ function renderNavSubmenuMobile(modulo, pagina) {
   const config = modulo ? SUBMENUS[modulo] : null;
   if (!config) { cont.innerHTML = ''; return; }
   let html = '', grupoAnterior = null;
-  config.items.filter(it => paginaPermitida(it.page)).forEach(it => {
+  config.items.filter(it => !it.oculto && paginaPermitida(it.page)).forEach(it => {
     const grupo = GRUPO_PAGINA[it.page] || null;
     if (grupo && grupo !== grupoAnterior) html += `<span class="submenu-sep">${grupo}</span>`;
     grupoAnterior = grupo;
@@ -19124,7 +19119,7 @@ async function instalarApp() {
     timer = setTimeout(ocultar, 180);
   }
   // Un menú de una sola página (Precios, FedEx…) no muestra submenú: se entra al tiro con el clic.
-  const conSubmenu = modulo => !!SUBMENUS[modulo] && SUBMENUS[modulo].items.length > 1;
+  const conSubmenu = modulo => !!SUBMENUS[modulo] && SUBMENUS[modulo].items.filter(it => !it.oculto).length > 1;
   function mostrar(tab) {
     const modulo = tab.dataset.modulo;
     if (!modulo || !conSubmenu(modulo)) { ocultar(); return; }
