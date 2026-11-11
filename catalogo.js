@@ -11,6 +11,7 @@ let catCargado = false;
 let catCargando = null;
 let catFichaId = null;      // producto abierto en la ficha
 let catFichaHosp = '';      // filtro de hospital dentro de la ficha
+let catFichaEnv = '';       // filtro de envase (volumen) dentro de la ficha
 // Filtros de la lista (cada uno es un conjunto de valores marcados; vacío = todos)
 const catFiltros = { letra: new Set(), forma: new Set(), unidad: new Set() };
 const catAbiertos = new Set(); // grupos de filtros desplegados
@@ -64,7 +65,11 @@ async function catCargar() {
       const ls = por[p.id] || [];
       p._lineas = ls;
       p._pu = catMediana(ls.map(l => l.precio_unidad));
-      p._pe = catMediana(ls.map(l => l.precio_envase));
+      // Envase más vendido (líquidos y cremas tienen varios volúmenes): su precio típico.
+      const envs = {}; ls.forEach(l => { if (l.envase) envs[l.envase] = (envs[l.envase] || 0) + 1; });
+      p._envTop = Object.keys(envs).sort((a, b) => envs[b] - envs[a])[0] || '';
+      p._nEnv = Object.keys(envs).length;
+      p._pe = catMediana(ls.filter(l => !p._envTop || l.envase === p._envTop).map(l => l.precio_envase));
       p._ult = ls[0] || null;
       p._hosp = new Set(ls.map(l => l.hospital_clave)).size;
       p._letra = catSinTildes(p.nombre).charAt(0);
@@ -134,7 +139,7 @@ function catRenderLista() {
     return `<tr class="cat-fila" onclick="catAbrirFicha(${p.id})" tabindex="0" onkeydown="if(event.key==='Enter')catAbrirFicha(${p.id})">
       <td data-label="Producto"><div class="cat-nombre">${catEsc(catNombreCorto(p))}</div><div class="cat-cod">${catEsc(p.codigo)}${p.forma ? ' · ' + catEsc(p.forma) : ''}</div></td>
       <td class="cat-num" data-label="Típico por unidad"><b>${catClp(p._pu)}</b><div class="cat-iva">${p._pu ? catClp(p._pu * 1.19) + ' c/IVA' : ''}</div><div class="cat-cod">por ${catEsc(p.unidad_base || 'unidad')}</div></td>
-      <td class="cat-num" data-label="Típico por envase">${catClp(p._pe)}<div class="cat-iva">${p._pe ? catClp(p._pe * 1.19) + ' c/IVA' : ''}</div></td>
+      <td class="cat-num" data-label="Típico por envase">${catClp(p._pe)}<div class="cat-iva">${p._pe ? catClp(p._pe * 1.19) + ' c/IVA' : ''}</div>${p._envTop ? `<div class="cat-cod">${catEsc(p._envTop)}${p._nEnv > 1 ? ` · ${p._nEnv} envases` : ''}</div>` : ''}</td>
       <td class="cat-num" data-label="Último precio">${u ? catClp(u.precio) : '—'}<div class="cat-cod">${u ? catFecha(u.fecha) : ''}</div></td>
       <td class="cat-num" data-label="Ventas">${p._lineas.length}</td>
       <td class="cat-num" data-label="Hospitales">${p._hosp}</td>
@@ -143,7 +148,7 @@ function catRenderLista() {
 }
 
 async function catAbrirFicha(id) {
-  catFichaId = id; catFichaHosp = '';
+  catFichaId = id; catFichaHosp = ''; catFichaEnv = '';
   document.getElementById('cat-lista').style.display = 'none';
   document.getElementById('cat-ficha').style.display = '';
   catRenderFicha();
@@ -185,9 +190,14 @@ function catRenderFicha() {
   const p = catProductos.find(x => x.id === catFichaId);
   if (!p) return catVolver();
   const todas = p._lineas;
-  const ls = catFichaHosp ? todas.filter(l => l.hospital_clave === catFichaHosp) : todas;
+  const ls = todas.filter(l => (!catFichaHosp || l.hospital_clave === catFichaHosp) && (!catFichaEnv || l.envase === catFichaEnv));
+  const envases = {}; todas.forEach(l => { if (l.envase) envases[l.envase] = (envases[l.envase] || 0) + 1; });
+  const ordenEnv = Object.keys(envases).sort((a, b) => parseFloat(a) - parseFloat(b));
   const pu = catMediana(ls.map(l => l.precio_unidad));
-  const pe = catMediana(ls.map(l => l.precio_envase));
+  // Por envase: el del envase más vendido (en líquidos cada volumen tiene su precio).
+  const cuenta = {}; ls.forEach(l => { if (l.envase) cuenta[l.envase] = (cuenta[l.envase] || 0) + 1; });
+  const envTop = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0] || '';
+  const pe = catMediana(ls.filter(l => !envTop || l.envase === envTop).map(l => l.precio_envase));
   const pus = ls.map(l => Number(l.precio_unidad)).filter(x => x > 0);
   const u = ls[0];
   const hosp = {};
@@ -200,15 +210,19 @@ function catRenderFicha() {
     <div class="cat-cod" style="margin-bottom:14px">${catEsc(p.codigo)}${p.forma ? ' · ' + catEsc(p.forma) : ''} · precio por ${catEsc(p.unidad_base || 'unidad')}</div>
     <div class="stats">
       <div class="stat"><div class="stat-label">Precio típico neto (por ${catEsc(p.unidad_base || 'unidad')})</div><div class="stat-val">${catClp(pu)}</div><div class="cat-iva">${pu ? catClp(pu * 1.19) + ' con IVA' : ''}</div></div>
-      <div class="stat"><div class="stat-label">Precio típico neto por envase</div><div class="stat-val">${catClp(pe)}</div><div class="cat-iva">${pe ? catClp(pe * 1.19) + ' con IVA' : ''}</div></div>
+      <div class="stat"><div class="stat-label">Precio típico neto por envase${envTop ? ' de ' + catEsc(envTop) : ''}</div><div class="stat-val">${catClp(pe)}</div><div class="cat-iva">${pe ? catClp(pe * 1.19) + ' con IVA' : ''}</div></div>
       <div class="stat"><div class="stat-label">Último precio vendido</div><div class="stat-val">${u ? catClp(u.precio) : '—'}</div><div class="cat-iva">${u ? catFecha(u.fecha) + ' · ' + catEsc(catHospital(u.hospital_clave).nombre) : ''}</div></div>
       <div class="stat"><div class="stat-label">Rango por unidad</div><div class="stat-val" style="font-size:16px">${pus.length ? catClp(Math.min(...pus)) + ' – ' + catClp(Math.max(...pus)) : '—'}</div><div class="cat-iva">${ls.length} ventas${sinOC ? ' · ' + sinOC + ' sin OC' : ''}</div></div>
     </div>
-    <label for="cat-ficha-hosp" class="pv-buscar-label">Hospital</label>
+    <label for="cat-ficha-hosp" class="pv-buscar-label">Hospital y envase</label>
     <div class="toolbar"><select id="cat-ficha-hosp" onchange="catFichaHosp=this.value;catRenderFicha()" style="max-width:420px">
       <option value="">Todos los hospitales (${todas.length} ventas)</option>
       ${opciones.map(([k, n, c]) => `<option value="${catEsc(k)}" ${k === catFichaHosp ? 'selected' : ''}>${catEsc(n)} (${c})</option>`).join('')}
-    </select></div>
+    </select>
+    ${ordenEnv.length > 1 ? `<select id="cat-ficha-env" onchange="catFichaEnv=this.value;catRenderFicha()" style="max-width:260px" aria-label="Envase">
+      <option value="">Todos los envases</option>
+      ${ordenEnv.map(e => `<option value="${catEsc(e)}" ${e === catFichaEnv ? 'selected' : ''}>${catEsc(e)} (${envases[e]})</option>`).join('')}
+    </select>` : ''}</div>
     <div class="table-card"><div class="cat-tabla-wrap"><table style="margin:0">
       <thead><tr><th>Fecha</th><th>Hospital</th><th>Factura</th><th>Orden de compra</th><th class="cat-num">Precio vendido</th><th class="cat-num">Neto por ${catEsc(p.unidad_base || 'unidad')}</th><th class="cat-num">Neto por envase</th><th>Envase</th></tr></thead>
       <tbody>${ls.map(l => {
