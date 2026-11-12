@@ -2649,10 +2649,72 @@ function ocNombreProducto(it) {
   return original;
 }
 
+// Empareja cada producto facturado con una línea de la OC. Devuelve, por cada
+// línea de la OC, la lista de productos de factura que le corresponden (los
+// que no calzan con ninguna quedan fuera). Puntaje por línea:
+//  * precio: igual al de la OC = 3; parecido (diferencia de hasta $1 o 1%) = 2.
+//    El precio exacto pesa más que el parecido: en una OC con "Cápsula N° 1"
+//    a $15 y "Cápsula N° 3" a $16 ambos precios son "parecidos" entre sí, y
+//    antes la N° 3 se iba a la primera línea por empate.
+//  * nombre: de 0 a 2 según las palabras en común (de 4 letras o más).
+//  * números cortos (calibres, concentraciones: "N° 1", "500 MG"): si la
+//    factura y la línea traen números y comparten alguno, +1; si no comparten
+//    ninguno, -1 (es otro calibre u otra concentración).
+// Si dos líneas empatan, gana la que todavía tiene más cantidad sin facturar.
+function ocEmparejarFacturados(lineasOC, its) {
+  const asignados = lineasOC.map(() => []);
+  const normal = t => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Colores de cápsulas abreviados en la factura ("R-B", "A/B") se escriben
+  // completos para que calcen con la OC ("ROJO BLANCO", "AZUL/BLANCO").
+  const COLORES = { A: 'AZUL', B: 'BLANCO', R: 'ROJO', V: 'VERDE' };
+  const conColores = t => t.replace(/\b([ABRV])\s*[-\/]\s*([ABRV])\b/g, (_, a, b) => `${COLORES[a]} ${COLORES[b]}`);
+  // Palabras de 4 letras o más, sin la "S" del plural (CAPSULAS = CAPSULA).
+  const palabras = t => new Set(conColores(normal(t)).split(/[^A-Z0-9]+/)
+    .filter(w => w.length >= 4 && !/^\d+$/.test(w)).map(w => w.length >= 5 ? w.replace(/S$/, '') : w));
+  // Números de hasta 4 cifras (los más largos suelen ser códigos de producto).
+  const numeros = t => new Set((normal(t).match(/\d+(?:[.,]\d+)?/g) || [])
+    .map(n => n.replace(',', '.').replace(/^0+(?=\d)/, '')).filter(n => n.replace('.', '').length <= 4));
+  // Texto de cada línea: todos sus nombres (el del comprador, el nuestro, el de
+  // Mercado Público y el unificado), para tener más con qué comparar.
+  const textoLinea = it => [textoOriginalDe(it), it.especificacionproveedor, it.productomp, it.productonormalizado]
+    .filter(t => t && !esRuido(t)).join(' ');
+  const palabrasOC = lineasOC.map(it => palabras(textoLinea(it)));
+  const numerosOC = lineasOC.map(it => numeros(textoLinea(it)));
+  const libre = lineasOC.map(it => Number(it.cantidad) || 0);
+  its.forEach(f => {
+    if (!f.nombre_producto) return;
+    let mejor = -1;
+    if (lineasOC.length === 1) mejor = 0;
+    else {
+      const pf = palabras(f.nombre_producto), nf = numeros(f.nombre_producto);
+      const pu = Number(f.precio_unitario);
+      let puntos = 0;
+      lineasOC.forEach((it, i) => {
+        const po = Number(it.preciounitario);
+        const precio = !pu || !po ? 0 : Math.abs(pu - po) < 0.5 ? 3 : Math.abs(pu - po) <= Math.max(1, po * 0.01) ? 2 : 0;
+        const comunes = [...pf].filter(w => palabrasOC[i].has(w)).length;
+        if (!precio && !comunes) return;
+        // Parecido del nombre (0 a 2): cuántas palabras de la factura están en
+        // la línea, y cuántas de ambas en total comparten (así "ROJO/ROJO" le
+        // gana a "BLANCO/ROJO" para una factura "R-R").
+        const union = new Set([...pf, ...palabrasOC[i]]).size;
+        let p = precio + (pf.size ? comunes / pf.size : 0) + (union ? comunes / union : 0);
+        if (nf.size && numerosOC[i].size) p += [...nf].some(n => numerosOC[i].has(n)) ? 1 : -1;
+        // Si esa línea ya quedó cubierta, se prefiere otra igual de parecida
+        // que todavía tenga saldo (pasa con cápsulas que solo cambian de color).
+        if (libre[i] < (Number(f.cantidad) || 0)) p -= 0.75;
+        if (p > puntos || (p === puntos && mejor !== -1 && libre[i] > libre[mejor])) { puntos = p; mejor = i; }
+      });
+    }
+    if (mejor !== -1) { asignados[mejor].push(f); libre[mejor] -= Number(f.cantidad) || 0; }
+  });
+  return asignados;
+}
+
 // Productos de las facturas de la OC, emparejados con las líneas de la OC.
-// Cada producto facturado se asigna a la línea de la OC con el mismo precio
-// unitario y/o alguna palabra del nombre en común (si la OC tiene una sola
-// línea, todo va a esa). Con eso se arman dos cosas:
+// Cada producto facturado se asigna a la línea de la OC que más se le parece
+// (ver ocEmparejarFacturados: precio, palabras, calibre/concentración y saldo;
+// si la OC tiene una sola línea, todo va a esa). Con eso se arman dos cosas:
 //  * el nombre que se muestra en Productos: el de la factura más nueva (el
 //    texto original de la OC queda en la "i" junto al nombre);
 //  * el cuadro "Saldo pendiente": lo disponible de cada producto (pedido menos
@@ -2670,23 +2732,9 @@ async function ocNombresDesdeFactura(lineasOC, facturas, idProd) {
   // La factura más nueva primero: su nombre es el más actualizado.
   const orden = new Map(facturas.map(d => [d.id, String(d.fecha_emision || '') + String(d.folio).padStart(8, '0')]));
   its.sort((a, b) => String(orden.get(b.documento_id) || '').localeCompare(String(orden.get(a.documento_id) || '')));
-  const parecido = (a, b) => a && b && Math.abs(Number(a) - Number(b)) <= Math.max(1, Number(b) * 0.01);
-  const palabras = t => new Set(String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Z0-9]+/).filter(w => w.length >= 4 && !/^\d+$/.test(w)));
-  const palabrasOC = lineasOC.map(it => palabras(textoOriginalDe(it)));
-  const asignados = lineasOC.map(() => []);
-  const sinPareja = [];
-  its.forEach(f => {
-    if (!f.nombre_producto) return;
-    let mejor = lineasOC.length === 1 ? 0 : -1, puntos = 0;
-    if (mejor === -1) {
-      const pf = palabras(f.nombre_producto);
-      lineasOC.forEach((it, i) => {
-        const p = (parecido(f.precio_unitario, it.preciounitario) ? 2 : 0) + ([...pf].some(w => palabrasOC[i].has(w)) ? 1 : 0);
-        if (p > puntos) { puntos = p; mejor = i; }
-      });
-    }
-    if (mejor === -1) sinPareja.push(f); else asignados[mejor].push(f);
-  });
+  const asignados = ocEmparejarFacturados(lineasOC, its);
+  const enLinea = new Set(asignados.flat());
+  const sinPareja = its.filter(f => f.nombre_producto && !enLinea.has(f));
 
   // 1) Nombres en la tabla de productos.
   asignados.forEach((lista, i) => {
