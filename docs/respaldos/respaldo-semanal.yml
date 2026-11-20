@@ -1,0 +1,68 @@
+# PLANTILLA — copiar a un repositorio PRIVADO (ej. bulfor-respaldos) en
+# .github/workflows/respaldo-semanal.yml. En este repositorio (público) NO corre:
+# solo corren los archivos que están en .github/workflows/.
+#
+# Cada domingo de madrugada:
+#  1. Descarga toda la base de datos (tablas, datos, cuentas y datos de archivos).
+#  2. Descarga todas las fotos de los buckets `recetas` y `recetas-web`.
+#  3. Lo junta en un archivo y lo CIFRA con la contraseña RESPALDO_CLAVE.
+#  4. Lo deja guardado en GitHub (Actions → la ejecución → "Artifacts").
+#
+# Secretos que hay que crear en el repositorio privado (Settings → Secrets → Actions):
+#  SUPABASE_DB_URL      cadena "Session pooler" de Supabase → Connect (con la contraseña de la base)
+#  SUPABASE_URL         https://uodijcksuqaaovohutkf.supabase.co
+#  SUPABASE_SERVICE_KEY la misma clave service_role que ya usan las sincronizaciones
+#  RESPALDO_CLAVE       una contraseña larga inventada; anotarla FUERA del computador
+name: Respaldo semanal
+
+on:
+  schedule:
+    - cron: '0 7 * * 0'   # domingo 07:00 UTC (≈ 3–4 AM de Chile)
+  workflow_dispatch:       # botón "Run workflow" para hacerlo a mano
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar pg_dump 17 (misma versión que Supabase)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Respaldar base de datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p respaldo
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-privileges \
+            -n public -n auth -n storage -f respaldo/base.dump
+          ls -lh respaldo
+
+      - name: Respaldar fotos (recetas y recetas-web)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install -q requests
+          python descargar_archivos.py respaldo/archivos
+
+      - name: Comprimir y cifrar
+        env:
+          RESPALDO_CLAVE: ${{ secrets.RESPALDO_CLAVE }}
+        run: |
+          FECHA=$(date -u +%Y-%m-%d)
+          tar czf - respaldo | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "$RESPALDO_CLAVE" -o "bulfor-respaldo-$FECHA.tar.gz.gpg"
+          rm -rf respaldo
+          ls -lh *.gpg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bulfor-respaldo
+          path: '*.gpg'
+          retention-days: 21   # ~3 copias; el plan gratis de GitHub da 500 MB para esto
