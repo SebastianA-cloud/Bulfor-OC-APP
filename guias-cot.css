@@ -12,7 +12,7 @@
 #page-guias-cot .gc-muted{color:#6b7280;font-size:12px}
 #page-guias-cot .gc-months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;margin-top:9px}
 #page-guias-cot .gc-month{border-radius:9px;border:1px solid #d1d5db;background:#f3f4f6;cursor:pointer;padding:9px 2px;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:center}
-#page-guias-cot .gc-month small{font-size:10px}
+#page-guias-cot .gc-month small{font-size:11px}
 #page-guias-cot .gc-month-facturado{background:#e9f7ef;color:#17623c;border-color:#b5e1c7}
 #page-guias-cot .gc-month-parcial{background:#fff4d8;color:#865e07;border-color:#efd99f}
 #page-guias-cot .gc-month-sincot{background:#fff0ed;color:#a12c20;border-color:#e8b9b1}

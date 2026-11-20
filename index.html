@@ -7,13 +7,11 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C0392B'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#C0392B">
 <meta name="theme-color" content="#C0392B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Bulfor OC">
-<title>Farmacia Bulfor — Buscador de OC</title>
+<title>Farmacia Bulfor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.46.0/tabler-icons.min.css">
@@ -68,199 +66,12 @@
     </button>
   </div>
   <div class="nav" id="nav-modulos">
-    <div class="nav-item nav-item-inicio active" id="nav-item-inicio" onclick="irAInicio()" title="Inicio">
-      <span class="nav-icon"><i class="ti ti-home" aria-hidden="true"></i></span><span>Inicio</span>
-    </div>
-
-    <div class="nav-section-label">Compras y ventas</div>
-
-    <div class="nav-group" data-modulo="oc-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('oc-modulo', true)" title="Órdenes de compra">
-        <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Órdenes de compra</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-oc-modulo">
-        <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Buscar orden de compra</span></div>
-        <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
-        <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="precios">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('precios')" title="Precios">
-        <span class="nav-icon"><i class="ti ti-tag" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Precios</span>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="facturas">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('facturas', true)" title="Facturas Bulfor">
-        <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas Bulfor</span>
-        <span id="badge-rechazadas" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-facturas">
-        <div class="nav-item nav-subitem" data-page="facturas" onclick="seleccionarSubpagina('facturas','facturas',this)"><span>Buscar documentos</span></div>
-        <div class="nav-item nav-subitem" data-page="guias-cot" onclick="seleccionarSubpagina('facturas','guias-cot',this)"><span>Guías por facturar</span></div>
-        <div class="nav-item nav-subitem" data-page="pagos" onclick="seleccionarSubpagina('facturas','pagos',this)"><span>Cobranza</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-rechazadas" onclick="seleccionarSubpagina('facturas','facturas-rechazadas',this)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas rechazadas</span><span id="badge-rechazadas-subitem" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span></div>
-        <div class="nav-item nav-subitem" data-page="pagos-graficos" onclick="seleccionarSubpagina('facturas','pagos-graficos',this)" style="display:none"><span>Gráficos de cobros</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-factura" onclick="seleccionarSubpagina('facturas','doc-factura',this)"><span>Factura</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-multiple" onclick="seleccionarSubpagina('facturas','doc-multiple',this)"><span>Facturación múltiple</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-guia" onclick="seleccionarSubpagina('facturas','doc-guia',this)"><span>Guía de despacho</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-nc" onclick="seleccionarSubpagina('facturas','doc-nc',this)"><span>Nota de crédito</span></div>
-        <div class="nav-item nav-subitem" data-page="doc-borradores" onclick="seleccionarSubpagina('facturas','doc-borradores',this)" style="display:none"><span>Borradores</span></div>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="proveedores">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('proveedores', true)" title="Facturas de proveedores">
-        <span class="nav-icon"><i class="ti ti-receipt" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Facturas de proveedores</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-proveedores">
-        <div class="nav-item nav-subitem" data-page="facturas-por-pagar" onclick="seleccionarSubpagina('proveedores','facturas-por-pagar',this)"><span>Facturas por pagar</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-prov-productos" onclick="seleccionarSubpagina('proveedores','facturas-prov-productos',this)"><span>Productos</span></div>
-        <div class="nav-item nav-subitem" data-page="facturas-prov-graficos" onclick="seleccionarSubpagina('proveedores','facturas-prov-graficos',this)" style="display:none"><span>Gráficos de pagos</span></div>
-      </div>
-    </div>
-
-    <div class="nav-section-label">Seguimiento de envíos</div>
-
-    <div class="nav-group" data-modulo="fedex">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('fedex')" title="FedEx">
-        <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">FedEx</span>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="chilexpress">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('chilexpress')" title="Chilexpress">
-        <span class="nav-icon"><i class="ti ti-package" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Chilexpress</span>
-      </div>
-    </div>
-
-    <div class="nav-section-label">Operaciones</div>
-
-    <div class="nav-group" data-modulo="elaboracion">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('elaboracion', true)" title="Elaboración">
-        <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Elaboración</span>
-        <span id="badge-oe-digitar" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
-        <span id="badge-sw-nuevas" title="Solicitudes web nuevas" style="display:none;flex-shrink:0;margin-left:4px;background:#1E40AF;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-elaboracion">
-        <div class="nav-item nav-subitem" data-page="elaboracion" onclick="seleccionarSubpagina('elaboracion','elaboracion',this)"><span>Órdenes</span></div>
-        <div class="nav-item nav-subitem" data-page="pacientes" onclick="seleccionarSubpagina('elaboracion','pacientes',this)"><span>Pacientes</span></div>
-        <div class="nav-item nav-subitem" data-page="solicitudes-web" onclick="seleccionarSubpagina('elaboracion','solicitudes-web',this)"><span>Solicitudes Web</span></div>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="recetario-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('recetario-modulo', true)" title="Recetario">
-        <span class="nav-icon"><i class="ti ti-prescription" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recetario</span>
-        <span id="badge-rec-alertas" title="RM con lote vencido en los últimos 7 días" style="display:none;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-recetario-modulo">
-        <div class="nav-item nav-subitem" data-page="rec-buscar" onclick="seleccionarSubpagina('recetario-modulo','rec-buscar',this)"><span>Buscar RM</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-compras" onclick="seleccionarSubpagina('recetario-modulo','rec-compras',this)"><span>Consumo y compras</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-alertas" onclick="seleccionarSubpagina('recetario-modulo','rec-alertas',this)"><span>Alertas de lotes</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-costos" onclick="seleccionarSubpagina('recetario-modulo','rec-costos',this)"><span>Costos y márgenes</span></div>
-        <div class="nav-item nav-subitem" data-page="rec-produccion" onclick="seleccionarSubpagina('recetario-modulo','rec-produccion',this)"><span>Producción</span></div>
-      </div>
-    </div>
-
-    <div class="nav-group" data-modulo="farmacia-modulo">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('farmacia-modulo', true)" title="Control farmacia">
-        <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Control farmacia</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-farmacia-modulo">
-        <div class="nav-item nav-subitem" data-page="farmacia-compras" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-compras',this)"><span>Sugerencia de compra</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-stock" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-stock',this)"><span>Stock actual</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-movimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-movimientos',this)"><span>Movimientos</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-vencimientos" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-vencimientos',this)"><span>Vencimientos</span></div>
-        <div class="nav-item nav-subitem" data-page="farmacia-catastro" onclick="seleccionarSubpagina('farmacia-modulo','farmacia-catastro',this)"><span>Catastro de stock</span></div>
-      </div>
-    </div>
-
-    <div class="nav-section-label">Personas</div>
-
-    <div class="nav-group" data-modulo="rrhh">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('rrhh', true)" title="Recursos humanos">
-        <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Recursos humanos</span>
-        <i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>
-      </div>
-      <div class="nav-subgroup" id="subgroup-rrhh">
-        <div class="nav-item nav-subitem" data-page="rrhh-personal" onclick="seleccionarSubpagina('rrhh','rrhh-personal',this)"><span>Personal</span></div>
-        <div class="nav-item nav-subitem" data-page="rrhh-vacaciones" onclick="seleccionarSubpagina('rrhh','rrhh-vacaciones',this)"><span>Vacaciones</span></div>
-      </div>
-    </div>
-
-    <div class="nav-section-label">Administración</div>
-
-    <div class="nav-group" data-modulo="admin">
-      <div class="nav-item nav-item-modulo" onclick="mostrarModulo('admin', true)" title="Usuarios y permisos">
-        <span class="nav-icon"><i class="ti ti-users-group" aria-hidden="true"></i></span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Usuarios y permisos</span>
-      </div>
-      <div class="nav-subgroup" id="subgroup-admin">
-        <div class="nav-item nav-subitem" data-page="usuarios" onclick="seleccionarSubpagina('admin','usuarios',this)"><span>Usuarios y permisos</span></div>
-      </div>
-    </div>
-
+    <!-- Menú lateral: se genera desde NAV_MODULOS + SUBMENUS (pintarNavegacion). -->
   </div>
 </nav>
 
 <nav class="bottom-tabbar" id="bottom-tabbar">
-  <div class="tab-item active" data-modulo="inicio" onclick="irAInicio()">
-    <i class="ti ti-home" aria-hidden="true"></i><span>Inicio</span>
-  </div>
-  <div class="tab-item" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')">
-    <i class="ti ti-shopping-cart" aria-hidden="true"></i><span>OC</span>
-  </div>
-  <div class="tab-item" data-modulo="precios" onclick="mostrarModulo('precios')">
-    <i class="ti ti-tag" aria-hidden="true"></i><span>Precios</span>
-  </div>
-  <div class="tab-item" data-modulo="facturas" onclick="mostrarModulo('facturas')" style="position:relative">
-    <i class="ti ti-file-invoice" aria-hidden="true"></i><span>Facturas</span>
-    <span id="badge-rechazadas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
-  </div>
-  <div class="tab-item" data-modulo="proveedores" onclick="mostrarModulo('proveedores')">
-    <i class="ti ti-receipt" aria-hidden="true"></i><span>Proveed.</span>
-  </div>
-  <div class="tab-item" data-modulo="fedex" onclick="mostrarModulo('fedex')">
-    <i class="ti ti-truck" aria-hidden="true"></i><span>FedEx</span>
-  </div>
-  <div class="tab-item" data-modulo="chilexpress" onclick="mostrarModulo('chilexpress')">
-    <i class="ti ti-package" aria-hidden="true"></i><span>Chilexpress</span>
-  </div>
-  <div class="tab-item" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')" style="position:relative">
-    <i class="ti ti-flask" aria-hidden="true"></i><span>Elaborac.</span>
-    <span id="badge-oe-digitar-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
-  </div>
-  <div class="tab-item" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')" style="position:relative">
-    <i class="ti ti-prescription" aria-hidden="true"></i><span>Recetario</span>
-    <span id="badge-rec-alertas-mobile" style="display:none;position:absolute;top:2px;right:14px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span>
-  </div>
-  <div class="tab-item" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')">
-    <i class="ti ti-first-aid-kit" aria-hidden="true"></i><span>Farmacia</span>
-  </div>
-  <div class="tab-item" data-modulo="rrhh" onclick="mostrarModulo('rrhh')">
-    <i class="ti ti-users" aria-hidden="true"></i><span>RRHH</span>
-  </div>
-  <div class="tab-item" data-modulo="admin" onclick="mostrarModulo('admin')">
-    <i class="ti ti-users-group" aria-hidden="true"></i><span>Usuarios</span>
-  </div>
+  <!-- Barra del celular: se genera desde NAV_MODULOS (pintarNavegacion). -->
 </nav>
 
 <div class="system-bar">
@@ -270,16 +81,16 @@
   </button>
   <span id="header-more-panel" style="display:flex;align-items:center;gap:16px">
     <span id="systemClock"></span>
-    <button onclick="location.reload()" title="Actualizar datos" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:5px">
-      <i class="ti ti-refresh" style="font-size:13px" aria-hidden="true"></i><span class="refresh-label">Actualizar</span>
+    <button onclick="actualizarDatos()" title="Volver a cargar los datos" class="sb-btn">
+      <i class="ti ti-refresh" aria-hidden="true"></i><span class="refresh-label">Actualizar</span>
     </button>
-    <button id="btn-instalar-app" onclick="instalarApp()" title="Instalar Bulfor OC en este equipo" style="display:none;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer;align-items:center;gap:5px">
-      <i class="ti ti-download" style="font-size:13px" aria-hidden="true"></i><span>Instalar app</span>
+    <button id="btn-instalar-app" onclick="instalarApp()" title="Instalar Bulfor OC en este equipo" class="sb-btn" style="display:none">
+      <i class="ti ti-download" aria-hidden="true"></i><span>Instalar app</span>
     </button>
     <span id="usuario-sesion" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-2)">
       <span id="usuario-email"></span>
-      <span id="usuario-rol-badge" class="badge-estado neutral" style="font-size:10px;padding:1px 7px"></span>
-      <button onclick="cerrarSesion()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--text-2);cursor:pointer">Salir</button>
+      <span id="usuario-rol-badge" class="badge-estado neutral" style="font-size:11px;padding:1px 7px"></span>
+      <button onclick="cerrarSesion()" title="Cerrar sesión" class="sb-btn">Salir</button>
     </span>
     <span style="display:flex;align-items:center;gap:6px">
       <span class="sync-dot" id="syncDot"></span>
@@ -293,26 +104,10 @@
     <div class="logo-badge">B</div>
     <div class="modulos-logo-texto">
       <div class="modulos-logo-titulo">Bulfor OC</div>
-      <div class="modulos-logo-sub">Sistema de gestión farmacéutica</div>
+      <div class="modulos-logo-sub">Gestión farmacéutica</div>
     </div>
   </div>
-  <div class="modulo-tab active" data-modulo="inicio" onclick="irAInicio()"><i class="ti ti-home"></i><span>Inicio</span></div>
-  <div class="modulos-grupo">Compras y ventas</div>
-  <div class="modulo-tab" data-modulo="oc-modulo" onclick="mostrarModulo('oc-modulo')"><i class="ti ti-shopping-cart"></i><span>Órdenes de compra</span></div>
-  <div class="modulo-tab" data-modulo="precios" onclick="mostrarModulo('precios')"><i class="ti ti-tag"></i><span>Precios</span></div>
-  <div class="modulo-tab" data-modulo="facturas" onclick="mostrarModulo('facturas')"><i class="ti ti-file-invoice"></i><span>Facturas Bulfor</span><span class="tab-badge" id="badge-rechazadas-tab" style="display:none"></span></div>
-  <div class="modulo-tab" data-modulo="proveedores" onclick="mostrarModulo('proveedores')"><i class="ti ti-receipt"></i><span>Facturas de proveedores</span></div>
-  <div class="modulos-grupo">Seguimiento de envíos</div>
-  <div class="modulo-tab" data-modulo="fedex" onclick="mostrarModulo('fedex')"><i class="ti ti-truck"></i><span>FedEx</span></div>
-  <div class="modulo-tab" data-modulo="chilexpress" onclick="mostrarModulo('chilexpress')"><i class="ti ti-package"></i><span>Chilexpress</span></div>
-  <div class="modulos-grupo">Operaciones</div>
-  <div class="modulo-tab" data-modulo="elaboracion" onclick="mostrarModulo('elaboracion')"><i class="ti ti-flask"></i><span>Elaboración</span><span class="tab-badge" id="badge-oe-digitar-tab" style="display:none"></span><span class="tab-badge tab-badge-azul" id="badge-sw-nuevas-tab" style="display:none"></span></div>
-  <div class="modulo-tab" data-modulo="recetario-modulo" onclick="mostrarModulo('recetario-modulo')"><i class="ti ti-prescription"></i><span>Recetario</span><span class="tab-badge" id="badge-rec-alertas-tab" style="display:none"></span></div>
-  <div class="modulo-tab" data-modulo="farmacia-modulo" onclick="mostrarModulo('farmacia-modulo')"><i class="ti ti-first-aid-kit"></i><span>Control farmacia</span></div>
-  <div class="modulos-grupo">Personas</div>
-  <div class="modulo-tab" data-modulo="rrhh" onclick="mostrarModulo('rrhh')"><i class="ti ti-users"></i><span>Recursos humanos</span></div>
-  <div class="modulos-grupo">Administración</div>
-  <div class="modulo-tab" data-modulo="admin" onclick="mostrarModulo('admin')"><i class="ti ti-users-group"></i><span>Usuarios y permisos</span></div>
+  <!-- Pestañas de módulos: se generan desde NAV_MODULOS (pintarNavegacion). -->
 </nav>
 <div class="nav" id="nav-submenu"></div>
 
@@ -335,41 +130,8 @@
     </div>
     <div id="inicio-kpis"></div>
 
-    <div class="inicio-seccion">
-      <div class="inicio-seccion-titulo">Compras y ventas</div>
-      <div class="inicio-accesos">
-        <div class="inicio-acceso" onclick="mostrarModulo('oc-modulo')">
-          <span class="nav-icon"><i class="ti ti-shopping-cart" aria-hidden="true"></i></span><span>Órdenes de compra</span>
-        </div>
-        <div class="inicio-acceso" onclick="mostrarModulo('facturas')">
-          <span class="nav-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span><span>Facturas Bulfor</span>
-        </div>
-        <div class="inicio-acceso" onclick="mostrarModulo('fedex')">
-          <span class="nav-icon"><i class="ti ti-truck" aria-hidden="true"></i></span><span>FedEx</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="inicio-seccion">
-      <div class="inicio-seccion-titulo">Operaciones</div>
-      <div class="inicio-accesos">
-        <div class="inicio-acceso" onclick="mostrarModulo('elaboracion')">
-          <span class="nav-icon"><i class="ti ti-flask" aria-hidden="true"></i></span><span>Órdenes de elaboración</span>
-        </div>
-        <div class="inicio-acceso" onclick="mostrarModulo('farmacia-modulo')">
-          <span class="nav-icon"><i class="ti ti-first-aid-kit" aria-hidden="true"></i></span><span>Control de farmacia</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="inicio-seccion">
-      <div class="inicio-seccion-titulo">Personas</div>
-      <div class="inicio-accesos">
-        <div class="inicio-acceso" onclick="mostrarModulo('rrhh')">
-          <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span><span>Recursos humanos</span>
-        </div>
-      </div>
-    </div>
+    <!-- Accesos a los módulos: se generan desde NAV_MODULOS (pintarNavegacion). -->
+    <div id="inicio-accesos-modulos"></div>
 
     <div class="inicio-seccion">
       <div class="inicio-seccion-titulo">Requiere atención</div>
@@ -386,7 +148,7 @@
     <label for="oc-search" style="display:block;font-weight:600;margin-bottom:6px">Buscar por número de orden</label>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon" aria-hidden="true">🔍</span>
+        <span class="search-icon" aria-hidden="true"><i class="ti ti-search"></i></span>
         <input type="search" id="oc-search" placeholder="Número de orden, hospital, RUT o producto…" aria-describedby="oc-search-help oc-search-scope" oninput="filterOC()" onkeydown="ocBuscarConEnter(event)">
       </div>
       <span id="oc-search-scope" role="status" hidden>Resultados de todas las fechas</span>
@@ -433,7 +195,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="items-search" placeholder="Buscar producto…" oninput="filterItems()">
       </div>
       <select id="items-familia" onchange="filterItems()"><option value="">Todas las familias</option></select>
@@ -468,11 +230,11 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="oc-clientes-search" placeholder="Buscar cliente por nombre o RUT…" oninput="filterClientesOC()">
       </div>
       <div class="search-wrap">
-        <span class="search-icon">📦</span>
+        <span class="search-icon"><i class="ti ti-package" aria-hidden="true"></i></span>
         <input type="text" id="oc-clientes-producto" placeholder="…que hayan comprado este producto" oninput="filterClientesOC()">
       </div>
       <button class="page-btn" id="oc-clientes-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosClientesOC()">✕ Limpiar filtros</button>
@@ -508,7 +270,7 @@
     <label for="fp-items-search" class="pv-buscar-label">Buscar producto</label>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="fp-items-search" placeholder="Nombre del producto…" aria-label="Buscar producto" aria-describedby="pv-buscar-ayuda" oninput="filterFacturaItems()">
       </div>
     </div>
@@ -547,11 +309,11 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="fp-clientes-search" placeholder="Nombre o RUT…" aria-label="Buscar cliente por nombre o RUT" oninput="filterClientesFacturas()">
       </div>
       <div class="search-wrap">
-        <span class="search-icon">📦</span>
+        <span class="search-icon"><i class="ti ti-package" aria-hidden="true"></i></span>
         <input type="text" id="fp-clientes-producto" placeholder="Producto vendido a ese cliente…" aria-label="Filtrar clientes por producto vendido" oninput="filterClientesFacturas()">
       </div>
       <button class="page-btn" id="fp-clientes-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosClientesFacturas()">✕ Limpiar filtros</button>
@@ -599,7 +361,7 @@
 
     <div class="toolbar" style="margin-bottom:10px">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="fpp-search" placeholder="Buscar por N° factura, proveedor o RUT…" oninput="fppBuscar(this.value)">
       </div>
       <div class="scope-toggle" id="scope-fpp" role="group" aria-label="Alcance de la búsqueda">
@@ -634,7 +396,7 @@
     <label for="hosp-search" style="display:block;font-weight:600;margin-bottom:6px">Buscar hospital</label>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="hosp-search" placeholder="Nombre o comuna…" aria-describedby="hosp-search-help" oninput="filterHosp()">
       </div>
       <select id="hosp-region" onchange="filterHosp()"><option value="">Todas las regiones</option></select>
@@ -686,7 +448,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="doc-search" placeholder="Buscar N° documento, hospital, RUT, OC o producto (en todas las fechas)…" oninput="filtrarDocumentosGdexpress(this.value)">
       </div>
       <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
@@ -715,7 +477,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="cx-search" placeholder="Buscar por OT, factura, OC, hospital o producto…" oninput="filterChilexpress()">
       </div>
       <div class="fpp-status-tabs" id="cx-tabs"></div>
@@ -749,7 +511,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="fedex-search" placeholder="Buscar por OT, factura, OC, hospital o producto…" oninput="filterFedex(true)">
       </div>
       <div class="fpp-status-tabs" id="fedex-tabs"></div>
@@ -788,7 +550,7 @@
       <div id="rec-prep-kpis"></div>
       <div class="toolbar">
         <div class="search-wrap">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="rec-prep-q" placeholder="Buscar por preparado, materia prima o fórmula (ej. captopril, omeprazol)…" oninput="recPrepFiltrar()" autocomplete="off">
         </div>
         <select id="rec-prep-forma" onchange="recPrepFiltrar()" aria-label="Forma farmacéutica"><option value="">Todas las formas</option></select>
@@ -822,7 +584,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="rec-buscar-q" placeholder="N° RM (7070/26), preparado, paciente, RUT, materia prima, hospital… (busca en todas las fechas)" onkeydown="if(event.key==='Enter')recBuscar()" oninput="recBuscarAlEscribir()" autocomplete="off">
       </div>
     </div>
@@ -910,13 +672,13 @@
       <div class="fpp-resumen" id="rec-mat-resumen"></div>
       <div class="toolbar">
         <div class="search-wrap">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="rec-mat-search" placeholder="Materia prima o proveedor…" oninput="recMatRender()" autocomplete="off">
         </div>
         <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
           <input type="checkbox" id="rec-mat-solo" checked onchange="recMatRender()"> Solo lo que hay que comprar
         </label>
-        <button class="page-btn" style="white-space:nowrap" onclick="recMatExcel()">⬇️ Descargar pedido (Excel)</button>
+        <button class="page-btn" style="white-space:nowrap" onclick="recMatExcel()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Descargar pedido (Excel)</button>
       </div>
       <div class="rec-nota">El stock que muestra Pharma_RM no es confiable (muchas materias primas están en negativo), por eso el <b>saldo estimado</b> se calcula con las compras menos lo consumido en las fórmulas de los últimos 12 meses. Para un stock exacto hay que contar las materias primas.</div>
       <div id="rec-mat-tabla"></div>
@@ -927,7 +689,7 @@
       </div>
       <div class="toolbar">
         <div class="search-wrap">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="rec-venc-search" placeholder="Materia prima o lote…" oninput="recVencRender()" autocomplete="off">
         </div>
       </div>
@@ -947,7 +709,7 @@
     </div>
     <div class="toolbar" id="rec-costos-filtros-formula" style="display:none">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="rec-costos-search" placeholder="Principio activo, hospital…" oninput="recCostosRenderFormulas()" autocomplete="off">
       </div>
       <select id="rec-costos-forma" onchange="recCostosRenderFormulas()"><option value="">Todas las formas</option></select>
@@ -965,7 +727,7 @@
     <div id="rec-cm-kpis"></div>
     <div class="toolbar toolbar-compacta">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="rec-cm-q" placeholder="Buscar materia prima (ej. captopril, glicerina)…" oninput="recCmFiltrar()" autocomplete="off">
       </div>
       <select id="rec-cm-prov" onchange="recCmFiltrar()" aria-label="Proveedor"><option value="">Todos los proveedores</option></select>
@@ -1017,7 +779,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="oe-search" placeholder="Buscar paciente, preparado, N° de orden o RM…" oninput="filterOE()">
       </div>
       <div class="vista-switch" id="oe-vista" role="group" aria-label="Vista">
@@ -1061,7 +823,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="sw-search" placeholder="Buscar por nombre, teléfono o fórmula…" oninput="filtrarSolicitudesWeb()">
       </div>
     </div>
@@ -1086,7 +848,7 @@
     <div id="pac-resumen-compacto" style="font-size:13px;color:var(--text-2);margin-bottom:10px"></div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="pac-search" placeholder="Buscar por nombre o teléfono…" oninput="filterPacientes()">
       </div>
     </div>
@@ -1114,7 +876,7 @@
     <div id="personal-resumen" class="fpp-resumen"></div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="personal-search" placeholder="Buscar por nombre, RUT o cargo…" oninput="filtrarPersonal(this.value)">
       </div>
       <div class="fpp-status-tabs" id="personal-estado-tabs"></div>
@@ -1158,7 +920,7 @@
     </div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="pagos-search" placeholder="Buscar hospital, RUT o N° de factura…" oninput="filtrarPagosBusqueda(this.value)">
       </div>
       <button class="page-btn" style="padding:8px 14px;white-space:nowrap" onclick="document.getElementById('pagos-file-listado').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir listado de pagos</button>
@@ -1201,7 +963,7 @@
     </div>
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="rechazadas-search" placeholder="Buscar cualquier N° de factura o NC de la cadena, o el hospital…" oninput="filtrarRechazadas(this.value)">
       </div>
     </div>
@@ -1221,7 +983,7 @@
     <div class="fpp-resumen" id="fpprov-items-resumen" style="display:none"></div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="fpprov-items-search" placeholder="Buscar producto…" oninput="filterFacturaProvItems()">
       </div>
     </div>
@@ -1266,10 +1028,10 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="farmacia-search" placeholder="Código o nombre del producto…" oninput="buscarProductoFarmacia(this.value)" autocomplete="off">
       </div>
-      <button class="page-btn" style="margin-left:10px;white-space:nowrap" onclick="document.getElementById('farmacia-import-file').click()">📤 Subir Excel de catastro</button>
+      <button class="page-btn" style="margin-left:10px;white-space:nowrap" onclick="document.getElementById('farmacia-import-file').click()"><i class="ti ti-upload" aria-hidden="true"></i> Subir Excel de catastro</button>
       <input type="file" id="farmacia-import-file" accept=".xlsx,.xlsm" style="display:none" onchange="importarCatastroExcel(this.files[0])">
     </div>
     <div id="farmacia-import-log" style="display:none;margin-bottom:14px"></div>
@@ -1287,7 +1049,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="farmacia-stock-search" placeholder="Código o nombre del producto…" oninput="farmStockFiltro()" autocomplete="off">
       </div>
       <select id="farmacia-stock-familia" onchange="farmStockFiltro()" style="margin-left:10px">
@@ -1297,7 +1059,7 @@
         <input type="checkbox" id="farmacia-stock-solo-bajo" onchange="farmStockFiltro()"> Solo bajo el mínimo
       </label>
       <button class="page-btn" id="farmacia-stock-limpiar" style="white-space:nowrap;display:none" onclick="limpiarFiltrosStock()">✕ Limpiar filtros</button>
-      <button class="page-btn" style="white-space:nowrap" onclick="descargarStockExcel()">⬇️ Excel</button>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarStockExcel()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Excel</button>
     </div>
     <div id="farmacia-stock-resultados"></div>
   </div>
@@ -1308,14 +1070,14 @@
       <div class="page-sub">Las compras, ventas y traspasos llegan solos desde el sistema de ventas cada 30 minutos (descontando con FEFO). Aquí solo registras ajustes por recuento.</div>
     </div>
     <div class="toolbar" style="gap:8px">
-      <button class="page-btn" id="farmacia-tab-compra" onclick="cambiarTipoMovFarmacia('compra')" style="display:none">⬆️ Compra</button>
-      <button class="page-btn" id="farmacia-tab-venta" onclick="cambiarTipoMovFarmacia('venta')" style="display:none">⬇️ Venta/Consumo</button>
-      <button class="page-btn" id="farmacia-tab-ajuste" onclick="cambiarTipoMovFarmacia('ajuste')">⚖️ Ajuste por recuento</button>
+      <button class="page-btn" id="farmacia-tab-compra" onclick="cambiarTipoMovFarmacia('compra')" style="display:none"><i class="ti ti-arrow-up" aria-hidden="true"></i> Compra</button>
+      <button class="page-btn" id="farmacia-tab-venta" onclick="cambiarTipoMovFarmacia('venta')" style="display:none"><i class="ti ti-arrow-down" aria-hidden="true"></i> Venta/Consumo</button>
+      <button class="page-btn" id="farmacia-tab-ajuste" onclick="cambiarTipoMovFarmacia('ajuste')"><i class="ti ti-scale" aria-hidden="true"></i> Ajuste por recuento</button>
       <span style="font-size:12px;color:var(--text-3)">Compras y ventas manuales desactivadas para no descontar dos veces lo que ya registra el sistema de ventas.</span>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="farmacia-mov-search" placeholder="Código o nombre del producto…" oninput="buscarProductoMovFarmacia(this.value)" autocomplete="off">
       </div>
     </div>
@@ -1339,7 +1101,7 @@
     </div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="farmacia-venc-search" placeholder="Código, nombre o lote…" oninput="renderVencimientos()" autocomplete="off">
       </div>
       <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
@@ -1347,7 +1109,7 @@
       </label>
       <button class="page-btn" id="farmacia-venc-limpiar" style="white-space:nowrap;display:none" onclick="limpiarFiltrosVenc()">✕ Limpiar filtros</button>
       <button class="page-btn" style="white-space:nowrap" onclick="cargarVencimientosERP(true)">↻ Actualizar</button>
-      <button class="page-btn" style="white-space:nowrap" onclick="descargarVencimientosExcel()">⬇️ Excel</button>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarVencimientosExcel()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Excel</button>
     </div>
     <div id="farmacia-venc-tabla"></div>
   </div>
@@ -1393,14 +1155,14 @@
     <div class="fpp-resumen" id="farmacia-compras-resumen"></div>
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="farmacia-compras-search" placeholder="Código, producto o proveedor…" oninput="renderSugerenciaCompra()" autocomplete="off">
       </div>
       <select id="farmacia-compras-proveedor" onchange="renderSugerenciaCompra()"><option value="">Todos los proveedores</option></select>
       <label style="display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px">
         <input type="checkbox" id="farmacia-compras-solo" checked onchange="renderSugerenciaCompra()"> Solo lo que hay que comprar
       </label>
-      <button class="page-btn" style="white-space:nowrap" onclick="descargarPedidoExcel()">⬇️ Descargar pedido (Excel)</button>
+      <button class="page-btn" style="white-space:nowrap" onclick="descargarPedidoExcel()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Descargar pedido (Excel)</button>
     </div>
     <div id="farmacia-compras-nota" style="font-size:12px;color:var(--text-3);padding:0 2px 8px"></div>
     <div id="farmacia-compras-tabla"></div>
@@ -1543,6 +1305,18 @@ function cerrarSesion() {
 
 /* Menú "⋮" del header en celular: agrupa reloj, Actualizar, usuario y estado
    de conexión sin eliminar ninguna función, solo la reorganiza visualmente. */
+// Botón "Actualizar": vuelve a cargar la app (queda en la misma página gracias
+// al # de la dirección). Si hay una ventana abierta con algo escrito, avisa
+// antes, para no perder datos sin guardar. Los documentos tributarios se
+// guardan solos en este equipo, así que esos no se pierden.
+async function actualizarDatos() {
+  const abiertas = [...document.querySelectorAll('.modal-overlay, #panel-lateral')];
+  const conDatos = abiertas.some(v => [...v.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([readonly]), textarea')]
+    .some(i => i.value && i.value !== i.defaultValue));
+  if (conDatos && !await confirmModal('Tienes una ventana abierta con datos sin guardar. Si actualizas, se pierden.\n\n¿Actualizar igual?', { textoOk: 'Actualizar igual' })) return;
+  location.reload();
+}
+
 function toggleHeaderMenu(forzarCerrado) {
   const bar = document.querySelector('.system-bar');
   const btn = document.getElementById('header-kebab-btn');
@@ -1556,6 +1330,50 @@ document.addEventListener('click', (e) => {
   if (bar && bar.classList.contains('header-menu-abierto') && !bar.contains(e.target)) {
     toggleHeaderMenu(true);
   }
+});
+
+// ─── Teclado en todo lo clicable ────────────────────────────────────────────
+// Muchos botones de la app son <div>, <span> o filas <tr> con onclick: con el
+// mouse funcionan, pero con el teclado no se podía llegar a ellos (Tab los
+// saltaba). Aquí, cada vez que aparece un elemento así (también los que se
+// pintan después, como las filas de una tabla), se le agrega tabindex="0"
+// para que Tab llegue, y role="button" para que el lector de pantalla lo
+// anuncie como botón (a las filas no, para no romper la tabla). Enter o
+// Espacio hacen lo mismo que el clic.
+const TECLADO_NATIVOS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'SUMMARY', 'LABEL', 'OPTION', 'DETAILS']);
+function esClicableSinTeclado(el) {
+  if (TECLADO_NATIVOS.has(el.tagName) || el.hasAttribute('tabindex')) return false;
+  if (el.classList.contains('modal-overlay')) return false;
+  const oc = (el.getAttribute('onclick') || '').replace(/\s/g, '');
+  // "event.stopPropagation()" solo evita que se cierre una ventana: no es una acción.
+  if (!oc || /^(event\.)?stopPropagation\(\);?$/.test(oc) || /^event\.stopPropagation\(\);?$/.test(oc)) return false;
+  if (oc.startsWith('if(event.target===this)')) return false;
+  return true;
+}
+function activarTecladoClicables(raiz) {
+  if (!raiz || raiz.nodeType !== 1) return;
+  // Las ventanas antiguas (modal-shell) también se anuncian como diálogo.
+  (raiz.matches('.modal-shell') ? [raiz] : raiz.querySelectorAll('.modal-shell')).forEach(m => {
+    if (!m.hasAttribute('role')) { m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); }
+  });
+  const lista = raiz.matches('[onclick]') ? [raiz, ...raiz.querySelectorAll('[onclick]')] : raiz.querySelectorAll('[onclick]');
+  lista.forEach(el => {
+    if (!esClicableSinTeclado(el)) return;
+    el.setAttribute('tabindex', '0');
+    if (el.tagName !== 'TR' && el.tagName !== 'TD' && !el.hasAttribute('role')) el.setAttribute('role', 'button');
+  });
+}
+new MutationObserver(cambios => {
+  cambios.forEach(c => c.addedNodes.forEach(activarTecladoClicables));
+}).observe(document.documentElement, { childList: true, subtree: true });
+activarTecladoClicables(document.body);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (!el || el.nodeType !== 1 || TECLADO_NATIVOS.has(el.tagName) || !el.hasAttribute('onclick')) return;
+  if (el.getAttribute('tabindex') !== '0') return;
+  e.preventDefault();
+  el.click();
 });
 
 /* Las barras de pestañas de estado (.fpp-status-tabs, usadas en Facturas por
@@ -1632,6 +1450,9 @@ function confirmModal(mensaje, { textoOk = 'Confirmar', textoCancelar = 'Cancela
     document.body.appendChild(modal);
     modal.querySelector('#confirm-ok').onclick = () => cerrar(true);
     modal.querySelector('#confirm-cancelar').onclick = () => cerrar(false);
+    // Ventana accesible: se anuncia como diálogo, Esc cancela y el foco
+    // queda en "Cancelar" (así un Enter apurado no confirma algo peligroso).
+    modalAccesible(modal, () => cerrar(false), modal.querySelector(peligro ? '#confirm-cancelar' : '#confirm-ok'));
   });
 }
 
@@ -1659,7 +1480,73 @@ function promptModal(mensaje, valorInicial = '') {
     modal.querySelector('#prompt-ok').onclick = aceptar;
     modal.querySelector('#prompt-cancelar').onclick = () => cerrar(null);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') aceptar(); });
+    modalAccesible(modal, () => cerrar(null));
   });
+}
+
+// Ventana con fecha y texto (reemplaza dos prompt() seguidos del navegador).
+// campos: [{ id, label, tipo: 'texto'|'textarea'|'fecha', valor, ayuda, obligatorio }]
+// Devuelve { id: valor, … } o null si se cancela.
+function formularioModal(titulo, campos, { textoOk = 'Guardar' } = {}) {
+  return new Promise(resolve => {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '2000';
+    const cerrar = (valor) => { modal.remove(); resolve(valor); };
+    modal.onclick = (e) => { if (e.target === modal) cerrar(null); };
+    const campo = c => {
+      const comun = `id="fm-${c.id}" class="fm-input"${c.obligatorio ? ' required' : ''}`;
+      const control = c.tipo === 'textarea' ? `<textarea ${comun} rows="3">${escapeHtml(c.valor || '')}</textarea>`
+        : `<input ${comun} type="${c.tipo === 'fecha' ? 'date' : 'text'}" value="${escapeHtml(c.valor || '')}">`;
+      return `<label class="fm-campo"><span>${escapeHtml(c.label)}${c.obligatorio ? ' <b style="color:var(--accent)">*</b>' : ''}</span>${control}${c.ayuda ? `<small>${escapeHtml(c.ayuda)}</small>` : ''}</label>`;
+    };
+    modal.innerHTML = `
+      <div class="modal-shell modal-sm fm-shell" onclick="event.stopPropagation()">
+        <div class="fm-titulo">${escapeHtml(titulo)}</div>
+        ${campos.map(campo).join('')}
+        <div class="fm-botones">
+          <button class="page-btn" id="fm-cancelar">Cancelar</button>
+          <button class="page-btn fm-ok" id="fm-ok">${escapeHtml(textoOk)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const aceptar = () => {
+      const datos = {};
+      for (const c of campos) {
+        const el = modal.querySelector('#fm-' + c.id);
+        datos[c.id] = el.value.trim();
+        if (c.obligatorio && !datos[c.id]) { el.focus(); el.classList.add('fm-error'); return; }
+      }
+      cerrar(datos);
+    };
+    modal.querySelector('#fm-ok').onclick = aceptar;
+    modal.querySelector('#fm-cancelar').onclick = () => cerrar(null);
+    modal.querySelectorAll('input.fm-input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') aceptar(); }));
+    modalAccesible(modal, () => cerrar(null), modal.querySelector('.fm-input'));
+  });
+}
+
+// Deja una ventana (modal-overlay) lista para teclado y lector de pantalla:
+// role="dialog", Esc la cierra, Tab no se escapa hacia la página de atrás y
+// el foco vuelve al botón que la abrió.
+function modalAccesible(modal, alCancelar, enfocar) {
+  const shell = modal.querySelector('.modal-shell') || modal;
+  shell.setAttribute('role', 'dialog');
+  shell.setAttribute('aria-modal', 'true');
+  const origen = document.activeElement;
+  const enfocables = () => [...shell.querySelectorAll('button:not([disabled]), input, select, textarea, a[href], [tabindex="0"]')].filter(x => x.offsetParent !== null);
+  modal.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); alCancelar(); }
+    else if (e.key === 'Tab') {
+      const l = enfocables(); if (!l.length) return;
+      if (e.shiftKey && document.activeElement === l[0]) { e.preventDefault(); l[l.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === l[l.length - 1]) { e.preventDefault(); l[0].focus(); }
+    }
+  });
+  new MutationObserver((_, obs) => {
+    if (!document.contains(modal)) { obs.disconnect(); if (origen && document.contains(origen)) origen.focus({ preventScroll: true }); }
+  }).observe(document.body, { childList: true });
+  if (enfocar) enfocar.focus();
 }
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
@@ -2279,7 +2166,7 @@ function urlMercadoPublicoOC(codigoOC) {
 
 function botonVerEnMPHtml(codigoOC) {
   if (!codigoOC) return '';
-  return `<a href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;text-decoration:none;white-space:nowrap" title="Abrir la ficha oficial en mercadopublico.cl para verla o guardarla como PDF"><span>📄</span> Ver en Mercado Público</a>`;
+  return `<a href="${urlMercadoPublicoOC(codigoOC)}" target="_blank" rel="noopener" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;text-decoration:none;white-space:nowrap" title="Abrir la ficha oficial en mercadopublico.cl para verla o guardarla como PDF"><span><i class="ti ti-file-text" aria-hidden="true"></i></span> Ver en Mercado Público</a>`;
 }
 
 // Historial completo de documentos de una OC, del más nuevo al más antiguo:
@@ -2303,7 +2190,7 @@ function facturasAsociadasA(codigoOC) {
 function botonFacturasAsociadasOCHtml(codigoOC) {
   if (!codigoOC) return '';
   const n = facturasAsociadasA(codigoOC).length;
-  return `<button onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));abrirFacturasAsociadasOC(_cod)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;white-space:nowrap"><span>🧾</span> Facturas asociadas${n ? ` (${n})` : ''}</button>`;
+  return `<button onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));abrirFacturasAsociadasOC(_cod)" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--text);padding:5px 10px;display:flex;align-items:center;gap:5px;white-space:nowrap"><span><i class="ti ti-receipt" aria-hidden="true"></i></span> Facturas asociadas${n ? ` (${n})` : ''}</button>`;
 }
 
 function abrirFacturasAsociadasOC(codigoOC) {
@@ -2314,8 +2201,8 @@ function abrirFacturasAsociadasOC(codigoOC) {
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No encontramos facturas asociadas a esta orden de compra.</div>`
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0"><thead><tr>
-          <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
-          <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
+          <th style="font-size:11px">Folio</th><th style="font-size:11px">Hospital</th>
+          <th style="font-size:11px">Fecha emisión</th><th style="font-size:11px;text-align:right">Monto</th>
         </tr></thead><tbody>
           ${facturas.map(d => {
             const estado = estadoAceptacionFusionado(d);
@@ -2323,7 +2210,7 @@ function abrirFacturasAsociadasOC(codigoOC) {
             const estilo = anulada ? 'opacity:.6' : '';
             return `
             <tr style="cursor:pointer;${estilo}" onclick="const _cod='${codigoOC.replace(/'/g,"\\'")}';navPush(()=>abrirFacturasAsociadasOC(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
-              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : 'var(--accent)'}">${d.folio}${anulada ? ' <span style="font-size:11px;font-weight:600">✕ ANULADA</span>' : ''}</td>
               <td data-label="Hospital" style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
               <td data-label="Fecha emisión">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
               <td data-label="Monto" style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
@@ -2527,7 +2414,7 @@ function renderOC() {
     const mensaje = hayFiltro ? 'No encontramos órdenes con estos filtros.' : busca
       ? 'No encontramos órdenes. Revisa el número o prueba con el nombre del hospital.'
       : 'No hay órdenes en el período seleccionado.';
-    document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon">🔍</div><p>${mensaje}</p>${hayFiltro ? `<button class="page-btn" onclick="limpiarFiltrosOC()">${busca ? 'Quitar filtros y mantener la búsqueda' : 'Quitar filtros'}</button>` : ''}</td></tr>`;
+    document.getElementById('oc-body').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-icon"><i class="ti ti-search"></i></div><p>${mensaje}</p>${hayFiltro ? `<button class="page-btn" onclick="limpiarFiltrosOC()">${busca ? 'Quitar filtros y mantener la búsqueda' : 'Quitar filtros'}</button>` : ''}</td></tr>`;
     return;
   }
   const abierta = panelPila[0]?.ocCodigo;
@@ -2871,8 +2758,8 @@ function openOCDetailAntiguo(codigoOC) {
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
-            <th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th>
-            <th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
+            <th style="font-size:11px">Producto</th><th style="font-size:11px;text-align:right">Cantidad</th>
+            <th style="font-size:11px;text-align:right">Precio unit.</th><th style="font-size:11px;text-align:right">Total</th>
           </tr></thead>
           <tbody>
             ${relacionados.map((it, i) => {
@@ -2898,14 +2785,14 @@ function openOCDetailAntiguo(codigoOC) {
     ? `<div style="font-size:12px;color:var(--text-3);padding:8px 0">No encontramos facturas asociadas a esta orden de compra.</div>`
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0"><thead><tr>
-          <th style="font-size:10px">Folio</th><th style="font-size:10px">Hospital</th>
-          <th style="font-size:10px">Fecha emisión</th><th style="font-size:10px;text-align:right">Monto</th>
+          <th style="font-size:11px">Folio</th><th style="font-size:11px">Hospital</th>
+          <th style="font-size:11px">Fecha emisión</th><th style="font-size:11px;text-align:right">Monto</th>
         </tr></thead><tbody>
           ${facturasDeEstaOC.map(d => {
             const estado = estadoAceptacionFusionado(d);
             const anulada = estado === 'N';
             return `<tr style="cursor:pointer;${anulada ? 'opacity:.6' : ''}" onclick="const _cod='${(r.codigooc||'').replace(/'/g,"\\'")}';navPush(()=>openOCDetail(_cod));abrirDetalleDocumentoGdexpress(${d.id})">
-              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : '#185FA5'}">${d.folio}${anulada ? ' <span style="font-size:10px;font-weight:600">✕ ANULADA</span>' : ''}</td>
+              <td data-label="Folio" class="mono" style="color:${anulada ? 'var(--red)' : '#185FA5'}">${d.folio}${anulada ? ' <span style="font-size:11px;font-weight:600">✕ ANULADA</span>' : ''}</td>
               <td data-label="Hospital" style="${anulada ? 'text-decoration:line-through' : ''}">${nombreHosp(d.hospital) || d.hospital || '—'}</td>
               <td data-label="Fecha emisión">${d.fecha_emision ? fDate(d.fecha_emision) : '—'}</td>
               <td data-label="Monto" style="text-align:right;font-variant-numeric:tabular-nums;${anulada ? 'text-decoration:line-through' : ''}">${clp(montoTotalDoc(d))}</td>
@@ -2950,7 +2837,7 @@ function openOCDetailAntiguo(codigoOC) {
             const totalFacturado = facturasValidas.reduce((s, d) => s + montoTotalDoc(d), 0);
             const sinStock = totalFacturado >= totalOC - 1; // tolerancia de $1 por redondeo
             return `<div style="margin-bottom:18px;padding:12px 16px;border-radius:var(--radius);font-weight:700;text-align:center;letter-spacing:.3px;${sinStock ? 'background:#fdecea;color:var(--red)' : 'background:#e6f4ea;color:var(--green)'}">
-              ${sinStock ? '🔴 ORDEN SIN STOCK' : '🟢 ORDEN CON STOCK DISPONIBLE'}
+              ${sinStock ? '<i class="ti ti-alert-circle" aria-hidden="true"></i> ORDEN SIN STOCK' : '<i class="ti ti-circle-check" aria-hidden="true"></i> ORDEN CON STOCK DISPONIBLE'}
               <div style="font-weight:400;font-size:11px;margin-top:2px;opacity:.85">Facturado (facturas aceptadas): ${clp(totalFacturado)} de ${clp(totalOC)}</div>
             </div>`;
           })()}
@@ -3253,7 +3140,7 @@ function goOC(p) { const {pages}=paginate(ocF,ocPage); if(p<1||p>pages) return; 
 function renderItems() {
   document.getElementById('items-info').textContent = `${productosUnicosF.length.toLocaleString('es-CL')} productos`;
   const hayFiltro = document.getElementById('items-limpiar').style.display !== 'none';
-  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
+  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'No encontramos productos con estos filtros.' : 'No encontramos productos.'}</p>${hayFiltro ? '<a onclick="limpiarFiltrosItems()" style="color:var(--accent);cursor:pointer;font-size:13px">Limpiar filtros</a>' : ''}</td>`;
   // Precio: el de la última OC. Si el producto tuvo más de un precio, se
   // muestra el rango debajo, que es lo que interesa al cotizar de nuevo.
   renderTablaAlfabetica('items-body', 'items-jump', productosUnicosF, p => p.nombre,
@@ -3262,8 +3149,8 @@ function renderItems() {
       <td style="text-align:right">${p.nOC || p.ventas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
-        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
-        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:11px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
       </td>
     </tr>`, 4, mensajeVacio);
 }
@@ -3318,7 +3205,7 @@ function renderClientesOC() {
     ? `${clientesOCF.length.toLocaleString('es-CL')} clientes con productos que calzan con “${qp}”`
     : `${clientesOCF.length.toLocaleString('es-CL')} clientes`;
   const hayFiltro = document.getElementById('oc-clientes-search').value || qp;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'No hay clientes con órdenes de compra.'}</p></div></td>`;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'No hay clientes con órdenes de compra.'}</p></div></td>`;
   renderTablaAlfabetica('oc-clientes-body', 'oc-clientes-jump', clientesOCF, c => c.cliente,
     (c, idx) => `<tr onclick="navReset();abrirClienteOCConFiltro(${idx})" style="cursor:pointer">
       <td style="font-weight:500;color:var(--accent)">${escapeHtml(c.cliente)} ↗${lineaProductosCalzados(c.__calzan)}</td>
@@ -3408,26 +3295,26 @@ function openClienteOCDetail(hospitalCrudo, filtro) {
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Productos comprados — clic para ver el historial de OC</div>
         ${todos.length > 8 ? `
         <div class="search-wrap" style="margin-bottom:12px">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="cliente-oc-search" value="${escapeHtml(q)}" placeholder="Buscar producto comprado por este cliente…" oninput="openClienteOCDetailDebounce(this.value)">
         </div>` : ''}
         ${lista.length ? `
         <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
           <table style="margin:0"><thead><tr>
-            <th style="font-size:10px">Producto</th>
-            <th style="font-size:10px;text-align:right">N° OC</th>
-            <th style="font-size:10px;text-align:right">Último precio OC</th>
-            <th style="font-size:10px;text-align:right">Última compra</th>
+            <th style="font-size:11px">Producto</th>
+            <th style="font-size:11px;text-align:right">N° OC</th>
+            <th style="font-size:11px;text-align:right">Último precio OC</th>
+            <th style="font-size:11px;text-align:right">Última compra</th>
           </tr></thead><tbody>
             ${lista.map((pr, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openClienteOCDetail(window.__clienteOCActual));openProductoHospitalOCs(window.__clienteOCProductosVisibles[${idx}].nombre, window.__clienteOCActual)">
               <td data-label="Producto" style="color:var(--accent);font-weight:500">${escapeHtml(pr.nombre)} ↗</td>
               <td data-label="N° OC" style="text-align:right">${pr.nOC}</td>
-              <td data-label="Último precio OC" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${pr.ultimoPrecio != null ? clp(pr.ultimoPrecio) : '—'}${pr.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(pr.ultimaUnidad)}</span>` : ''}</td>
+              <td data-label="Último precio OC" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${pr.ultimoPrecio != null ? clp(pr.ultimoPrecio) : '—'}${pr.ultimaUnidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(pr.ultimaUnidad)}</span>` : ''}</td>
               <td data-label="Última compra" style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${pr.ultima ? fDate(pr.ultima) : '—'}</td>
             </tr>`).join('')}
           </tbody></table>
         </div>`
-        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'No encontramos productos con ese nombre para este cliente.' : 'Este cliente no tiene productos en órdenes de compra.'}</p></div>`}
+        : `<div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${q ? 'No encontramos productos con ese nombre para este cliente.' : 'Este cliente no tiene productos en órdenes de compra.'}</p></div>`}
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -3535,7 +3422,7 @@ function openProductDetail(nombreProducto) {
           <div class="stat" style="padding:12px"><div class="stat-label">Rango histórico</div><div class="stat-val" style="font-size:14px">${precioMin != null ? `${clp(precioMin)} – ${clp(precioMax)}` : '—'}</div></div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-          <button class="page-btn" style="padding:8px 16px" onclick="verPreciosFacturadosDe(window.__productoActual)" title="Buscar este producto en Facturas Bulfor → Precios. Son fuentes distintas: no se mezclan los datos.">🧾 Ver precios facturados</button>
+          <button class="page-btn" style="padding:8px 16px" onclick="verPreciosFacturadosDe(window.__productoActual)" title="Buscar este producto en Facturas Bulfor → Precios. Son fuentes distintas: no se mezclan los datos."><i class="ti ti-receipt" aria-hidden="true"></i> Ver precios facturados</button>
         </div>
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Hospitales que han comprado este producto</div>
         <input type="text" id="product-hosp-search" placeholder="Buscar hospital por nombre o RUT…" style="width:100%;margin-bottom:10px" oninput="filterProductoHospitales()">
@@ -3553,11 +3440,11 @@ function renderProductoHospitalesTable(lista) {
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
-            <th style="font-size:10px">Hospital</th>
-            <th style="font-size:10px">RUT</th>
-            <th style="font-size:10px;text-align:right">N° OC</th>
-            <th style="font-size:10px;text-align:right">Última compra</th>
-            <th style="font-size:10px;text-align:right">Total comprado</th>
+            <th style="font-size:11px">Hospital</th>
+            <th style="font-size:11px">RUT</th>
+            <th style="font-size:11px;text-align:right">N° OC</th>
+            <th style="font-size:11px;text-align:right">Última compra</th>
+            <th style="font-size:11px;text-align:right">Total comprado</th>
           </tr></thead>
           <tbody>
             ${lista.map((h, idx) => `<tr style="cursor:pointer" onclick="openProductoHospitalOCs(window.__productoActual, window.__productoHospitalesVisibles[${idx}].hospital)">
@@ -3653,8 +3540,8 @@ function renderProductoHospitalOCsTabla(ventas) {
     : `<div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
           <thead><tr>
-            <th style="font-size:10px">N° OC</th><th style="font-size:10px">Fecha</th>
-            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th>
+            <th style="font-size:11px">N° OC</th><th style="font-size:11px">Fecha</th>
+            <th style="font-size:11px;text-align:right">Cantidad</th><th style="font-size:11px;text-align:right">Precio unit.</th><th style="font-size:11px;text-align:right">Total</th>
           </tr></thead>
           <tbody>
             ${ventas.map((v, idx) => `<tr style="cursor:pointer" onclick="navPush(()=>openProductoHospitalOCs(window.__prodHospNombreActual, window.__prodHospHospitalActual));cerrarTodosLosModales();abrirOCEnProductos(window.__prodHospVentasVisibles[${idx}].codigooc)">
@@ -3853,7 +3740,7 @@ function renderFacturaItems() {
     <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${totalFacturas.toLocaleString('es-CL')}</div></div>`;
 
   const hayFiltro = document.getElementById('fp-items-search').value;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td>`;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos facturados.'}</p></div></td>`;
   // Una fila por producto base ("ACIDO ACETICO"); sus presentaciones (3%,
   // 5% 250 ml, glacial…) se ven al abrirlo. Si tiene una sola, la fila es ella.
   renderTablaAlfabetica('fp-items-body', 'fp-items-jump', sustanciasDePrecios(facturaProductosUnicosF), p => p.nombre,
@@ -3867,8 +3754,8 @@ function renderFacturaItems() {
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
-        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
-        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:11px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
       </td>
     </tr>`, 4, mensajeVacio);
 }
@@ -4182,7 +4069,7 @@ function renderClientesFacturas() {
     ? `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes con productos que calzan con “${qp}”`
     : `${clientesFacturadosF.length.toLocaleString('es-CL')} clientes`;
   const hayFiltro = document.getElementById('fp-clientes-search').value || qp;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'Todavía no hay clientes facturados.'}</p></div></td>`;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'Ningún cliente calza con esos filtros.' : 'Todavía no hay clientes facturados.'}</p></div></td>`;
   renderTablaAlfabetica('fp-clientes-body', 'fp-clientes-jump', clientesFacturadosF, c => c.cliente,
     (c, idx) => `<tr onclick="navReset();abrirClienteFacturaConFiltro(${idx})" style="cursor:pointer">
       <td style="font-weight:500;color:#185FA5">${escapeHtml(c.cliente)} ↗${lineaProductosCalzados(c.__calzan)}</td>
@@ -4264,13 +4151,13 @@ function fichaProductoVenta(nombreProducto) {
       <p>Rango de precios unitarios registrados: <b>${prod.precioMin != null ? (prod.precioMin === prod.precioMax ? clp(prod.precioMin) : `${clp(prod.precioMin)} – ${clp(prod.precioMax)}`) : '—'}</b></p>
       <p>Comprueba la unidad de cada registro antes de comparar precios.</p>
     </details>`,
-    acciones: `<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button><button class="page-btn" onclick="abrirPrecioCosto(${panelEsc(JSON.stringify(nombreProducto))})">💰 Precio costo</button>`,
+    acciones: `<button type="button" class="page-btn" onclick="panelCerrar()">Volver a resultados</button><button class="page-btn" onclick="abrirPrecioCosto(${panelEsc(JSON.stringify(nombreProducto))})"><i class="ti ti-coin" aria-hidden="true"></i> Precio costo</button>`,
     get cuerpo() {
       window.__pvClientes = clientes;
       window.__pvBuscarClientes = estado;
       return `
         <label for="pv-cliente-buscar" class="pv-buscar-label">Buscar cliente</label>
-        <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true">🔍</span>
+        <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true"><i class="ti ti-search"></i></span>
           <input id="pv-cliente-buscar" type="text" value="${escapeHtml(estado.consulta)}" placeholder="Nombre del cliente…" oninput="pvBuscarClientes(this.value)" aria-describedby="pv-cliente-ayuda"></div>
         <p id="pv-cliente-ayuda" class="pv-ayuda">Elige un cliente para consultar sus precios y facturas. Puedes buscar por parte del nombre.</p>
         <div id="pv-clientes-resultados">${pvClientesHtml(nombreProducto, clientes, estado.consulta)}</div>`;
@@ -4336,7 +4223,7 @@ function fichaClienteVenta(clienteNombre) {
     antetitulo: 'Cliente',
     titulo: clienteNombre,
     sub: `${productos.length} ${productos.length === 1 ? 'producto facturado' : 'productos facturados'} · ${clp(total)} neto`,
-    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto vendido a este cliente…" oninput="pvFiltrarProductos(this)"></div>
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon"><i class="ti ti-search"></i></span><input type="text" placeholder="Buscar producto vendido a este cliente…" oninput="pvFiltrarProductos(this)"></div>
       <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Facturas</th><th>Última venta</th><th style="text-align:right">Total facturado</th></tr></thead><tbody>
         ${productos.map((p, i) => `<tr class="pv-fila" data-buscar="${escapeHtml(p.nombre)}" onclick="panelAbrir(fichaHistorialVenta(window.__pvProductos[${i}].nombre, ${panelEsc(JSON.stringify(clienteNombre))}), true)">
           <td><span class="panel-link">${escapeHtml(p.nombre)}</span></td><td style="text-align:right">${p.facturas}</td><td>${p.ultima ? fDate(p.ultima) : '—'}</td><td class="oc-monto" style="font-weight:500">${clp(p.total)}</td></tr>`).join('')}
@@ -4563,7 +4450,7 @@ function filaCandidatoCostoHtml(c, arreglo, idx, destacado) {
       <div style="font-size:11px;color:var(--text-3);margin-top:2px">${c.proveedor ? escapeHtml(c.proveedor) : 'Proveedor no identificado'} · ${c.compras} compra${c.compras===1?'':'s'}${destacado ? '' : etiquetaCoincidencia(c)}</div>
     </td>
     <td style="text-align:right;white-space:nowrap">
-      <div style="font-weight:600;font-variant-numeric:tabular-nums">${c.ultimoPrecio != null ? clp(c.ultimoPrecio) : '—'}${c.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(c.ultimaUnidad)}</span>` : ''}</div>
+      <div style="font-weight:600;font-variant-numeric:tabular-nums">${c.ultimoPrecio != null ? clp(c.ultimoPrecio) : '—'}${c.ultimaUnidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(c.ultimaUnidad)}</span>` : ''}</div>
       <div style="font-size:11px;color:var(--text-3)">${c.ultima ? fDate(c.ultima) : 'sin fecha'}</div>
     </td>
   </tr>`;
@@ -4603,7 +4490,7 @@ async function abrirPrecioCosto(nombreProductoVenta, filtroManual) {
           Posibles productos en facturas de proveedor. Son <strong>sugerencias</strong>: marca con ☆ los que sí corresponden y quedarán arriba como <strong>destacados</strong> para este producto.
         </div>
         <div class="search-wrap" style="margin-bottom:12px">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="precio-costo-search" value="${escapeHtml(q)}" placeholder="Buscar producto en facturas de proveedor…"
             oninput="abrirPrecioCostoDebounce(this.value)">
         </div>
@@ -4619,7 +4506,7 @@ async function abrirPrecioCosto(nombreProductoVenta, filtroManual) {
         </table>
         ${!q ? `<div style="font-size:11px;color:var(--text-3);margin-top:10px">¿No aparece el que buscas? Los nombres de venta y de compra suelen no coincidir (por ejemplo "PEG" y "Polyglykol"). Usa el buscador de arriba con el nombre del proveedor.</div>` : ''}`
         : (destacados.length ? `<div style="font-size:11px;color:var(--text-3)">${q ? 'Ningún otro producto de proveedor calza con esa búsqueda.' : 'No hay otras sugerencias además de los destacados. Si falta alguno, búscalo arriba por el nombre del proveedor.'}</div>`
-        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div>
+        : `<div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div>
              <p>${q ? 'No encontramos productos de proveedor con ese nombre.' : 'No encontramos posibles productos de proveedor relacionados.'}</p>
              <p style="font-size:12px;color:var(--text-3)">Busca manualmente arriba: los nombres de compra y de venta muchas veces no se parecen.</p>
            </div>`)}
@@ -4680,21 +4567,21 @@ function abrirHistorialCosto(nombreProductoProveedor) {
         ${compras.length ? `
         <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
           <table style="margin:0"><thead><tr>
-            <th style="font-size:10px">Fecha</th><th style="font-size:10px">Proveedor</th>
-            <th style="font-size:10px">N° Factura</th>
-            <th style="font-size:10px;text-align:right">Precio unitario</th>
+            <th style="font-size:11px">Fecha</th><th style="font-size:11px">Proveedor</th>
+            <th style="font-size:11px">N° Factura</th>
+            <th style="font-size:11px;text-align:right">Precio unitario</th>
           </tr></thead><tbody>
             ${compras.map(({f, item}) => `
               <tr style="cursor:pointer" onclick="navPush(()=>abrirHistorialCosto(window.__histCostoProducto));abrirDetalleFacturaPorPagar(${f.id}, window.__histCostoFacturaIds)">
                 <td data-label="Fecha" style="white-space:nowrap">${f.fecha_emision ? fDate(f.fecha_emision) : '—'}</td>
                 <td data-label="Proveedor" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(f.proveedor||'')}">${escapeHtml(f.proveedor || '—')}</td>
                 <td data-label="N° Factura" class="mono" style="color:#185FA5">${f.factura} ↗</td>
-                <td data-label="Precio unitario" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${item.precio_unitario != null && item.precio_unitario !== '' ? clp(Number(item.precio_unitario)) : '—'}${item.unidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(item.unidad)}</span>` : ''}</td>
+                <td data-label="Precio unitario" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap">${item.precio_unitario != null && item.precio_unitario !== '' ? clp(Number(item.precio_unitario)) : '—'}${item.unidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(item.unidad)}</span>` : ''}</td>
               </tr>`).join('')}
           </tbody></table>
         </div>
         <div style="font-size:11px;color:var(--text-3);margin-top:8px">Precio unitario tal como viene en cada factura de proveedor. No se convierten unidades.</div>`
-        : `<div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>No encontramos compras de este producto.</p></div>`}
+        : `<div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>No encontramos compras de este producto.</p></div>`}
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -4812,7 +4699,7 @@ function renderProveedoresCompras() {
     <div class="stat destacado"><div class="stat-label">Total comprado</div><div class="stat-val" style="font-size:20px">${clp(lista.reduce((t, p) => t + p.total, 0))}</div></div>
     <div class="stat"><div class="stat-label">Proveedores</div><div class="stat-val" style="font-size:16px">${lista.length.toLocaleString('es-CL')}</div></div>
     <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${new Set(lista.flatMap(p => [...p.docs])).size.toLocaleString('es-CL')}</div></div>`;
-  const vacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay compras a proveedores.'}</p></div></td>`;
+  const vacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${q ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay compras a proveedores.'}</p></div></td>`;
   renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', lista, p => p.nombre,
     (p, idx) => `<tr onclick="navReset();ppAbrirProveedor(${idx})" style="cursor:pointer">
       <td style="font-weight:500;color:#185FA5">${escapeHtml(p.nombre)} ↗${p.rut ? `<small style="display:block;font-weight:400;color:var(--text-3);font-size:11.5px">${escapeHtml(p.rut)}</small>` : ''}</td>
@@ -4856,7 +4743,7 @@ function fichaProveedorCompras(proveedor) {
     antetitulo: 'Proveedor',
     titulo: proveedor,
     sub: `${productos.length} ${productos.length === 1 ? 'producto comprado' : 'productos comprados'} · ${clp(total)} neto`,
-    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar producto comprado a este proveedor…" oninput="pvFiltrarProductos(this)"></div>
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon"><i class="ti ti-search"></i></span><input type="text" placeholder="Buscar producto comprado a este proveedor…" oninput="pvFiltrarProductos(this)"></div>
       <table class="hosp-oc-tabla pv-tabla"><thead><tr><th>Producto</th><th style="text-align:right">Facturas</th><th>Última compra</th><th style="text-align:right">Último precio (neto)</th><th style="text-align:right">Total comprado</th></tr></thead><tbody>
         ${productos.map((p, i) => `<tr class="pv-fila" data-buscar="${escapeHtml(p.nombre)}" onclick="panelAbrir(fichaHistorialCompra(window.__ppProductos[${i}].nombre, ${panelEsc(JSON.stringify(proveedor))}), true)">
           <td><span class="panel-link">${escapeHtml(p.nombre)}</span></td><td style="text-align:right">${p.docs.size}</td><td>${p.ultima ? fDate(p.ultima) : '—'}</td>
@@ -4893,7 +4780,7 @@ function renderFacturaProvItems() {
     <div class="stat"><div class="stat-label">Total de facturas</div><div class="stat-val" style="font-size:16px">${totalFacturas.toLocaleString('es-CL')}</div></div>`;
 
   const hayFiltro = document.getElementById('fpprov-items-search').value;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos de facturas de proveedor.'}</p></div></td>`;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'Sin resultados para tu búsqueda.' : 'Todavía no hay productos de facturas de proveedor.'}</p></div></td>`;
   // Igual que Precios: una fila por producto base; sus presentaciones se ven al abrirlo.
   renderTablaAlfabetica('fpprov-items-body', 'fpprov-items-jump', sustanciasDePrecios(facturaProvProductosUnicosF), p => p.nombre,
     (p, idx) => p.presentaciones ? `<tr onclick="navReset();abrirFilaPreciosProv(${idx})" style="cursor:pointer">
@@ -4906,8 +4793,8 @@ function renderFacturaProvItems() {
       <td style="text-align:right">${p.facturas}</td>
       <td style="text-align:right;font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaFecha ? fDate(p.ultimaFecha) : '—'}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">
-        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:10px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
-        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:10px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
+        <div style="font-weight:600">${p.ultimoPrecio != null ? clp(p.ultimoPrecio) : '—'}${p.ultimaUnidad ? ` <span style="font-size:11px;color:var(--text-3);font-weight:400">/ ${escapeHtml(p.ultimaUnidad)}</span>` : ''}</div>
+        ${p.precioMin != null && p.precioMax != null && p.precioMin !== p.precioMax ? `<div style="font-size:11px;color:var(--text-3)">${clp(p.precioMin)} – ${clp(p.precioMax)}</div>` : ''}
       </td>
     </tr>`, 4, mensajeVacio, { numerosAlFinal: true });
 }
@@ -5122,8 +5009,8 @@ function abrirFacturasProvDeProductoProveedor(nombreProducto, proveedorNombre) {
       <div class="modal-body">
         <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
           <table style="margin:0"><thead><tr>
-            <th style="font-size:10px">N° Factura</th><th style="font-size:10px">Fecha</th>
-            <th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Monto ítem</th>
+            <th style="font-size:11px">N° Factura</th><th style="font-size:11px">Fecha</th>
+            <th style="font-size:11px;text-align:right">Cantidad</th><th style="font-size:11px;text-align:right">Monto ítem</th>
           </tr></thead><tbody>
             ${facturas.map(({f, item}) => `
               <tr style="cursor:pointer" onclick="navPush(()=>abrirFacturasProvDeProductoProveedor(window.__facturaProdProvActualNombre, window.__facturaProdProvActualProveedor));abrirDetalleFacturaPorPagar(${f.id})">
@@ -5146,14 +5033,14 @@ function abrirFacturasProvDeProductoProveedor(nombreProducto, proveedorNombre) {
 // así que el atraso se calcula directo contra esa fecha. 'N' (anulada) nunca
 // cuenta para nada de esto — mismo criterio que el resto de Facturas por pagar.
 const GRAFICOS_PAGOS_PROV_DISPONIBLES = [
-  { id: 'atrasadas-ahora', icono: '🔥', titulo: 'Facturas atrasadas ahora mismo', sub: 'Vencidas y sin pagar, factura por factura' },
-  { id: 'deuda-vigente', icono: '⚠️', titulo: 'Deuda vigente por proveedor', sub: 'Cuánto les debemos hoy (pendiente + atrasado)' },
-  { id: 'mas-puntuales', icono: '⚡', titulo: 'Proveedores que pagamos más puntual', sub: 'Comparado con la fecha de vencimiento real' },
-  { id: 'mas-atrasados', icono: '🐢', titulo: 'Proveedores con los que más nos atrasamos', sub: 'Comparado con la fecha de vencimiento real' },
-  { id: 'pct-a-tiempo', icono: '✅', titulo: '% de facturas pagadas a tiempo', sub: 'Qué tan cumplidor hemos sido con cada uno' },
-  { id: 'top-monto-pagado', icono: '💰', titulo: 'Proveedores a los que más hemos pagado', sub: 'Ranking por monto total pagado' },
-  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Proveedores que más nos facturan', sub: 'Ranking por monto total facturado' },
-  { id: 'evolucion-mensual-prov', icono: '📅', titulo: 'Evolución mensual de pagos', sub: 'Total pagado a proveedores, mes a mes' },
+  { id: 'atrasadas-ahora', icono: '<i class="ti ti-flame" aria-hidden="true"></i>', titulo: 'Facturas atrasadas ahora mismo', sub: 'Vencidas y sin pagar, factura por factura' },
+  { id: 'deuda-vigente', icono: '<i class="ti ti-alert-triangle" aria-hidden="true"></i>', titulo: 'Deuda vigente por proveedor', sub: 'Cuánto les debemos hoy (pendiente + atrasado)' },
+  { id: 'mas-puntuales', icono: '<i class="ti ti-bolt" aria-hidden="true"></i>', titulo: 'Proveedores que pagamos más puntual', sub: 'Comparado con la fecha de vencimiento real' },
+  { id: 'mas-atrasados', icono: '<i class="ti ti-clock-exclamation" aria-hidden="true"></i>', titulo: 'Proveedores con los que más nos atrasamos', sub: 'Comparado con la fecha de vencimiento real' },
+  { id: 'pct-a-tiempo', icono: '<i class="ti ti-circle-check" aria-hidden="true"></i>', titulo: '% de facturas pagadas a tiempo', sub: 'Qué tan cumplidor hemos sido con cada uno' },
+  { id: 'top-monto-pagado', icono: '<i class="ti ti-coin" aria-hidden="true"></i>', titulo: 'Proveedores a los que más hemos pagado', sub: 'Ranking por monto total pagado' },
+  { id: 'top-monto-facturado', icono: '<i class="ti ti-receipt" aria-hidden="true"></i>', titulo: 'Proveedores que más nos facturan', sub: 'Ranking por monto total facturado' },
+  { id: 'evolucion-mensual-prov', icono: '<i class="ti ti-calendar" aria-hidden="true"></i>', titulo: 'Evolución mensual de pagos', sub: 'Total pagado a proveedores, mes a mes' },
 ];
 
 let graficoPagoProvActivo = null;
@@ -5242,7 +5129,7 @@ function abrirGraficoPagoProv(id) {
       .map(f => ({ f, dias: Math.round((hoy - new Date(f.fecha_vencimiento + 'T00:00:00')) / 86400000) }))
       .sort((a,b) => b.dias - a.dias);
     pintarGraficoPagoProv('Facturas atrasadas ahora mismo',
-      !atrasadas.length ? '<div style="font-size:13px;color:var(--text-3)">🎉 No hay facturas atrasadas en este momento.</div>' :
+      !atrasadas.length ? '<div style="font-size:13px;color:var(--text-3)"> No hay facturas atrasadas en este momento.</div>' :
       `<div style="font-size:11px;color:var(--text-3);margin-bottom:12px">${atrasadas.length} factura${atrasadas.length===1?'':'s'} vencida${atrasadas.length===1?'':'s'} sin pagar, ordenadas de más a menos atrasada.</div>
       <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden"><table style="margin:0"><thead><tr>
         <th>N° Factura</th><th>Proveedor</th><th style="text-align:right">Monto</th><th>Venció</th><th style="text-align:right">Atraso</th>
@@ -5274,7 +5161,7 @@ function abrirGraficoPagoProv(id) {
         </div>
         <span style="font-size:12px;font-weight:500;white-space:nowrap;min-width:90px;text-align:right">${clp(d.total)}</span>
       </div>`;
-      }).join('')) || '<div style="font-size:13px;color:var(--text-3)">Sin deuda vigente — todo al día 🎉</div>');
+      }).join('')) || '<div style="font-size:13px;color:var(--text-3)">Sin deuda vigente — todo al día</div>');
 
   } else if (id === 'mas-puntuales') {
     const con = stats.filter(s => s.nAtrasoValidos >= MIN_MUESTRA).sort((a,b) => a.atrasoPromedio - b.atrasoPromedio).slice(0, 15);
@@ -5332,7 +5219,7 @@ function renderHosp() {
   const mensaje = hayRegion ? 'No encontramos hospitales en la región seleccionada.' : busca
     ? 'No encontramos hospitales. Prueba con parte del nombre o con la comuna.'
     : 'No hay hospitales en el listado.';
-  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon">🔍</div><p>${mensaje}</p>${hayRegion ? '<button type="button" class="page-btn" onclick="quitarRegionHosp()">Quitar filtro de región</button>' : ''}</td>`;
+  const mensajeVacio = `<td colspan="COLSPAN" class="empty"><div class="empty-icon"><i class="ti ti-search"></i></div><p>${mensaje}</p>${hayRegion ? '<button type="button" class="page-btn" onclick="quitarRegionHosp()">Quitar filtro de región</button>' : ''}</td>`;
   renderTablaAlfabetica('hosp-body', 'hosp-jump', hospF, r => nombreHosp(r.hospital) || r.hospital || '',
     (r, idx) => `<tr style="cursor:pointer" onclick="navReset();openHospitalOCs(window.__alfabeticoOrden['hosp-body'][${idx}].hospital)">
       <td style="max-width:240px"><button type="button" class="hosp-abrir-ficha" onclick="event.stopPropagation();navReset();openHospitalOCs(window.__alfabeticoOrden['hosp-body'][${idx}].hospital)">${escapeHtml(nombreHosp(r.hospital)||'—')} <i class="ti ti-chevron-right" aria-hidden="true"></i></button></td>
@@ -5668,7 +5555,7 @@ async function copiarTexto(texto, btnEl) {
 }
 
 function botonCopiar(texto, extraStyle='') {
-  return `<button onclick="event.stopPropagation();copiarTexto('${texto.replace(/'/g,"\\'")}', this)" title="Copiar número" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:13px;padding:2px 4px;vertical-align:middle;${extraStyle}">📋</button>`;
+  return `<button onclick="event.stopPropagation();copiarTexto('${texto.replace(/'/g,"\\'")}', this)" title="Copiar número" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:13px;padding:2px 4px;vertical-align:middle;${extraStyle}"><i class="ti ti-copy" aria-hidden="true"></i></button>`;
 }
 
 // Construye el link directo a la página de rastreo de FedEx, con el número
@@ -5839,7 +5726,7 @@ function renderFedex() {
       retraso: '✓ No hay envíos con retraso.',
       entregado: 'No hay envíos entregados.',
     };
-    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!buscando?'✓':'🔍'}</div><p>${buscando ? 'No encontramos envíos con esa búsqueda.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
+    document.getElementById('fedex-body').innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">${fedexCategoriaActiva==='retraso'&&!buscando?'<i class="ti ti-circle-check"></i>':'<i class="ti ti-search"></i>'}</div><p>${buscando ? 'No encontramos envíos con esa búsqueda.' : mensajes[fedexCategoriaActiva]}</p>${fedexCategoriaActiva!=='todos' ? '<a onclick="filtrarPorCategoriaFedex(\'todos\')">Ver todos</a>' : ''}</div></td></tr>`;
     return;
   }
   const abierto = panelPila[0]?.envioId;
@@ -5974,7 +5861,7 @@ function renderChilexpress() {
   renderPages('cx-pages', total, pages, cxPage, 'goChilexpress');
   if (!slice.length) {
     const q = (document.getElementById('cx-search')?.value || '').trim();
-    body.innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">📦</div><p>${q ? 'No encontramos envíos con esa búsqueda.' : chilexpress.length ? 'No hay envíos en esta vista.' : 'Todavía no hay envíos de Chilexpress. Usa «+ Nuevo envío» para registrar el primero.'}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-package" aria-hidden="true"></i></div><p>${q ? 'No encontramos envíos con esa búsqueda.' : chilexpress.length ? 'No hay envíos en esta vista.' : 'Todavía no hay envíos de Chilexpress. Usa «+ Nuevo envío» para registrar el primero.'}</p></div></td></tr>`;
     return;
   }
   const abierto = panelPila[0]?.cxId;
@@ -6446,7 +6333,7 @@ function renderOE() {
   if (!slice.length) {
     const buscando = document.getElementById('oe-search').value.trim();
     const cat = OE_CATEGORIAS.find(c => c.id === oeCategoria);
-    document.getElementById('oe-body').innerHTML = `<tr><td colspan="8"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${buscando ? 'No encontramos órdenes con esa búsqueda.' : `No hay órdenes${oeCategoria !== 'todos' ? ' «' + cat.label.toLowerCase() + '»' : ''} en ${nombrePeriodoAlcance('oe', oePeriodo)}.`}</p>${oeCategoria !== 'todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
+    document.getElementById('oe-body').innerHTML = `<tr><td colspan="8"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${buscando ? 'No encontramos órdenes con esa búsqueda.' : `No hay órdenes${oeCategoria !== 'todos' ? ' «' + cat.label.toLowerCase() + '»' : ''} en ${nombrePeriodoAlcance('oe', oePeriodo)}.`}</p>${oeCategoria !== 'todos' ? '<a onclick="filtrarOECategoria(\'todos\')">Ver todas</a>' : ''}</div></td></tr>`;
     return;
   }
   // La fecha va en su propia columna (sin separaciones entre días). Paciente
@@ -6542,7 +6429,7 @@ function renderSW() {
   document.getElementById('sw-info').textContent = `${total.toLocaleString('es-CL')} solicitud${total===1?'':'es'}`;
   renderPages('sw-pages', total, pages, swPage, 'goSW');
   if (!slice.length) {
-    document.getElementById('sw-body').innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon">📭</div><p>${swCategoria==='Nueva' ? 'No hay solicitudes nuevas.' : 'No hay solicitudes en esta categoría.'}</p>${swCategoria!=='todas' ? `<a onclick="swCategoria='todas';filtrarSolicitudesWeb()">Ver todas</a>` : ''}</div></td></tr>`;
+    document.getElementById('sw-body').innerHTML = `<tr><td colspan="6"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-inbox" aria-hidden="true"></i></div><p>${swCategoria==='Nueva' ? 'No hay solicitudes nuevas.' : 'No hay solicitudes en esta categoría.'}</p>${swCategoria!=='todas' ? `<a onclick="swCategoria='todas';filtrarSolicitudesWeb()">Ver todas</a>` : ''}</div></td></tr>`;
     return;
   }
   document.getElementById('sw-body').innerHTML = slice.map(x => `
@@ -6611,7 +6498,7 @@ function abrirDetalleSW(id) {
         </table>
 
         ${archivos.length ? `
-        <div style="font-size:13px;font-weight:500;margin:16px 0 8px">📋 Receta enviada (${archivos.length})</div>
+        <div style="font-size:13px;font-weight:500;margin:16px 0 8px"><i class="ti ti-clipboard-list" aria-hidden="true"></i> Receta enviada (${archivos.length})</div>
         <div id="sw-fotos" style="display:flex;gap:10px;flex-wrap:wrap">
           ${archivos.map((ruta, i) => `<button type="button" onclick="verArchivoSW('${ruta}')" data-ruta="${ruta}" style="width:110px;height:110px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);cursor:pointer;overflow:hidden;padding:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-2)">Cargando…</button>`).join('')}
         </div>` : '<div style="font-size:13px;color:var(--text-3);margin-top:14px">Sin fotos adjuntas.</div>'}
@@ -6791,11 +6678,11 @@ function filterPacientes() {
 function renderPacientes() {
   document.getElementById('pac-info').textContent = `${pacientesF.length.toLocaleString('es-CL')} pacientes`;
   const hayFiltro = document.getElementById('pac-search').value;
-  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${hayFiltro ? 'No encontramos pacientes con esa búsqueda.' : 'No encontramos pacientes.'}</p></div></td>`;
+  const mensajeVacio = `<td colspan="COLSPAN"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${hayFiltro ? 'No encontramos pacientes con esa búsqueda.' : 'No encontramos pacientes.'}</p></div></td>`;
   renderTablaAlfabetica('pac-body', 'pac-jump', pacientesF, p => p.nombre,
     (p, idx) => `<tr style="cursor:pointer" onclick="navReset();abrirDetallePaciente(window.__alfabeticoOrden['pac-body'][${idx}].id)">
       <td style="font-weight:500">${escapeHtml(p.nombre)}</td>
-      <td style="font-size:12px">${p.telefono ? '📞 '+escapeHtml(p.telefono) : '—'}</td>
+      <td style="font-size:12px">${p.telefono ? '<i class="ti ti-phone" aria-hidden="true"></i> '+escapeHtml(p.telefono) : '—'}</td>
       <td style="text-align:center">${p.numeroRecetas}</td>
       <td style="text-align:center">${p.numeroOrdenes}</td>
       <td style="font-size:12px;color:var(--text-2);white-space:nowrap">${p.ultimaOrden ? fDate(p.ultimaOrden) : '—'}</td>
@@ -6847,7 +6734,7 @@ async function abrirDetallePaciente(id) {
         <div>
           <div style="font-size:13px;font-weight:500">Emitida el ${fDate(r.fecha_emision)}</div>
           <div style="font-size:11px;margin-top:2px;color:${vigente?'var(--green)':'var(--red)'}">${vigente?'✓ Vigente hasta':'✗ Venció el'} ${fDate(venc.toISOString())}</div>
-          ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px">📎 ${r.archivo_nombre}</div>` : ''}
+          ${r.archivo_nombre ? `<div style="font-size:11px;color:var(--text-2);margin-top:2px"><i class="ti ti-paperclip" aria-hidden="true"></i> ${r.archivo_nombre}</div>` : ''}
         </div>
         ${r.archivo_url ? `<button class="page-btn" style="padding:6px 12px;white-space:nowrap" onclick="navPush(()=>abrirDetallePaciente(${id}));verRecetaEnModal('${r.archivo_url}')">Ver</button>` : ''}
       </div>`;
@@ -7186,7 +7073,7 @@ function renderPagosVista(soloTabla) {
       overdue: `No hay facturas atrasadas en ${nombrePeriodo}.`,
       paid: `No hay facturas pagadas en ${nombrePeriodo}.`,
     };
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'🧾':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">${pagosEstadoFiltro==='all'?'<i class="ti ti-receipt" aria-hidden="true"></i>':'✓'}</div><p>${pagosBusqueda ? 'Sin resultados para tu búsqueda.' : mensajes[pagosEstadoFiltro]}</p>${pagosEstadoFiltro!=='all' ? `<a onclick="pagosSetEstado('all')">Ver todas</a>` : ''}</div></div>`;
     pagosF = [];
     return;
   }
@@ -7271,7 +7158,7 @@ function renderCobranzaClientes(soloTabla) {
   cobClientesF = lista;
   const cont = document.getElementById('pagos-contenido');
   if (!lista.length) {
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : cobAtajo === 'vencida' ? 'Ningún cliente tiene facturas vencidas. 🎉' : 'No hay clientes en esta lista.'}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : cobAtajo === 'vencida' ? 'Ningún cliente tiene facturas vencidas.' : 'No hay clientes en esta lista.'}</p></div></div>`;
     return;
   }
   const abierto = panelPila[0]?.cobClave;
@@ -7308,7 +7195,7 @@ function fichaCobranzaCliente(g, i) {
     destacado: g.vencido ? `${clp(g.vencido)} vencido` : `${clp(g.porVencerMonto)} por vencer`,
     etiquetas: g.vencidas.length ? `<span class="badge ${cobColorAtraso(g.atrasoMax)}">${g.vencidas.length} factura${g.vencidas.length === 1 ? '' : 's'} vencida${g.vencidas.length === 1 ? '' : 's'} · hasta ${g.atrasoMax} días</span>` : '',
     acciones: `<button class="page-btn page-btn-pri" onclick="cobEstadoCuentaExcel()">⬇ Estado de cuenta (Excel)</button>
-      <button class="page-btn" onclick="cobEscribirCorreo()">✉ Escribir correo</button>
+      <button class="page-btn" onclick="cobEscribirCorreo()"><i class="ti ti-mail" aria-hidden="true"></i> Escribir correo</button>
       <button class="page-btn" onclick="cobAnotarGestion()">＋ Anotar gestión</button>`,
     cuerpo: `${filas.length ? `<div class="panel-h">Facturas vencidas</div><table class="panel-tabla"><thead><tr><th>N°</th><th>Vencimiento</th><th>Atraso</th><th style="text-align:right">Monto</th></tr></thead><tbody>
         ${filas.map(x => `<tr><td><span class="panel-link mono" onclick="cobVerFactura('${String(x.f.factura).replace(/'/g, "\\'")}')">${escapeHtml(String(x.f.factura))}</span></td><td>${fDate(x.venc)}</td><td><span class="badge ${cobColorAtraso(x.atraso)}">${x.atraso} d</span></td><td style="text-align:right">${clp(x.monto)}</td></tr>`).join('')}
@@ -7367,12 +7254,16 @@ function cobEscribirCorreo() {
 async function cobAnotarGestion() {
   const g = window.__cobActual;
   if (!g) return;
-  const nota = prompt(`Gestión de cobro con ${g.nombre}\n(ej. "Llamé a Juan de finanzas, pagan el 15-11")`);
-  if (!nota || !nota.trim()) return;
-  const rec = prompt('¿Quieres que te lo recuerde? Escribe la fecha (dd-mm-aaaa) o deja vacío.') || '';
-  const m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(rec.trim());
-  const fila = { cliente: g.clave, hospital: g.nombre, nota: nota.trim(), fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
-    recordar_el: m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null, creado_por: sesionActual?.email || null };
+  // Una sola ventana con la nota y la fecha (calendario), en vez de dos
+  // preguntas del navegador con la fecha escrita a mano.
+  const datos = await formularioModal(`Gestión de cobro con ${g.nombre}`, [
+    { id: 'nota', label: 'Qué se hizo', tipo: 'textarea', obligatorio: true, ayuda: 'Ej.: Llamé a Juan de finanzas, pagan el 15-11' },
+    { id: 'recordar', label: 'Recordármelo el (opcional)', tipo: 'fecha' },
+  ], { textoOk: 'Anotar gestión' });
+  if (!datos || !datos.nota) return;
+  const fila = { cliente: g.clave, hospital: g.nombre, nota: datos.nota, fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
+    // El calendario ya entrega la fecha como aaaa-mm-dd (sin hora: no se corre de día).
+    recordar_el: /^\d{4}-\d{2}-\d{2}$/.test(datos.recordar) ? datos.recordar : null, creado_por: sesionActual?.email || null };
   try {
     const r = await sb('cobranza_gestiones', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(fila) });
     if (!r.ok) throw new Error('error ' + r.status);
@@ -7457,7 +7348,7 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
   window.__ultimaListaFacturasPago = lista; // para que el botón de descarga exporte justo lo que se ve
 
   if (!lista.length) {
-    return `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🧾</div><p>${mensajeVacio}</p></div></div>`;
+    return `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-receipt" aria-hidden="true"></i></div><p>${mensajeVacio}</p></div></div>`;
   }
 
   // Las anuladas/rechazadas se muestran aparte, destacadas — no mezcladas
@@ -7467,7 +7358,7 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
 
   let html = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFacturasPago()">⬇️ Descargar Excel (${lista.length})</button>
+      <button class="page-btn" style="padding:7px 14px;white-space:nowrap" onclick="descargarExcelFacturasPago()"><i class="ti ti-arrow-down" aria-hidden="true"></i> Descargar Excel (${lista.length})</button>
     </div>`;
 
   // Páginas de 15, como el listado de OC (las anuladas van aparte, abajo).
@@ -7481,13 +7372,13 @@ function construirTablaFacturasHtml(lista, mensajeVacio) {
   window.__pagosPaginas = pag;
   html += normales.length
     ? tablaFacturasHtml(pag.slice, { paginas: pag })
-    : `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Sin facturas normales — solo hay anuladas/rechazadas abajo.</p></div></div>`;
+    : `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-receipt" aria-hidden="true"></i></div><p>Sin facturas normales — solo hay anuladas/rechazadas abajo.</p></div></div>`;
 
   if (anuladas.length) {
     html += `
       <div class="cob-anuladas" style="margin-top:24px;border:1px solid var(--red);border-radius:var(--radius-lg);overflow:hidden">
         <div style="background:var(--red-light);padding:12px 20px;font-size:13px;font-weight:600;color:var(--red)">
-          🚫 Anuladas / Rechazadas (${anuladas.length})
+          <i class="ti ti-ban" aria-hidden="true"></i> Anuladas / Rechazadas (${anuladas.length})
         </div>
         <div style="padding:14px">
           ${tablaFacturasHtml(anuladas, { sinPago: true })}
@@ -7644,7 +7535,7 @@ ${doc && fechaDocumentoDesalineada(doc) ? `
       </div>
 
       <div class="modal-zona-cierre">
-        ${doc && doc.doc_url ? `<div style="margin-bottom:12px;text-align:right"><a href="${doc.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
+        ${doc && doc.doc_url ? `<div style="margin-bottom:12px;text-align:right"><a href="${doc.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block"><i class="ti ti-file-text" aria-hidden="true"></i> Ver documento</a></div>` : ''}
         <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Pago</div>
         <div style="display:flex;gap:10px">
           <div style="flex:1">
@@ -7678,7 +7569,7 @@ ${doc && fechaDocumentoDesalineada(doc) ? `
     cuerpoItems.innerHTML = `
       <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
-          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
+          <thead><tr><th style="font-size:11px">Producto</th><th style="font-size:11px;text-align:right">Cantidad</th><th style="font-size:11px;text-align:right">Precio unit.</th><th style="font-size:11px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
               <td data-label="Producto" style="font-weight:500">
@@ -7737,12 +7628,12 @@ async function guardarPagoFacturaDetalle(id, btnEl) {
 // trajo), así que "rapidez de pago" se mide como días entre fecha de
 // emisión y fecha de pago — es el dato más parecido que existe hoy.
 const GRAFICOS_PAGOS_DISPONIBLES = [
-  { id: 'antiguedad', icono: '⏳', titulo: 'Antigüedad de la deuda', sub: 'Cuánto está vencido y hace cuánto' },
-  { id: 'facturado-cobrado', icono: '📅', titulo: 'Facturado vs. cobrado', sub: 'Mes a mes: lo que se factura y lo que entra' },
-  { id: 'top-monto-pagado', icono: '💰', titulo: 'Hospitales que más han pagado', sub: 'Ranking por monto pagado' },
-  { id: 'top-monto-facturado', icono: '🧾', titulo: 'Hospitales que más facturan', sub: 'Ranking por monto facturado' },
-  { id: 'mas-rapidos', icono: '⚡', titulo: 'Los que pagan más puntual', sub: 'Comparado con su plazo de pago' },
-  { id: 'mas-lentos', icono: '🐢', titulo: 'Los que más se atrasan', sub: 'Comparado con su plazo de pago' },
+  { id: 'antiguedad', icono: '<i class="ti ti-hourglass" aria-hidden="true"></i>', titulo: 'Antigüedad de la deuda', sub: 'Cuánto está vencido y hace cuánto' },
+  { id: 'facturado-cobrado', icono: '<i class="ti ti-calendar" aria-hidden="true"></i>', titulo: 'Facturado vs. cobrado', sub: 'Mes a mes: lo que se factura y lo que entra' },
+  { id: 'top-monto-pagado', icono: '<i class="ti ti-coin" aria-hidden="true"></i>', titulo: 'Hospitales que más han pagado', sub: 'Ranking por monto pagado' },
+  { id: 'top-monto-facturado', icono: '<i class="ti ti-receipt" aria-hidden="true"></i>', titulo: 'Hospitales que más facturan', sub: 'Ranking por monto facturado' },
+  { id: 'mas-rapidos', icono: '<i class="ti ti-bolt" aria-hidden="true"></i>', titulo: 'Los que pagan más puntual', sub: 'Comparado con su plazo de pago' },
+  { id: 'mas-lentos', icono: '<i class="ti ti-clock-exclamation" aria-hidden="true"></i>', titulo: 'Los que más se atrasan', sub: 'Comparado con su plazo de pago' },
 ];
 
 let graficoPagoActivo = null;
@@ -8299,7 +8190,7 @@ function renderDocumentosGdexpress(soloTabla) {
   docF = lista;
 
   if (!lista.length) {
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">🔎</div><p>${buscando ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodoAlcance('doc', docPeriodo)}.`}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${buscando ? 'Sin resultados para tu búsqueda.' : `No encontramos documentos en ${nombrePeriodoAlcance('doc', docPeriodo)}.`}</p></div></div>`;
     return;
   }
 
@@ -8490,7 +8381,7 @@ ${fechaDocumentoDesalineada(d) ? `
           <div class="skeleton" style="height:38px;width:80%"></div>
         </div>
 
-        ${d.doc_url ? `<div style="margin-top:16px;text-align:right"><a href="${d.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block">📄 Ver documento</a></div>` : ''}
+        ${d.doc_url ? `<div style="margin-top:16px;text-align:right"><a href="${d.doc_url}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-block"><i class="ti ti-file-text" aria-hidden="true"></i> Ver documento</a></div>` : ''}
         </div>
       </div>
     </div>`;
@@ -8510,7 +8401,7 @@ ${fechaDocumentoDesalineada(d) ? `
     cuerpoItems.innerHTML = `
       <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table style="margin:0">
-          <thead><tr><th style="font-size:10px">Producto</th><th style="font-size:10px;text-align:right">Cantidad</th><th style="font-size:10px;text-align:right">Precio unit.</th><th style="font-size:10px;text-align:right">Total</th></tr></thead>
+          <thead><tr><th style="font-size:11px">Producto</th><th style="font-size:11px;text-align:right">Cantidad</th><th style="font-size:11px;text-align:right">Precio unit.</th><th style="font-size:11px;text-align:right">Total</th></tr></thead>
           <tbody>
             ${items.map(it => `<tr>
               <td data-label="Producto" style="font-weight:500">
@@ -9571,7 +9462,7 @@ function renderVacPersonal(cont) {
   cont.innerHTML = `
     <div class="toolbar">
       <div class="search-wrap">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="vac-buscar-personal" value="${escapeHtml(vacFiltros.q)}" placeholder="Buscar trabajador por nombre o RUT…" oninput="vacFiltros.q=this.value;renderVacPersonal(document.getElementById('vac-contenido'))">
       </div>
       <div class="scope-toggle" role="group" aria-label="Qué trabajadores mostrar">
@@ -9603,7 +9494,7 @@ function renderVacPersonal(cont) {
           </td>
           <td style="text-align:center">
             <div style="font-size:15px;font-weight:600;color:${s.disponibles > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? s.disponibles : '—'}</div>
-            ${detallePeriodos ? `<div style="font-size:10.5px;color:var(--text-3);margin-top:2px">${detallePeriodos}</div>` : ''}
+            ${detallePeriodos ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${detallePeriodos}</div>` : ''}
           </td>
           <td style="text-align:center;color:var(--text-2)">${s.periodos.length ? s.utilizados : '—'}</td>
           <td style="text-align:center;color:${s.pendientes ? 'var(--amber)' : 'var(--text-3)'}">${s.pendientes || '—'}</td>
@@ -9723,7 +9614,7 @@ function renderVacHistorial(cont) {
   cont.innerHTML = `
     <div class="toolbar" style="flex-wrap:wrap">
       <div class="search-wrap" style="min-width:200px">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="vac-f-busca" value="${escapeHtml(vacFiltros.q)}" placeholder="Buscar por nombre u observación…" oninput="filtrarHistorialVac()">
       </div>
       <select id="vac-f-trabajador" onchange="filtrarHistorialVac()" aria-label="Trabajador">
@@ -10828,10 +10719,10 @@ function fppBadgeEstado(f) {
 
 function fppMensajeVacio() {
   const nombrePeriodo = nombrePeriodoAlcance('fpp', fppPeriodo);
-  if (fppBusqueda) return { icono: '🔍', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
+  if (fppBusqueda) return { icono: '<i class="ti ti-search" aria-hidden="true"></i>', texto: `Sin resultados para "${fppBusqueda}" en ${nombrePeriodo}.`, accion: null };
   const nombres = { pending: 'pendientes', overdue: 'atrasadas', paid: 'pagadas' };
-  if (fppEstado === 'all') return { icono: '🧾', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
-  if (fppEstado === 'paid') return { icono: '⏳', texto: `Todavía no hay facturas pagadas en ${nombrePeriodo}.`, accion: 'Ver todas' };
+  if (fppEstado === 'all') return { icono: '<i class="ti ti-receipt" aria-hidden="true"></i>', texto: `No hay facturas en ${nombrePeriodo}.`, accion: null };
+  if (fppEstado === 'paid') return { icono: '<i class="ti ti-hourglass" aria-hidden="true"></i>', texto: `Todavía no hay facturas pagadas en ${nombrePeriodo}.`, accion: 'Ver todas' };
   return { icono: '✓', texto: `No hay facturas ${nombres[fppEstado]} en ${nombrePeriodo}.`, accion: 'Ver todas' };
 }
 
@@ -10877,7 +10768,7 @@ function fppRenderTabla(soloTabla) {
   let html = tabla(normales, true);
   if (anuladas.length) {
     html += `<div style="margin-top:16px">
-      <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">🚫 Anuladas (${anuladas.length}) — no se contabilizan en ningún total</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:6px"><i class="ti ti-ban" aria-hidden="true"></i> Anuladas (${anuladas.length}) — no se contabilizan en ningún total</div>
       ${tabla(anuladas, false)}
     </div>`;
   }
@@ -11481,7 +11372,7 @@ function renderRechazadas(soloTabla) {
     ? porResolver.slice().sort((a, b) => (b.fechaRechazo || '').localeCompare(a.fechaRechazo || '') || Number(b.raiz) - Number(a.raiz))
     : resueltas.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || Number(b.raiz) - Number(a.raiz));
   if (!visibles.length) {
-    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'por_resolver' ? 'No hay rechazos por resolver. 🎉' : `No hay casos en ${periodo}.`}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="fpp-empty"><div class="fpp-empty-icon">✓</div><p>${q ? 'Sin resultados para tu búsqueda.' : rechazadasEstadoActivo === 'por_resolver' ? 'No hay rechazos por resolver.' : `No hay casos en ${periodo}.`}</p></div></div>`;
     return;
   }
   // Cada fila se despliega hacia abajo (clic) y muestra la cadena del caso,
@@ -11843,7 +11734,7 @@ function oeAbrirFicha(id) {
             <div class="oe-bloque-tit"><span>1</span> Paciente</div>
             <div class="oe-grid2">
               <label>Nombre
-                <input type="text" id="oe-paciente-input" value="${esc(o?.pacientes?.nombre)}" placeholder="🔍 Escribe para buscar o crear…" autocomplete="off" oninput="oeBuscarPaciente()" onfocus="oeBuscarPaciente()">
+                <input type="text" id="oe-paciente-input" value="${esc(o?.pacientes?.nombre)}" placeholder="Escribe para buscar o crear…" autocomplete="off" oninput="oeBuscarPaciente()" onfocus="oeBuscarPaciente()">
                 <div id="oe-paciente-sugerencias" class="oe-sugerencias" style="display:none"></div>
               </label>
               <label>Teléfono
@@ -11893,7 +11784,7 @@ function oeAbrirFicha(id) {
       </div>
       <div class="oe-ficha-pie">
         ${o ? `<button class="page-btn oe-eliminar" onclick="eliminarOrdenOE(${o.id})">Eliminar orden</button>
-          <button class="page-btn" onclick="navPush(()=>abrirDetalleOE(${o.id}));abrirComprobanteOE(${o.id})">🧾 Comprobante de retiro</button>`
+          <button class="page-btn" onclick="navPush(()=>abrirDetalleOE(${o.id}));abrirComprobanteOE(${o.id})"><i class="ti ti-receipt" aria-hidden="true"></i> Comprobante de retiro</button>`
           : '<span class="oe-pie-nota">Queda en estado <b>Recibida</b>; se puede digitar después.</span>'}
         <span style="flex:1"></span>
         <button class="page-btn" onclick="oeCerrarFicha()">Cancelar</button>
@@ -11953,25 +11844,25 @@ function oeRecetaLadoHtml(o) {
     <input type="file" id="oe-receta-camara" accept="image/*" capture="environment" style="display:none" onchange="oeElegirArchivo(this.files[0])">`;
   if (url) {
     const visor = esPdf
-      ? `<div class="oe-receta-pdf"><div style="font-size:40px">📄</div><div>${escapeHtml(oeForm?.archivo?.name || o?.recetas?.archivo_nombre || 'Receta en PDF')}</div></div>`
+      ? `<div class="oe-receta-pdf"><div style="font-size:40px"><i class="ti ti-file-text" aria-hidden="true"></i></div><div>${escapeHtml(oeForm?.archivo?.name || o?.recetas?.archivo_nombre || 'Receta en PDF')}</div></div>`
       : `<img src="${url}" alt="Receta" id="oe-receta-img" style="transform:rotate(${oeForm?.giro || 0}deg)">`;
     return `${cab}<div class="oe-receta-visor" onclick="oeAmpliarReceta()">${visor}</div>
       <div class="oe-receta-btns">
-        <button type="button" class="page-btn" onclick="oeAmpliarReceta()">🔍 Ampliar</button>
+        <button type="button" class="page-btn" onclick="oeAmpliarReceta()"><i class="ti ti-zoom-in" aria-hidden="true"></i> Ampliar</button>
         ${esPdf ? '' : '<button type="button" class="page-btn" onclick="oeGirarReceta()">⟳ Girar</button>'}
         <button type="button" class="page-btn" onclick="document.getElementById('oe-receta-archivo').click()">↺ Cambiar foto</button>
       </div>${inputs}${oeRecetasAnterioresHtml()}`;
   }
   return `${cab}
     <div class="oe-drop" id="oe-dropzone" ondragover="event.preventDefault();this.classList.add('sobre')" ondragleave="this.classList.remove('sobre')" ondrop="oeSoltarArchivo(event)">
-      <div style="font-size:34px">🖼️</div>
+      <div style="font-size:34px"><i class="ti ti-photo" aria-hidden="true"></i></div>
       <b>Pega la foto de la receta</b>
       <span>Copia la imagen en WhatsApp Web o en el correo y aprieta <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
       <small>o arrástrala hasta aquí</small>
       <div class="oe-drop-o">o</div>
       <div class="oe-receta-btns" style="justify-content:center">
-        <button type="button" class="page-btn" onclick="document.getElementById('oe-receta-archivo').click()">📁 Elegir archivo</button>
-        <button type="button" class="page-btn" onclick="document.getElementById('oe-receta-camara').click()">📷 Usar cámara</button>
+        <button type="button" class="page-btn" onclick="document.getElementById('oe-receta-archivo').click()"><i class="ti ti-folder" aria-hidden="true"></i> Elegir archivo</button>
+        <button type="button" class="page-btn" onclick="document.getElementById('oe-receta-camara').click()"><i class="ti ti-camera" aria-hidden="true"></i> Usar cámara</button>
       </div>
     </div>${inputs}${oeRecetasAnterioresHtml()}`;
 }
@@ -12087,7 +11978,7 @@ function oeBuscarPaciente() {
   if (!q || (oeForm.pacienteId && elegido && elegido.nombre === input.value)) { cont.style.display = 'none'; return; }
   const lista = pacientes.filter(p => coincideBusqueda(p.nombre, q)).slice(0, 6);
   if (!lista.length) { cont.style.display = 'none'; return; }
-  cont.innerHTML = lista.map(p => `<div onclick="oeElegirPaciente(${p.id})"><b>${escapeHtml(p.nombre)}</b>${p.telefono ? `<small>📞 ${escapeHtml(p.telefono)}</small>` : ''}</div>`).join('');
+  cont.innerHTML = lista.map(p => `<div onclick="oeElegirPaciente(${p.id})"><b>${escapeHtml(p.nombre)}</b>${p.telefono ? `<small><i class="ti ti-phone" aria-hidden="true"></i> ${escapeHtml(p.telefono)}</small>` : ''}</div>`).join('');
   cont.style.display = 'block';
 }
 
@@ -12262,7 +12153,7 @@ async function oeGuardarFicha() {
   if (fechaReceta) {
     const venc = calcularVencimientoReceta(fechaReceta, oeForm.recetaId && !oeFechaRecetaCambio() ? oeForm.recetaVencimiento : null);
     if (venc < new Date() && (nueva || oeFechaRecetaCambio())
-      && !(await confirmModal(`⚠️ Esta receta venció el ${fDate(venc.toISOString())}. ¿Guardar la orden de todas formas?`, { textoOk: 'Guardar igual', peligro: false }))) return;
+      && !(await confirmModal(`<i class="ti ti-alert-triangle" aria-hidden="true"></i> Esta receta venció el ${fDate(venc.toISOString())}. ¿Guardar la orden de todas formas?`, { textoOk: 'Guardar igual', peligro: false }))) return;
   }
 
   const btn = document.getElementById('oe-guardar');
@@ -12429,7 +12320,7 @@ function ticketComprobanteOE(d) {
   <div class="tk" style="font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.4;color:#000;background:#fff;width:300px;max-width:100%;margin:0 auto;padding:16px;border:1px solid #ddd;box-sizing:border-box">
     <div style="text-align:center">
       <div style="font-size:15px;font-weight:700;letter-spacing:1px">FARMACIA BULFOR</div>
-      <div style="font-size:10px;letter-spacing:.5px">RECETARIO MAGISTRAL</div>
+      <div style="font-size:11px;letter-spacing:.5px">RECETARIO MAGISTRAL</div>
       <div style="font-size:12px;font-weight:700;margin-top:7px">COMPROBANTE DE RETIRO</div>
     </div>
     ${sep}
@@ -12438,10 +12329,10 @@ function ticketComprobanteOE(d) {
       ${fila('Emitido', escapeHtml(d.emitido))}
       ${fila('Paciente', escapeHtml(d.nombre))}
     </table>
-    <div style="margin-top:7px;font-size:10px;color:#555;letter-spacing:.5px">PREPARADO</div>
+    <div style="margin-top:7px;font-size:11px;color:#555;letter-spacing:.5px">PREPARADO</div>
     <div style="font-weight:700;word-break:break-word">${escapeHtml(d.preparado)}</div>
     ${sep}
-    <div style="text-align:center;font-size:10px;font-weight:700;letter-spacing:1.5px">RETIRO</div>
+    <div style="text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px">RETIRO</div>
     <table style="width:100%;border-collapse:collapse;margin-top:4px">
       ${fila('Fecha', d.fechaRetiro ? escapeHtml(fDate(d.fechaRetiro)) : 'Por confirmar')}
       ${fila('Hora', d.horaRetiro ? escapeHtml(d.horaRetiro) + ' hrs' : 'Por confirmar')}
@@ -12455,7 +12346,7 @@ function ticketComprobanteOE(d) {
       ${fila('Estado', d.estado)}
     </table>
     ${sep}
-    <div style="text-align:center;font-size:10px;line-height:1.6;color:#333">
+    <div style="text-align:center;font-size:11px;line-height:1.6;color:#333">
       Presente este comprobante al retirar.${d.abonado && d.saldo ? '<br>El saldo se paga al momento del retiro.' : ''}<br>
       Gracias por preferirnos.
     </div>
@@ -12787,7 +12678,7 @@ function abrirComprobanteOE(id) {
       <div class="modal-body">
         ${avisos.length ? `
         <div style="border:1px solid #F0C36D;background:#FEF6E4;border-radius:var(--radius);padding:11px 13px;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;margin-bottom:5px">⚠️ Revisa antes de enviarlo</div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:5px"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Revisa antes de enviarlo</div>
           <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6;color:var(--text-2)">
             ${avisos.map(a => `<li>${a}</li>`).join('')}
           </ul>
@@ -12813,8 +12704,8 @@ function abrirComprobanteOE(id) {
         </div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">
-          <button class="page-btn" style="padding:8px 14px" onclick="imprimirComprobanteOE(${d.id})">🖨 Imprimir</button>
-          <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})">📄 Descargar PDF</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="imprimirComprobanteOE(${d.id})"><i class="ti ti-printer" aria-hidden="true"></i> Imprimir</button>
+          <button class="page-btn" style="padding:8px 14px" onclick="descargarComprobanteOE(${d.id})"><i class="ti ti-file-text" aria-hidden="true"></i> Descargar PDF</button>
           ${compartir ? `<button class="page-btn" style="padding:8px 14px" onclick="compartirComprobanteOE(${d.id})">Compartir…</button>` : ''}
           ${waOk
             ? `<button class="page-btn" style="padding:8px 14px;background:#1FAE5B;color:#fff;border-color:#1FAE5B" onclick="abrirWhatsAppWebComprobanteOE(${d.id},'${d.wa}')"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i> WhatsApp Web</button>`
@@ -12851,7 +12742,7 @@ function verRecetaEnModal(url) {
       <div class="receta-visor-header" style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <span style="font-size:14px;font-weight:500">Vista de receta</span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button onclick="imprimirRecetaOE('${url}', ${esImagen})" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500">🖨 Imprimir</button>
+          <button onclick="imprimirRecetaOE('${url}', ${esImagen})" style="background:var(--accent);color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer;font-weight:500"><i class="ti ti-printer" aria-hidden="true"></i> Imprimir</button>
           <button onclick="descargarRecetaOE('${url}')" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;font-size:13px;cursor:pointer">⬇ Descargar</button>
           ${botonAtrasHtml()}
           <button onclick="document.getElementById('oe-receta-visor-overlay').remove()" class="modal-close" aria-label="Cerrar">✕</button>
@@ -13319,7 +13210,7 @@ function renderDetalleEnvio(f, modoEdicion) {
       <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap">
         <button class="page-btn" style="padding:7px 12px;color:var(--text-3);font-size:12px" onclick="eliminarEnvio(${f.id})" title="Elimina este envío permanentemente">Eliminar envío</button>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          ${f.orden_transporte ? `<a href="${urlRastreoFedex(f.orden_transporte)}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-color:#4d148c;color:#4d148c" title="Abre fedex.com con este número ya cargado en el rastreador">🚚 Rastrear en FedEx ↗</a>` : ''}
+          ${f.orden_transporte ? `<a href="${urlRastreoFedex(f.orden_transporte)}" target="_blank" rel="noopener" class="page-btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border-color:#4d148c;color:#4d148c" title="Abre fedex.com con este número ya cargado en el rastreador"><i class="ti ti-truck" aria-hidden="true"></i> Rastrear en FedEx ↗</a>` : ''}
           <button class="page-btn" style="padding:8px 16px" onclick="renderDetalleEnvio(fedex.find(x=>x.id===${f.id}), true)">✎ Editar manualmente</button>
           <button class="import-btn" style="margin-top:0;padding:8px 16px" onclick="cerrarDetalleEnvio()">Cerrar</button>
         </div>
@@ -13736,7 +13627,7 @@ function hospVistaHtml(ficha) {
   const productos = ficha.vista === 'productos';
   const q = ficha.consultas[ficha.vista];
   return `<label for="hosp-ficha-buscar" class="panel-h">${productos ? 'Buscar producto' : 'Buscar por número de orden'}</label>
-    <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true">🔍</span>
+    <div class="search-wrap hosp-buscar"><span class="search-icon" aria-hidden="true"><i class="ti ti-search"></i></span>
       <input id="hosp-ficha-buscar" type="text" value="${escapeHtml(q)}" oninput="hospBuscarEnFicha(this.value)">
     </div>
     <div id="hosp-ficha-resultados">${hospResultadosHtml(ficha)}</div>`;
@@ -13794,7 +13685,7 @@ function fichaHospitalProducto(i) {
     antetitulo: f.hospital,
     titulo: g.nombre,
     sub: `${filas.length} ${filas.length === 1 ? 'orden de compra' : 'órdenes de compra'}${g.variantes > 1 ? ' · con ' + g.variantes + ' nombres distintos' : ''}`,
-    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar N° de OC, fecha o precio…" oninput="hospFiltrarOC(this)"></div>
+    cuerpo: `<div class="search-wrap hosp-buscar"><span class="search-icon"><i class="ti ti-search"></i></span><input type="text" placeholder="Buscar N° de OC, fecha o precio…" oninput="hospFiltrarOC(this)"></div>
       <table class="hosp-oc-tabla"><thead><tr><th>N° OC</th><th>Fecha de emisión</th><th>Facturación</th><th style="text-align:right">Precio unitario (neto)</th></tr></thead><tbody>
       ${filas.map(r => { const precio = [...new Set(g.precios[r.codigooc] || [])].filter(Boolean).map(clp).join(' · ') || '—';
         return `<tr data-buscar="${escapeHtml(`${r.codigooc} ${fDate(r.fechaenvio || r.fechaoc)} ${precio} ${(g.precios[r.codigooc] || []).join(' ')} ${productosTextoPorOC[r.codigooc] || ''}`)}"><td><button class="oc-folio" onclick="panelAbrir(fichaOC(${panelEsc(JSON.stringify(r.codigooc))}), true)">${escapeHtml(r.codigooc)} ›</button></td>
@@ -14020,7 +13911,7 @@ function abrirEvolucionMensual() {
         const alturaPx = Math.max(4, Math.round((valor/max)*190));
         return `<div style="flex:0 0 auto;width:22px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${nombresMes[parseInt(mes)-1]} ${y}: ${clp(valor)}">
           <div style="width:16px;height:${alturaPx}px;background:var(--accent);border-radius:2px 2px 0 0"></div>
-          <div style="font-size:9px;color:var(--text-3);margin-top:4px;writing-mode:vertical-rl;text-orientation:mixed;height:34px">${nombresMes[parseInt(mes)-1]} ${y.slice(2)}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px;writing-mode:vertical-rl;text-orientation:mixed;height:34px">${nombresMes[parseInt(mes)-1]} ${y.slice(2)}</div>
         </div>`;
       }).join('')}
     </div>
@@ -14055,10 +13946,10 @@ function abrirComparadorPrecios() {
     <div class="table-card" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
       <table style="margin:0">
         <thead><tr>
-          <th style="font-size:10px">Producto</th>
-          <th style="font-size:10px;text-align:right">Precio mín.</th>
-          <th style="font-size:10px;text-align:right">Precio máx.</th>
-          <th style="font-size:10px;text-align:right">Diferencia</th>
+          <th style="font-size:11px">Producto</th>
+          <th style="font-size:11px;text-align:right">Precio mín.</th>
+          <th style="font-size:11px;text-align:right">Precio máx.</th>
+          <th style="font-size:11px;text-align:right">Diferencia</th>
         </tr></thead>
         <tbody>
           ${(window.__statsVariacionPrecio = lista).map((p, idx) => `<tr style="cursor:pointer" onclick="closeEstadistica();openProductDetail(window.__statsVariacionPrecio[${idx}].nombre)">
@@ -14503,7 +14394,7 @@ function abrirRevisionFamiliasCatastro(productoIds) {
       </div>
       <div style="padding:12px 24px">
         <div class="table-card"><table><thead><tr>
-          <th style="font-size:10px">Código</th><th style="font-size:10px">Producto</th><th style="font-size:10px">Familia</th>
+          <th style="font-size:11px">Código</th><th style="font-size:11px">Producto</th><th style="font-size:11px">Familia</th>
         </tr></thead><tbody>
           ${sinFamilia.map(p => `
             <tr>
@@ -14534,7 +14425,7 @@ function buscarProductoFarmacia(q) {
   if (resultados.length === 0) {
     cont.innerHTML = `
       <div class="table-card"><div class="empty">
-        <div class="empty-icon">🔎</div>
+        <div class="empty-icon"><i class="ti ti-search"></i></div>
         <p>No encontramos ningún producto con "${query}".</p>
         <button class="page-btn" style="margin-top:10px" onclick="mostrarFormularioProductoNuevo('${query.replace(/'/g,"\\'")}')">+ Crear producto nuevo</button>
       </div></div>`;
@@ -14781,7 +14672,7 @@ function renderStockActual() {
 
   const cont = document.getElementById('farmacia-stock-resultados');
   if (total === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>${farmaciaStockTab === 'neg' ? 'No hay productos con stock negativo. 🎉' : 'No hay productos que coincidan.'}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-package" aria-hidden="true"></i></div><p>${farmaciaStockTab === 'neg' ? 'No hay productos con stock negativo.' : 'No hay productos que coincidan.'}</p></div></div>`;
     return;
   }
   const notas = {
@@ -14854,7 +14745,7 @@ function buscarProductoMovFarmacia(q) {
   ).slice(0, 30);
 
   if (resultados.length === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🔎</div><p>No encontramos ningún producto con "${query}".</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-search"></i></div><p>No encontramos ningún producto con "${query}".</p></div></div>`;
     return;
   }
   cont.innerHTML = `<div class="table-card"><table><tbody>
@@ -15034,15 +14925,15 @@ function renderHistorialMovFarmacia() {
     cont.innerHTML = `<div class="table-card"><div class="empty"><p>Todavía no hay movimientos registrados.</p></div></div>`;
     return;
   }
-  const iconoTipo = { compra: '⬆️', venta: '⬇️', ajuste: '⚖️', catastro_inicial: '📋' };
+  const iconoTipo = { compra: '<i class="ti ti-arrow-up" aria-hidden="true"></i>', venta: '<i class="ti ti-arrow-down" aria-hidden="true"></i>', ajuste: '<i class="ti ti-scale" aria-hidden="true"></i>', catastro_inicial: '<i class="ti ti-clipboard-list" aria-hidden="true"></i>' };
   const nombreTipo = { compra: 'Compra', venta: 'Venta', ajuste: 'Ajuste', catastro_inicial: 'Catastro inicial' };
   const etiqueta = m => {
     const o = m.archivo_origen || '';
-    if (o === 'baja_vencimiento') return '🗑️ Baja por vencimiento';
-    if (/traspaso local salida/i.test(o)) return '↗️ Traspaso salida';
-    if (/traspaso local entrada/i.test(o)) return '↙️ Traspaso entrada';
-    if (/^ERP anulaci/i.test(o)) return '↩️ Anulación';
-    if (/^Carga inicial ESTIMADA/i.test(o)) return '🧮 Carga inicial estimada';
+    if (o === 'baja_vencimiento') return '<i class="ti ti-trash" aria-hidden="true"></i> Baja por vencimiento';
+    if (/traspaso local salida/i.test(o)) return '<i class="ti ti-arrow-up-right" aria-hidden="true"></i> Traspaso salida';
+    if (/traspaso local entrada/i.test(o)) return '<i class="ti ti-arrow-down-left" aria-hidden="true"></i> Traspaso entrada';
+    if (/^ERP anulaci/i.test(o)) return '<i class="ti ti-arrow-back-up" aria-hidden="true"></i> Anulación';
+    if (/^Carga inicial ESTIMADA/i.test(o)) return '<i class="ti ti-calculator" aria-hidden="true"></i> Carga inicial estimada';
     return `${iconoTipo[m.tipo] || ''} ${nombreTipo[m.tipo] || m.tipo}`;
   };
   const lotePorId = {};
@@ -15213,7 +15104,7 @@ function renderVencimientos() {
 
   const cont = document.getElementById('farmacia-venc-tabla');
   if (total === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaVencTab === 'Vencido' ? 'No hay lotes vencidos con stock. 🎉' : 'No hay lotes en esta categoría.'}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaVencTab === 'Vencido' ? 'No hay lotes vencidos con stock.' : 'No hay lotes en esta categoría.'}</p></div></div>`;
     return;
   }
 
@@ -15707,7 +15598,7 @@ function recBuscarRender(q) {
   renderPages('rec-pages', total, pages, recPage, 'goRec');
   const body = document.getElementById('rec-body');
   if (!slice.length) {
-    body.innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${q ? 'No encontré RM con esa búsqueda.' : 'No hay RM en este mes.'}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${q ? 'No encontré RM con esa búsqueda.' : 'No hay RM en este mes.'}</p></div></td></tr>`;
     return;
   }
   body.innerHTML = slice.map(r => `<tr class="oc-fila" onclick="recAbrirRm(${r.id_rp_detalle})">
@@ -15892,8 +15783,8 @@ async function recAbrirRm(idDetalle) {
           <td data-label="Lote · vence" style="white-space:nowrap">${l.sin_lote ? '<span style="color:var(--text-3)">sin lote</span>' : `<span class="mono" style="font-size:12px">${escapeHtml(l.lote || '—')}</span>`}
             <div style="font-size:11px;${l.lote_vencido ? 'color:var(--red);font-weight:700' : 'color:var(--text-3)'}">${l.vence ? 'vence ' + fDate(l.vence) : ''}${l.lote_vencido ? ' · VENCIDO' : ''}</div></td>
           <td data-label="Costo" style="text-align:right;white-space:nowrap">${l.costo_tipo === 'sin costo' ? '<span style="color:var(--text-3)">sin costo</span>' : recClp(l.costo)}
-            ${l.costo_tipo === 'estimado' ? '<div style="font-size:10px;color:var(--text-3)">estimado</div>' : ''}
-            ${l.precio_dudoso ? '<div style="font-size:10px;color:var(--amber);font-weight:600">⚠ revisar precio</div>' : ''}</td>
+            ${l.costo_tipo === 'estimado' ? '<div style="font-size:11px;color:var(--text-3)">estimado</div>' : ''}
+            ${l.precio_dudoso ? '<div style="font-size:11px;color:var(--amber);font-weight:600">⚠ revisar precio</div>' : ''}</td>
         </tr>`).join('')}
       </tbody>
       <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600">Costo materias primas (todo el preparado)</td><td style="text-align:right;font-weight:700;white-space:nowrap">${recClp(r.costo)}</td></tr></tfoot>
@@ -16085,7 +15976,7 @@ function recAlertasExportar() {
 async function recMarcarRevisado(i, marcar) {
   const g = recHistGrupos[i];
   if (!g) return;
-  if (marcar && !confirm(`¿Marcar como revisados los ${g.rms.length} RM de ${g.materia} (lote ${g.lote})? Pasarán a Revisados; esto no corrige Pharma_RM ni confirma resolución.`)) return;
+  if (marcar && !await confirmModal(`¿Marcar como revisados los ${g.rms.length} RM de ${g.materia} (lote ${g.lote})? Pasarán a Revisados; esto no corrige Pharma_RM ni confirma resolución.`, { textoOk: 'Marcar revisados', peligro: false })) return;
   try {
     let res;
     if (marcar) {
@@ -16165,7 +16056,7 @@ function recMatRender() {
   const cont = document.getElementById('rec-mat-tabla');
   const filas = recMatFilas();
   if (!filas.length) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📦</div><p>${(recMatData || []).length ? 'Nada que comprar con estos filtros.' : 'No hay consumo de materias primas en el período.'}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-package" aria-hidden="true"></i></div><p>${(recMatData || []).length ? 'Nada que comprar con estos filtros.' : 'No hay consumo de materias primas en el período.'}</p></div></div>`;
     recMatTotales();
     return;
   }
@@ -16187,7 +16078,7 @@ function recMatRender() {
         <td data-label="Saldo estimado" style="text-align:right">${recNum(m.saldo_estimado, 1)}</td>
         <td data-label="Alcanza" style="text-align:right;white-space:nowrap;${m.alcance_dias !== null && Number(m.alcance_dias) < 15 ? 'color:var(--red);font-weight:600' : ''}">${m.alcance_dias === null ? '—' : recNum(m.alcance_dias) + ' días'}</td>
         <td data-label="Comprar" style="text-align:right"><input type="number" min="0" step="any" value="${cant}" style="width:96px;text-align:right" onchange="recMatEditar(${m.id_producto}, this.value)"></td>
-        <td data-label="Precio unit." style="text-align:right;white-space:nowrap">${m.precio ? recNum(m.precio, 3) : '—'}${dud ? '<div style="font-size:10px;color:var(--amber);font-weight:600" title="Más de $40.000 por gramo: revisa la unidad en Pharma_RM">⚠ revisar</div>' : ''}</td>
+        <td data-label="Precio unit." style="text-align:right;white-space:nowrap">${m.precio ? recNum(m.precio, 3) : '—'}${dud ? '<div style="font-size:11px;color:var(--amber);font-weight:600" title="Más de $40.000 por gramo: revisa la unidad en Pharma_RM">⚠ revisar</div>' : ''}</td>
         <td data-label="Total" id="rec-mat-total-${m.id_producto}" style="text-align:right;white-space:nowrap;font-weight:600">${recClp(cant * Number(m.precio || 0))}</td>
         <td data-label="Última compra" style="font-size:12px;white-space:nowrap">${m.ultima_compra ? `${fDate(m.ultima_compra)} · ${recNum(m.ultima_compra_cant, 2)} ${escapeHtml(m.unidad || '')}<div style="color:var(--text-3)">${escapeHtml(m.proveedor || '')}</div>` : '<span style="color:var(--text-3)">sin compras registradas</span>'}</td>
       </tr>`; }).join('')}
@@ -16260,7 +16151,7 @@ function recVencRender() {
   ], recVencFiltro, 'recVencSetFiltro');
   const filas = grupos[recVencFiltro].filter(l => !q || recNorm(l.materia).includes(q) || recNorm(l.lote).includes(q));
   const cont = document.getElementById('rec-venc-tabla');
-  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">✅</div><p>No hay lotes en este grupo.</p></div></div>`; return; }
+  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-circle-check" aria-hidden="true"></i></div><p>No hay lotes en este grupo.</p></div></div>`; return; }
   cont.innerHTML = `
     <div class="rec-nota">Lotes comprados en los últimos 2 años o usados en el último año. Pharma_RM no lleva stock por lote, así que "en uso" significa que aparece en algún RM de los últimos 60 días.</div>
     <div class="table-card farm-grilla"><table><thead><tr>
@@ -16318,7 +16209,7 @@ function recCostosRenderOE() {
     </div>`;
   const cont = document.getElementById('rec-costos-cont');
   if (!filas.length) {
-    cont.innerHTML = resumen + `<div class="table-card"><div class="empty"><div class="empty-icon">🧾</div><p>Todavía no hay órdenes con N° RM en este período. Anótalo en cada orden (Órdenes de Elaboración → abrir orden → "N° RM") y aquí verás cuánto costó y cuánto se ganó.</p></div></div>`;
+    cont.innerHTML = resumen + `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-receipt" aria-hidden="true"></i></div><p>Todavía no hay órdenes con N° RM en este período. Anótalo en cada orden (Órdenes de Elaboración → abrir orden → "N° RM") y aquí verás cuánto costó y cuánto se ganó.</p></div></div>`;
     return;
   }
   cont.innerHTML = resumen + `
@@ -16373,7 +16264,7 @@ function recCostosRenderFormulas() {
     .filter(f => !forma || f.forma === forma)
     .filter(f => !q || recNorm(f.formula).includes(q) || recNorm(f.instituciones).includes(q));
   const cont = document.getElementById('rec-costos-cont');
-  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">🧪</div><p>No hay fórmulas con estos filtros.</p></div></div>`; return; }
+  if (!filas.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-flask" aria-hidden="true"></i></div><p>No hay fórmulas con estos filtros.</p></div></div>`; return; }
   cont.innerHTML = `
     <div class="rec-nota">Costo de materias primas con el <b>último precio de compra</b>, agrupado por fórmula (principios activos y concentración). "Por unidad" es por cápsula, gramo o ml según la forma. La columna de licitaciones muestra el precio promedio que pagan los hospitales por un producto con ese nombre (coincidencia aproximada: revísala).</div>
     <div style="font-size:12px;color:var(--text-3);padding:0 2px 8px">${filas.length} fórmulas${filas.length > 400 ? ' (mostrando 400)' : ''}.</div>
@@ -16731,7 +16622,7 @@ async function recPrepVerTodas(idx) {
       </div>
       <div class="modal-body">
         <div class="toolbar" style="margin-bottom:10px">
-          <div class="search-wrap"><span class="search-icon">🔍</span>
+          <div class="search-wrap"><span class="search-icon"><i class="ti ti-search"></i></span>
             <input type="text" id="rec-todas-q" placeholder="Buscar RM, paciente u hospital…" oninput="recTodas.q=this.value;recTodas.pag=1;recTodasRender()" autocomplete="off"></div>
           <select id="rec-todas-anio" onchange="recTodas.anio=this.value;recTodas.pag=1;recTodasRender()" class="rec-todas-sel"><option value="">Todos los años</option></select>
         </div>
@@ -17454,7 +17345,7 @@ function fichaMateriaRec(idProducto) {
       <div id="rec-cm-cc" class="rec-cm-cc-compacto">${recCmCompVsConsHtml(m)}</div>`}
       ${compras.length > 1 ? `<details class="fx-envio rec-cm-pleg" ontoggle="if(this.open&&!this.dataset.listo){this.dataset.listo='1';recCmActivarGrafico()}">
         <summary>
-          <span class="fx-envio-tit">📈 Historia de precios</span>
+          <span class="fx-envio-tit"><i class="ti ti-chart-line" aria-hidden="true"></i> Historia de precios</span>
           <span class="fx-envio-sub">${recCmResumenPrecio(compras.slice(0, 24))}</span>
           <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Ocultar</span> <span class="fx-envio-flecha">⌄</span></span>
         </summary>
@@ -17462,7 +17353,7 @@ function fichaMateriaRec(idProducto) {
       </details>` : ''}
       <details class="fx-envio rec-cm-pleg">
         <summary>
-          <span class="fx-envio-tit">🧾 Últimas compras</span>
+          <span class="fx-envio-tit"><i class="ti ti-receipt" aria-hidden="true"></i> Últimas compras</span>
           <span class="fx-envio-sub">${compras.length ? `${compras.length > 10 ? 'las 10 más recientes de ' : ''}${recNum(compras.length)} compra${compras.length === 1 ? '' : 's'}` : 'sin compras registradas'}</span>
           <span class="fx-envio-ver"><span class="fx-envio-abrir">Ver</span><span class="fx-envio-cerrar">Ocultar</span> <span class="fx-envio-flecha">⌄</span></span>
         </summary>
@@ -17795,7 +17686,7 @@ async function recProdCargar() {
 function recProdRender() {
   const datos = recProdData || [];
   const cont = document.getElementById('rec-prod-cont');
-  if (!datos.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon">📊</div><p>Sin datos de producción en el período.</p></div></div>`; return; }
+  if (!datos.length) { cont.innerHTML = `<div class="table-card"><div class="empty"><div class="empty-icon"><i class="ti ti-chart-bar" aria-hidden="true"></i></div><p>Sin datos de producción en el período.</p></div></div>`; return; }
   const meses = {}, formas = {};
   datos.forEach(r => {
     const m = meses[r.mes] || (meses[r.mes] = { rm: 0, env: 0, inst: 0, costo: 0 });
@@ -17858,7 +17749,7 @@ function recNormalizarRm(texto, fechaOrden) {
 function recSeccionOEHtml(o) {
   return `<details class="fx-envio oe-rm-barra" ontoggle="if(this.open&&!this.dataset.cargado){this.dataset.cargado='1';recPintarSeccionOE(${o.id}, false)}">
     <summary>
-      <span class="fx-envio-tit">🧪 Recetario (N° RM)</span>
+      <span class="fx-envio-tit"><i class="ti ti-flask" aria-hidden="true"></i> Recetario (N° RM)</span>
       <span class="fx-envio-sub">${o.numero_rm ? `RM <b class="mono" style="color:var(--text)">${escapeHtml(o.numero_rm)}</b>` : 'Sin N° RM anotado'}</span>
       <span class="fx-envio-ver"><span class="fx-envio-ver-txt">${o.numero_rm ? 'Ver' : 'Elegir RM'}</span> <span class="fx-envio-flecha">⌄</span></span>
     </summary>
@@ -18031,7 +17922,7 @@ function renderConciliacionERP() {
   filas = filas.slice(0, 400);
   const cont = document.getElementById('farmacia-conc-tabla');
   if (total === 0) {
-    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaConcTab === 'dif' ? 'Todo cuadra con el PC. 🎉' : 'No hay productos en esta categoría.'}</p></div></div>`;
+    cont.innerHTML = `<div class="table-card"><div class="empty"><p>${farmaciaConcTab === 'dif' ? 'Todo cuadra con el PC.' : 'No hay productos en esta categoría.'}</p></div></div>`;
     return;
   }
   const nota = farmaciaConcTab === 'neg'
@@ -18199,7 +18090,7 @@ function renderResultadoConciliacion(r) {
 
   if (r.ajustados.length) {
     html += `
-      <div class="page-header" style="margin-top:8px"><div class="page-title" style="font-size:16px">✅ Ajustados automáticamente (FEFO)</div></div>
+      <div class="page-header" style="margin-top:8px"><div class="page-title" style="font-size:16px"><i class="ti ti-circle-check" aria-hidden="true"></i> Ajustados automáticamente (FEFO)</div></div>
       <div class="table-card"><table><thead><tr>
         <th>Código</th><th>Producto</th><th style="text-align:right">Antes</th><th style="text-align:right">Maestro PC</th><th style="text-align:right">Se quitó</th><th>Lotes afectados (del más próximo a vencer)</th>
       </tr></thead><tbody>
@@ -18238,11 +18129,11 @@ function renderResultadoConciliacion(r) {
 
   if (r.noEncontrados.length) {
     html += `
-      <div class="page-header" style="margin-top:22px"><div class="page-title" style="font-size:16px">❓ Códigos del maestro que no existen en Bulfor</div></div>
+      <div class="page-header" style="margin-top:22px"><div class="page-title" style="font-size:16px"><i class="ti ti-help-circle" aria-hidden="true"></i> Códigos del maestro que no existen en Bulfor</div></div>
       <div class="table-card"><div style="padding:14px;font-size:13px;color:var(--text-2)">${r.noEncontrados.map(f => `${f.codigo} (${f.pcTotal})`).join(', ')}</div></div>`;
   }
 
-  if (!html) html = `<div class="table-card"><div class="empty"><p>Todo coincide — no hubo que ajustar nada. 🎉</p></div></div>`;
+  if (!html) html = `<div class="table-card"><div class="empty"><p>Todo coincide — no hubo que ajustar nada.</p></div></div>`;
   cont.innerHTML = html;
 }
 
@@ -18490,6 +18381,147 @@ const SUBMENUS = {
   ] },
 };
 
+// ─── Navegación generada desde una sola lista ───────────────────────────────
+// Antes cada menú estaba escrito a mano 4 veces (menú lateral, barra de
+// módulos de escritorio, barra del celular y accesos de Inicio) y había que
+// agregar cada módulo nuevo en todos lados. Ahora todo sale de NAV_MODULOS
+// (módulos, íconos, secciones y avisos) + SUBMENUS (páginas de cada módulo).
+// El HTML que se genera es el mismo de antes (mismas clases e ids), así que
+// el resto del código (permisos, avisos, showPage…) sigue funcionando igual.
+// Para agregar un módulo: una línea aquí y su entrada en SUBMENUS.
+const NAV_MODULOS = [
+  { seccion: 'Compras y ventas' },
+  { id: 'oc-modulo',   label: 'Órdenes de compra',       corto: 'OC',        icon: 'ti-shopping-cart' },
+  { id: 'precios',     label: 'Precios',                                    icon: 'ti-tag' },
+  { id: 'facturas',    label: 'Facturas Bulfor',         corto: 'Facturas',  icon: 'ti-file-invoice',
+    avisos: [{ id: 'badge-rechazadas' }] },
+  { id: 'proveedores', label: 'Facturas de proveedores', corto: 'Proveed.',  icon: 'ti-receipt' },
+  { seccion: 'Seguimiento de envíos' },
+  { id: 'fedex',       label: 'FedEx',                                      icon: 'ti-truck' },
+  { id: 'chilexpress', label: 'Chilexpress',                                icon: 'ti-package' },
+  { seccion: 'Operaciones' },
+  { id: 'elaboracion', label: 'Elaboración',                                icon: 'ti-flask',
+    avisos: [{ id: 'badge-oe-digitar' }, { id: 'badge-sw-nuevas', azul: true, title: 'Solicitudes web nuevas', sinCelular: true }] },
+  { id: 'recetario-modulo', label: 'Recetario',                             icon: 'ti-prescription',
+    avisos: [{ id: 'badge-rec-alertas', title: 'RM con lote vencido en los últimos 7 días' }] },
+  { id: 'farmacia-modulo', label: 'Control farmacia',    corto: 'Farmacia',  icon: 'ti-first-aid-kit' },
+  { seccion: 'Personas' },
+  { id: 'rrhh',        label: 'Recursos humanos',        corto: 'RRHH',      icon: 'ti-users' },
+  { seccion: 'Administración' },
+  { id: 'admin',       label: 'Usuarios y permisos',     corto: 'Usuarios',  icon: 'ti-users-group', sinInicio: true },
+];
+// Módulos que van fijos en la barra del celular; el resto queda en "Más".
+const NAV_CELULAR_FIJOS = ['oc-modulo', 'facturas', 'elaboracion'];
+// Páginas del menú que no están en SUBMENUS pero se abren por enlace (botón flotante de Borradores).
+const NAV_SUBITEMS_EXTRA = { facturas: [{ page: 'doc-borradores', label: 'Borradores', oculto: true }] };
+// Aviso propio de una página dentro del menú lateral.
+const NAV_AVISO_PAGINA = { 'facturas-rechazadas': 'badge-rechazadas-subitem' };
+
+// Atributos para que un elemento clicable también se use con el teclado
+// (Tab para llegar, Enter o Espacio para abrir; ver activarTecladoClicables).
+const A11Y_BOTON = 'role="button" tabindex="0"';
+
+function pintarNavegacion() {
+  const modulos = NAV_MODULOS.filter(m => m.id);
+  const aviso = (a, sufijo, clase) => `<span id="${a.id}${sufijo}" class="${clase}${a.azul ? ' azul' : ''}"${a.title ? ` title="${a.title}"` : ''} style="display:none"></span>`;
+
+  // 1) Menú lateral (pantallas medianas y respaldo para las búsquedas internas).
+  let lat = `<div class="nav-item nav-item-inicio active" id="nav-item-inicio" ${A11Y_BOTON} onclick="irAInicio()" title="Inicio">
+      <span class="nav-icon"><i class="ti ti-home" aria-hidden="true"></i></span><span>Inicio</span></div>`;
+  NAV_MODULOS.forEach(m => {
+    if (m.seccion) { lat += `<div class="nav-section-label">${m.seccion}</div>`; return; }
+    const items = (SUBMENUS[m.id]?.items || []).concat(NAV_SUBITEMS_EXTRA[m.id] || []);
+    const multi = (SUBMENUS[m.id]?.items || []).length > 1;
+    const avisos = (m.avisos || []).map(a => aviso(a, '', 'nav-badge')).join('');
+    lat += `<div class="nav-group" data-modulo="${m.id}">
+      <div class="nav-item nav-item-modulo" ${A11Y_BOTON} onclick="mostrarModulo('${m.id}'${multi ? ', true' : ''})" title="${m.label}"${multi ? ' aria-haspopup="true"' : ''}>
+        <span class="nav-icon"><i class="ti ${m.icon}" aria-hidden="true"></i></span>
+        <span class="nav-label">${m.label}</span>${avisos}${multi ? '<i class="ti ti-chevron-down nav-chevron" aria-hidden="true"></i>' : ''}
+      </div>
+      <div class="nav-subgroup${multi ? '' : ' nav-subgroup-unico'}" id="subgroup-${m.id}">${items.map(it => {
+        const idAviso = NAV_AVISO_PAGINA[it.page];
+        return `<div class="nav-item nav-subitem" ${A11Y_BOTON} data-page="${it.page}" onclick="seleccionarSubpagina('${m.id}','${it.page}',this)"${it.oculto ? ' style="display:none"' : ''}>`
+          + (idAviso ? `<span class="nav-label">${it.label}</span>${aviso({ id: idAviso }, '', 'nav-badge')}` : `<span>${it.label}</span>`) + `</div>`;
+      }).join('')}</div>
+    </div>`;
+  });
+  const lateral = document.getElementById('nav-modulos');
+  if (lateral) lateral.innerHTML = lat;
+
+  // 2) Barra de módulos de escritorio (la columna oscura).
+  let barra = `<div class="modulo-tab active" data-modulo="inicio" ${A11Y_BOTON} onclick="irAInicio()"><i class="ti ti-home" aria-hidden="true"></i><span>Inicio</span></div>`;
+  NAV_MODULOS.forEach(m => {
+    if (m.seccion) { barra += `<div class="modulos-grupo">${m.seccion}</div>`; return; }
+    barra += `<div class="modulo-tab" data-modulo="${m.id}" ${A11Y_BOTON} onclick="mostrarModulo('${m.id}')"><i class="ti ${m.icon}" aria-hidden="true"></i><span>${m.label}</span>`
+      + (m.avisos || []).map(a => aviso(a, '-tab', 'tab-badge' + (a.azul ? ' tab-badge-azul' : ''))).join('') + `</div>`;
+  });
+  const barraEl = document.getElementById('modulos-bar');
+  if (barraEl) {
+    barraEl.querySelectorAll('.modulo-tab, .modulos-grupo').forEach(n => n.remove());
+    barraEl.insertAdjacentHTML('beforeend', barra);
+  }
+
+  // 3) Barra del celular: Inicio + los módulos fijos + "Más" (hoja con todos los demás).
+  // Antes eran 12 botones en una fila que había que deslizar sin ninguna pista.
+  const tab = (m, largo) => `<div class="tab-item" data-modulo="${m.id}" ${A11Y_BOTON} onclick="mostrarModulo('${m.id}');cerrarHojaMas()">
+      <i class="ti ${m.icon}" aria-hidden="true"></i><span>${largo ? m.label : (m.corto || m.label)}</span>`
+    + (m.avisos || []).filter(a => !a.sinCelular).map(a => aviso(a, '-mobile', 'tab-badge-m')).join('') + `</div>`;
+  let cel = `<div class="tab-item active" data-modulo="inicio" ${A11Y_BOTON} onclick="irAInicio();cerrarHojaMas()"><i class="ti ti-home" aria-hidden="true"></i><span>Inicio</span></div>`;
+  NAV_CELULAR_FIJOS.forEach(id => { const m = modulos.find(x => x.id === id); if (m) cel += tab(m); });
+  cel += `<div class="tab-item tab-mas" ${A11Y_BOTON} aria-haspopup="true" aria-expanded="false" onclick="alternarHojaMas()"><i class="ti ti-menu-2" aria-hidden="true"></i><span>Más</span></div>`;
+  let hoja = '';
+  NAV_MODULOS.forEach(m => {
+    if (m.seccion) { hoja += `<div class="tab-hoja-grupo">${m.seccion}</div>`; return; }
+    if (!NAV_CELULAR_FIJOS.includes(m.id)) hoja += tab(m, true);   // en la hoja cabe el nombre completo
+  });
+  cel += `<div class="tab-hoja" id="tab-hoja-mas" role="menu" aria-label="Más módulos">${hoja}</div>`;
+  const celEl = document.getElementById('bottom-tabbar');
+  if (celEl) celEl.innerHTML = cel;
+
+  // 4) Accesos de Inicio: todos los módulos (antes faltaban Precios, Proveedores, Chilexpress y Recetario).
+  let ini = '', abierta = false;
+  NAV_MODULOS.forEach(m => {
+    if (m.seccion) {
+      if (abierta) ini += '</div></div>';
+      ini += `<div class="inicio-seccion"><div class="inicio-seccion-titulo">${m.seccion}</div><div class="inicio-accesos">`;
+      abierta = true; return;
+    }
+    if (m.sinInicio) return;
+    ini += `<div class="inicio-acceso" ${A11Y_BOTON} onclick="mostrarModulo('${m.id}')"><span class="nav-icon"><i class="ti ${m.icon}" aria-hidden="true"></i></span><span>${m.label}</span></div>`;
+  });
+  if (abierta) ini += '</div></div>';
+  const iniEl = document.getElementById('inicio-accesos-modulos');
+  if (iniEl) {
+    iniEl.innerHTML = ini;
+    // Una sección que quedó sin accesos (Administración) no se muestra.
+    iniEl.querySelectorAll('.inicio-seccion').forEach(s => { if (!s.querySelector('.inicio-acceso')) s.remove(); });
+  }
+}
+
+// Hoja "Más" de la barra del celular.
+function alternarHojaMas(forzar) {
+  const tb = document.getElementById('bottom-tabbar');
+  if (!tb) return;
+  const abrir = forzar !== undefined ? forzar : !tb.classList.contains('hoja-abierta');
+  // Títulos de grupo sin ningún módulo visible para esta cuenta no se muestran.
+  if (abrir) tb.querySelectorAll('.tab-hoja-grupo').forEach(t => {
+    let sig = t.nextElementSibling, alguno = false;
+    while (sig && !sig.classList.contains('tab-hoja-grupo')) { if (!sig.classList.contains('sin-permiso')) { alguno = true; break; } sig = sig.nextElementSibling; }
+    t.style.display = alguno ? '' : 'none';
+  });
+  tb.classList.toggle('hoja-abierta', abrir);
+  tb.querySelector('.tab-mas')?.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+function cerrarHojaMas() { alternarHojaMas(false); }
+document.addEventListener('click', e => {
+  const tb = document.getElementById('bottom-tabbar');
+  if (tb && tb.classList.contains('hoja-abierta') && !tb.contains(e.target)) cerrarHojaMas();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarHojaMas(); });
+
+pintarNavegacion();
+
+
 // Módulo (menú) al que pertenece una página, según el menú lateral. Las
 // páginas con dos vistas (Precios: por producto / por cliente) cuentan las dos.
 function moduloDePagina(pagina) {
@@ -18555,6 +18587,9 @@ function mostrarModulo(modulo, soloExpandir) {
 
   document.querySelectorAll('.nav-group.abierto').forEach(g => { if (g !== grupo) g.classList.remove('abierto'); });
 
+  // En pantallas medianas el menú lateral es solo de íconos y no puede
+  // desplegar las páginas: se entra directo y salen como pestañas arriba.
+  if (soloExpandir && window.matchMedia('(min-width: 641px) and (max-width: 900px)').matches) soloExpandir = false;
   if (esMultiItem && grupo && soloExpandir) {
     grupo.classList.toggle('abierto');
     return;
@@ -18627,7 +18662,7 @@ function renderNavSubmenuMobile(modulo, pagina) {
     const aviso = it.page === 'facturas-rechazadas'
       ? '<span class="badge-rechazadas-sub" style="display:none;margin-left:auto;flex-shrink:0;background:var(--red);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px"></span>'
       : '';
-    html += `<div class="nav-item${activo ? ' active' : ''}" data-page="${it.page}" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
+    html += `<div class="nav-item${activo ? ' active' : ''}" data-page="${it.page}" role="button" tabindex="0" onclick="seleccionarSubpagina('${modulo}','${it.page}',this)">
       <span class="nav-icon">${it.icon}</span><span>${it.label}</span>${aviso}
     </div>`;
   });
@@ -19187,12 +19222,41 @@ async function instalarApp() {
   });
   nav.addEventListener('mouseenter', function () { clearTimeout(timer); });
   nav.addEventListener('mouseleave', function () { if (escritorio.matches) programarOcultar(); });
-  // Clic en un módulo con submenú: no navega ni cambia nada.
+  // Clic en un módulo con submenú: no navega, solo muestra el submenú (sirve
+  // también en pantallas táctiles). Si se abrió con el teclado (Enter), el
+  // foco pasa a la primera página del submenú para seguir con Tab o flechas.
   document.addEventListener('click', function (e) {
     if (!escritorio.matches || !e.target.closest) return;
     const tab = e.target.closest('.modulo-tab');
-    if (tab && conSubmenu(tab.dataset.modulo)) { e.stopPropagation(); e.preventDefault(); }
+    if (tab && conSubmenu(tab.dataset.modulo)) {
+      e.stopPropagation(); e.preventDefault();
+      mostrar(tab);
+      if (e.detail === 0) nav.querySelector('.nav-item')?.focus();
+    }
   }, true);
+  // Teclado dentro del submenú: flechas para moverse, Esc vuelve al módulo.
+  let tabOrigen = null;
+  document.addEventListener('focusin', function (e) {
+    const tab = e.target.closest && e.target.closest('.modulo-tab');
+    if (tab) tabOrigen = tab;
+  });
+  nav.addEventListener('keydown', function (e) {
+    if (!escritorio.matches) return;
+    const items = [...nav.querySelectorAll('.nav-item')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const sig = items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
+      if (sig) sig.focus();
+    } else if (e.key === 'Escape') {
+      ocultar();
+      if (tabOrigen) tabOrigen.focus();
+    }
+  });
+  // Si el foco sale del submenú y de los módulos (Tab hacia la página), se oculta.
+  nav.addEventListener('focusout', function (e) {
+    if (escritorio.matches && !nav.contains(e.relatedTarget) && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.modulo-tab'))) programarOcultar();
+  });
   // Al elegir una página, el submenú se cierra.
   document.addEventListener('click', function (e) {
     if (escritorio.matches && e.target.closest && e.target.closest('#nav-submenu .nav-item')) ocultar();

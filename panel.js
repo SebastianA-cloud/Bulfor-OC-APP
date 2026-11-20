@@ -144,7 +144,20 @@ function panelCerrar() {
   document.getElementById('panel-fondo')?.remove();
   document.body.classList.remove('con-panel');
   if (primera && primera.alCerrar) primera.alCerrar();
+  // El foco vuelve a la fila o botón desde donde se abrió la ficha.
+  const origen = panelFocoOrigen;
+  panelFocoOrigen = null;
+  if (origen && document.contains(origen)) origen.focus({ preventScroll: true });
+  else if (origen && origen.getAttribute && origen.getAttribute('onclick')) {
+    // Si la lista se volvió a dibujar, se busca la misma fila (mismo onclick).
+    const clave = origen.getAttribute('onclick');
+    const igual = [...document.querySelectorAll('[onclick]')].find(x => x.getAttribute('onclick') === clave);
+    if (igual) { if (!igual.hasAttribute('tabindex')) igual.setAttribute('tabindex', '0'); igual.focus({ preventScroll: true }); }
+  }
 }
+
+// Elemento que tenía el foco al abrir la ficha (para devolverlo al cerrar).
+let panelFocoOrigen = null;
 
 function panelPintar() {
   const f = panelPila[panelPila.length - 1];
@@ -188,7 +201,12 @@ function panelPintar() {
     el = document.createElement('aside');
     el.id = 'panel-lateral';
     el.className = 'panel-lateral';
-    el.setAttribute('aria-label', 'Detalle');
+    // Se anuncia como ventana: el lector de pantalla sabe que lo de atrás no cuenta.
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'panel-titulo');
+    el.tabIndex = -1;
+    panelFocoOrigen = document.activeElement;
     document.body.appendChild(el);
   }
   // Fichas con poca información (envíos) van en una ventana más angosta.
@@ -198,7 +216,7 @@ function panelPintar() {
       <button class="panel-btn-ico" title="Cerrar (Esc)" onclick="panelCerrar()"><i class="ti ti-x"></i></button></span></div>
     <div class="panel-cuerpo">
       ${f.antetitulo ? `<div class="panel-antetit">${panelEsc(f.antetitulo)}</div>` : ''}
-      <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}${f.tituloMono ? ' panel-tit-mono' : ''}"><span>${panelEsc(f.titulo)}</span>${f.tituloCopiar
+      <div class="panel-tit${f.antetitulo ? ' panel-tit-destacado' : ''}${f.tituloMono ? ' panel-tit-mono' : ''}"><span id="panel-titulo">${panelEsc(f.titulo)}</span>${f.tituloCopiar
         ? `<button class="panel-copiar-mini" title="Copiar" onclick="copiarTexto(${panelEsc(JSON.stringify(String(f.titulo)))}, this)"><i class="ti ti-copy"></i></button>` : ''}${f.tituloExtra || ''}</div>
       ${f.sub ? `<div class="panel-sub">${panelEsc(f.sub)}</div>` : ''}
       ${ids ? `<div class="panel-ids">${ids}</div>` : ''}
@@ -212,11 +230,24 @@ function panelPintar() {
     </div>`;
   el.querySelector('.panel-cuerpo').scrollTop = 0;
   document.body.classList.add('con-panel');
+  // El foco entra a la ficha (si no estaba ya adentro), para seguir con Tab desde ahí.
+  if (!el.contains(document.activeElement)) el.focus({ preventScroll: true });
 }
 
 // Teclado: Esc cierra, ↑ ↓ pasan a la anterior/siguiente (si no se está escribiendo).
 document.addEventListener('keydown', ev => {
   if (!document.getElementById('panel-lateral')) return;
+  // Tab no sale de la ficha: al llegar al final vuelve al primer botón (y al revés).
+  if (ev.key === 'Tab' && !document.querySelector('.modal-overlay')) {
+    const el = document.getElementById('panel-lateral');
+    const enfocables = [...el.querySelectorAll('button:not([disabled]), a[href], input, select, textarea, [tabindex="0"]')]
+      .filter(x => x.offsetParent !== null);
+    if (!enfocables.length) return;
+    const primero = enfocables[0], ultimo = enfocables[enfocables.length - 1];
+    if (ev.shiftKey && (document.activeElement === primero || document.activeElement === el)) { ev.preventDefault(); ultimo.focus(); }
+    else if (!ev.shiftKey && (document.activeElement === ultimo || !el.contains(document.activeElement))) { ev.preventDefault(); primero.focus(); }
+    return;
+  }
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName) || ev.target.isContentEditable) return;
   if (document.querySelector('.modal-overlay')) return;   // un modal encima manda
   if (ev.key === 'Escape') { ev.preventDefault(); panelCerrar(); }
