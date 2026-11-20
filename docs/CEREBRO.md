@@ -8,7 +8,7 @@
 >
 > **Mantenlo al día:** cada vez que termines un cambio, agrega una línea en la
 > "Bitácora" (sección 9) y actualiza "Pendientes" (sección 10) y lo que haya
-> cambiado de las demás secciones. Última actualización: 29-10-2026.
+> cambiado de las demás secciones. Última actualización: 20-11-2026.
 
 ---
 
@@ -80,7 +80,7 @@ El código está dividido con comentarios `// ─── TÍTULO ───`. Busc
 | Recetario | `rec-buscar` (vistas "Por RM" y "Por preparado"), `rec-compras`, `rec-alertas`, `rec-costos`, `rec-produccion` | `RECETARIO MAGISTRAL`, `BUSCAR RM`, `Nombrar un preparado`, `Preparados (vista "Por preparado"`, `DETALLE DE UN RM`, `ALERTAS DE LOTES`, `COSTOS Y MÁRGENES`, `Compras de materias` |
 | Control farmacia | `farmacia-compras`, `farmacia-stock`, `farmacia-movimientos`, `farmacia-vencimientos`, `farmacia-catastro` | `CONTROL FARMACIA`, `FARMACIA: …` |
 | RR.HH. | `rrhh-personal`, `rrhh-vacaciones` | `Pestaña Resumen`, `El cálculo del saldo`, `vac_*` |
-| Navegación | — | `SUBMENUS` (objeto de menús), `seleccionarSubpagina`, `irAModuloPagina`, `showPage` |
+| Navegación | — | `NAV_MODULOS` (módulos, íconos, secciones, avisos) + `SUBMENUS` (páginas) → `pintarNavegacion()` genera menú lateral, barra de módulos, barra del celular (con hoja "Más") y accesos de Inicio; `seleccionarSubpagina`, `irAModuloPagina`, `showPage` |
 
 Notas de navegación: los menús se definen en `SUBMENUS`; `showPage(id)` activa
 `#page-<id>` y llama al `…Init()` del módulo (ver el bloque de `if (id === …)` cerca
@@ -109,6 +109,8 @@ del final). `showPage('rec-preparados')` redirige a Buscar RM, vista "Por prepar
 - Fichas existentes: `fichaDocumento(id, lista, {cobranza})`, `fichaOC(codigo)`, `fichaEnvioFedex`, `fichaEnvioChilexpress`, `fichaFacturaProveedor`, fichas de Precios y de proveedores.
 - Modales antiguos (`modal-overlay` + `modal-shell`): `cerrarTodosLosModales()`, `navPush(()=>volver)` + `botonAtrasHtml()` para "Volver".
 - Clases de ficha: `doc-arriba`, `doc-caja`, `oc-info`, `oc-fact`, `panel-tabla-cuadros`, `doc-totales`, barra plegable `fx-envio` (`<details>`; "Ver productos"), `btn-mp` (botón píldora), `btn-mp-gris`, `btn-mp-cx`.
+
+**Ventanas y teclado** (desde la auditoría UI/UX, nov-2026): no usar `confirm()`/`prompt()` del navegador: `await confirmModal(msg, {textoOk, peligro})`, `await promptModal(msg, valor)`, `await formularioModal(titulo, campos)` (texto/área/fecha). `modalAccesible(modal, alCancelar, enfocar)` deja una ventana con role=dialog, Esc y Tab encerrado. Cualquier `<div>/<span>/<tr>` con `onclick` recibe solo `tabindex`/`role` y Enter/Espacio (`activarTecladoClicables`, automático). Íconos: solo Tabler (`<i class="ti ti-…">`), sin emojis. Letra mínima 11 px; gris de ayudas `--text-3` = #726F68 (contraste 4,6:1).
 
 **Otros**: `toast(msg, 'err')`, `copiarTexto(v, boton)`, SheetJS (`XLSX`) cargado para Excel, `botonMP(url, texto)` (Mercado Público).
 
@@ -171,6 +173,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
+- 20-11-2026 · Claude · **Propuesto en rama `claude/pensive-carson-ji91pc` (PR pendiente de aprobación de Seba; Seba pidió que Claude hiciera todo, aunque la interfaz normalmente es de Codex):** auditoría UI/UX y sus arreglos. (1) Teclado: todo lo clicable se alcanza con Tab y se abre con Enter/Espacio; submenú de escritorio se abre con Enter y se recorre con flechas, Esc vuelve. (2) Menús generados desde `NAV_MODULOS` + `SUBMENUS` (antes escritos 4 veces); Inicio muestra todos los módulos; enlaces `#fedex`/`#chilexpress`/`#precios` ahora abren su página. (3) Celular: barra con Inicio, OC, Facturas, Elaboración y "Más" (hoja con el resto; punto rojo si hay avisos dentro). (4) Contraste del gris de ayudas 2,6→4,6:1. (5) Letra mínima 11 px (antes 9–10,5). (6) Pestañas de estado pasan a segunda línea en celular; textos de ejemplo terminan en "…". (7) Sin `confirm()`/`prompt()` del navegador (18 en documentos.js, 1 en Recetario, 2 en Usuarios, 2 en Cobranza → ventana con nota y calendario). (8) Fichas y ventanas con role=dialog, foco adentro, Tab encerrado, foco vuelve a la fila. (9) Emojis → íconos Tabler (≈85 líneas). (10) Estilos repetidos de avisos y botones de la barra superior pasados a clases (`.nav-badge`, `.tab-badge-m`, `.sb-btn`); el resto de estilos en línea queda para limpiezas futuras. (11) Título de pestaña "Farmacia Bulfor". (12) "Actualizar" avisa si hay una ventana con datos sin guardar. (13) Ejemplo del RUT corto. (14) Etiquetas duplicadas del `<head>`. Extras encontrados al probar: en pantallas de 641–900 px los módulos con varias páginas no se podían abrir (ahora pestañas arriba); punto rojo vacío junto a "Facturas rechazadas" en las pestañas de celular; reloj partido en 3 líneas. Probado con Playwright y datos simulados (sin escribir en Supabase) a 1280, 800 y 390 px, con perfil admin y con perfil limitado.
 - 13-11-2026 · Claude · **Datos (Supabase, pedido por Seba):** Guías por facturar › La Florida, Mayo: la guía 5392 ($5.672.016) ya no queda "Sin COT". Se registró la COT 812030-1007-COT26 (`guias_cot` id 10, Mayo 2) con esa guía; su OC 812030-1038-AG26 (mismo monto, ya sincronizada desde Mercado Público, "generada por invitación a compra ágil: 812030-1007-COT26") se enlaza sola, así que pasa a "Con OC, sin factura". La nota fija del código sobre la 5392 deja de mostrarse porque solo sale cuando la guía no tiene COT. De paso: la COT 812030-1038-COT26 (Junio 1, $6.790.201) ya tiene su OC 812030-1067-AG26 en la base. Sin cambios de código.
 - 12-11-2026 · Claude · **Integrado en main mediante PR #28 (aprobado por Seba el 12-11-2026):** Órdenes de compra › ficha › "Saldo pendiente" asignaba mal los productos facturados cuando la OC tiene productos de precio casi igual (ej. OC 1058128-1935-AG26: "Cápsula N° 3" a $16 se descontaba de la "Cápsula N° 1" a $15, porque $15 y $16 contaban como "parecidos" y el empate lo ganaba la primera línea). Nueva función `ocEmparejarFacturados` (usada por `ocNombresDesdeFactura`): precio exacto pesa más que parecido, palabras en común con plural y colores abreviados de cápsulas ("R-B" = ROJO BLANCO), calibre/concentración (números cortos que coinciden o no) y, a igual parecido, la línea con saldo. Probado con datos reales (solo lectura) sobre 672 OC con varias líneas y facturas: cambian 38, todas a mejor en lo revisado; OC con algún producto "más facturado que pedido" bajan de 104 a 75 (las que quedan son refacturaciones reales o notas de crédito). Solo cambia lo que se ve; no escribe en la base.
 - 11-11-2026 · Claude · **Integrado en main mediante PR #26 (aprobado por Seba el 11-11-2026):** el botón "Volver" de Gráficos de cobros y Gráficos de pagos se veía como una barra gris a lo ancho y Seba no lo encontraba; ahora es un botón rojo chico bajo el título (solo CSS, `.btn-volver-graficos`).
@@ -246,6 +249,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
   - Omeprazol pellets 8,5%: Pharma registra el omeprazol (no el peso de pellets): 657 g ÷ 0,085 ≈ 7,7 kg de pellets vs 11 kg comprados.
   - Coenzima Q10: el consumo está completo; el Hospital Roberto del Río (~65 g/mes) dejó de pedir después de abril 2026. En Pharma_RM se siguió eligiendo el lote 4201023 (100 g comprados, 2.617 g registrados) y 3 lotes (0050124, 3420924 de abr-2025, 0270325) nunca aparecen usados.
 - [ ] **Agente del recetario v2** (paciente): Seba reemplazó `recetario.ps1` el 29-10 pero no había vuelto a correr (última vuelta 10:56). Revisar: archivo bloqueado (Propiedades → Desbloquear), log `C:\BulforSync\recetario\logs\recetario.log`, ejecutar la tarea a mano. Verificar con `select count(*) from rec_rm where paciente_nombre is not null`.
+- [ ] **Auditoría UI/UX** (rama `claude/pensive-carson-ji91pc`): Seba prueba la vista previa (escritorio, celular, teclado) y aprueba el PR. Ojo: el PR #13 de Codex (Facturación múltiple) toca `documentos.js`; si se integra antes, resolver conflictos conservando ambos cambios.
+- [ ] Pendiente de la auditoría: quedan ≈1.800 estilos escritos en línea (`style="…"`) y ~135 colores distintos en el CSS; ir pasándolos a clases módulo por módulo.
 - [ ] Revisar módulos que faltan del rediseño (Seba los va eligiendo uno a uno).
 - [ ] Probar `buscar-factura` con una factura real recién emitida.
 - [ ] Tabla `cobranza_gestiones` (la app la consulta y da 404): no creada; preguntar antes.

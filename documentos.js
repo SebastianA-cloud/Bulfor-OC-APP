@@ -171,7 +171,7 @@ async function dteAbrirBorrador(id) {
   const t = b.tipo;
   const actual = dteEstado[t] || dteCargarBorrador(t);
   if (actual && !actual.borradorId && dteTieneDatos(actual)
-      && !confirm(`Tienes una ${DTE_NOMBRES[t]} a medio escribir que no está guardada como borrador. ¿Reemplazarla por este borrador?`)) return;
+      && !await confirmModal(`Tienes una ${DTE_NOMBRES[t]} a medio escribir que no está guardada como borrador. ¿Reemplazarla por este borrador?`)) return;
   dteEstado[t] = { ...dteNuevo(t), ...b.datos, borradorId: b.id };
   dteGuardarBorrador(t);
   irAModuloPagina('facturas', DTE_PAGINAS[t]);
@@ -185,13 +185,13 @@ async function dteQuitarDeBorradores(id) {
   return r.ok;
 }
 async function dteEliminarBorrador(id) {
-  if (!confirm('¿Eliminar este borrador?')) return;
+  if (!await confirmModal('¿Eliminar este borrador?')) return;
   if (!(await dteQuitarDeBorradores(id))) toast('No se pudo eliminar el borrador.', 'err');
   dteBorradoresRender();
 }
 async function dteEliminarTodosBorradores() {
   const l = dteBorrCache || [];
-  if (!l.length || !confirm(`¿Eliminar los ${l.length} borradores?`)) return;
+  if (!l.length || !await confirmModal(`¿Eliminar los ${l.length} borradores?`)) return;
   for (const b of l) await dteQuitarDeBorradores(b.id);
   dteBorradoresRender();
 }
@@ -277,10 +277,10 @@ function dteInit(tipo) {
 
 // "Facturar" desde el Listado de OC: abre la Factura con el cliente y la OC
 // ya puestos; los productos se eligen de la lista de esa OC, como siempre.
-function dteFacturarOC(o) {
+async function dteFacturarOC(o) {
   const actual = dteEstado[33] || dteCargarBorrador(33);
   if (actual && dteTieneDatos(actual) && !actual.borradorId
-      && !confirm('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por una nueva para esta OC?')) return;
+      && !await confirmModal('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por una nueva para esta OC?')) return;
   const s = dteNuevo(33);
   s.refs = [{ ...dteRefNueva(), folio: o.codigo, fecha: dteFechaCL(o.fecha) }];
   dteEstado[33] = s;
@@ -291,10 +291,10 @@ function dteFacturarOC(o) {
 
 // "Refacturar" desde Facturas rechazadas: factura nueva con "¿Es refacturación?"
 // activado, el N° que reemplaza, el cliente y la OC de la factura rechazada.
-function dteRefacturar(o) {
+async function dteRefacturar(o) {
   const actual = dteEstado[33] || dteCargarBorrador(33);
   if (actual && dteTieneDatos(actual) && !actual.borradorId
-      && !confirm('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por la refacturación?')) return;
+      && !await confirmModal('Tienes una factura a medio escribir que no está guardada como borrador. ¿Reemplazarla por la refacturación?')) return;
   const s = dteNuevo(33);
   s.refact = { on: true, folio: String(o.folio || '') };
   const ordenOC = o.oc && typeof oc !== 'undefined' ? oc.find(x => x.codigooc === String(o.oc).trim()) : null;
@@ -307,8 +307,8 @@ function dteRefacturar(o) {
   else if (o.rut) dteBuscarRut(33, o.rut);
 }
 
-function dteLimpiar(tipo) {
-  if (!confirm(`¿Empezar una ${DTE_NOMBRES[tipo]} nueva? Se borra lo escrito.`)) return;
+async function dteLimpiar(tipo) {
+  if (!await confirmModal(`¿Empezar una ${DTE_NOMBRES[tipo]} nueva? Se borra lo escrito.`)) return;
   dteEstado[tipo] = dteNuevo(tipo);
   dteGuardarBorrador(tipo);
   dteRender(tipo);
@@ -715,7 +715,7 @@ async function dteCopiarFactura(t, folio, sinPreguntar) {
   folio = String(folio || '').replace(/\D/g, '');
   if (!folio || s.tipo !== 33) return;
   if (!sinPreguntar && s.det.some(d => d.nombre.trim() || d.qty || d.precio)
-      && !confirm(`¿Reemplazar lo escrito con los datos de la factura N° ${folio}?`)) return;
+      && !await confirmModal(`¿Reemplazar lo escrito con los datos de la factura N° ${folio}?`)) return;
   s.refact.info = 'Buscando la factura N° ' + folio + '…';
   dteRender(t);
   try {
@@ -851,7 +851,7 @@ function dteRender(t) {
       </label><p id="dte-33-cliente-ayuda" class="dte-sub">Elige un resultado para cargar su RUT y los datos de su última factura o guía. También puedes ingresar el RUT directamente.</p>
       <div id="dte-33-clientes-nombre"></div>` : ''}
     <div class="dte-grid dte-grid-cli">
-      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
+      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Ej.: 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
         <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
       ${dteCampo('Razón social', dteInput(t, 'recep.rzn', s.recep.rzn), true, 2)}
       ${dteCampo('Giro', dteInput(t, 'recep.giro', s.recep.giro, 'maxlength="40"'), true)}
@@ -1086,8 +1086,8 @@ let dteEnviando = false;
 async function dteEnviar(t) {
   const s = dteEstado[t];
   if (dteEnviando || dteValidar(s).length) return;
-  if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
-  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se va a emitir una ${DTE_NOMBRES[s.tipo]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
+  if (s.det.some(d => d.ocMax && Number(d.qty) > d.ocMax) && !await confirmModal('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
+  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !await confirmModal(`Se va a emitir una ${DTE_NOMBRES[s.tipo]} REAL ante el SII por ${dteClp(dteTotales(s).total)}. ¿Confirmas?`)) return;
   dteEnviando = true;
   const btn = document.querySelector('#dte-modal-overlay .dte-btn-principal');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Enviando…'; }
@@ -1130,22 +1130,22 @@ const DTE_HOJA_CSS = `
 .dh-caja div { margin: 6px 0; font-size: 14px; }
 .dh-sii { color: #D0021B; text-align: center; font-weight: 700; font-size: 12px; margin-top: 8px; }
 .dh-tabla { width: 100%; border-collapse: collapse; margin-top: 12px; }
-.dh-tabla th, .dh-tabla td { border: 1px solid #111; padding: 3px 6px; text-align: left; vertical-align: top; font-size: 10.5px; }
+.dh-tabla th, .dh-tabla td { border: 1px solid #111; padding: 3px 6px; text-align: left; vertical-align: top; font-size: 11px; }
 .dh-tabla th { background: #fff !important; color: #111 !important; font-weight: 700; text-align: center; text-transform: none; letter-spacing: 0; white-space: nowrap; }
 .dh-hoja td { color: #111; }
 .dh-datos { border: 1px solid #111; margin-top: 14px; padding: 6px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
-.dh-datos div { display: grid; grid-template-columns: 92px 10px 1fr; font-size: 10.5px; line-height: 1.55; }
+.dh-datos div { display: grid; grid-template-columns: 92px 10px 1fr; font-size: 11px; line-height: 1.55; }
 .dh-datos b { font-weight: 700; }
-.dh-titulo { font-weight: 700; font-size: 10.5px; margin-top: 10px; }
+.dh-titulo { font-weight: 700; font-size: 11px; margin-top: 10px; }
 .dh-det td { height: 18px; }
 .dh-det .dh-relleno td { height: 120px; }
 .dh-num { text-align: right !important; white-space: nowrap; }
 .dh-pie { display: flex; justify-content: space-between; gap: 18px; margin-top: 14px; align-items: flex-start; }
-.dh-timbre { width: 330px; border: 1px dashed #999; color: #555; text-align: center; padding: 16px 10px; font-size: 10px; line-height: 1.5; }
+.dh-timbre { width: 330px; border: 1px dashed #999; color: #555; text-align: center; padding: 16px 10px; font-size: 11px; line-height: 1.5; }
 .dh-totales { min-width: 240px; border: 1px solid #111; }
 .dh-totales div { display: flex; justify-content: space-between; padding: 3px 8px; font-size: 11px; }
 .dh-totales div:last-child { font-weight: 700; border-top: 1px solid #111; }
-.dh-pago { font-size: 10.5px; margin-top: 8px; }
+.dh-pago { font-size: 11px; margin-top: 8px; }
 .dh-marca { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; font-size: 86px; font-weight: 800; color: rgba(208, 2, 27, .08); transform: rotate(-28deg); letter-spacing: 6px; }
 @media print { @page { size: A4; margin: 10mm; } body { margin: 0; } .dh-hoja { width: auto; padding: 0; } }`;
 
@@ -1408,7 +1408,7 @@ function dteMultiElegirHtml() {
   const rutOk = dteRutValido(s.rut);
   const cliente = `
     <div class="dte-grid dte-grid-cli">
-      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Escribe el RUT, ej. 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
+      <div class="dte-rut-wrap">${dteCampo('RUT del cliente', `<input type="text" class="dte-in dte-rut" id="dte-${t}-rut" autocomplete="off" placeholder="Ej.: 65075485-9" value="${dteAttr(s.rut)}" oninput="dteRutSugerir(${t},this.value)" onfocus="dteRutSugerir(${t},this.value)" onkeydown="dteRutTecla(${t},event)" onblur="setTimeout(()=>dteRutCerrar(${t}),150)" onchange="dteBuscarRut(${t},this.value)">`, true)}
         <div class="dte-rut-lista" id="dte-${t}-rut-lista"></div></div>
       ${dteCampo('Razón social', dteInput(t, 'recep.rzn', s.recep.rzn), true, 2)}
       ${dteCampo('Giro', dteInput(t, 'recep.giro', s.recep.giro, 'maxlength="40"'), true)}
@@ -1491,14 +1491,14 @@ function dteMultiBuscar(v) {
   if (c) c.innerHTML = dteMultiOcsHtml();
 }
 function dteMultiCambioSel() { dteMultiGuardar(); dteMultiRender(); }
-function dteMultiMarcar(cod) {
+async function dteMultiMarcar(cod) {
   const m = dteMulti;
   const i = m.sel.findIndex(x => x.oc === cod);
   if (i >= 0) m.sel.splice(i, 1);
   else {
     const o = dteOcsDelRut(m.base.rut).find(o => o.codigooc === cod);
     const completa = o && dteMultiOcCompleta(o);
-    if (completa && !confirm(`La OC ${cod} ya está facturada completa (${dteClp(completa.facturado)} de ${dteClp(completa.total)}). ¿Agregarla igual?`)) return;
+    if (completa && !await confirmModal(`La OC ${cod} ya está facturada completa (${dteClp(completa.facturado)} de ${dteClp(completa.total)}). ¿Agregarla igual?`)) return;
     m.sel.push({ oc: cod, fecha: o ? dteFechaCL(o.fechaoc) : '' });
   }
   dteMultiCambioSel();
@@ -1517,7 +1517,7 @@ function dteMultiAgregarManual() {
 }
 function dteMultiAgregarSinOC() { dteMulti.sel.push({ oc: '', fecha: '' }); dteMultiCambioSel(); }
 function dteMultiQuitar(i) { dteMulti.sel.splice(i, 1); dteMultiCambioSel(); }
-function dteMultiLimpiarSel() { if (confirm('¿Quitar todas las facturas de la lista?')) { dteMulti.sel = []; dteMultiCambioSel(); } }
+async function dteMultiLimpiarSel() { if (await confirmModal('¿Quitar todas las facturas de la lista?')) { dteMulti.sel = []; dteMultiCambioSel(); } }
 
 // Formulario de una factura del flujo: los datos del cliente y la OC; los
 // productos parten vacíos (se eligen de la lista de esa OC, como en Factura).
@@ -1589,9 +1589,9 @@ function dteMultiIr(i) {
   dteMultiRender();
   window.scrollTo(0, 0);
 }
-function dteMultiRecuperar(i) {
+async function dteMultiRecuperar(i) {
   const f = dteMulti.facturas[i];
-  if (!confirm(`¿Volver a incluir ${dteMultiEtiqueta(f)}?`)) return;
+  if (!await confirmModal(`¿Volver a incluir ${dteMultiEtiqueta(f)}?`)) return;
   f.estado = 'pendiente';
   f.form = dteMultiFormDe(f);
   dteMultiIr(i);
@@ -1629,9 +1629,9 @@ function dteMultiMarcarLista() {
   dteMultiSiguiente();
 }
 
-function dteMultiSaltar() {
+async function dteMultiSaltar() {
   const f = dteMulti.facturas[dteMulti.actual];
-  if (!confirm(`¿Saltar ${dteMultiEtiqueta(f)}? Lo que cargaste en esta factura no se guarda.`)) return;
+  if (!await confirmModal(`¿Saltar ${dteMultiEtiqueta(f)}? Lo que cargaste en esta factura no se guarda.`)) return;
   f.estado = 'saltada';
   f.form = dteMultiFormDe(f);
   dteMultiSiguiente();
@@ -1693,8 +1693,8 @@ async function dteMultiEmitirTodas() {
   const porEmitir = m.facturas.filter(f => f.estado === 'lista' || f.estado === 'error');
   if (!porEmitir.length) return;
   const total = porEmitir.reduce((a, f) => a + dteTotales(f.form).total, 0);
-  if (porEmitir.some(f => f.form.det.some(d => d.ocMax && Number(d.qty) > d.ocMax)) && !confirm('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
-  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !confirm(`Se van a emitir ${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'} REAL${porEmitir.length === 1 ? '' : 'ES'} ante el SII por ${dteClp(total)} en total. ¿Confirmas?`)) return;
+  if (porEmitir.some(f => f.form.det.some(d => d.ocMax && Number(d.qty) > d.ocMax)) && !await confirmModal('Hay productos con más cantidad que la orden de compra. ¿Continuar igual?')) return;
+  if (dteModoServidor && dteModoServidor.ambiente === 'P' && !await confirmModal(`Se van a emitir ${porEmitir.length} factura${porEmitir.length === 1 ? '' : 's'} REAL${porEmitir.length === 1 ? '' : 'ES'} ante el SII por ${dteClp(total)} en total. ¿Confirmas?`)) return;
   const cont = () => { const c = document.getElementById('dte-multi'); if (c && dteMulti === m && m.paso === 'revisar') c.innerHTML = dteMultiRevisarHtml(); };
   for (let i = 0; i < m.facturas.length; i++) {
     const f = m.facturas[i];
@@ -1728,11 +1728,11 @@ async function dteMultiEmitirTodas() {
 
 // Sale del flujo. Si ya hay facturas emitidas, lo que no se emitió queda
 // como saltado y se va a la pantalla final para imprimir lo emitido.
-function dteMultiTerminar() {
+async function dteMultiTerminar() {
   const m = dteMulti;
   const emitidas = m.facturas.filter(f => f.estado === 'emitida').length;
   const sinEmitir = m.facturas.filter(f => f.estado !== 'emitida' && f.estado !== 'saltada').length;
-  if (sinEmitir && !confirm(`Quedan ${sinEmitir} factura${sinEmitir === 1 ? '' : 's'} sin emitir, que no se guardarán. ¿Terminar igual?`)) return;
+  if (sinEmitir && !await confirmModal(`Quedan ${sinEmitir} factura${sinEmitir === 1 ? '' : 's'} sin emitir, que no se guardarán. ¿Terminar igual?`)) return;
   dteMultiRetomado = true;
   if (emitidas) {
     m.facturas.forEach(f => { if (f.estado !== 'emitida' && f.estado !== 'saltada') { f.estado = 'saltada'; f.form = dteMultiFormDe(f); } });
@@ -1842,7 +1842,7 @@ async function dteMultiImprimirTodas() {
   const listas = emitidas.filter(f => dteMultiPdfs[f.folio]?.bytes);
   if (!listas.length) return;
   const faltan = emitidas.length - listas.length;
-  if (faltan && !confirm(`${faltan} factura${faltan === 1 ? '' : 's'} todavía no tiene${faltan === 1 ? '' : 'n'} su PDF listo. ¿Imprimir igual las ${listas.length} que ya están?`)) return;
+  if (faltan && !await confirmModal(`${faltan} factura${faltan === 1 ? '' : 's'} todavía no tiene${faltan === 1 ? '' : 'n'} su PDF listo. ¿Imprimir igual las ${listas.length} que ya están?`)) return;
   if (listas.length === 1) { dteMultiImprimir(listas[0].folio); return; }
   try {
     await dteCargarPdfLib();
@@ -1858,8 +1858,8 @@ async function dteMultiImprimirTodas() {
   }
 }
 
-function dteMultiFinalizar() {
-  if (!confirm('¿Terminar? Las facturas ya quedaron emitidas; después puedes ver sus PDF en Facturas → Documentos.')) return;
+async function dteMultiFinalizar() {
+  if (!await confirmModal('¿Terminar? Las facturas ya quedaron emitidas; después puedes ver sus PDF en Facturas → Documentos.')) return;
   clearTimeout(dteMultiEspera);
   dteMultiEspera = null;
   dteMulti = dteMultiNuevo();
