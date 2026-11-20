@@ -11954,7 +11954,7 @@ function oeRecetaLadoHtml(o) {
   if (url) {
     const visor = esPdf
       ? `<div class="oe-receta-pdf"><div style="font-size:40px">📄</div><div>${escapeHtml(oeForm?.archivo?.name || o?.recetas?.archivo_nombre || 'Receta en PDF')}</div></div>`
-      : `<img src="${url}" alt="Receta" id="oe-receta-img" style="transform:rotate(${oeForm?.giro || 0}deg)">`;
+      : `<img ${atributoSrcReceta(url)} alt="Receta" id="oe-receta-img" style="transform:rotate(${oeForm?.giro || 0}deg)">`;
     return `${cab}<div class="oe-receta-visor" onclick="oeAmpliarReceta()">${visor}</div>
       <div class="oe-receta-btns">
         <button type="button" class="page-btn" onclick="oeAmpliarReceta()">🔍 Ampliar</button>
@@ -12238,7 +12238,8 @@ async function oeSubirArchivoReceta(archivo, pacienteId) {
   });
   if (!r.ok) throw new Error('no se pudo subir la foto de la receta: ' + await r.text());
   return {
-    archivo_url: `${SUPABASE_URL}/storage/v1/object/public/recetas/${nombreArchivo}`,
+    // Dirección "authenticated": el bucket es privado y la foto solo se abre con sesión.
+    archivo_url: `${SUPABASE_URL}/storage/v1/object/authenticated/recetas/${nombreArchivo}`,
     archivo_nombre: archivo.name,
     archivo_size_kb: Math.round(archivo.size / 1024),
   };
@@ -12840,6 +12841,61 @@ async function eliminarOrdenOE(id) {
   }
 }
 
+// ─── Fotos de recetas (bucket privado `recetas`) ───────────────────────────
+// Las fotos de las Órdenes de Elaboración tienen datos de pacientes, así que el
+// bucket `recetas` no debe ser público. En vez de poner la dirección directa en
+// <img>/<iframe>, la foto se baja con el token de la sesión (igual que las de
+// solicitudes web) y se muestra desde una copia local en el navegador (blob).
+// Sirve para las direcciones antiguas (/object/public/recetas/...) y para las
+// nuevas (/object/authenticated/recetas/...).
+const recetaBlobCache = {};
+function rutaRecetaPrivada(url) {
+  const m = /\/storage\/v1\/object\/(?:public|authenticated)\/recetas\/([^?#]+)/.exec(String(url || ''));
+  return m ? m[1] : null;
+}
+// Devuelve una dirección que el navegador puede abrir: la copia local si es una
+// foto del bucket `recetas`, o la misma dirección si es otra cosa (ej. una foto
+// recién elegida que todavía no se sube).
+async function urlLocalReceta(url) {
+  const ruta = rutaRecetaPrivada(url);
+  if (!ruta) return url;
+  if (!recetaBlobCache[ruta]) {
+    recetaBlobCache[ruta] = (async () => {
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/recetas/${ruta}`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${sesionActual?.access_token || SUPABASE_KEY}` }
+      });
+      if (!res.ok) throw new Error('No se pudo abrir la receta (' + res.status + ')');
+      return URL.createObjectURL(await res.blob());
+    })();
+    recetaBlobCache[ruta].catch(() => { delete recetaBlobCache[ruta]; }); // si falla, se reintenta la próxima vez
+  }
+  return recetaBlobCache[ruta];
+}
+// Atributo para <img>/<iframe>: las fotos del bucket privado quedan en
+// data-receta-src y se completan solas (ver el observador de abajo).
+function atributoSrcReceta(url) {
+  return rutaRecetaPrivada(url) ? `data-receta-src="${escapeHtml(url)}"` : `src="${url}"`;
+}
+function hidratarRecetas(raiz) {
+  const els = raiz.matches?.('[data-receta-src]') ? [raiz] : [...(raiz.querySelectorAll?.('[data-receta-src]') || [])];
+  els.forEach(el => {
+    const original = el.getAttribute('data-receta-src');
+    el.removeAttribute('data-receta-src');
+    urlLocalReceta(original)
+      .then(u => { el.src = u; })
+      .catch(() => { el.alt = 'No se pudo cargar la receta'; el.title = 'No se pudo cargar la receta. Revisa tu conexión o vuelve a iniciar sesión.'; });
+  });
+}
+// Cualquier <img>/<iframe> con data-receta-src que aparezca en pantalla se completa.
+(function vigilarRecetas() {
+  const iniciar = () => {
+    hidratarRecetas(document.body);
+    new MutationObserver(cambios => cambios.forEach(c => c.addedNodes.forEach(n => { if (n.nodeType === 1) hidratarRecetas(n); })))
+      .observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
+})();
+
 function verRecetaEnModal(url) {
   const esImagen = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
   const modal = document.createElement('div');
@@ -12859,15 +12915,17 @@ function verRecetaEnModal(url) {
       </div>
       <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px;background:#111">
         ${esImagen
-          ? `<img src="${url}" style="max-width:100%;max-height:70vh;border-radius:4px;object-fit:contain">`
-          : `<iframe src="${url}" style="width:100%;height:70vh;border:none;border-radius:4px"></iframe>`
+          ? `<img ${atributoSrcReceta(url)} alt="Receta" style="max-width:100%;max-height:70vh;border-radius:4px;object-fit:contain">`
+          : `<iframe ${atributoSrcReceta(url)} style="width:100%;height:70vh;border:none;border-radius:4px"></iframe>`
         }
       </div>
     </div>`;
   document.body.appendChild(modal);
 }
 
-function imprimirRecetaOE(url, esImagen) {
+async function imprimirRecetaOE(url, esImagen) {
+  // La foto del bucket privado se baja primero con la sesión (copia local).
+  try { url = await urlLocalReceta(url); } catch (e) { toast(e.message, 'err'); return; }
   // Creamos un iframe oculto en el mismo dominio con el contenido a imprimir
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;visibility:hidden';
@@ -12893,9 +12951,9 @@ function imprimirRecetaOE(url, esImagen) {
 async function descargarRecetaOE(url) {
   try {
     // Fetch del archivo para forzar descarga sin abrir pestaña
-    const res = await fetch(url);
-    const blob = await res.blob();
     const ext = url.split('.').pop().split('?')[0];
+    const res = await fetch(await urlLocalReceta(url)); // bucket privado: con la sesión
+    const blob = await res.blob();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `receta.${ext}`;
