@@ -14,6 +14,26 @@ let opDatos = null;            // filas de mp_oportunidades (sin productos)
 let opVistas = {};             // codigo → { descartada }
 let opCargando = null;
 const opFiltro = { vista: 'abiertas', tipo: '', q: '', soloClientes: false, conBaja: false };
+// Orden de la lista: se cambia apretando el título de una columna (otra vez =
+// al revés). Sin elegir, por fecha de cierre (las cerradas, la más reciente primero).
+const opOrden = { campo: null, dir: 1 };
+const OP_COLUMNAS = [
+  ['cierre', 'Cierre'], ['tipo', 'Tipo'], ['organismo', 'Hospital / comprador'],
+  ['nombre', 'Qué piden'], ['prioridad', 'Prioridad'], ['monto', 'Presupuesto'],
+];
+const OP_PRIO_ORDEN = { alta: 0, media: 1, baja: 2 };
+function opValorOrden(r, campo) {
+  if (campo === 'cierre') return r.fecha_cierre || '';
+  if (campo === 'tipo') return OP_TIPO[r.tipo] || '';
+  if (campo === 'prioridad') return OP_PRIO_ORDEN[r.prioridad] ?? 9;
+  if (campo === 'monto') return Number(r.monto) || 0;
+  return (r[campo] || '').toString().trim().toLowerCase();
+}
+function opOrdenarPor(campo) {
+  if (opOrden.campo === campo) opOrden.dir = -opOrden.dir;
+  else { opOrden.campo = campo; opOrden.dir = campo === 'monto' ? -1 : 1; } // presupuesto: mayor primero
+  opRender();
+}
 
 const OP_TIPO = { licitacion: 'Licitación', compra_agil: 'Compra ágil' };
 const OP_PRIO = {
@@ -154,7 +174,7 @@ function opInit() {
         <div class="op-info" id="op-info"></div>
         <div>
           <table class="oc-tabla op-tabla">
-            <thead><tr><th>Cierre</th><th>Tipo</th><th>Hospital / comprador</th><th>Qué piden</th><th>Prioridad</th><th style="text-align:right">Presupuesto</th><th></th></tr></thead>
+            <thead><tr id="op-cabecera"></tr></thead>
             <tbody id="op-body"><tr><td colspan="7"><div class="fpp-empty"><p>Cargando oportunidades…</p></div></td></tr></tbody>
           </table>
         </div>
@@ -182,9 +202,28 @@ function opFiltradas() {
     if (f.soloClientes && !r.es_cliente) return false;
     if (f.q && !coincideBusqueda(`${r.codigo} ${r.nombre} ${r.organismo} ${r.unidad} ${r.region} ${(r.palabras || []).join(' ')}`, f.q)) return false;
     return true;
-  }).sort((a, b) => f.vista === 'cerradas'
-    ? String(b.fecha_cierre).localeCompare(String(a.fecha_cierre))
-    : String(a.fecha_cierre).localeCompare(String(b.fecha_cierre)));
+  }).sort((a, b) => {
+    const campo = opOrden.campo || 'cierre';
+    const dir = opOrden.campo ? opOrden.dir : (f.vista === 'cerradas' ? -1 : 1);
+    const va = opValorOrden(a, campo), vb = opValorOrden(b, campo);
+    const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'es');
+    // Empates: por fecha de cierre
+    return (c * dir) || String(a.fecha_cierre).localeCompare(String(b.fecha_cierre));
+  });
+}
+
+// Títulos de la tabla: botones que ordenan, con flecha en la columna activa.
+function opPintarCabecera() {
+  const tr = document.getElementById('op-cabecera');
+  if (!tr) return;
+  const activo = opOrden.campo || 'cierre';
+  const dir = opOrden.campo ? opOrden.dir : (opFiltro.vista === 'cerradas' ? -1 : 1);
+  tr.innerHTML = OP_COLUMNAS.map(([campo, label]) => {
+    const on = campo === activo;
+    const flecha = on ? (dir === 1 ? '▲' : '▼') : '↕';
+    return `<th class="op-th${on ? ' op-th-activo' : ''}"${campo === 'monto' ? ' style="text-align:right"' : ''} aria-sort="${on ? (dir === 1 ? 'ascending' : 'descending') : 'none'}">
+      <button type="button" onclick="opOrdenarPor('${campo}')" title="Ordenar por ${label.toLowerCase()}">${label} <span class="op-flecha">${flecha}</span></button></th>`;
+  }).join('') + '<th></th>';
 }
 
 function opRender() {
@@ -197,6 +236,7 @@ function opRender() {
   document.getElementById('op-tipos').innerHTML = tipos.map(([t, l]) =>
     `<button type="button" class="fpp-status-tab${opFiltro.tipo === t ? ' active' : ''}" aria-pressed="${opFiltro.tipo === t}" onclick="opCambiarTipo('${t}')">${l}</button>`).join('');
 
+  opPintarCabecera();
   const filas = opFiltradas();
   window.__opLista = filas.map(r => r.codigo);
   document.getElementById('op-info').innerHTML = `${filas.length.toLocaleString('es-CL')} oportunidad${filas.length === 1 ? '' : 'es'}`
