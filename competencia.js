@@ -14,7 +14,7 @@ const cmpState = {
   lineas: [], ofertas: [], competidores: [],
   porLinea: new Map(),        // clave_linea -> [ofertas]
   vista: 'resumen',           // resumen | ofertas | competidores
-  q: '', resultado: 'todas', anio: 'todos', competidor: 'todos', pagina: 1,
+  q: '', resultado: 'todas', desde: '', hasta: '', competidor: 'todos', pagina: 1,
   demo: new URLSearchParams(location.search).get('competencia_demo') === '1',
 };
 const CMP_POR_PAGINA = 15;
@@ -187,22 +187,39 @@ function cmpVerCompetidor(rut) {
 }
 
 // ─── Nuestras ofertas ───────────────────────────────────────────────────────
-function cmpFiltradas() {
-  const q = cmpState.q.trim();
-  return cmpState.lineas.filter(l =>
-    (cmpState.resultado === 'todas' || l._resultado === cmpState.resultado) &&
-    (cmpState.anio === 'todos' || String(l.fecha_publicacion || '').startsWith(cmpState.anio)) &&
-    (cmpState.competidor === 'todos' || cmpPrecioDe(l.clave, cmpState.competidor) != null) &&
-    (!q || coincideBusqueda(l._texto, q)));
+// Resultado: "adjudicadas" = ganadas + perdidas (las que ya tienen ganador).
+function cmpCalzaResultado(l, r) {
+  if (r === 'todas') return true;
+  if (r === 'adjudicadas') return l._resultado === 'gano' || l._resultado === 'perdio';
+  return l._resultado === r;
 }
+// Filtros sin el de resultado (para contar cuántas hay en cada pestaña).
+function cmpFiltradasSinResultado() {
+  const q = cmpState.q.trim();
+  return cmpState.lineas.filter(l => {
+    // Rango de fechas (fecha de publicación de la licitación, solo el día)
+    const f = String(l.fecha_publicacion || '').slice(0, 10);
+    if (cmpState.desde && (!f || f < cmpState.desde)) return false;
+    if (cmpState.hasta && (!f || f > cmpState.hasta)) return false;
+    return (cmpState.competidor === 'todos' || cmpPrecioDe(l.clave, cmpState.competidor) != null) &&
+      (!q || coincideBusqueda(l._texto, q));
+  });
+}
+function cmpFiltradas() {
+  return cmpFiltradasSinResultado().filter(l => cmpCalzaResultado(l, cmpState.resultado));
+}
+function cmpFecha2(campo, v) { cmpState[campo] = v || ''; cmpState.pagina = 1; cmpRender(); }
+function cmpLimpiarFechas() { cmpState.desde = ''; cmpState.hasta = ''; cmpState.pagina = 1; cmpRender(); }
 
 function cmpHtmlOfertas() {
   const lista = cmpFiltradas();
   const paginas = Math.max(1, Math.ceil(lista.length / CMP_POR_PAGINA));
   cmpState.pagina = Math.min(cmpState.pagina, paginas);
   const desde = (cmpState.pagina - 1) * CMP_POR_PAGINA;
-  const anios = [...new Set(cmpState.lineas.map(l => String(l.fecha_publicacion || '').slice(0, 4)).filter(Boolean))].sort().reverse();
-  const res = { todas: 'Todas', gano: 'Ganadas', perdio: 'Perdidas', sin: 'Sin adjudicar' };
+  const base = cmpFiltradasSinResultado();
+  const res = { todas: 'Todas', adjudicadas: 'Adjudicadas', gano: 'Ganadas', perdio: 'Perdidas', sin: 'Sin adjudicar' };
+  const cuenta = k => base.filter(l => cmpCalzaResultado(l, k)).length;
+  const fechas = cmpState.lineas.map(l => String(l.fecha_publicacion || '').slice(0, 10)).filter(Boolean).sort();
   const badge = l => l._resultado === 'gano' ? '<span class="cmp-badge cmp-b-gano">Ganó</span>'
     : l._resultado === 'perdio' ? '<span class="cmp-badge cmp-b-perdio">Perdió</span>' : '<span class="cmp-badge">Sin adjudicar</span>';
   // Mejor precio de la competencia (cualquier empresa distinta de Bulfor).
@@ -229,12 +246,17 @@ function cmpHtmlOfertas() {
       <div class="search-wrap"><span class="search-icon">🔍</span>
         <input type="text" id="cmp-q" placeholder="Buscar producto, hospital, licitación o empresa…" value="${cmpEsc(cmpState.q)}" oninput="cmpBuscar(this.value)">
       </div>
-      <select onchange="cmpFiltro('resultado',this.value)" aria-label="Resultado">${Object.entries(res).map(([k, t]) => `<option value="${k}"${cmpState.resultado === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-      <select onchange="cmpFiltro('anio',this.value)" aria-label="Año"><option value="todos">Todos los años</option>${anios.map(a => `<option${cmpState.anio === a ? ' selected' : ''}>${a}</option>`).join('')}</select>
+      <div class="cmp-fechas" role="group" aria-label="Rango de fechas de publicación">
+        <label>Desde <input type="date" value="${cmpState.desde}" min="${fechas[0] || ''}" max="${cmpState.hasta || fechas[fechas.length - 1] || ''}" onchange="cmpFecha2('desde',this.value)"></label>
+        <label>Hasta <input type="date" value="${cmpState.hasta}" min="${cmpState.desde || fechas[0] || ''}" max="${fechas[fechas.length - 1] || ''}" onchange="cmpFecha2('hasta',this.value)"></label>
+        ${cmpState.desde || cmpState.hasta ? '<button type="button" class="cmp-limpiar" onclick="cmpLimpiarFechas()" title="Quitar el rango de fechas">✕</button>' : ''}
+      </div>
       <select onchange="cmpFiltro('competidor',this.value)" aria-label="Competidor"><option value="todos">Con cualquier competidor</option>${cmpActivos().map(c => `<option value="${cmpEsc(c.rut)}"${cmpState.competidor === c.rut ? ' selected' : ''}>Donde ofertó ${cmpEsc(c.nombre)}</option>`).join('')}</select>
       <button class="page-btn" onclick="cmpExcel()" title="Descargar lo filtrado a Excel"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Excel</button>
     </div>
-    <div class="cmp-info">${lista.length.toLocaleString('es-CL')} productos</div>
+    <div class="fpp-status-tabs cmp-resultados" role="group" aria-label="Resultado">${Object.entries(res).map(([k, t]) =>
+      `<button type="button" class="fpp-status-tab${cmpState.resultado === k ? ' active' : ''}" aria-pressed="${cmpState.resultado === k}" onclick="cmpFiltro('resultado','${k}')">${t} <span class="cmp-cuenta">${cuenta(k).toLocaleString('es-CL')}</span></button>`).join('')}</div>
+    <div class="cmp-info">${lista.length.toLocaleString('es-CL')} productos${cmpState.desde || cmpState.hasta ? ` · publicadas ${cmpState.desde ? 'desde el ' + cmpFecha(cmpState.desde) : ''}${cmpState.desde && cmpState.hasta ? ' ' : ''}${cmpState.hasta ? 'hasta el ' + cmpFecha(cmpState.hasta) : ''}` : ''}</div>
     <div class="table-card tabla-centrada cmp-tabla">
       <table>
         <thead><tr><th>Fecha</th><th>Producto</th><th>Unidad</th><th>Bulfor</th><th>Mejor precio competencia</th><th>Ganador</th><th>Resultado</th></tr></thead>

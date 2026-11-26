@@ -40,3 +40,12 @@
   .cmp-franja > div:nth-child(2) { border-right: none; }
   .cmp-franja > div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
 }
+
+/* Nuestras ofertas: rango de fechas y pestañas de resultado (26-11-2026) */
+.cmp-fechas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmp-fechas label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+.cmp-fechas input[type=date] { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: #fff; color: var(--text); }
+.cmp-limpiar { background: none; border: 1px solid var(--border); border-radius: 999px; width: 28px; height: 28px; cursor: pointer; color: var(--text-2); }
+.cmp-limpiar:hover { border-color: var(--red); color: var(--red); }
+.cmp-resultados { margin: 4px 0 10px; flex-wrap: wrap; }
+.cmp-cuenta { font-size: 11px; color: var(--text-3); margin-left: 3px; }
