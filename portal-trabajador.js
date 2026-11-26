@@ -20,7 +20,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 let portalDatos = null;        // respuesta de portal_mis_datos
-let portalEquipo = [];         // calendario compartido (quién sale y cuándo)
+let portalEquipo = [];         // calendario compartido: aprobadas y pendientes del equipo (próximo año)
 
 // cerrarTodosLosModales() de index.html cierra las ventanas cuyo id está en
 // MODAL_OVERLAY_IDS. Este archivo carga antes que esa lista, así que las del
@@ -80,7 +80,10 @@ async function portalRecargar() {
   const hoy = vacHoy();
   const [datos, equipo] = await Promise.all([
     rpcVac('portal_mis_datos', {}),
-    rpcVac('portal_calendario', { p_desde: hoy, p_hasta: vacSumarDias(hoy, 120) }).catch(() => []),
+    // Un año hacia adelante; si la base aún tiene el límite anterior, 4 meses.
+    rpcVac('portal_calendario', { p_desde: hoy, p_hasta: vacSumarDias(hoy, 365) })
+      .catch(() => rpcVac('portal_calendario', { p_desde: hoy, p_hasta: vacSumarDias(hoy, 120) }))
+      .catch(() => []),
   ]);
   portalDatos = datos;
   portalEquipo = Array.isArray(equipo) ? equipo : [];
@@ -122,6 +125,8 @@ function portalRender() {
   const usableHoy = p => { const d = periodoUsableDesde(p.id); return !d || d <= hoy; };
   const dispHoy = redondear(s.periodos.filter(usableHoy).reduce((n, p) => n + p.disponibles, 0));
   const futuros = s.periodos.filter(p => !usableHoy(p) && p.disponibles > 0);
+  const limiteEquipo = vacSumarDias(hoy, 120);
+  const equipoAprobado = portalEquipo.filter(e => (e.estado || 'aprobado') === 'aprobado' && e.fecha_inicio <= limiteEquipo);
 
   // Antes del primer aniversario la ley todavía no da derecho a vacaciones:
   // lo que pida es un adelanto que Sebastián decide si aprueba.
@@ -168,8 +173,8 @@ function portalRender() {
       <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo. Usar días de un período antes de la fecha en que se puede usar es un adelanto y debe estar conversado con Sebastián.</div>
 
       <div class="portal-seccion">Vacaciones del equipo (próximos 4 meses)</div>
-      ${portalEquipo.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
-        ${portalEquipo.map(e => `
+      ${equipoAprobado.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
+        ${equipoAprobado.map(e => `
           <div class="portal-fila-equipo">
             <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
             <div style="color:var(--text-2);white-space:nowrap">${rangoLegible(e.fecha_inicio, e.fecha_fin)}</div>
@@ -280,7 +285,10 @@ function portalRecalcular() {
     if (adel.length) html += `<div class="portal-aviso warn" style="margin-top:8px"><strong>Estás adelantando vacaciones:</strong> ${textoAdelanto(adel)}. Envíala solo si ya lo conversaste con Sebastián; la solicitud le llegará marcada como adelanto.</div>`;
   }
   if (cruce) { html += `<div class="portal-aviso err" style="margin-top:8px">Ya tienes vacaciones ${cruce.estado === 'pendiente' ? 'pedidas' : 'aprobadas'} que se cruzan con esas fechas (${rangoLegible(cruce.fecha_inicio, cruce.fecha_fin)}).</div>`; ok = false; }
-  if (equipo.length) html += `<div style="font-size:12px;color:var(--amber);margin-top:6px">En esas fechas también sale: ${equipo.map(e => escapeHtml(e.nombre)).join(', ')}.</div>`;
+  // No bloquea: avisa, y Sebastián decide al aprobar.
+  if (equipo.length) html += `<div class="portal-aviso warn" style="margin-top:8px"><strong>Ojo: esas fechas chocan con las de otra persona.</strong>
+    ${equipo.map(e => `<div style="margin-top:4px">• ${escapeHtml(e.nombre)}: ${rangoLegible(e.fecha_inicio, e.fecha_fin)} (${e.estado === 'pendiente' ? 'pedidas antes, por aprobar' : 'aprobadas'})</div>`).join('')}
+    <div style="margin-top:6px">Puedes enviar igual tu solicitud; Sebastián decidirá.</div></div>`;
   out.innerHTML = html;
   btn.disabled = !ok;
 }
