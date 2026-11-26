@@ -2110,3 +2110,10 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
   .portal-pasos li { flex-direction: row; align-items: center; gap: 8px; font-size: 12.5px; }
   .portal-hero-num { font-size: 46px; }
 }
+/* Tarjeta "Instala la app en tu celular" del portal. */
+.portal-instalar { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px dashed var(--accent);
+  border-radius: var(--radius-lg); padding: 12px 14px; margin-top: 12px; }
+.portal-instalar-icono { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-light); color: var(--accent);
+  display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.portal-instalar-btn { background: var(--accent); color: #fff; border: none; border-radius: 999px; padding: 9px 16px; font-size: 13.5px;
+  font-weight: 600; cursor: pointer; flex-shrink: 0; }

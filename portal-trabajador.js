@@ -143,6 +143,25 @@ function portalEncabezado(nombre, dispHoy, futuros, sinPeriodos) {
     </div>`;
 }
 
+// "Instalar app": la barra de la oficina (donde está ese botón) no se ve en
+// el portal, así que aquí va su propia tarjeta. Usa instalarApp() de
+// index.html: en Android abre el instalador; en iPhone explica los pasos de
+// Safari. Si ya se está usando instalada, no aparece.
+function portalTarjetaInstalar() {
+  if (typeof appYaInstalada === 'function' && appYaInstalada()) return '';
+  return `
+    <div class="portal-instalar">
+      <div class="portal-instalar-icono"><i class="ti ti-device-mobile-down" aria-hidden="true"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">Instala la app en tu celular</div>
+        <div style="font-size:12.5px;color:var(--text-2);margin-top:2px">Queda como un ícono en tu pantalla y entras a tus vacaciones de un toque.</div>
+      </div>
+      <button class="portal-instalar-btn" onclick="instalarApp()">Instalar</button>
+    </div>`;
+}
+// Cuando se instala, la tarjeta se va sola.
+window.addEventListener('appinstalled', () => { if (portalDatos) portalRender(); });
+
 // Un mensaje claro de "cómo estás hoy": de vacaciones, esperando respuesta,
 // con vacaciones aprobadas por delante, o nada programado.
 function portalEstadoHoy(vigente, pendientes, proxAprobada) {
@@ -209,6 +228,8 @@ function portalRender() {
           </button>
           ${s.disponibles > 0 ? '' : '<div class="portal-cta-nota">Por ahora no tienes días disponibles para pedir.</div>'}
         </div>
+
+        ${portalTarjetaInstalar()}
 
         ${portalDesplegable('solicitudes', '<i class="ti ti-list-check" aria-hidden="true"></i> Mis solicitudes', resumenSolicitudes,
           solicitudes.length ? solicitudes.map(portalTarjetaSolicitud).join('') : '<div class="portal-vacio">Todavía no has pedido vacaciones desde aquí.</div>')}
