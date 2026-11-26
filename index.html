@@ -9119,6 +9119,29 @@ function saldoDeTrabajador(personalId, excluirSolicitud) {
   };
 }
 
+// Separa el saldo en lo que se puede usar HOY y lo de períodos que todavía
+// no empiezan (disponible_desde en el futuro). Usar estos últimos antes de
+// su fecha es un adelanto acordado. Sin fecha registrada = usable.
+function saldoHoyYProximos(personalId) {
+  const s = saldoDeTrabajador(personalId);
+  const hoy = vacHoy();
+  const desdeDe = id => ((vacPeriodos.find(x => x.id === id) || {}).disponible_desde) || null;
+  const hoyPeriodos = s.periodos.filter(p => { const d = desdeDe(p.id); return !d || d <= hoy; });
+  const proximos = s.periodos.filter(p => { const d = desdeDe(p.id); return d && d > hoy && p.disponibles > 0; })
+    .map(p => ({ periodo: p.periodo, disponibles: p.disponibles, desde: desdeDe(p.id) }));
+  return {
+    saldo: s,
+    hoy: redondear(hoyPeriodos.reduce((n, p) => n + p.disponibles, 0)),
+    hoyPeriodos: hoyPeriodos.filter(p => p.disponibles > 0),
+    proximos,
+  };
+}
+
+// Las mismas dos líneas en el listado y en la ficha: "del 25/26" y "+15 del 26/27 desde el 01-12-2026".
+function htmlProximosPeriodos(sh) {
+  return sh.proximos.map(x => `<div style="color:var(--amber)">+${x.disponibles} del ${escapeHtml(x.periodo)} desde el ${fDate(x.desde)}</div>`).join('');
+}
+
 // ─── Estados derivados ─────────────────────────────────────────────────────
 function estadoVisualSolicitud(s) {
   if (s.estado !== 'aprobado') return s.estado;
@@ -9477,7 +9500,8 @@ function renderVacResumen(cont) {
     .filter(s => (s.estado === 'aprobado' || s.estado === 'pendiente') && s.fecha_inicio > hoy)
     .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
   const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
-  const diasDisponibles = redondear(activos.reduce((s,p) => s + saldoDeTrabajador(p.id).disponibles, 0));
+  const diasDisponibles = redondear(activos.reduce((s,p) => s + saldoHoyYProximos(p.id).hoy, 0));
+  const diasProximos = redondear(activos.reduce((s,p) => s + saldoHoyYProximos(p.id).proximos.reduce((n,x) => n + x.disponibles, 0), 0));
 
   const tarjetas = `
     <div class="fpp-resumen" style="grid-template-columns:repeat(5,1fr)">
@@ -9485,7 +9509,7 @@ function renderVacResumen(cont) {
       <div class="stat${deVacacionesHoy.length ? ' destacado' : ''}"><div class="stat-label">De vacaciones hoy</div><div class="stat-val">${deVacacionesHoy.length}</div><div class="stat-sub">${deVacacionesHoy.length ? escapeHtml(deVacacionesHoy.map(p => p.nombre.split(' ')[0]).join(', ')) : 'nadie'}</div></div>
       <div class="stat"><div class="stat-label">Próximas vacaciones</div><div class="stat-val">${proximas.length}</div><div class="stat-sub">${proximas.length ? 'la más cercana, ' + rangoLegible(proximas[0].fecha_inicio, proximas[0].fecha_fin) : 'nada programado'}</div></div>
       <div class="stat"><div class="stat-label">Solicitudes pendientes</div><div class="stat-val" style="color:${pendientes.length ? 'var(--amber)' : 'var(--text)'}">${pendientes.length}</div><div class="stat-sub">${pendientes.length ? 'esperan aprobación' : 'nada por aprobar'}</div></div>
-      <div class="stat"><div class="stat-label">Días disponibles</div><div class="stat-val">${diasDisponibles}</div><div class="stat-sub">suma de todo el personal activo</div></div>
+      <div class="stat"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${diasDisponibles}</div><div class="stat-sub">suma del personal activo${diasProximos ? ` · +${diasProximos} de próximos períodos` : ''}</div></div>
     </div>`;
 
   const alertas = alertasVacaciones();
@@ -9597,7 +9621,7 @@ function renderVacPersonal(cont) {
     <div class="table-card"><table>
       <thead><tr>
         <th>Trabajador</th>
-        <th style="text-align:center">Días disponibles</th>
+        <th style="text-align:center">Disponibles hoy</th>
         <th style="text-align:center">Días utilizados</th>
         <th style="text-align:center">Pendientes</th>
         <th>Próximas vacaciones</th>
@@ -9608,16 +9632,19 @@ function renderVacPersonal(cont) {
         const prox = proximasVacacionesDe(p.id);
         const est = estadoTrabajador(p.id);
         const vigente = vacacionesVigentes(p.id);
-        const detallePeriodos = s.periodos.filter(x => x.disponibles > 0)
-          .map(x => `${x.periodo}: ${x.disponibles}`).join(' · ');
+        const sh = saldoHoyYProximos(p.id);
+        const detalleHoy = sh.hoyPeriodos.map(x => x.periodo).join(' + ');
         return `<tr onclick="navReset();abrirPerfilVacaciones(${p.id})">
           <td>
             <div style="font-weight:500">${escapeHtml(p.nombre)}</div>
             ${p.cargo ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${escapeHtml(p.cargo)}</div>` : ''}
           </td>
           <td style="text-align:center">
-            <div style="font-size:15px;font-weight:600;color:${s.disponibles > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? s.disponibles : '—'}</div>
-            ${detallePeriodos ? `<div style="font-size:10.5px;color:var(--text-3);margin-top:2px">${detallePeriodos}</div>` : ''}
+            <div style="font-size:15px;font-weight:600;color:${sh.hoy > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? sh.hoy : '—'}</div>
+            <div style="font-size:10.5px;color:var(--text-3);margin-top:2px;line-height:1.5">
+              ${detalleHoy ? `<div>del ${escapeHtml(detalleHoy)}</div>` : ''}
+              ${htmlProximosPeriodos(sh)}
+            </div>
           </td>
           <td style="text-align:center;color:var(--text-2)">${s.periodos.length ? s.utilizados : '—'}</td>
           <td style="text-align:center;color:${s.pendientes ? 'var(--amber)' : 'var(--text-3)'}">${s.pendientes || '—'}</td>
@@ -9838,7 +9865,8 @@ function abrirPerfilVacaciones(id) {
 
         ${portalBloqueAcceso(p)}
         <div class="fpp-resumen" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
-          <div class="stat destacado"><div class="stat-label">Disponibles</div><div class="stat-val">${s.periodos.length ? s.disponibles : '—'}</div><div class="stat-sub">${s.periodos.length ? 'días' : 'sin períodos asignados'}</div></div>
+          <div class="stat destacado"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${s.periodos.length ? saldoHoyYProximos(id).hoy : '—'}</div><div class="stat-sub" style="line-height:1.5">${!s.periodos.length ? 'sin períodos asignados'
+            : (saldoHoyYProximos(id).proximos.length ? htmlProximosPeriodos(saldoHoyYProximos(id)) : 'días')}</div></div>
           <div class="stat"><div class="stat-label">Utilizados</div><div class="stat-val">${s.utilizados}</div><div class="stat-sub">días aprobados</div></div>
           <div class="stat"><div class="stat-label">Programados</div><div class="stat-val">${programados}</div><div class="stat-sub">aún no los toma</div></div>
           <div class="stat"><div class="stat-label">Progresivos</div><div class="stat-val">${s.progresivos}</div><div class="stat-sub">sobre los días base</div></div>
