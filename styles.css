@@ -379,11 +379,12 @@
   .vac-cal-dia { background: var(--surface); min-height: 96px; padding: 6px 7px; }
   .vac-cal-dia.fuera   { background: var(--bg); opacity: .5; }
   .vac-cal-dia.finde   { background: #FBFAF8; }
-  .vac-cal-dia.feriado { background: var(--amber-light); }
+  /* Feriados en azul: el amarillo es solo para solicitudes pendientes de aprobación. */
+  .vac-cal-dia.feriado { background: #E6EFFA; }
   .vac-cal-dia.hoy     { box-shadow: inset 0 0 0 2px var(--accent); }
   .vac-cal-num { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
   .vac-cal-dia.hoy .vac-cal-num { color: var(--accent); }
-  .vac-cal-feriado { font-size: 9.5px; color: var(--amber); margin-top: 2px; line-height: 1.3;
+  .vac-cal-feriado { font-size: 9.5px; color: #1E4E8C; margin-top: 2px; line-height: 1.3;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vac-cal-chip { display: block; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; margin-top: 3px;
     background: var(--green-light); color: var(--green); cursor: pointer; font-weight: 500;
@@ -393,7 +394,7 @@
   .vac-leyenda { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
   .vac-leyenda.ok   { background: var(--green-light); border: 1px solid var(--green); }
   .vac-leyenda.pend { background: var(--amber-light); border: 1px solid var(--amber); }
-  .vac-leyenda.fer  { background: var(--amber-light); }
+  .vac-leyenda.fer  { background: #E6EFFA; border: 1px solid #1E4E8C; }
 
   @media (max-width: 900px) {
     .vac-dos-columnas { grid-template-columns: 1fr; }
@@ -2019,3 +2020,18 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
   #portal-trabajador .vac-cal-chip { font-size: 9px; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #portal-trabajador .vac-cal-feriado { display: none; }
 }
+/* Secciones desplegables del portal (<details>): se abren y cierran al tocar el título. */
+.portal-desp { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-top: 12px; }
+.portal-desp > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 14px; flex-wrap: wrap; }
+.portal-desp > summary::-webkit-details-marker { display: none; }
+.portal-desp-titulo { font-size: 14px; font-weight: 600; }
+.portal-desp-resumen { font-size: 12.5px; color: var(--text-2); flex: 1; text-align: right; }
+.portal-desp-flecha { font-size: 16px; color: var(--text-3); transition: transform .15s; margin-left: auto; }
+.portal-desp[open] > summary .portal-desp-flecha { transform: rotate(180deg); }
+.portal-desp-cuerpo { padding: 0 14px 14px; }
+.portal-desp-cuerpo .portal-tarjeta:last-child { margin-bottom: 0; }
+/* Los períodos van como desplegables dentro de "Mis días por período". */
+.portal-desp-interno { margin-top: 8px; background: var(--bg); }
+.portal-desp-interno > summary { padding: 11px 12px; }
+.portal-desp-interno .portal-desp-titulo { font-size: 13.5px; }
+.portal-desp-interno .portal-desp-cuerpo { padding: 0 12px 12px; }
