@@ -5,8 +5,8 @@
 //  - Página Órdenes de compra › Oportunidades, con filtros y ficha.
 //  - Campana roja arriba con las "Novedades": las abiertas que esta cuenta
 //    todavía no ha visto. Cada cuenta marca lo suyo (`mp_oportunidades_vistas`).
-// Prioridad (la calcula la sincronización): alta = dice magistral/recetario…
-// o es un hospital cliente pidiendo un producto de Bulfor; media = pide un
+// Prioridad (la calcula la sincronización): alta = dice magistral, recetario
+// magistral, preparado farmacéutico, oficinal o papelillos; media = pide un
 // producto de Bulfor; baja = solo una forma farmacéutica (oculta por defecto).
 // Todo lo de este módulo empieza con "op".
 

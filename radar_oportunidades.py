@@ -17,8 +17,8 @@ Qué hace:
      volver a consultarlas en cada corrida (la app no las muestra).
 
 Prioridad:
-  alta  = dice magistral/recetario/preparado/oficinal/papelillos…, o es de un
-          hospital cliente y pide un producto que Bulfor vende.
+  alta  = dice magistral, recetario magistral, preparado farmacéutico, oficinal
+          o papelillos.
   media = pide un producto que Bulfor vende, o es de un cliente y pide una forma
           farmacéutica típica (jarabe, cápsulas, suspensión oral…).
   baja  = solo coincide una forma farmacéutica, o es una licitación de
@@ -51,9 +51,11 @@ supabase = None if PROBAR and not os.environ.get('SUPABASE_URL') else \
 # Sacadas de las OC de Bulfor de los últimos 18 meses (26-11-2026). Se comparan
 # sin tildes y en minúsculas. Cada una es una expresión regular corta.
 FUERTES = [  # hablan directamente de recetario magistral
-    r'magistral', r'recetario', r'preparados? farmac', r'preparado magistral',
-    r'\bformulas?\b(?! ?(de )?(inscripcion|postulacion))', r'oficinal',
-    r'papelillos?', r'encapsulad', r'fraccionamiento',
+    # (26-11-2026, tras la primera carga real: se quitaron "fórmula" —traía
+    # fórmulas lácteas y enterales—, "encapsulado" y "fraccionamiento" —traían
+    # envasadoras— y "recetario" a secas —traía impresión de recetarios—)
+    r'magistral', r'recetario (magistral|farmac)', r'preparados? farmac',
+    r'oficinal', r'papelillos?',
 ]
 PRODUCTOS = [  # productos que Bulfor vende seguido a hospitales
     r'polietilenglicol', r'\bpeg\b', r'bicarbonato de sodio', r'carnitina',
@@ -94,7 +96,9 @@ def clasificar(texto, es_cliente, medicamento=False):
     """Prioridad y palabras encontradas para un texto (nombre + descripción + productos)."""
     f, p, fo = buscar(texto, FUERTES), buscar(texto, PRODUCTOS), buscar(texto, FORMAS)
     palabras = f + p + fo
-    if f or (es_cliente and p):
+    # Un producto de Bulfor dentro de una licitación grande de medicamentos no
+    # basta para "alta": queda en media (la app muestra primero a los clientes)
+    if f:
         prio = 'alta'
     elif p or (es_cliente and fo):
         prio = 'media'
@@ -192,6 +196,8 @@ def ultima_publicacion_compra_agil():
 def guardar(filas):
     if not filas:
         return
+    # Sin repetidos dentro del mismo envío (la base rechaza el lote completo)
+    filas = list({f['codigo']: f for f in filas}.values())
     if PROBAR or not supabase:
         for f in filas:
             if f['prioridad']:
@@ -237,6 +243,7 @@ def compras_agiles(clientes):
             # traer la palabra aunque el nombre no)
             medica = LICITACION_CANDIDATA.search(sin_tildes(it.get('nombre')))
             if it.get('codigo') not in ya and (prio or (cliente and medica)):
+                ya.add(it.get('codigo'))  # la misma puede salir en dos páginas
                 candidatas.append((it, cliente))
         pag = p.get('paginacion') or {}
         if pagina == 1:
