@@ -21,6 +21,7 @@
 
 <link rel="stylesheet" href="guias-cot.css">
 <link rel="stylesheet" href="oportunidades.css">
+<link rel="stylesheet" href="competencia.css">
 </head>
 <body>
 
@@ -86,6 +87,7 @@
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
         <div class="nav-item nav-subitem" data-page="oportunidades" onclick="seleccionarSubpagina('oc-modulo','oportunidades',this)"><span>Oportunidades</span></div>
+        <div class="nav-item nav-subitem" data-page="competencia" onclick="seleccionarSubpagina('oc-modulo','competencia',this)"><span>Competencia en licitaciones</span></div>
       </div>
     </div>
 
@@ -707,6 +709,12 @@
       <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
     </div>
     <div id="doc-contenido"></div>
+  </div>
+
+  <!-- Competencia en licitaciones (competencia.js): solo productos donde ofertó Bulfor. -->
+  <div class="page" id="page-competencia">
+    <div class="page-header"><div class="page-title">Competencia en licitaciones</div><div class="page-sub">Lo que ofertamos en licitaciones de Mercado Público y lo que ofertó la competencia en esos mismos productos.</div></div>
+    <div id="cmp-contenido"></div>
   </div>
 
   <!-- Guías por facturar: pantalla centrada en COT, sin cambios a otros módulos. -->
@@ -1465,6 +1473,7 @@
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
+<script src="competencia.js"></script>
 <script src="permisos.js"></script>
 <script src="oportunidades.js"></script>
 <script src="portal-trabajador.js"></script>
@@ -18553,6 +18562,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
     { icon: '<i class="ti ti-radar"></i>', label: 'Oportunidades', page: 'oportunidades' },
+    { icon: '<i class="ti ti-scale"></i>', label: 'Competencia en licitaciones', page: 'competencia' },
   ] },
   // Precios: solo los precios facturados (los de OC se quitaron). El menú
   // entra directo; "Por cliente" es la otra vista de la misma pantalla.
@@ -18770,6 +18780,7 @@ function showPage(id, el) {
   if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
   if (id === 'guias-cot') gcInit();
   if (id === 'oportunidades') opInit();
+  if (id === 'competencia') cmpInit();
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
   // agrupa Por producto y Por cliente): así queda marcado en las dos.
