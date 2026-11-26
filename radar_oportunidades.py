@@ -214,8 +214,11 @@ def compras_agiles(clientes):
         params = {'publicado_desde': desde.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
         print(f"  Publicadas desde {desde.astimezone(CHILE):%d-%m-%Y %H:%M}")
     else:
-        params = {}
-        print("  Primera corrida: todas las que siguen abiertas")
+        # Primera corrida: las publicadas en los últimos 4 días (una compra ágil
+        # suele cerrar en 1 a 3 días, así que las abiertas están ahí)
+        desde = ahora - timedelta(days=4)
+        params = {'publicado_desde': desde.strftime('%Y-%m-%dT%H:%M:%SZ')}
+        print("  Primera corrida: publicadas en los últimos 4 días")
     params.update({'estado': 'publicada', 'tamano_pagina': 50, 'ordenar_por': 'FechaPublicacion'})
 
     ya = codigos_guardados('compra_agil')
@@ -236,7 +239,12 @@ def compras_agiles(clientes):
             if it.get('codigo') not in ya and (prio or (cliente and medica)):
                 candidatas.append((it, cliente))
         pag = p.get('paginacion') or {}
-        if pagina >= (pag.get('total_paginas') or 1):
+        if pagina == 1:
+            print(f"  {pag.get('total_resultados')} publicadas en {pag.get('total_paginas')} páginas", flush=True)
+        elif pagina % 20 == 0:
+            print(f"    … página {pagina}", flush=True)
+        # Tope de seguridad: si la API no cierra la paginación, no se queda pegado
+        if not items or pagina >= (pag.get('total_paginas') or 1) or pagina >= 400:
             break
         pagina += 1
         time.sleep(0.3)
@@ -274,7 +282,10 @@ def compras_agiles(clientes):
             'actualizada_en': datetime.now(timezone.utc).isoformat(),
         })
         time.sleep(0.3)
-    guardar(filas)
+        if len(filas) % 50 == 0:  # se guarda por partes para no perder avance
+            guardar(filas[-50:])
+            print(f"    … {len(filas)} abiertas en detalle", flush=True)
+    guardar(filas[len(filas) - len(filas) % 50:])
     print(f"  ✔ {len(filas)} compras ágiles revisadas ({sum(1 for f in filas if f['prioridad'])} calzan)")
 
 
@@ -327,7 +338,10 @@ def licitaciones(clientes):
             'url': f"https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion={codigo}",
             'actualizada_en': datetime.now(timezone.utc).isoformat(),
         })
-    guardar(filas)
+        if len(filas) % 25 == 0:  # se guarda por partes para no perder avance
+            guardar(filas[-25:])
+            print(f"    … {len(filas)} de {len(cand)} licitaciones abiertas en detalle", flush=True)
+    guardar(filas[len(filas) - len(filas) % 25:])
     print(f"  ✔ {len(filas)} licitaciones revisadas ({sum(1 for f in filas if f['prioridad'])} calzan)")
 
 

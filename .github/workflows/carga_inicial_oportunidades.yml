@@ -3,6 +3,7 @@ name: TEMPORAL - Carga inicial radar y contactos de OC
 # Carga única autorizada por Seba el 26-11-2026. Corre al hacer push a la rama
 # de Claude: llena el radar por primera vez y completa contacto y estado de las
 # OC antiguas (respaldo previo: ordenes_compra_backup_20261126). Se borra después.
+# (2.º intento: el primero se canceló porque el radar no tenía tope de fechas.)
 on:
   push:
     branches: [claude/gracious-cray-bpmg45]
@@ -19,14 +20,16 @@ jobs:
           python-version: '3.11'
       - run: pip install requests supabase
       - name: Radar (primera corrida)
+        timeout-minutes: 60
+        continue-on-error: true  # si el radar falla, igual se cargan los contactos
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           MP_TICKET:    ${{ secrets.MP_TICKET }}
-        run: python radar_oportunidades.py
+        run: python -u radar_oportunidades.py
       - name: Contacto y estado de las OC antiguas
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           MP_TICKET:    ${{ secrets.MP_TICKET }}
-        run: python actualizar_oc_final.py --rellenar
+        run: python -u actualizar_oc_final.py --rellenar
