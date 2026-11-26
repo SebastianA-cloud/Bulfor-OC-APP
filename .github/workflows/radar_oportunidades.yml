@@ -25,4 +25,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}  # clave de administrador: solo en GitHub Secrets
           MP_TICKET:    ${{ secrets.MP_TICKET }}
-        run: python radar_oportunidades.py
+        run: python -u radar_oportunidades.py

@@ -68,7 +68,8 @@ PRODUCTOS = [  # productos que Bulfor vende seguido a hospitales
 FORMAS = [  # formas farmacéuticas típicas de magistrales (por sí solas pesan poco)
     r'capsulas?', r'jarabe', r'suspension oral', r'solucion oral', r'pellets',
 ]
-# Nombres de licitaciones que vale la pena abrir en detalle
+# Nombres que pueden ser de medicamentos: vale la pena abrirlos en detalle
+# (licitaciones siempre; compras ágiles solo si son de un hospital cliente)
 LICITACION_CANDIDATA = re.compile(
     r'magistral|recetario|preparad|medicament|farmac|farmaco|suplement|formula|oficinal|papelillo')
 
@@ -207,8 +208,9 @@ def compras_agiles(clientes):
     ultima = ultima_publicacion_compra_agil()
     ahora = datetime.now(timezone.utc)
     if ultima:
-        # 6 horas de margen por si alguna se publicó con atraso; máximo 3 días
-        desde = max(ultima - timedelta(hours=6), ahora - timedelta(days=3))
+        # Desde la última revisada (con 2 h de margen), mínimo las últimas 4 h
+        # (la sincronización corre cada 2 h) y máximo 3 días hacia atrás.
+        desde = max(min(ultima - timedelta(hours=2), ahora - timedelta(hours=4)), ahora - timedelta(days=3))
         params = {'publicado_desde': desde.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
         print(f"  Publicadas desde {desde.astimezone(CHILE):%d-%m-%Y %H:%M}")
     else:
@@ -227,9 +229,11 @@ def compras_agiles(clientes):
             inst = it.get('institucion') or {}
             cliente = norm_rut(inst.get('rut')) in clientes
             prio, _ = clasificar(it.get('nombre'), cliente)
-            # Se abre en detalle si calza algo o si es un cliente (la descripción
-            # y los productos pueden traer la palabra aunque el nombre no)
-            if it.get('codigo') not in ya and (prio or cliente):
+            # Se abre en detalle si el nombre calza, o si es de un cliente y el
+            # nombre suena a medicamentos (la descripción y los productos pueden
+            # traer la palabra aunque el nombre no)
+            medica = LICITACION_CANDIDATA.search(sin_tildes(it.get('nombre')))
+            if it.get('codigo') not in ya and (prio or (cliente and medica)):
                 candidatas.append((it, cliente))
         pag = p.get('paginacion') or {}
         if pagina >= (pag.get('total_paginas') or 1):
@@ -251,8 +255,8 @@ def compras_agiles(clientes):
         texto = ' '.join([d.get('nombre') or '', d.get('descripcion') or ''] +
                          [f"{x['nombre'] or ''} {x['descripcion'] or ''}" for x in productos])
         prio, palabras = clasificar(texto, cliente)
-        if not prio:
-            continue  # cliente, pero no es algo que Bulfor venda
+        # Las que no calzan se guardan igual con prioridad vacía (la app no las
+        # muestra) para no volver a abrirlas en la próxima corrida.
         inst, fechas, pres = d.get('institucion') or {}, d.get('fechas') or {}, d.get('presupuesto') or {}
         filas.append({
             'codigo': d['codigo'], 'tipo': 'compra_agil',
@@ -263,7 +267,7 @@ def compras_agiles(clientes):
             'fecha_publicacion': fecha_chile(fechas.get('fecha_publicacion')),
             'fecha_cierre': fecha_chile(fechas.get('fecha_cierre')),
             'monto': pres.get('monto_disponible_clp') or pres.get('presupuesto_estimado'),
-            'moneda': 'CLP', 'productos': productos, 'palabras': palabras,
+            'moneda': 'CLP', 'productos': productos if prio else None, 'palabras': palabras,
             'prioridad': prio, 'es_cliente': cliente,
             'total_ofertas': (d.get('resumen') or {}).get('total_ofertas_recibidas'),
             'url': f"https://buscador.mercadopublico.cl/ficha?code={d['codigo']}",
@@ -271,7 +275,7 @@ def compras_agiles(clientes):
         })
         time.sleep(0.3)
     guardar(filas)
-    print(f"  ✔ {len(filas)} compras ágiles guardadas")
+    print(f"  ✔ {len(filas)} compras ágiles revisadas ({sum(1 for f in filas if f['prioridad'])} calzan)")
 
 
 # ─── 2. LICITACIONES ────────────────────────────────────────────────────────
