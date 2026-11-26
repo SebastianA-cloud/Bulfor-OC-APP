@@ -1,0 +1,42 @@
+/* Competencia en licitaciones (competencia.js). Todo bajo .cmp-* para no
+   afectar otras pantallas. */
+.cmp-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.cmp-nota { font-size: 12px; color: var(--text-3); }
+.cmp-vacio { padding: 28px; text-align: center; color: var(--text-3); }
+.cmp-kpis { grid-template-columns: repeat(4, 1fr); }
+.cmp-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.cmp-verde { color: #1E7B4F; }
+.cmp-rojo { color: var(--red, #C0392B); }
+.cmp-gris { font-size: 12px; color: var(--text-3); font-weight: 400; }
+.cmp-tabla { margin-bottom: 8px; }
+@media (max-width: 760px) { .cmp-tabla { overflow-x: auto; } }
+.cmp-tabla table { width: 100%; }
+.cmp-tabla td, .cmp-tabla th { text-align: center; vertical-align: middle; }
+.cmp-tabla td.cmp-izq, .cmp-tabla th.cmp-izq { text-align: left; }
+.cmp-prod { max-width: 420px; }
+.cmp-click { cursor: pointer; }
+.cmp-click:hover td { background: var(--row-hover, #FAF8F4); }
+.cmp-ayuda { font-size: 12px; color: var(--text-3); line-height: 1.5; max-width: 820px; margin: 8px 0 20px; }
+.cmp-toolbar select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-family: var(--font); font-size: 13px; }
+.cmp-info { font-size: 12px; color: var(--text-3); margin: 0 0 8px; }
+.cmp-tabla td:first-child { white-space: nowrap; }
+.cmp-paginas { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 12px 0; font-size: 13px; }
+.cmp-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; background: #EEECE6; color: var(--text-2); white-space: nowrap; }
+.cmp-b-gano { background: #E3F2EA; color: #1E7B4F; }
+.cmp-b-perdio { background: #FBE9E7; color: #A5341F; }
+.cmp-modal { max-width: 860px; }
+.cmp-eyebrow { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; }
+.cmp-titulo { font-size: 16px; font-weight: 600; margin: 2px 0; }
+.cmp-franja { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 12px; background: #FAF9F6; margin-bottom: 16px; }
+.cmp-franja > div { padding: 10px 14px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cmp-franja > div:last-child { border-right: none; }
+.cmp-franja span { font-size: 11px; color: var(--text-3); }
+.cmp-franja strong { font-size: 14px; overflow-wrap: anywhere; }
+.cmp-h4 { font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
+.cmp-fila-bulfor td { background: #FFF6F4; font-weight: 600; }
+@media (max-width: 760px) {
+  .cmp-kpis { grid-template-columns: 1fr 1fr; }
+  .cmp-franja { grid-template-columns: 1fr 1fr; }
+  .cmp-franja > div:nth-child(2) { border-right: none; }
+  .cmp-franja > div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
