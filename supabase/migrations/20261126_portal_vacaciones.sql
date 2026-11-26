@@ -10,7 +10,9 @@
 --     tablas de `public` y en los archivos (storage) que dice "si la cuenta es
 --     de trabajador, nada". Es restrictiva: se SUMA a las reglas actuales sin
 --     tocarlas, así que el equipo de oficina sigue exactamente igual.
---  4. El trabajador no lee tablas: usa solo cuatro funciones que entregan SU
+--  4. Cada período guarda desde qué fecha se puede usar (disponible_desde);
+--     usar días antes de esa fecha es un adelanto acordado.
+--  5. El trabajador no lee tablas: usa solo cuatro funciones que entregan SU
 --     información y le permiten pedir o anular SUS vacaciones. Las funciones
 --     recalculan días hábiles y saldo aquí en la base, no en el navegador.
 --
@@ -26,6 +28,39 @@ alter table public.personal
 alter table public.vacaciones_solicitudes drop constraint if exists vacaciones_solicitudes_origen_check;
 alter table public.vacaciones_solicitudes add constraint vacaciones_solicitudes_origen_check
   check (origen = any (array['app'::text, 'excel'::text, 'portal'::text]));
+
+-- 1b. Desde cuándo se puede usar cada período ──────────────────────────────
+-- Un período se gana en el aniversario de ingreso. Antes de esa fecha, usar
+-- sus días es un ADELANTO (se permite, pero debe estar conversado con
+-- Sebastián: el portal lo avisa y la solicitud llega marcada).
+-- Se guarda en vez de calcularse porque no siempre calza con el nombre del
+-- período (caso real: ingreso en diciembre). Si no se indica, se sugiere el
+-- aniversario de ingreso en el año siguiente al de inicio del período.
+alter table public.vacaciones_periodos add column if not exists disponible_desde date;
+
+create or replace function public.vac_periodo_disponible_desde()
+returns trigger language plpgsql set search_path = public, pg_temp as $$
+begin
+  if new.disponible_desde is null then
+    -- `+ interval` resuelve solo el 29 de febrero (pasa al 28).
+    select (pe.fecha_ingreso + make_interval(years => new.anio_inicio + 1 - extract(year from pe.fecha_ingreso)::int))::date
+      into new.disponible_desde
+      from public.personal pe where pe.id = new.personal_id and pe.fecha_ingreso is not null;
+  end if;
+  return new;
+end $$;
+drop trigger if exists vac_periodo_disponible_desde on public.vacaciones_periodos;
+create trigger vac_periodo_disponible_desde before insert on public.vacaciones_periodos
+  for each row execute function public.vac_periodo_disponible_desde();
+
+-- Períodos ya cargados (26-11-2026): la regla general…
+update public.vacaciones_periodos p
+   set disponible_desde = (pe.fecha_ingreso + make_interval(years => p.anio_inicio + 1 - extract(year from pe.fecha_ingreso)::int))::date
+  from public.personal pe
+ where pe.id = p.personal_id and p.disponible_desde is null and pe.fecha_ingreso is not null;
+-- …y la excepción confirmada por Seba: el trabajador id 9 (ingreso en
+-- diciembre) ganó su "25/26" el 01-12-2025 y su "26/27" el 01-12-2026.
+update public.vacaciones_periodos set disponible_desde = make_date(anio_inicio, 12, 1) where personal_id = 9;
 
 -- 2. ¿La cuenta conectada es de trabajador? ──────────────────────────────────
 create or replace function public.es_trabajador()
@@ -128,6 +163,7 @@ declare
   v_total  numeric := 0;
   v_id     bigint;
   v_dist   text;
+  v_adel   numeric := 0;
   r        record;
 begin
   if v_pid is null then raise exception 'Tu cuenta no está vinculada a una ficha de trabajador activa. Habla con Sebastián.'; end if;
@@ -164,7 +200,7 @@ begin
   returning id into v_id;
 
   v_resto := v_dias;
-  for r in select p.id, p.dias_totales from public.vacaciones_periodos p
+  for r in select p.id, p.dias_totales, p.disponible_desde from public.vacaciones_periodos p
             where p.personal_id = v_pid order by p.anio_inicio loop
     exit when v_resto <= 0;
     v_disp := r.dias_totales - public.vac_dias_usados(r.id);
@@ -172,6 +208,8 @@ begin
       v_usa := least(v_disp, v_resto);
       insert into public.vacaciones_distribucion (solicitud_id, periodo_id, dias) values (v_id, r.id, v_usa);
       v_resto := v_resto - v_usa;
+      -- Días de un período que aún no se puede usar en la fecha de inicio = adelanto.
+      if r.disponible_desde is not null and r.disponible_desde > p_inicio then v_adel := v_adel + v_usa; end if;
     end if;
   end loop;
   if v_resto > 0 then raise exception 'No alcanza el saldo para cubrir esos días.'; end if;
@@ -183,8 +221,9 @@ begin
    where d.solicitud_id = v_id;
   insert into public.vacaciones_bitacora (entidad, entidad_id, personal_id, accion, detalle, usuario)
   values ('solicitud', v_id, v_pid, 'crear',
-          format('Pedida desde el portal · %s a %s · %s días · pendiente · períodos %s',
-                 p_inicio, p_fin, public.vac_num(v_dias), coalesce(v_dist, '—')),
+          format('Pedida desde el portal · %s a %s · %s días · pendiente · períodos %s%s',
+                 p_inicio, p_fin, public.vac_num(v_dias), coalesce(v_dist, '—'),
+                 case when v_adel > 0 then ' · ADELANTO de ' || public.vac_num(v_adel) || ' días' else '' end),
           v_email);
   return v_id;
 end $$;

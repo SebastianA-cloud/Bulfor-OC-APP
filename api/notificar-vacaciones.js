@@ -74,10 +74,16 @@ export default async function handler(req, res) {
       // Evita reenvíos: solo avisa de solicitudes recién creadas.
       if (Date.now() - new Date(s.created_at).getTime() > 10 * 60 * 1000) return res.status(200).json({ ok: true, omitido: true });
       const t = datos.trabajador;
-      await enviarCorreo(process.env.NOTIFY_EMAIL, `Vacaciones: ${t.nombre} pidió ${s.dias_habiles} días`, `
+      // ¿Usa días de un período que aún no se puede usar en esa fecha? = adelanto acordado.
+      const periodos = new Map((datos.periodos || []).map(p => [p.id, p]));
+      const adelanto = (datos.distribucion || []).filter(d => d.solicitud_id === id)
+        .map(d => ({ dias: Number(d.dias), per: periodos.get(d.periodo_id) }))
+        .filter(x => x.per && x.per.disponible_desde && x.per.disponible_desde > s.fecha_inicio);
+      await enviarCorreo(process.env.NOTIFY_EMAIL, `Vacaciones: ${t.nombre} pidió ${s.dias_habiles} días${adelanto.length ? ' (adelanto)' : ''}`, `
         <p><strong>${esc(t.nombre)}</strong> pidió vacaciones desde el portal.</p>
         <p><strong>Fechas:</strong> ${fechaLarga(s.fecha_inicio)} al ${fechaLarga(s.fecha_fin)}<br>
            <strong>Días hábiles:</strong> ${esc(s.dias_habiles)}</p>
+        ${adelanto.length ? `<p style="color:#92400E"><strong>Es un adelanto:</strong> ${adelanto.map(x => `${x.dias} día(s) del período ${esc(x.per.periodo)}, que se puede usar desde el ${fechaLarga(x.per.disponible_desde)}`).join('; ')}.</p>` : ''}
         ${s.observaciones ? `<p><strong>Comentario:</strong> ${esc(s.observaciones)}</p>` : ''}
         <p>Entra a la app (Recursos humanos → Vacaciones) para aprobarla o rechazarla:<br>
            <a href="${APP_URL}">${APP_URL}</a></p>`);

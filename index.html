@@ -9531,7 +9531,7 @@ function alertasVacaciones() {
   // Las pedidas por el propio trabajador desde el portal van una por una,
   // para abrirlas y responder directo.
   pendientes.filter(s => s.origen === 'portal').forEach(s => out.push({ tipo: 'warn',
-    texto: `<strong>${escapeHtml(nombreDe(s.personal_id))}</strong> pidió vacaciones desde el portal: ${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} día${Number(s.dias_habiles) === 1 ? '' : 's'}.`,
+    texto: `<strong>${escapeHtml(nombreDe(s.personal_id))}</strong> pidió vacaciones desde el portal: ${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} día${Number(s.dias_habiles) === 1 ? '' : 's'}${adelantoDeSolicitud(s).length ? ' · <strong>adelanto</strong>' : ''}.`,
     onclick: `navReset();abrirDetalleSolicitud(${s.id})` }));
   if (pendientes.length) out.push({ tipo: 'warn',
     texto: `Hay <strong>${pendientes.length}</strong> solicitud${pendientes.length === 1 ? '' : 'es'} pendiente${pendientes.length === 1 ? '' : 's'} de aprobación.`,
@@ -9957,6 +9957,8 @@ function abrirFormPeriodo(personalId, periodoId) {
           <span style="font-size:13px;color:var(--accent);font-weight:500">Total del período</span>
           <span style="font-size:19px;font-weight:700;color:var(--accent)" id="vp-total">—</span>
         </div>
+        ${campoRRHH('vp-desde', 'Se puede usar desde', `<input type="date" id="vp-desde" value="${per && per.disponible_desde ? per.disponible_desde : ''}" style="padding-left:12px">`)}
+        <div style="font-size:11.5px;color:var(--text-3);margin:-6px 0 14px">Normalmente el aniversario de ingreso en que se gana el período. Usar días antes de esta fecha cuenta como adelanto. Si lo dejas vacío, se calcula solo.</div>
         ${campoRRHH('vp-obs', 'Motivo del ajuste u observación', `<input type="text" id="vp-obs" value="${escapeHtml((per && per.observacion) || '')}" placeholder="Queda registrado en la bitácora" style="padding-left:12px">`)}
         <div style="font-size:11.5px;color:var(--text-3);margin-bottom:14px">
           El ajuste sirve para correcciones puntuales: días arrastrados, un acuerdo particular, un error del control anterior. Todo cambio queda con fecha, valor anterior, valor nuevo y usuario.
@@ -9986,11 +9988,19 @@ async function guardarPeriodoVac(personalId, periodoId, periodoTexto, btn) {
   const original = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
-    await rpcVac('vac_guardar_periodo', {
+    const idPeriodo = await rpcVac('vac_guardar_periodo', {
       p_personal_id: personalId, p_periodo: periodo, p_anio_inicio: anio,
       p_base: n('vp-base'), p_progresivos: n('vp-prog'), p_ajuste: n('vp-ajuste'),
       p_usuario: usuarioActualVac(), p_obs: document.getElementById('vp-obs').value.trim() || null,
     });
+    // "Se puede usar desde": vacío en un período nuevo = lo calcula la base
+    // (aniversario de ingreso); si se escribió, se guarda tal cual.
+    const desdeEl = document.getElementById('vp-desde');
+    const desdeAntes = periodoId ? (vacPeriodos.find(p => p.id === periodoId).disponible_desde || '') : '';
+    if (idPeriodo && desdeEl && desdeEl.value && desdeEl.value !== desdeAntes) {
+      const r = await sb(`vacaciones_periodos?id=eq.${idPeriodo}`, { method: 'PATCH', body: JSON.stringify({ disponible_desde: desdeEl.value }) });
+      if (!r.ok) toast('El período se guardó, pero no la fecha "Se puede usar desde".', 'err');
+    }
     await recargarVacaciones();
     cerrarTodosLosModales();
     abrirPerfilVacaciones(personalId);
@@ -10303,6 +10313,7 @@ function abrirDetalleSolicitud(id) {
           ${s.excepcion_saldo ? `<div style="margin-top:6px;color:var(--amber)"><strong>Autorizada como excepción por sobre el saldo.</strong> ${escapeHtml(s.motivo_excepcion || '')}</div>` : ''}
           ${s.origen === 'excel' ? '<div style="margin-top:6px;color:var(--text-3)">Registro migrado desde el control en Excel.</div>' : ''}
           ${s.origen === 'portal' ? '<div style="margin-top:6px;color:var(--text-3)">Pedida por el trabajador desde el portal. Al aprobar o rechazar se le avisa por correo.</div>' : ''}
+          ${adelantoDeSolicitud(s).length ? `<div style="margin-top:6px;color:var(--amber)"><strong>Adelanto:</strong> ${textoAdelanto(adelantoDeSolicitud(s))}.</div>` : ''}
         </div>
 
         ${otros.length ? `<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--amber)">

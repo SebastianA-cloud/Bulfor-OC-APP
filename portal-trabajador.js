@@ -29,6 +29,30 @@ function portalRegistrarModal(id) {
   if (typeof MODAL_OVERLAY_IDS !== 'undefined' && !MODAL_OVERLAY_IDS.includes(id)) MODAL_OVERLAY_IDS.push(id);
 }
 
+// ─── Adelantos ─────────────────────────────────────────────────────────────
+// Cada período guarda desde qué fecha se puede usar (disponible_desde = el
+// aniversario de ingreso en que se gana). Usar sus días antes de esa fecha
+// es un ADELANTO: se permite, pero debe estar conversado con Sebastián.
+// Sin fecha registrada se considera usable.
+function periodoUsableDesde(periodoId) {
+  const p = vacPeriodos.find(x => x.id === periodoId);
+  return (p && p.disponible_desde) || null;
+}
+
+// Tramos de una solicitud que son adelanto: [{periodo, dias, desde}].
+function adelantoDeSolicitud(sol) {
+  if (!sol) return [];
+  return vacDistribucion.filter(d => d.solicitud_id === sol.id).map(d => {
+    const per = vacPeriodos.find(x => x.id === d.periodo_id);
+    return { periodo: per ? per.periodo : '', dias: Number(d.dias), desde: per && per.disponible_desde };
+  }).filter(t => t.desde && t.desde > sol.fecha_inicio);
+}
+
+// Texto corto para avisos: "3 días del período 26/27 (se puede usar desde el 01-03-2027)".
+function textoAdelanto(tramos) {
+  return tramos.map(t => `${redondear(t.dias)} día${t.dias === 1 ? '' : 's'} del período ${escapeHtml(t.periodo)} (se puede usar desde el ${fDate(t.desde)})`).join(' y ');
+}
+
 async function arrancarPortalTrabajador() {
   document.body.classList.add('modo-portal');
   let cont = document.getElementById('portal-trabajador');
@@ -95,6 +119,9 @@ function portalRender() {
   const prox = proximasVacacionesDe(t.id);
   const solicitudes = solicitudesDe(t.id);
   const hoy = vacHoy();
+  const usableHoy = p => { const d = periodoUsableDesde(p.id); return !d || d <= hoy; };
+  const dispHoy = redondear(s.periodos.filter(usableHoy).reduce((n, p) => n + p.disponibles, 0));
+  const futuros = s.periodos.filter(p => !usableHoy(p) && p.disponibles > 0);
 
   // Antes del primer aniversario la ley todavía no da derecho a vacaciones:
   // lo que pida es un adelanto que Sebastián decide si aprueba.
@@ -106,10 +133,11 @@ function portalRender() {
       ${portalEncabezado(t.nombre)}
 
       ${vigente ? `<div class="portal-aviso ok"><i class="ti ti-beach" aria-hidden="true"></i> Estás de vacaciones hasta el <strong>${fDate(vigente.fecha_fin)}</strong>. Vuelves el ${fDate(portalDiaRegreso(vigente.fecha_fin))}.</div>` : ''}
-      ${antesDelAnio ? `<div class="portal-aviso warn">Tu derecho legal a vacaciones comienza el <strong>${fDate(aniversario)}</strong> (al cumplir un año). Antes de esa fecha, lo que pidas es un adelanto que debe aprobarse.</div>` : ''}
+      ${antesDelAnio ? `<div class="portal-aviso warn">Tu derecho legal a vacaciones comienza el <strong>${fDate(aniversario)}</strong> (al cumplir un año). Antes de esa fecha, lo que pidas es un adelanto que debe estar conversado con Sebastián.</div>` : ''}
 
       <div class="portal-stats">
-        <div class="stat destacado"><div class="stat-label">Días disponibles</div><div class="stat-val">${s.periodos.length ? s.disponibles : '—'}</div><div class="stat-sub">${s.periodos.length ? 'días hábiles para pedir' : 'aún sin períodos asignados'}</div></div>
+        <div class="stat destacado"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${s.periodos.length ? dispHoy : '—'}</div><div class="stat-sub">${!s.periodos.length ? 'aún sin períodos asignados'
+          : futuros.length ? futuros.map(p => `+${p.disponibles} desde el ${fDate(periodoUsableDesde(p.id))} (período ${escapeHtml(p.periodo)})`).join('<br>') : 'días hábiles para pedir'}</div></div>
         <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val">${s.pendientes}</div><div class="stat-sub">días esperando aprobación</div></div>
         <div class="stat"><div class="stat-label">Próximas vacaciones</div><div class="stat-val" style="font-size:15px;line-height:1.35">${prox ? rangoLegible(prox.fecha_inicio, prox.fecha_fin) : '—'}</div><div class="stat-sub">${prox ? `${prox.dias_habiles} días · ${prox.estado === 'pendiente' ? 'por aprobar' : 'aprobadas'}` : 'nada programado'}</div></div>
       </div>
@@ -126,7 +154,8 @@ function portalRender() {
       ${s.periodos.length ? s.periodos.map(p => `
         <div class="portal-tarjeta">
           <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
-            <div style="font-weight:600">Período ${escapeHtml(p.periodo)}</div>
+            <div><div style="font-weight:600">Período ${escapeHtml(p.periodo)}</div>
+              <div style="font-size:11.5px;margin-top:2px;color:${usableHoy(p) ? 'var(--green)' : 'var(--amber)'}">${usableHoy(p) ? 'Ya lo puedes usar' : 'Se puede usar desde el ' + fDate(periodoUsableDesde(p.id))}</div></div>
             <div style="font-size:13px"><strong style="font-size:18px">${p.disponibles}</strong> disponibles</div>
           </div>
           <div class="portal-periodo-nums">
@@ -136,7 +165,7 @@ function portalRender() {
           </div>
           ${p.observacion ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:6px">${escapeHtml(p.observacion)}</div>` : ''}
         </div>`).join('') : '<div class="portal-vacio">Aún no tienes períodos asignados.</div>'}
-      <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo.</div>
+      <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo. Usar días de un período antes de la fecha en que se puede usar es un adelanto y debe estar conversado con Sebastián.</div>
 
       <div class="portal-seccion">Vacaciones del equipo (próximos 4 meses)</div>
       ${portalEquipo.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
@@ -169,6 +198,7 @@ function portalTarjetaSolicitud(sol) {
         </div>
         ${badgeVac(estado)}
       </div>
+      ${(() => { const a = adelantoDeSolicitud(sol); return a.length && sol.estado !== 'cancelado' && sol.estado !== 'rechazado' ? `<div style="font-size:12px;color:var(--amber);margin-top:8px"><strong>Adelanto:</strong> ${textoAdelanto(a)}.</div>` : ''; })()}
       ${sol.observaciones ? `<div style="font-size:12.5px;color:var(--text-2);margin-top:8px">${escapeHtml(sol.observaciones)}</div>` : ''}
       ${respuesta && (sol.estado === 'rechazado' || sol.estado === 'aprobado') ? `<div style="font-size:12.5px;margin-top:8px"><strong>Respuesta:</strong> ${escapeHtml(respuesta)}</div>` : ''}
       ${sol.estado === 'pendiente' ? `<div style="margin-top:10px"><button class="page-btn" style="padding:6px 12px;font-size:12.5px" onclick="portalAnular(${sol.id}, this)">Anular solicitud</button></div>` : ''}
@@ -240,7 +270,15 @@ function portalRecalcular() {
   let ok = true;
   if (dias === 0) { html += `<div class="portal-aviso warn" style="margin-top:8px">Esas fechas no tienen días hábiles.</div>`; ok = false; }
   else if (dias > saldo.disponibles) { html += `<div class="portal-aviso err" style="margin-top:8px">Tienes ${saldo.disponibles} días disponibles: no te alcanza.</div>`; ok = false; }
-  else html += `<div style="font-size:12.5px;margin-top:6px">Te quedarían <strong>${redondear(saldo.disponibles - dias)}</strong> días disponibles.</div>`;
+  else {
+    html += `<div style="font-size:12.5px;margin-top:6px">Te quedarían <strong>${redondear(saldo.disponibles - dias)}</strong> días en total.</div>`;
+    // Misma regla que la base: se gasta primero el período más antiguo; lo
+    // que salga de un período que aún no se puede usar en esa fecha es adelanto.
+    const adel = sugerirDistribucion(t.id, dias).tramos
+      .map(tr => ({ periodo: tr.periodo, dias: tr.dias, desde: periodoUsableDesde(tr.periodo_id) }))
+      .filter(tr => tr.desde && tr.desde > desde);
+    if (adel.length) html += `<div class="portal-aviso warn" style="margin-top:8px"><strong>Estás adelantando vacaciones:</strong> ${textoAdelanto(adel)}. Envíala solo si ya lo conversaste con Sebastián; la solicitud le llegará marcada como adelanto.</div>`;
+  }
   if (cruce) { html += `<div class="portal-aviso err" style="margin-top:8px">Ya tienes vacaciones ${cruce.estado === 'pendiente' ? 'pedidas' : 'aprobadas'} que se cruzan con esas fechas (${rangoLegible(cruce.fecha_inicio, cruce.fecha_fin)}).</div>`; ok = false; }
   if (equipo.length) html += `<div style="font-size:12px;color:var(--amber);margin-top:6px">En esas fechas también sale: ${equipo.map(e => escapeHtml(e.nombre)).join(', ')}.</div>`;
   out.innerHTML = html;
