@@ -10,6 +10,11 @@
 //    ni renovar la sesión que tenía abierta.
 //  * Los menús que ve cada cuenta (columna `paginas`) los cambia la app
 //    directamente en `perfiles`, protegida por RLS (solo el administrador).
+//  * Cuentas de TRABAJADOR (portal "Mis vacaciones"): app_metadata.rol =
+//    "trabajador". Esa marca solo se puede escribir desde aquí (con la clave
+//    de servicio) y la base de datos la usa para bloquearles todo lo que no
+//    sean sus propias vacaciones. La cuenta queda vinculada a su ficha en
+//    `personal.user_id`.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const CORS = {
@@ -85,6 +90,79 @@ Deno.serve(async (req) => {
       });
       if (!p.ok) return json({ error: "La cuenta se creó, pero no su perfil. Revisar en Supabase." }, 500);
       return json({ ok: true, perfil: (await p.json())[0] });
+    }
+
+    if (accion === "crear_trabajador") {
+      const personalId = Number(body.personal_id);
+      const password = String(body.password || "");
+      if (!Number.isInteger(personalId) || personalId <= 0) return json({ error: "Trabajador no válido." }, 400);
+      if (password.length < 8) return json({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
+      // Los datos salen de la ficha, no del navegador.
+      const f = await fetch(`${URL_BASE}/rest/v1/personal?select=id,nombre,email,user_id,estado&id=eq.${personalId}`, { headers: hServicio });
+      const ficha = (f.ok ? await f.json() : [])[0];
+      if (!ficha) return json({ error: "No se encontró la ficha del trabajador." }, 404);
+      if (ficha.estado !== "activo") return json({ error: "El trabajador está inactivo." }, 400);
+      const email = String(ficha.email || "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "La ficha no tiene un correo válido." }, 400);
+      const nombre = String(ficha.nombre || "").trim();
+
+      let userId: string = ficha.user_id || "";
+      if (!userId) {
+        // ¿Ya tuvo una cuenta con ese correo (se le quitó el acceso antes)?
+        const pe = await fetch(`${URL_BASE}/rest/v1/perfiles?select=user_id&email=eq.${encodeURIComponent(email)}`, { headers: hServicio });
+        const previo = ((pe.ok ? await pe.json() : [])[0] || {}).user_id;
+        if (previo) {
+          const ua = await fetch(`${URL_BASE}/auth/v1/admin/users/${previo}`, { headers: hServicio });
+          const cuenta = ua.ok ? await ua.json() : null;
+          if (cuenta?.app_metadata?.rol !== "trabajador") {
+            return json({ error: "Ese correo ya se usa en una cuenta de la oficina. Usa otro correo para el portal." }, 400);
+          }
+          userId = previo;
+        }
+      }
+      if (userId) {
+        // Ya tuvo cuenta (se le quitó el acceso): se reactiva con la nueva contraseña.
+        await actualizarCuenta(userId, { password, ban_duration: "none", email,
+          user_metadata: { rol: "trabajador", nombre }, app_metadata: { rol: "trabajador" } });
+      } else {
+        const r = await fetch(`${URL_BASE}/auth/v1/admin/users`, {
+          method: "POST", headers: hServicio,
+          body: JSON.stringify({ email, password, email_confirm: true,
+            user_metadata: { rol: "trabajador", nombre }, app_metadata: { rol: "trabajador" } }),
+        });
+        const u = await r.json().catch(() => ({}));
+        if (!r.ok || !u?.id) return json({ error: u?.msg || u?.error_description || "No se pudo crear la cuenta (¿ese correo ya tiene una cuenta en la app?)." }, 400);
+        userId = u.id;
+      }
+      // Perfil (para "Usuarios y permisos" y para poder desactivarla) sin menús.
+      const p = await fetch(`${URL_BASE}/rest/v1/perfiles?on_conflict=user_id`, {
+        method: "POST", headers: { ...hServicio, Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ user_id: userId, email, nombre, activo: true, es_admin: false, paginas: [],
+          actualizado_en: new Date().toISOString() }),
+      });
+      if (!p.ok) return json({ error: "La cuenta se creó, pero no su perfil. Revisar en Supabase." }, 500);
+      const v = await fetch(`${URL_BASE}/rest/v1/personal?id=eq.${personalId}`, {
+        method: "PATCH", headers: { ...hServicio, Prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (!v.ok) return json({ error: "La cuenta se creó, pero no se pudo vincular a la ficha." }, 500);
+      return json({ ok: true, user_id: userId });
+    }
+
+    if (accion === "quitar_trabajador") {
+      const personalId = Number(body.personal_id);
+      if (!Number.isInteger(personalId) || personalId <= 0) return json({ error: "Trabajador no válido." }, 400);
+      const f = await fetch(`${URL_BASE}/rest/v1/personal?select=user_id&id=eq.${personalId}`, { headers: hServicio });
+      const uid = ((f.ok ? await f.json() : [])[0] || {}).user_id;
+      if (!uid) return json({ ok: true });
+      // Se desactiva (no se borra) y se desvincula de la ficha; su historial queda.
+      await actualizarCuenta(uid, { ban_duration: "876000h" });
+      await actualizarPerfil(uid, { activo: false });
+      await fetch(`${URL_BASE}/rest/v1/personal?id=eq.${personalId}`, {
+        method: "PATCH", headers: { ...hServicio, Prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: null }),
+      });
+      return json({ ok: true });
     }
 
     const userId = String(body.user_id || "");

@@ -7,7 +7,8 @@
 // Seguridad:
 //  * La llave de GDExpress solo vive aquí (secretos de Supabase), nunca en
 //    el navegador.
-//  * Solo usuarios con sesión iniciada en la app pueden consultar.
+//  * Solo usuarios con sesión iniciada en la app pueden consultar (no las
+//    cuentas de trabajador del portal de vacaciones).
 //  * Siempre busca en producción ("P"): son los documentos reales emitidos.
 //
 // Secretos necesarios (los mismos de emitir-dte): DTEBOX_IP, GDEXPRESS_API_KEY.
@@ -32,6 +33,8 @@ async function usuarioConSesion(req: Request): Promise<boolean> {
   });
   if (!r.ok) return false;
   const u = await r.json();
+  // Las cuentas del portal de vacaciones (trabajadores) no consultan facturas.
+  if (u?.app_metadata?.rol === "trabajador") return false;
   return !!u?.email;
 }
 
