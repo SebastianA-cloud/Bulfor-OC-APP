@@ -12,6 +12,10 @@
 
 let opDatos = null;            // filas de mp_oportunidades (sin productos)
 let opVistas = {};             // codigo → { descartada }
+// Participación del equipo (compartida, no por cuenta): codigo → { participamos,
+// participante, actualizado_por, actualizado_en }. Tabla mp_oportunidades_gestion.
+let opGestion = {};
+const OP_PARTICIPANTES = ['Sebastián', 'Javiera', 'Christian', 'Genoveva'];
 let opCargando = null;
 const opFiltro = { vista: 'abiertas', tipo: '', q: '', soloClientes: false, conBaja: false };
 // Orden de la lista: se cambia apretando el título de una columna (otra vez =
@@ -51,10 +55,14 @@ function opCargar(forzar) {
     fetchAll('mp_oportunidades', 'select=codigo,tipo,nombre,organismo,unidad,region,estado,fecha_publicacion,fecha_cierre,monto,moneda,palabras,prioridad,es_cliente,total_ofertas,url,detectada_en'
       + `&prioridad=not.is.null&fecha_cierre=gte.${encodeURIComponent(hace30)}&order=fecha_cierre.asc`),
     fetchAll('mp_oportunidades_vistas', 'select=codigo,descartada'),
-  ]).then(([filas, vistas]) => {
+    // Si la tabla aún no existe, la página funciona igual sin participación
+    fetchAll('mp_oportunidades_gestion', 'select=*').catch(() => []),
+  ]).then(([filas, vistas, gestion]) => {
     opDatos = filas || [];
     opVistas = {};
     (vistas || []).forEach(v => { opVistas[v.codigo] = { descartada: !!v.descartada }; });
+    opGestion = {};
+    (gestion || []).forEach(g => { opGestion[g.codigo] = g; });
     opPintarAviso();
     return opDatos;
   }).catch(e => { opCargando = null; throw e; });
@@ -193,11 +201,12 @@ function opFiltradas() {
   return (opDatos || []).filter(r => {
     const v = opVistas[r.codigo] || {};
     if (f.vista === 'descartadas') { if (!v.descartada) return false; }
+    else if (f.vista === 'participamos') { if (!opGestion[r.codigo]?.participamos) return false; }
     else if (v.descartada) return false;
     if (f.vista === 'abiertas' && !opAbierta(r)) return false;
     if (f.vista === 'nuevas' && !opEsNueva(r)) return false;
     if (f.vista === 'cerradas' && opAbierta(r)) return false;
-    if (!f.conBaja && r.prioridad === 'baja' && f.vista !== 'descartadas') return false;
+    if (!f.conBaja && r.prioridad === 'baja' && !['descartadas', 'participamos'].includes(f.vista)) return false;
     if (f.tipo && r.tipo !== f.tipo) return false;
     if (f.soloClientes && !r.es_cliente) return false;
     if (f.q && !coincideBusqueda(`${r.codigo} ${r.nombre} ${r.organismo} ${r.unidad} ${r.region} ${(r.palabras || []).join(' ')}`, f.q)) return false;
@@ -229,7 +238,7 @@ function opPintarCabecera() {
 function opRender() {
   if (!opDatos) return;
   const nNuevas = opNuevas().length;
-  const vistas = [['abiertas', 'Abiertas'], ['nuevas', `Nuevas${nNuevas ? ` (${nNuevas})` : ''}`], ['cerradas', 'Cerradas (último mes)'], ['descartadas', 'Descartadas']];
+  const vistas = [['abiertas', 'Abiertas'], ['nuevas', `Nuevas${nNuevas ? ` (${nNuevas})` : ''}`], ['participamos', 'Participamos'], ['cerradas', 'Cerradas (último mes)'], ['descartadas', 'Descartadas']];
   document.getElementById('op-vistas').innerHTML = vistas.map(([v, l]) =>
     `<button type="button" class="fpp-status-tab${opFiltro.vista === v ? ' active' : ''}" aria-pressed="${opFiltro.vista === v}" onclick="opCambiarVista('${v}')">${l}</button>`).join('');
   const tipos = [['', 'Todas'], ['compra_agil', 'Compras ágiles'], ['licitacion', 'Licitaciones']];
@@ -253,9 +262,13 @@ function opRender() {
       <td data-label="Tipo"><span class="badge ${r.tipo === 'licitacion' ? 'badge-blue' : 'badge-gray'}">${OP_TIPO[r.tipo] || r.tipo}</span></td>
       <td data-label="Hospital"><div>${escapeHtml(r.organismo || '—')}${r.es_cliente ? ' <span class="op-cliente" title="Ya le ha comprado a Bulfor">Cliente</span>' : ''}<small class="op-sub">${escapeHtml(r.region || '')}</small></div></td>
       <td data-label="Qué piden"><div>${opEsNueva(r) ? '<span class="op-punto" title="Nueva"></span>' : ''}${escapeHtml(r.nombre || '')}${(r.palabras || []).length ? `<small class="op-sub">${r.palabras.map(escapeHtml).join(' · ')}</small>` : ''}</div></td>
-      <td data-label="Prioridad">${OP_PRIO[r.prioridad] || ''}</td>
+      <td data-label="Prioridad"><div>${OP_PRIO[r.prioridad] || ''}${opParticipacionBadge(r.codigo)}</div></td>
       <td data-label="Presupuesto" style="text-align:right;white-space:nowrap">${opMonto(r)}</td>
-      <td><i class="ti ti-chevron-right" aria-hidden="true"></i></td>
+      <td class="op-td-acc">${(() => {
+        // Descartar / recuperar desde la lista, sin abrir la ficha
+        const desc = opVistas[r.codigo]?.descartada;
+        return `<button type="button" class="op-btn-desc" title="${desc ? 'Volver a mostrar' : 'Descartar: no me interesa'}" onclick="event.stopPropagation();opDescartar('${escapeHtml(r.codigo)}', ${!desc})">${desc ? '<i class="ti ti-arrow-back-up"></i> Recuperar' : '<i class="ti ti-eye-off"></i> Descartar'}</button>`;
+      })()}</td>
     </tr>`).join('');
 }
 
@@ -302,6 +315,7 @@ function opFicha(r, nav) {
         ${botonMP(r.url, r.tipo === 'compra_agil' ? 'Ver compra ágil en Mercado Público' : 'Ver licitación en Mercado Público')}
         <button type="button" class="btn-mp btn-mp-gris" onclick="opDescartar('${escapeHtml(r.codigo)}', ${!descartada})">${descartada ? '<i class="ti ti-arrow-back-up"></i> Recuperar' : '<i class="ti ti-eye-off"></i> Descartar (no me interesa)'}</button>
       </div>
+      ${opParticipacionHtml(r.codigo)}
       ${r.es_cliente ? '<p class="op-nota-cliente"><i class="ti ti-building-hospital"></i> Este comprador ya le ha comprado a Bulfor.</p>' : ''}
       ${(r.palabras || []).length ? `<div class="panel-h">Por qué apareció</div><p>Coincide con: <b>${r.palabras.map(escapeHtml).join(', ')}</b></p>` : ''}
       ${desc ? `<div class="panel-h">Descripción</div><p class="op-desc">${escapeHtml(desc)}</p>` : ''}
@@ -351,4 +365,74 @@ function opMarcarTodasVistas() {
   panelCerrar();
   opAbrirNovedades();
   if (document.getElementById('page-oportunidades')?.classList.contains('active')) opRender();
+}
+
+// ─── Participación del equipo (¿participamos? ¿quién?) ──────────────────────
+// Es un dato compartido: lo ve todo el equipo, lo marque quien lo marque. El
+// nombre se elige de la lista (no depende de la cuenta que lo anota).
+function opParticipacionBadge(codigo) {
+  const g = opGestion[codigo];
+  if (!g) return '';
+  return g.participamos
+    ? `<span class="op-part op-part-si" title="Participamos">✓ ${escapeHtml(g.participante || 'Participamos')}</span>`
+    : '<span class="op-part op-part-no">No participamos</span>';
+}
+
+function opParticipacionHtml(codigo) {
+  const g = opGestion[codigo] || {};
+  const c = escapeHtml(codigo);
+  const si = g.participamos === true, no = g.participamos === false;
+  return `<div class="op-part-caja">
+    <div class="panel-h" style="margin-top:0">¿Participamos?</div>
+    <div class="fpp-status-tabs" role="group" aria-label="¿Participamos?">
+      <button type="button" class="fpp-status-tab${si ? ' active' : ''}" aria-pressed="${si}" onclick="opElegirParticipacion('${c}', true)">Sí, participamos</button>
+      <button type="button" class="fpp-status-tab${no ? ' active' : ''}" aria-pressed="${no}" onclick="opElegirParticipacion('${c}', false)">No participamos</button>
+      ${si || no ? `<button type="button" class="fpp-status-tab" onclick="opElegirParticipacion('${c}', null)" title="Borrar la respuesta">Sin responder</button>` : ''}
+    </div>
+    ${si || window.__opPartPendiente === codigo ? `<label class="op-part-quien">¿Quién participó?
+      <select onchange="opGuardarParticipacion('${c}', true, this.value)">
+        <option value="">Elegir…</option>
+        ${OP_PARTICIPANTES.map(n => `<option${g.participante === n ? ' selected' : ''}>${n}</option>`).join('')}
+      </select></label>` : ''}
+    ${g.actualizado_en ? `<div class="op-nota">Anotado por ${escapeHtml(g.actualizado_por || '—')} el ${opFecha(g.actualizado_en)}</div>` : ''}
+  </div>`;
+}
+
+// "Sí" primero pide el nombre (no se guarda hasta elegirlo); "No" y "Sin
+// responder" se guardan al tiro.
+function opElegirParticipacion(codigo, valor) {
+  if (valor === true && !opGestion[codigo]?.participamos) {
+    window.__opPartPendiente = codigo;
+    opRepintarFicha(codigo);
+    return;
+  }
+  window.__opPartPendiente = null;
+  if (valor === true) return;
+  opGuardarParticipacion(codigo, valor, null);
+}
+
+async function opGuardarParticipacion(codigo, participamos, participante) {
+  if (participamos === true && !participante) return;
+  let res;
+  if (participamos === null) {
+    res = await sb(`mp_oportunidades_gestion?codigo=eq.${encodeURIComponent(codigo)}`, { method: 'DELETE' });
+  } else {
+    res = await sb('mp_oportunidades_gestion', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([{ codigo, participamos, participante: participamos ? participante : null,
+        actualizado_por: sesionActual?.email || null, actualizado_en: new Date().toISOString() }]) });
+  }
+  if (!res.ok) { toast('No se pudo guardar la participación. Intenta de nuevo.', 'err'); return; }
+  if (participamos === null) delete opGestion[codigo];
+  else opGestion[codigo] = (await res.json())[0] || { codigo, participamos, participante };
+  window.__opPartPendiente = null;
+  toast(participamos === null ? 'Respuesta borrada' : participamos ? `Guardado: participó ${participante}` : 'Guardado: no participamos');
+  opRepintarFicha(codigo);
+  if (document.getElementById('page-oportunidades')?.classList.contains('active')) opRender();
+}
+
+function opRepintarFicha(codigo) {
+  if (typeof panelPila === 'undefined' || !panelPila.length) return;
+  const top = panelPila[panelPila.length - 1];
+  const r = (opDatos || []).find(x => x.codigo === codigo);
+  if (top && top.opCodigo === codigo && r) { panelPila[panelPila.length - 1] = opFicha(r, top.opNav); panelPintar(); }
 }
