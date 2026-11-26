@@ -171,7 +171,7 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 
 ## 9. Bitácora (lo último arriba)
 
-- 26-11-2026 · Claude · **Propuesto en rama `claude/busy-hawking-6o5mgy`, NO integrado:** botón "ver contraseña" (ojo) en todos los campos de contraseña de la app. Archivo nuevo `ver-contrasena.js` (cargado en index.html después de `portal-trabajador.js`): agrega el botón a cada `input[type=password]`, también a los que aparecen después (MutationObserver); ícono SVG propio. Estilo `.ver-clave-btn` al final de styles.css. Hoy aplica al login y a "Cambiar clave" del portal.
+- 26-11-2026 · Claude · **Integrado en main mediante PR #36 (aprobado por Seba el 26-11-2026):** botón "ver contraseña" (ojo) en todos los campos de contraseña de la app. Archivo nuevo `ver-contrasena.js` (cargado en index.html después de `portal-trabajador.js`): agrega el botón a cada `input[type=password]`, también a los que aparecen después (MutationObserver); ícono SVG propio. Estilo `.ver-clave-btn` al final de styles.css. Hoy aplica al login y a "Cambiar clave" del portal.
 
 - 26-11-2026 · Claude · **Integrado en main mediante PR #35 (aprobado por Seba el 26-11-2026):** el portal del trabajador no mostraba "Instalar app" (ese botón vive en la barra de la oficina, oculta en el portal). Se agrega la tarjeta "Instala la app en tu celular" (`portalTarjetaInstalar`) que llama a `instalarApp()` de index.html: en Android abre el instalador; en iPhone muestra los pasos de Safari; no aparece si ya se usa instalada y se oculta al instalar.
 
