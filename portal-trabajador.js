@@ -125,8 +125,10 @@ function portalRender() {
   const usableHoy = p => { const d = periodoUsableDesde(p.id); return !d || d <= hoy; };
   const dispHoy = redondear(s.periodos.filter(usableHoy).reduce((n, p) => n + p.disponibles, 0));
   const futuros = s.periodos.filter(p => !usableHoy(p) && p.disponibles > 0);
-  const limiteEquipo = vacSumarDias(hoy, 120);
-  const equipoAprobado = portalEquipo.filter(e => (e.estado || 'aprobado') === 'aprobado' && e.fecha_inicio <= limiteEquipo);
+  // Próximos 6 meses: aprobadas y pendientes (las pendientes van marcadas,
+  // para que nadie las tome como fijas).
+  const limiteEquipo = vacSumarDias(hoy, 183);
+  const equipoVisible = portalEquipo.filter(e => e.fecha_inicio <= limiteEquipo);
 
   // Antes del primer aniversario la ley todavía no da derecho a vacaciones:
   // lo que pida es un adelanto que Sebastián decide si aprueba.
@@ -172,15 +174,18 @@ function portalRender() {
         </div>`).join('') : '<div class="portal-vacio">Aún no tienes períodos asignados.</div>'}
       <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo. Usar días de un período antes de la fecha en que se puede usar es un adelanto y debe estar conversado con Sebastián.</div>
 
-      <div class="portal-seccion">Vacaciones del equipo (próximos 4 meses)</div>
-      ${equipoAprobado.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
-        ${equipoAprobado.map(e => `
+      <div class="portal-seccion">Vacaciones del equipo (próximos 6 meses)</div>
+      ${equipoVisible.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
+        ${equipoVisible.map(e => `
           <div class="portal-fila-equipo">
-            <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
+            <div style="min-width:0">
+              <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
+              ${e.estado === 'pendiente' ? '<span class="badge-estado warn" style="font-size:11px;padding:1px 8px;margin-top:3px;display:inline-flex">Pendiente de aprobación</span>' : ''}
+            </div>
             <div style="color:var(--text-2);white-space:nowrap">${rangoLegible(e.fecha_inicio, e.fecha_fin)}</div>
           </div>`).join('')}
-      </div>` : '<div class="portal-vacio">Nadie del equipo tiene vacaciones aprobadas en los próximos meses.</div>'}
-      <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Solo se muestran vacaciones ya aprobadas, para que puedas planificar las tuyas.</div>
+      </div>` : '<div class="portal-vacio">Nadie del equipo tiene vacaciones en los próximos 6 meses.</div>'}
+      <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Las marcadas "Pendiente de aprobación" todavía no están confirmadas.</div>
     </div>`;
 }
 
