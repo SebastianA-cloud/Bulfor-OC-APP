@@ -2005,3 +2005,17 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
 .portal-periodo-nums span { display: block; font-size: 15px; font-weight: 600; color: var(--text); }
 .portal-fila-equipo { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
 .portal-fila-equipo:last-child { border-bottom: none; }
+/* Calendario del equipo en el portal (reutiliza la grilla .vac-cal-* de la oficina). */
+.portal-cal-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.portal-cal-nav .fpp-period-btn:disabled { opacity: .35; cursor: not-allowed; }
+.portal-cal-leyenda { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; font-size: 11.5px; color: var(--text-2); margin-bottom: 8px; }
+.portal-cal-leyenda > span { display: inline-flex; align-items: center; gap: 5px; }
+.vac-cal-chip.propia { outline: 2px solid var(--accent); outline-offset: -2px; font-weight: 600; }
+@media (max-width: 640px) {
+  /* En el celular la grilla entra completa (sin desplazamiento lateral): etiquetas más chicas. */
+  #portal-trabajador .vac-cal-head, #portal-trabajador .vac-cal-grid { min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  #portal-trabajador .vac-cal-dia { min-height: 56px; padding: 3px 2px; }
+  #portal-trabajador .vac-cal-head > div { padding: 6px 2px; text-align: center; }
+  #portal-trabajador .vac-cal-chip { font-size: 9px; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #portal-trabajador .vac-cal-feriado { display: none; }
+}

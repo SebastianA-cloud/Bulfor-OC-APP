@@ -20,7 +20,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 let portalDatos = null;        // respuesta de portal_mis_datos
-let portalEquipo = [];         // calendario compartido: aprobadas y pendientes del equipo (próximo año)
+let portalEquipo = [];         // calendario compartido: aprobadas y pendientes del equipo (mes actual + 11)
+let portalVistaEquipo = 'lista';   // 'lista' o 'calendario'
+let portalCalMes = null;           // {anio, mes} que muestra el calendario
+
+// El calendario del portal va del mes actual a 11 meses más (un año).
+function portalRangoCalendario() {
+  const h = new Date();
+  const desde = vacISO(new Date(h.getFullYear(), h.getMonth(), 1));
+  const hasta = vacISO(new Date(h.getFullYear(), h.getMonth() + 12, 0));
+  return { desde, hasta };
+}
 
 // cerrarTodosLosModales() de index.html cierra las ventanas cuyo id está en
 // MODAL_OVERLAY_IDS. Este archivo carga antes que esa lista, así que las del
@@ -80,8 +90,9 @@ async function portalRecargar() {
   const hoy = vacHoy();
   const [datos, equipo] = await Promise.all([
     rpcVac('portal_mis_datos', {}),
-    // Un año hacia adelante; si la base aún tiene el límite anterior, 4 meses.
-    rpcVac('portal_calendario', { p_desde: hoy, p_hasta: vacSumarDias(hoy, 365) })
+    // Desde el 1° del mes actual (para ver también lo ya tomado este mes)
+    // hasta 11 meses más; si la base aún tuviera el límite anterior, 4 meses.
+    rpcVac('portal_calendario', { p_desde: portalRangoCalendario().desde, p_hasta: portalRangoCalendario().hasta })
       .catch(() => rpcVac('portal_calendario', { p_desde: hoy, p_hasta: vacSumarDias(hoy, 120) }))
       .catch(() => []),
   ]);
@@ -128,7 +139,7 @@ function portalRender() {
   // Próximos 6 meses: aprobadas y pendientes (las pendientes van marcadas,
   // para que nadie las tome como fijas).
   const limiteEquipo = vacSumarDias(hoy, 183);
-  const equipoVisible = portalEquipo.filter(e => e.fecha_inicio <= limiteEquipo);
+  const equipoVisible = portalEquipo.filter(e => e.fecha_fin >= hoy && e.fecha_inicio <= limiteEquipo);
 
   // Antes del primer aniversario la ley todavía no da derecho a vacaciones:
   // lo que pida es un adelanto que Sebastián decide si aprueba.
@@ -174,8 +185,14 @@ function portalRender() {
         </div>`).join('') : '<div class="portal-vacio">Aún no tienes períodos asignados.</div>'}
       <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo. Usar días de un período antes de la fecha en que se puede usar es un adelanto y debe estar conversado con Sebastián.</div>
 
-      <div class="portal-seccion">Vacaciones del equipo (próximos 6 meses)</div>
-      ${equipoVisible.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
+      <div class="portal-seccion" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>Vacaciones del equipo</span>
+        <div class="scope-toggle" role="group" aria-label="Cómo ver las vacaciones del equipo">
+          <button class="${portalVistaEquipo === 'lista' ? 'active' : ''}" onclick="portalVistaEquipo='lista';portalRender()">Lista (6 meses)</button>
+          <button class="${portalVistaEquipo === 'calendario' ? 'active' : ''}" onclick="portalVistaEquipo='calendario';portalRender()">Calendario (1 año)</button>
+        </div>
+      </div>
+      ${portalVistaEquipo === 'calendario' ? portalHtmlCalendario() : equipoVisible.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
         ${equipoVisible.map(e => `
           <div class="portal-fila-equipo">
             <div style="min-width:0">
@@ -186,6 +203,78 @@ function portalRender() {
           </div>`).join('')}
       </div>` : '<div class="portal-vacio">Nadie del equipo tiene vacaciones en los próximos 6 meses.</div>'}
       <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Las marcadas "Pendiente de aprobación" todavía no están confirmadas.</div>
+    </div>`;
+}
+
+// ─── Calendario del equipo ─────────────────────────────────────────────────
+// Misma grilla que el calendario de la oficina (clases vac-cal-*): lunes a
+// domingo, feriados en ámbar, cada persona como una etiqueta con su primer
+// nombre. Las pendientes van en ámbar y las propias destacadas.
+function portalCambiarMes(delta) {
+  const h = new Date();
+  const base = h.getFullYear() * 12 + h.getMonth();
+  let n = portalCalMes.anio * 12 + portalCalMes.mes + delta;
+  n = Math.max(base, Math.min(base + 11, n));
+  portalCalMes = { anio: Math.floor(n / 12), mes: n % 12 };
+  portalRender();
+}
+
+function portalHtmlCalendario() {
+  const h = new Date();
+  if (!portalCalMes) portalCalMes = { anio: h.getFullYear(), mes: h.getMonth() };
+  const { anio, mes } = portalCalMes;
+  const base = h.getFullYear() * 12 + h.getMonth(), actual = anio * 12 + mes;
+  const primero = new Date(anio, mes, 1), ultimo = new Date(anio, mes + 1, 0);
+  const offset = (primero.getDay() + 6) % 7;            // la semana parte el lunes
+  const inicio = vacSumarDias(vacISO(primero), -offset);
+  const celdas = Math.ceil((offset + ultimo.getDate()) / 7) * 7;
+  const hoy = vacHoy();
+  const primerNombre = n => escapeHtml(String(n || '').split(' ')[0]);
+
+  let grilla = '';
+  for (let i = 0; i < celdas; i++) {
+    const iso = vacSumarDias(inicio, i);
+    const d = vacFecha(iso);
+    const fuera = d.getMonth() !== mes;
+    const clases = ['vac-cal-dia'];
+    if (fuera) clases.push('fuera');
+    else if (esFeriado(iso)) clases.push('feriado');
+    else if (esFinDeSemana(iso)) clases.push('finde');
+    if (iso === hoy) clases.push('hoy');
+    const delDia = fuera ? [] : portalEquipo.filter(e => e.fecha_inicio <= iso && e.fecha_fin >= iso);
+    grilla += `<div class="${clases.join(' ')}">
+      <div class="vac-cal-num">${d.getDate()}</div>
+      ${!fuera && esFeriado(iso) ? `<div class="vac-cal-feriado">${escapeHtml(feriados[iso])}</div>` : ''}
+      ${delDia.map(e => `<span class="vac-cal-chip${e.estado === 'pendiente' ? ' pend' : ''}${e.propia ? ' propia' : ''}" title="${escapeHtml(e.nombre)} — ${rangoLegible(e.fecha_inicio, e.fecha_fin)}${e.estado === 'pendiente' ? ' (pendiente de aprobación)' : ''}">${e.propia ? 'Tú' : primerNombre(e.nombre)}</span>`).join('')}
+    </div>`;
+  }
+
+  // Debajo, el detalle del mes en texto: en el celular la grilla es chica.
+  const delMes = portalEquipo.filter(e => e.fecha_inicio <= vacISO(ultimo) && e.fecha_fin >= vacISO(primero));
+  return `
+    <div class="portal-cal-nav">
+      <button class="fpp-period-btn" onclick="portalCambiarMes(-1)" ${actual <= base ? 'disabled' : ''} title="Mes anterior">‹</button>
+      <div style="font-size:15px;font-weight:600;min-width:150px;text-align:center">${MESES_NOMBRE[mes]} ${anio}</div>
+      <button class="fpp-period-btn" onclick="portalCambiarMes(1)" ${actual >= base + 11 ? 'disabled' : ''} title="Mes siguiente">›</button>
+    </div>
+    <div class="portal-cal-leyenda">
+      <span><span class="vac-leyenda ok"></span>Aprobadas</span>
+      <span><span class="vac-leyenda pend"></span>Pendientes de aprobación</span>
+      <span><span class="vac-leyenda fer"></span>Feriado</span>
+    </div>
+    <div class="vac-cal-wrap">
+      <div class="vac-cal-head">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(x => `<div>${x}</div>`).join('')}</div>
+      <div class="vac-cal-grid">${grilla}</div>
+    </div>
+    <div class="portal-tarjeta" style="padding:4px 14px;margin-top:10px">
+      ${delMes.length ? delMes.map(e => `
+        <div class="portal-fila-equipo">
+          <div style="min-width:0">
+            <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
+            ${e.estado === 'pendiente' ? '<span class="badge-estado warn" style="font-size:11px;padding:1px 8px;margin-top:3px;display:inline-flex">Pendiente de aprobación</span>' : ''}
+          </div>
+          <div style="color:var(--text-2);white-space:nowrap">${rangoLegible(e.fecha_inicio, e.fecha_fin)}${e.fecha_fin < hoy ? ' <span style="color:var(--text-3)">(ya tomadas)</span>' : ''}</div>
+        </div>`).join('') : `<div class="portal-vacio">Nadie del equipo tiene vacaciones en ${MESES_NOMBRE[mes].toLowerCase()}.</div>`}
     </div>`;
 }
 
