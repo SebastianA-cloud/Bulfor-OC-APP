@@ -78,7 +78,7 @@ async function arrancarPortalTrabajador() {
   } catch (e) {
     cont.innerHTML = `
       <div class="portal-wrap">
-        ${portalEncabezado('')}
+        ${portalEncabezado('', null, [], true)}
         <div class="portal-aviso err">${escapeHtml(e.message || 'No se pudieron cargar tus datos.')}</div>
       </div>`;
   }
@@ -106,22 +106,60 @@ async function portalRecargar() {
   vacVersion++;
 }
 
-function portalEncabezado(nombre) {
+// Fecha de hoy en palabras ("jueves 26 de noviembre"), para el saludo.
+function portalFechaLarga() {
+  const d = vacFecha(vacHoy());
+  const D = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const M = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${D[d.getDay()]} ${d.getDate()} de ${M[d.getMonth()]}`;
+}
+
+// Cabecera de color: saludo, fecha, botones de cuenta y el número que más
+// importa (días que puede usar hoy).
+function portalEncabezado(nombre, dispHoy, futuros, sinPeriodos) {
   const primerNombre = (nombre || '').split(' ')[0];
   return `
-    <div class="portal-top">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0">
-        <div class="login-badge portal-logo">B</div>
-        <div style="min-width:0">
-          <div style="font-size:12px;color:var(--text-3)">Farmacia Bulfor</div>
-          <div style="font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${primerNombre ? 'Hola, ' + escapeHtml(primerNombre) : 'Mis vacaciones'}</div>
+    <div class="portal-hero">
+      <div class="portal-hero-top">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <div class="portal-hero-logo">B</div>
+          <div style="min-width:0">
+            <div class="portal-hero-saludo">${primerNombre ? 'Hola, ' + escapeHtml(primerNombre) : 'Mis vacaciones'}</div>
+            <div class="portal-hero-fecha">Hoy es ${portalFechaLarga()}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="portal-hero-btn" onclick="portalCambiarClave()" title="Cambiar contraseña"><i class="ti ti-key" aria-hidden="true"></i><span>Clave</span></button>
+          <button class="portal-hero-btn" onclick="cerrarSesion()" title="Cerrar sesión"><i class="ti ti-logout" aria-hidden="true"></i><span>Salir</span></button>
         </div>
       </div>
-      <div style="display:flex;gap:6px">
-        <button class="page-btn" style="padding:7px 10px" onclick="portalCambiarClave()" title="Cambiar contraseña"><i class="ti ti-key" aria-hidden="true"></i><span class="portal-solo-ancho"> Contraseña</span></button>
-        <button class="page-btn" style="padding:7px 10px" onclick="cerrarSesion()" title="Cerrar sesión"><i class="ti ti-logout" aria-hidden="true"></i><span class="portal-solo-ancho"> Salir</span></button>
-      </div>
+      ${dispHoy === null ? '' : `
+      <div class="portal-hero-saldo">
+        <div class="portal-hero-label">Días que puedes usar hoy</div>
+        <div class="portal-hero-num">${sinPeriodos ? '—' : dispHoy}<span>${sinPeriodos ? '' : ` día${dispHoy === 1 ? '' : 's'} hábil${dispHoy === 1 ? '' : 'es'}`}</span></div>
+        ${sinPeriodos ? '<div class="portal-hero-chip">Aún no tienes períodos asignados</div>'
+          : futuros.map(p => `<div class="portal-hero-chip"><i class="ti ti-calendar-plus" aria-hidden="true"></i> +${p.disponibles} más desde el ${fDate(periodoUsableDesde(p.id))} · período ${escapeHtml(p.periodo)}</div>`).join('')}
+      </div>`}
     </div>`;
+}
+
+// Un mensaje claro de "cómo estás hoy": de vacaciones, esperando respuesta,
+// con vacaciones aprobadas por delante, o nada programado.
+function portalEstadoHoy(vigente, pendientes, proxAprobada) {
+  if (vigente) return `<div class="portal-estado ok"><i class="ti ti-beach" aria-hidden="true"></i><div><strong>Estás de vacaciones</strong> hasta el ${fDate(vigente.fecha_fin)}. Vuelves el ${fDate(portalDiaRegreso(vigente.fecha_fin))}. ¡Disfruta!</div></div>`;
+  if (pendientes.length) return `<div class="portal-estado warn"><i class="ti ti-hourglass" aria-hidden="true"></i><div><strong>Tienes ${pendientes.length === 1 ? 'una solicitud' : pendientes.length + ' solicitudes'} esperando respuesta</strong> (${pendientes.map(x => rangoLegible(x.fecha_inicio, x.fecha_fin)).join(', ')}). Te avisaremos cuando Sebastián la revise.</div></div>`;
+  if (proxAprobada) return `<div class="portal-estado ok"><i class="ti ti-circle-check" aria-hidden="true"></i><div><strong>Tus próximas vacaciones están aprobadas:</strong> ${rangoLegible(proxAprobada.fecha_inicio, proxAprobada.fecha_fin)} (${proxAprobada.dias_habiles} días, en ${diasHasta(proxAprobada.fecha_inicio)} días más).</div></div>`;
+  return `<div class="portal-estado"><i class="ti ti-calendar" aria-hidden="true"></i><div>No tienes vacaciones programadas. Cuando quieras, pídelas con el botón de abajo.</div></div>`;
+}
+
+// Barra de un período: usados (gris), pendientes (amarillo) y disponibles (verde).
+function portalBarraPeriodo(p) {
+  const total = Math.max(p.totales, p.utilizados + p.pendientes + Math.max(p.disponibles, 0), 0.0001);
+  const pct = n => Math.max(0, Math.min(100, (n / total) * 100)).toFixed(1);
+  return `<div class="portal-barra" role="img" aria-label="${p.utilizados} usados, ${p.pendientes} pendientes, ${p.disponibles} disponibles">
+      <span class="usado" style="width:${pct(p.utilizados)}%"></span><span class="pend" style="width:${pct(p.pendientes)}%"></span><span class="libre" style="width:${pct(Math.max(p.disponibles, 0))}%"></span>
+    </div>
+    <div class="portal-barra-leyenda"><span><i class="usado"></i>${p.utilizados} usado${p.utilizados === 1 ? '' : 's'}</span><span><i class="pend"></i>${p.pendientes} pendiente${p.pendientes === 1 ? '' : 's'}</span><span><i class="libre"></i>${p.disponibles} disponible${p.disponibles === 1 ? '' : 's'}</span></div>`;
 }
 
 function portalRender() {
@@ -130,79 +168,89 @@ function portalRender() {
   const t = portalDatos.trabajador;
   const s = saldoDeTrabajador(t.id);
   const vigente = vacacionesVigentes(t.id);
-  const prox = proximasVacacionesDe(t.id);
   const solicitudes = solicitudesDe(t.id);
   const hoy = vacHoy();
   const usableHoy = p => { const d = periodoUsableDesde(p.id); return !d || d <= hoy; };
   const dispHoy = redondear(s.periodos.filter(usableHoy).reduce((n, p) => n + p.disponibles, 0));
   const futuros = s.periodos.filter(p => !usableHoy(p) && p.disponibles > 0);
+  const pendientes = solicitudes.filter(x => x.estado === 'pendiente');
+  const proxAprobada = solicitudes.filter(x => x.estado === 'aprobado' && x.fecha_inicio > hoy)
+    .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0] || null;
   // Próximos 6 meses: aprobadas y pendientes (las pendientes van marcadas,
   // para que nadie las tome como fijas).
   const limiteEquipo = vacSumarDias(hoy, 183);
   const equipoVisible = portalEquipo.filter(e => e.fecha_fin >= hoy && e.fecha_inicio <= limiteEquipo);
-  const nPend = solicitudes.filter(x => x.estado === 'pendiente').length;
   const resumenSolicitudes = !solicitudes.length ? 'ninguna todavía'
-    : nPend ? `<span style="color:var(--amber)">${nPend} pendiente${nPend === 1 ? '' : 's'}</span> · ${solicitudes.length} en total`
+    : pendientes.length ? `<span class="portal-chip warn">${pendientes.length} pendiente${pendientes.length === 1 ? '' : 's'}</span>`
     : `${solicitudes.length} en total`;
 
   // Antes del primer aniversario la ley todavía no da derecho a vacaciones:
-  // lo que pida es un adelanto que Sebastián decide si aprueba.
+  // lo que pida es un adelanto que debe estar conversado con Sebastián.
   const aniversario = t.fecha_ingreso ? String(Number(t.fecha_ingreso.slice(0, 4)) + 1) + t.fecha_ingreso.slice(4, 10) : null;
   const antesDelAnio = aniversario && aniversario > hoy;
 
   cont.innerHTML = `
     <div class="portal-wrap">
-      ${portalEncabezado(t.nombre)}
+      ${portalEncabezado(t.nombre, dispHoy, futuros, !s.periodos.length)}
 
-      ${vigente ? `<div class="portal-aviso ok"><i class="ti ti-beach" aria-hidden="true"></i> Estás de vacaciones hasta el <strong>${fDate(vigente.fecha_fin)}</strong>. Vuelves el ${fDate(portalDiaRegreso(vigente.fecha_fin))}.</div>` : ''}
-      ${antesDelAnio ? `<div class="portal-aviso warn">Tu derecho legal a vacaciones comienza el <strong>${fDate(aniversario)}</strong> (al cumplir un año). Antes de esa fecha, lo que pidas es un adelanto que debe estar conversado con Sebastián.</div>` : ''}
+      <div class="portal-cuerpo">
+        ${portalEstadoHoy(vigente, pendientes, proxAprobada)}
+        ${antesDelAnio ? `<div class="portal-estado warn"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Tu derecho legal a vacaciones comienza el <strong>${fDate(aniversario)}</strong>, al cumplir un año. Antes de esa fecha, lo que pidas es un adelanto que debe estar conversado con Sebastián.</div></div>` : ''}
 
-      <div class="portal-stats">
-        <div class="stat destacado"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${s.periodos.length ? dispHoy : '—'}</div><div class="stat-sub">${!s.periodos.length ? 'aún sin períodos asignados'
-          : futuros.length ? futuros.map(p => `+${p.disponibles} desde el ${fDate(periodoUsableDesde(p.id))} (período ${escapeHtml(p.periodo)})`).join('<br>') : 'días hábiles para pedir'}</div></div>
-        <div class="stat"><div class="stat-label">Pendientes</div><div class="stat-val">${s.pendientes}</div><div class="stat-sub">días esperando aprobación</div></div>
-        <div class="stat"><div class="stat-label">Próximas vacaciones</div><div class="stat-val" style="font-size:15px;line-height:1.35">${prox ? rangoLegible(prox.fecha_inicio, prox.fecha_fin) : '—'}</div><div class="stat-sub">${prox ? `${prox.dias_habiles} días · ${prox.estado === 'pendiente' ? 'por aprobar' : 'aprobadas'}` : 'nada programado'}</div></div>
-      </div>
-
-      <button class="page-btn portal-btn-principal" onclick="portalAbrirSolicitud()" ${s.disponibles > 0 ? '' : 'disabled'}>
-        <i class="ti ti-plus" aria-hidden="true"></i> Solicitar vacaciones
-      </button>
-      ${s.disponibles > 0 ? '' : '<div style="font-size:12.5px;color:var(--text-3);text-align:center;margin-top:6px">No tienes días disponibles para pedir.</div>'}
-
-      ${portalDesplegable('solicitudes', 'Mis solicitudes', resumenSolicitudes,
-        solicitudes.length ? solicitudes.map(portalTarjetaSolicitud).join('') : '<div class="portal-vacio">Todavía no tienes solicitudes.</div>')}
-
-      ${portalDesplegable('periodos', 'Mis días por período', s.periodos.length ? `${dispHoy} disponibles hoy` : '',
-        (s.periodos.length ? s.periodos.map(p => portalDesplegable('periodo-' + p.id,
-          `Período ${escapeHtml(p.periodo)}`,
-          `<strong>${p.disponibles}</strong> disponibles · <span style="color:${usableHoy(p) ? 'var(--green)' : 'var(--amber)'}">${usableHoy(p) ? 'ya lo puedes usar' : 'desde el ' + fDate(periodoUsableDesde(p.id))}</span>`,
-          `<div class="portal-periodo-nums" style="margin-top:0">
-             <div><span>${p.totales}</span>asignados${p.progresivos ? ` (incl. ${p.progresivos} progresivo${p.progresivos === 1 ? '' : 's'})` : ''}</div>
-             <div><span>${p.utilizados}</span>usados</div>
-             <div><span>${p.pendientes}</span>pendientes</div>
-           </div>
-           ${p.observacion ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:6px">${escapeHtml(p.observacion)}</div>` : ''}`,
-          'portal-desp-interno')).join('') : '<div class="portal-vacio">Aún no tienes períodos asignados.</div>')
-        + '<div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Al pedir vacaciones, los días se descuentan primero del período más antiguo. Usar días de un período antes de la fecha en que se puede usar es un adelanto y debe estar conversado con Sebastián.</div>')}
-
-      ${portalDesplegable('equipo', 'Vacaciones del equipo', equipoVisible.length ? `${equipoVisible.length} en los próximos 6 meses` : 'nadie en los próximos 6 meses', `
-        <div style="display:flex;justify-content:center;margin-bottom:10px">
-          <div class="scope-toggle" role="group" aria-label="Cómo ver las vacaciones del equipo">
-            <button class="${portalVistaEquipo === 'lista' ? 'active' : ''}" onclick="portalVistaEquipo='lista';portalRender()">Lista (6 meses)</button>
-            <button class="${portalVistaEquipo === 'calendario' ? 'active' : ''}" onclick="portalVistaEquipo='calendario';portalRender()">Calendario (1 año)</button>
-          </div>
+        <div class="portal-cta">
+          <div class="portal-cta-titulo">¿Quieres tomarte unos días?</div>
+          <ol class="portal-pasos">
+            <li><span>1</span>Elige desde y hasta cuándo</li>
+            <li><span>2</span>Revisa cuántos días se descuentan</li>
+            <li><span>3</span>Envía y espera la respuesta</li>
+          </ol>
+          <button class="portal-btn-principal" onclick="portalAbrirSolicitud()" ${s.disponibles > 0 ? '' : 'disabled'}>
+            <i class="ti ti-calendar-plus" aria-hidden="true"></i> Pedir vacaciones
+          </button>
+          ${s.disponibles > 0 ? '' : '<div class="portal-cta-nota">Por ahora no tienes días disponibles para pedir.</div>'}
         </div>
-        ${portalVistaEquipo === 'calendario' ? portalHtmlCalendario() : equipoVisible.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
-          ${equipoVisible.map(e => `
-            <div class="portal-fila-equipo">
-              <div style="min-width:0">
-                <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
-                ${e.estado === 'pendiente' ? '<span class="badge-estado warn" style="font-size:11px;padding:1px 8px;margin-top:3px;display:inline-flex">Pendiente de aprobación</span>' : ''}
-              </div>
-              <div style="color:var(--text-2);white-space:nowrap">${rangoLegible(e.fecha_inicio, e.fecha_fin)}</div>
-            </div>`).join('')}
-        </div>` : '<div class="portal-vacio">Nadie del equipo tiene vacaciones en los próximos 6 meses.</div>'}
-        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Las marcadas "Pendiente de aprobación" todavía no están confirmadas.</div>`)}
+
+        ${portalDesplegable('solicitudes', '<i class="ti ti-list-check" aria-hidden="true"></i> Mis solicitudes', resumenSolicitudes,
+          solicitudes.length ? solicitudes.map(portalTarjetaSolicitud).join('') : '<div class="portal-vacio">Todavía no has pedido vacaciones desde aquí.</div>')}
+
+        ${portalDesplegable('periodos', '<i class="ti ti-chart-bar" aria-hidden="true"></i> Mis días por período', s.periodos.length ? `${dispHoy} para usar hoy` : '',
+          (s.periodos.length ? s.periodos.map(p => portalDesplegable('periodo-' + p.id,
+            `Período ${escapeHtml(p.periodo)}`,
+            `<strong>${p.disponibles}</strong> disponible${p.disponibles === 1 ? '' : 's'} · <span style="color:${usableHoy(p) ? 'var(--green)' : 'var(--amber)'}">${usableHoy(p) ? 'ya lo puedes usar' : 'desde el ' + fDate(periodoUsableDesde(p.id))}</span>`,
+            `${portalBarraPeriodo(p)}
+             <div style="font-size:12px;color:var(--text-2);margin-top:8px">Te corresponden <strong>${p.totales}</strong> días${p.progresivos ? `, incluido${p.progresivos === 1 ? '' : 's'} ${p.progresivos} día${p.progresivos === 1 ? '' : 's'} progresivo${p.progresivos === 1 ? '' : 's'}` : ''}.</div>
+             ${p.observacion ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:4px">${escapeHtml(p.observacion)}</div>` : ''}`,
+            'portal-desp-interno')).join('') : '<div class="portal-vacio">Aún no tienes períodos asignados.</div>')
+          + '<div class="portal-nota">Los días se descuentan primero del período más antiguo. Usar días de un período antes de su fecha es un <strong>adelanto</strong> y debe estar conversado con Sebastián.</div>')}
+
+        ${portalDesplegable('equipo', '<i class="ti ti-users" aria-hidden="true"></i> Vacaciones del equipo', equipoVisible.length ? `${equipoVisible.length} en los próximos 6 meses` : 'nadie en los próximos meses', `
+          <div style="display:flex;justify-content:center;margin-bottom:10px">
+            <div class="scope-toggle" role="group" aria-label="Cómo ver las vacaciones del equipo">
+              <button class="${portalVistaEquipo === 'lista' ? 'active' : ''}" onclick="portalVistaEquipo='lista';portalRender()">Lista (6 meses)</button>
+              <button class="${portalVistaEquipo === 'calendario' ? 'active' : ''}" onclick="portalVistaEquipo='calendario';portalRender()">Calendario (1 año)</button>
+            </div>
+          </div>
+          ${portalVistaEquipo === 'calendario' ? portalHtmlCalendario() : equipoVisible.length ? `<div class="portal-tarjeta" style="padding:4px 14px">
+            ${equipoVisible.map(e => `
+              <div class="portal-fila-equipo">
+                <div style="min-width:0">
+                  <div style="font-weight:${e.propia ? 600 : 500}">${escapeHtml(e.nombre)}${e.propia ? ' <span style="color:var(--text-3);font-weight:400">(tú)</span>' : ''}</div>
+                  ${e.estado === 'pendiente' ? '<span class="portal-chip warn" style="margin-top:3px">Pendiente de aprobación</span>' : ''}
+                </div>
+                <div style="color:var(--text-2);white-space:nowrap">${rangoLegible(e.fecha_inicio, e.fecha_fin)}</div>
+              </div>`).join('')}
+          </div>` : '<div class="portal-vacio">Nadie del equipo tiene vacaciones en los próximos 6 meses.</div>'}
+          <div class="portal-nota">Te sirve para no pedir las mismas fechas que un compañero. Las marcadas "Pendiente de aprobación" todavía no están confirmadas.</div>`)}
+
+        ${portalDesplegable('ayuda', '<i class="ti ti-help-circle" aria-hidden="true"></i> ¿Cómo funciona?', '', `
+          <div class="portal-faq">
+            <div><strong>¿Qué son los días hábiles?</strong>De lunes a viernes, sin contar feriados. Los fines de semana y feriados que caen dentro de tus vacaciones no se descuentan.</div>
+            <div><strong>¿Cuándo sé si me aprobaron?</strong>Tu solicitud queda <em>Pendiente</em> hasta que Sebastián la revise. Verás la respuesta en "Mis solicitudes" (y te llegará un correo).</div>
+            <div><strong>¿Me puedo arrepentir?</strong>Sí: mientras esté pendiente, ábrela en "Mis solicitudes" y toca <em>Anular solicitud</em>. Si ya está aprobada, habla con Sebastián.</div>
+            <div><strong>¿Qué es un adelanto?</strong>Usar días de tu próximo período antes de la fecha en que lo ganas. Se puede, pero solo si ya lo conversaste con Sebastián.</div>
+            <div><strong>¿Algo no cuadra?</strong>Si tus días no coinciden con lo que esperabas, habla con Sebastián para revisarlo.</div>
+          </div>`)}
+      </div>
     </div>`;
 }
 
@@ -314,8 +362,17 @@ function portalTarjetaSolicitud(sol) {
   // ("comentario · motivo"): aquí se quita para no mostrarlo dos veces.
   let obs = sol.observaciones || '';
   if (respuesta) { if (obs === respuesta) obs = ''; else if (obs.endsWith(' · ' + respuesta)) obs = obs.slice(0, -(' · ' + respuesta).length); }
+  // Pasos: Enviada → En revisión → Respuesta. Solo para las pedidas en el portal.
+  const paso = sol.estado === 'pendiente' ? 2 : 3;
+  const final = sol.estado === 'rechazado' ? 'Rechazada' : sol.estado === 'cancelado' ? 'Anulada' : 'Aprobada';
+  const pasos = sol.origen === 'portal' ? `
+    <div class="portal-pasos-estado ${sol.estado}">
+      <span class="hecho">Enviada</span>
+      <span class="${paso >= 2 ? (paso === 2 ? 'actual' : 'hecho') : ''}">En revisión</span>
+      <span class="${paso === 3 ? 'hecho final' : ''}">${paso === 3 ? final : 'Respuesta'}</span>
+    </div>` : '';
   return `
-    <div class="portal-tarjeta">
+    <div class="portal-tarjeta portal-sol ${sol.estado}">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
         <div style="min-width:0">
           <div style="font-weight:600">${rangoLegible(sol.fecha_inicio, sol.fecha_fin)} de ${vacFecha(sol.fecha_inicio).getFullYear()}</div>
@@ -323,9 +380,10 @@ function portalTarjetaSolicitud(sol) {
         </div>
         ${badgeVac(estado)}
       </div>
+      ${pasos}
       ${(() => { const a = adelantoDeSolicitud(sol); return a.length && sol.estado !== 'cancelado' && sol.estado !== 'rechazado' ? `<div style="font-size:12px;color:var(--amber);margin-top:8px"><strong>Adelanto:</strong> ${textoAdelanto(a)}.</div>` : ''; })()}
-      ${obs ? `<div style="font-size:12.5px;color:var(--text-2);margin-top:8px">${escapeHtml(obs)}</div>` : ''}
-      ${respuesta && (sol.estado === 'rechazado' || sol.estado === 'aprobado') ? `<div style="font-size:12.5px;margin-top:8px"><strong>Respuesta:</strong> ${escapeHtml(respuesta)}</div>` : ''}
+      ${obs ? `<div style="font-size:12.5px;color:var(--text-2);margin-top:8px">Tu comentario: ${escapeHtml(obs)}</div>` : ''}
+      ${respuesta && (sol.estado === 'rechazado' || sol.estado === 'aprobado') ? `<div class="portal-respuesta"><strong>Respuesta de Sebastián:</strong> ${escapeHtml(respuesta)}</div>` : ''}
       ${sol.estado === 'pendiente' ? `<div style="margin-top:10px"><button class="page-btn" style="padding:6px 12px;font-size:12.5px" onclick="portalAnular(${sol.id}, this)">Anular solicitud</button></div>` : ''}
     </div>`;
 }
@@ -342,17 +400,20 @@ function portalAbrirSolicitud() {
   modal.innerHTML = `
     <div class="modal-shell modal-sm" onclick="event.stopPropagation()">
       <div class="modal-header">
-        <div style="flex:1;font-size:16px;font-weight:600">Solicitar vacaciones</div>
+        <div style="flex:1"><div style="font-size:16px;font-weight:600">Pedir vacaciones</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Elige las fechas: te mostramos el cálculo antes de enviar.</div></div>
         <button onclick="cerrarTodosLosModales()" class="modal-close" aria-label="Cerrar">✕</button>
       </div>
       <div class="modal-body">
+        <div class="portal-paso-titulo"><span>1</span>¿Desde y hasta cuándo?</div>
         <div class="portal-fechas">
-          <label>Desde<input type="date" id="ps-desde" min="${hoy}" oninput="portalRecalcular()"></label>
-          <label>Hasta (inclusive)<input type="date" id="ps-hasta" min="${hoy}" oninput="portalRecalcular()"></label>
+          <label>Primer día de vacaciones<input type="date" id="ps-desde" min="${hoy}" oninput="portalRecalcular()"></label>
+          <label>Último día de vacaciones<input type="date" id="ps-hasta" min="${hoy}" oninput="portalRecalcular()"></label>
         </div>
-        <div id="ps-calculo" class="portal-calculo">Elige las fechas y te muestro cuántos días se descuentan.</div>
-        <label style="display:block;font-size:12.5px;color:var(--text-2);margin-top:12px">Comentario (opcional)
-          <textarea id="ps-obs" rows="2" maxlength="500" style="width:100%;margin-top:4px;padding:8px 10px;resize:vertical"></textarea>
+        <div class="portal-paso-titulo"><span>2</span>Revisa el cálculo</div>
+        <div id="ps-calculo" class="portal-calculo">Elige las fechas y aquí verás cuántos días hábiles se descuentan.</div>
+        <div class="portal-paso-titulo"><span>3</span>Agrega un comentario (si quieres) y envía</div>
+        <label style="display:block;font-size:12.5px;color:var(--text-2)">Comentario para Sebastián (opcional)
+          <textarea id="ps-obs" rows="2" maxlength="500" placeholder="Ej.: viaje familiar, trámite…" style="width:100%;margin-top:4px;padding:8px 10px;resize:vertical"></textarea>
         </label>
         <div id="ps-error" class="portal-aviso err" style="display:none;margin-top:10px"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
@@ -375,7 +436,7 @@ function portalRecalcular() {
   const out = document.getElementById('ps-calculo');
   const btn = document.getElementById('ps-enviar');
   btn.disabled = true;
-  if (!desde || !hasta) { out.textContent = 'Elige las fechas y te muestro cuántos días se descuentan.'; return; }
+  if (!desde || !hasta) { out.textContent = 'Elige las fechas y aquí verás cuántos días hábiles se descuentan.'; return; }
 
   const t = portalDatos.trabajador;
   const dias = diasHabilesEntre(desde, hasta);
@@ -390,7 +451,7 @@ function portalRecalcular() {
   if (noHab.findes.length) motivos.push(`${noHab.findes.length} día${noHab.findes.length === 1 ? '' : 's'} de fin de semana`);
   if (noHab.feriados.length) motivos.push(`${noHab.feriados.length} feriado${noHab.feriados.length === 1 ? '' : 's'} (${noHab.feriados.map(f => escapeHtml(f.nombre)).join(', ')})`);
 
-  let html = `<div style="font-size:20px;font-weight:600">${dias} día${dias === 1 ? '' : 's'} hábil${dias === 1 ? '' : 'es'}</div>
+  let html = `<div style="font-size:22px;font-weight:700;color:var(--text)">${dias} día${dias === 1 ? '' : 's'} hábil${dias === 1 ? '' : 'es'}</div>
     <div style="font-size:12.5px;color:var(--text-2);margin-top:2px">${corridos} día${corridos === 1 ? '' : 's'} corrido${corridos === 1 ? '' : 's'}${motivos.length ? '; no se descuentan ' + motivos.join(' ni ') : ''}. Vuelves el ${fDate(portalDiaRegreso(hasta))}.</div>`;
   let ok = true;
   if (dias === 0) { html += `<div class="portal-aviso warn" style="margin-top:8px">Esas fechas no tienen días hábiles.</div>`; ok = false; }
