@@ -1451,6 +1451,7 @@
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
 <script src="permisos.js"></script>
+<script src="portal-trabajador.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -1483,6 +1484,14 @@ function cargarSesionGuardada() {
   } catch (e) { return null; }
 }
 
+// Rol de la cuenta. "trabajador" se lee de app_metadata, que solo el servidor
+// puede escribir (user_metadata la puede cambiar el propio usuario): esas
+// cuentas van al portal "Mis vacaciones" y no a la app de la oficina.
+function rolDesdeUsuario(u) {
+  if (u?.app_metadata?.rol === 'trabajador') return 'trabajador';
+  return u?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+}
+
 async function iniciarSesion(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -1491,7 +1500,7 @@ async function iniciarSesion(email, password) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(res.status === 400 ? 'Usuario o contraseña incorrectos.' : (data.error_description || data.msg || 'No se pudo iniciar sesión.'));
-  const rol = data.user?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+  const rol = rolDesdeUsuario(data.user);
   guardarSesion({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
@@ -1511,7 +1520,7 @@ async function refrescarSesion() {
     });
     if (!res.ok) throw new Error('refresh falló');
     const data = await res.json();
-    const rol = data.user?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+    const rol = rolDesdeUsuario(data.user);
     guardarSesion({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
@@ -9519,6 +9528,11 @@ function alertasVacaciones() {
   const anioActual = anioPeriodoActual();
 
   const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
+  // Las pedidas por el propio trabajador desde el portal van una por una,
+  // para abrirlas y responder directo.
+  pendientes.filter(s => s.origen === 'portal').forEach(s => out.push({ tipo: 'warn',
+    texto: `<strong>${escapeHtml(nombreDe(s.personal_id))}</strong> pidió vacaciones desde el portal: ${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} día${Number(s.dias_habiles) === 1 ? '' : 's'}.`,
+    onclick: `navReset();abrirDetalleSolicitud(${s.id})` }));
   if (pendientes.length) out.push({ tipo: 'warn',
     texto: `Hay <strong>${pendientes.length}</strong> solicitud${pendientes.length === 1 ? '' : 'es'} pendiente${pendientes.length === 1 ? '' : 's'} de aprobación.`,
     onclick: `cambiarTabVac('historial');setTimeout(()=>{const s=document.getElementById('vac-f-estado');if(s){s.value='pendiente';filtrarHistorialVac()}},50)` });
@@ -9822,6 +9836,7 @@ function abrirPerfilVacaciones(id) {
       </div>
       <div class="modal-body">
 
+        ${portalBloqueAcceso(p)}
         <div class="fpp-resumen" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
           <div class="stat destacado"><div class="stat-label">Disponibles</div><div class="stat-val">${s.periodos.length ? s.disponibles : '—'}</div><div class="stat-sub">${s.periodos.length ? 'días' : 'sin períodos asignados'}</div></div>
           <div class="stat"><div class="stat-label">Utilizados</div><div class="stat-val">${s.utilizados}</div><div class="stat-sub">días aprobados</div></div>
@@ -10287,6 +10302,7 @@ function abrirDetalleSolicitud(id) {
           ${s.observaciones ? `<div style="margin-top:6px"><strong>Observación:</strong> ${escapeHtml(s.observaciones)}</div>` : ''}
           ${s.excepcion_saldo ? `<div style="margin-top:6px;color:var(--amber)"><strong>Autorizada como excepción por sobre el saldo.</strong> ${escapeHtml(s.motivo_excepcion || '')}</div>` : ''}
           ${s.origen === 'excel' ? '<div style="margin-top:6px;color:var(--text-3)">Registro migrado desde el control en Excel.</div>' : ''}
+          ${s.origen === 'portal' ? '<div style="margin-top:6px;color:var(--text-3)">Pedida por el trabajador desde el portal. Al aprobar o rechazar se le avisa por correo.</div>' : ''}
         </div>
 
         ${otros.length ? `<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--amber)">
@@ -10314,10 +10330,20 @@ function abrirDetalleSolicitud(id) {
 }
 
 async function cambiarEstadoSolicitud(id, estado, btn) {
+  const sol = vacSolicitudes.find(x => x.id === id);
+  const delPortal = sol && sol.origen === 'portal';
+  // Si la pidió el trabajador desde el portal, el motivo del rechazo le llega
+  // a él (lo ve en el portal y en el correo de aviso).
+  let motivo = null;
+  if (delPortal && estado === 'rechazado') {
+    motivo = await promptModal(`Motivo del rechazo (opcional).\n\n${escapeHtml(nombreDe(sol.personal_id))} lo verá en su portal y en el correo de aviso.`, '');
+    if (motivo === null) return;
+  }
   const original = btn.textContent;
   btn.disabled = true; btn.textContent = '…';
   try {
-    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: estado, p_usuario: usuarioActualVac() });
+    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: estado, p_usuario: usuarioActualVac(), p_motivo: (motivo || '').trim() || null });
+    if (delPortal && (estado === 'aprobado' || estado === 'rechazado')) avisarVacacionesPorCorreo('respuesta', id);
     await recargarVacaciones();
     cerrarTodosLosModales();
     abrirDetalleSolicitud(id);
@@ -10441,7 +10467,7 @@ function exportarVacaciones() {
       'Días hábiles': Number(s.dias_habiles), 'Período utilizado': textoDistribucion(s.id),
       'Estado': ESTADOS_VAC[s.estado].label, 'Observación': s.observaciones || '',
       'Excepción de saldo': s.excepcion_saldo ? 'Sí' : '', 'Motivo de la excepción': s.motivo_excepcion || '',
-      'Origen': s.origen === 'excel' ? 'Migrado del Excel' : 'Registrado en la app',
+      'Origen': s.origen === 'excel' ? 'Migrado del Excel' : s.origen === 'portal' ? 'Pedida en el portal' : 'Registrado en la app',
     }))), 'Historial');
 
   // Vacaciones programadas
@@ -18986,6 +19012,13 @@ function mostrarPantallaLogin(mensaje) {
 }
 
 async function arrancarApp() {
+  // Las cuentas de trabajador solo ven su portal de vacaciones
+  // (portal-trabajador.js): no se carga nada de la app de la oficina.
+  if (sesionActual?.rol === 'trabajador') {
+    document.getElementById('login-overlay').style.display = 'none';
+    arrancarPortalTrabajador();
+    return;
+  }
   // Primero el perfil: qué menús ve esta cuenta (permisos.js).
   await cargarPerfil();
   if (perfilActual && perfilActual.activo === false) {
