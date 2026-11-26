@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="styles.css">
 
 <link rel="stylesheet" href="guias-cot.css">
+<link rel="stylesheet" href="oportunidades.css">
 </head>
 <body>
 
@@ -84,6 +85,7 @@
         <div class="nav-item nav-subitem" data-page="oc" onclick="seleccionarSubpagina('oc-modulo','oc',this)"><span>Buscar orden de compra</span></div>
         <div class="nav-item nav-subitem" data-page="hospitales" onclick="seleccionarSubpagina('oc-modulo','hospitales',this)"><span>Hospitales</span></div>
         <div class="nav-item nav-subitem" data-page="estadisticas" onclick="seleccionarSubpagina('oc-modulo','estadisticas',this)"><span>Estadísticas</span></div>
+        <div class="nav-item nav-subitem" data-page="oportunidades" onclick="seleccionarSubpagina('oc-modulo','oportunidades',this)"><span>Oportunidades</span></div>
       </div>
     </div>
 
@@ -265,6 +267,10 @@
 
 <div class="system-bar">
   <span class="system-bar-brand"><span class="system-bar-brand-main">Bulfor OC</span><span class="system-bar-brand-sub"> — Sistema de gestión farmacéutica</span></span>
+  <!-- Campana de Novedades: licitaciones y compras ágiles nuevas (oportunidades.js) -->
+  <button id="op-campana" class="op-campana" onclick="opAbrirNovedades()" title="Novedades de Mercado Público" aria-label="Novedades de Mercado Público">
+    <i class="ti ti-bell" aria-hidden="true"></i><span class="op-campana-tx">Novedades</span><span class="op-campana-n" id="op-campana-n"></span>
+  </button>
   <button id="header-kebab-btn" class="header-kebab-btn" onclick="toggleHeaderMenu()" title="Más opciones" aria-label="Más opciones" aria-expanded="false">
     <i class="ti ti-dots-vertical" aria-hidden="true"></i>
   </button>
@@ -666,6 +672,15 @@
       <div class="page-sub">Elige una estadística para verla en detalle</div>
     </div>
     <div id="stats-content"></div>
+  </div>
+
+  <!-- OPORTUNIDADES: licitaciones y compras ágiles abiertas (oportunidades.js) -->
+  <div class="page" id="page-oportunidades">
+    <div class="page-header">
+      <div class="page-title">Oportunidades <span class="info-tip" tabindex="0" role="note" data-tip="Licitaciones y compras ágiles abiertas en todo Chile que calzan con lo que vende Bulfor (magistrales, recetario y los productos que más vendemos). Se revisa Mercado Público cada 2 horas. Prioridad alta: dice magistral, recetario magistral o preparado farmacéutico. Media: pide un producto que vendemos.">i</span></div>
+      <div class="page-sub">Licitaciones y compras ágiles abiertas que calzan con lo que vende Bulfor</div>
+    </div>
+    <div id="op-contenido"></div>
   </div>
 
 
@@ -1451,6 +1466,7 @@
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
 <script src="permisos.js"></script>
+<script src="oportunidades.js"></script>
 <script src="portal-trabajador.js"></script>
 <script src="ver-contrasena.js"></script>
 <script>
@@ -1892,6 +1908,7 @@ async function init() {
     const rrhhListo = cargarRRHH().catch(() => {});
     cargarSolicitudesWeb().catch(() => {});
     cargarRecResumen().catch(() => {});
+    opIniciarAviso();  // campana de Novedades (oportunidades.js)
     if (!window.__swTimer) window.__swTimer = setInterval(() => { if (sesionActual) cargarSolicitudesWeb().catch(() => {}); }, 5 * 60 * 1000);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -13777,7 +13794,7 @@ function fichaHospital(hospital) {
     get cuerpo() {
       const volver = document.getElementById('page-hospitales').classList.contains('active')
         ? '<button type="button" class="panel-volver" onclick="panelCerrar()">← Volver a Hospitales</button>' : '';
-      const pestañas = [['productos', 'Productos que compra'], ['ordenes', 'Órdenes de compra']];
+      const pestañas = HOSP_PESTANAS;
       return `${volver}<div class="fpp-status-tabs" role="group" aria-label="Contenido de la ficha del hospital">
         ${pestañas.map(([vista, label]) => `<button type="button" class="fpp-status-tab${ficha.vista === vista ? ' active' : ''}" aria-pressed="${ficha.vista === vista}" onclick="hospCambiarVista('${vista}')">${label}</button>`).join('')}
       </div><div id="hosp-ficha-vista">${hospVistaHtml(ficha)}</div>`;
@@ -13785,13 +13802,17 @@ function fichaHospital(hospital) {
   };
 }
 
+// Pestañas de la ficha del hospital. "Contactos" (26-11-2026): las personas que
+// firman las OC del hospital en Mercado Público (lo guarda la sincronización).
+const HOSP_PESTANAS = [['productos', 'Productos que compra'], ['ordenes', 'Órdenes de compra'], ['contactos', 'Contactos']];
+
 function hospCambiarVista(vista) {
   const ficha = window.__hospFicha;
   if (ficha.vista === vista) return;
   ficha.vista = vista;
   const botones = document.querySelectorAll('#panel-lateral [aria-label="Contenido de la ficha del hospital"] button');
   botones.forEach((boton, i) => {
-    const activo = i === (vista === 'productos' ? 0 : 1);
+    const activo = i === HOSP_PESTANAS.findIndex(p => p[0] === vista);
     boton.classList.toggle('active', activo);
     boton.setAttribute('aria-pressed', activo);
   });
@@ -13799,6 +13820,7 @@ function hospCambiarVista(vista) {
 }
 
 function hospVistaHtml(ficha) {
+  if (ficha.vista === 'contactos') return hospContactosHtml(ficha);
   const productos = ficha.vista === 'productos';
   const q = ficha.consultas[ficha.vista];
   return `<label for="hosp-ficha-buscar" class="panel-h">${productos ? 'Buscar producto' : 'Buscar por número de orden'}</label>
@@ -13807,6 +13829,37 @@ function hospVistaHtml(ficha) {
     </div>
     <div id="hosp-ficha-resultados">${hospResultadosHtml(ficha)}</div>`;
 }
+
+// Contactos del hospital: uno por persona (mismo nombre o correo), con su
+// cargo, unidad, teléfono y correo de la OC más reciente.
+function hospContactosHtml(ficha) {
+  const porPersona = {};
+  ficha.ordenes.forEach(r => {
+    const nombre = (r.contacto_nombre || '').trim();
+    const mail = (r.contacto_mail || '').trim().toLowerCase();
+    if (!nombre && !mail) return;
+    const clave = mail || nombre.toLowerCase();
+    const fecha = String(r.fechaenvio || r.fechaoc || '');
+    const p = porPersona[clave] || (porPersona[clave] = { n: 0, ultima: '', primera: fecha });
+    p.n++;
+    if (fecha < p.primera) p.primera = fecha;
+    if (fecha >= p.ultima) Object.assign(p, { ultima: fecha, nombre, mail: r.contacto_mail, cargo: r.contacto_cargo,
+      fono: r.contacto_fono, unidad: r.unidadcompradora, codigo: r.codigooc });
+  });
+  const lista = Object.values(porPersona).sort((a, b) => b.ultima.localeCompare(a.ultima));
+  if (!lista.length) return '<div class="fpp-empty"><p>Todavía no hay contactos guardados para este hospital. Se completan con la sincronización de Mercado Público.</p></div>';
+  // Tarjetas (no tabla) para que en el celular no se salga de la pantalla
+  return `<p style="color:var(--text-2);font-size:12px;margin:4px 0 10px">Personas que han emitido órdenes de compra a Bulfor, la más reciente primero. Datos de Mercado Público.</p>
+    <div class="hosp-contactos">${lista.map(p => `<div class="hosp-contacto">
+      <div class="hosp-contacto-nombre"><b>${escapeHtml(p.nombre || '—')}</b>${p.cargo ? `<span>${escapeHtml(p.cargo)}</span>` : ''}${p.unidad ? `<span>${escapeHtml(p.unidad)}</span>` : ''}</div>
+      <div class="hosp-contacto-datos">
+        ${p.fono ? `<a href="tel:${escapeHtml(p.fono.replace(/[^0-9+]/g, ''))}"><i class="ti ti-phone" aria-hidden="true"></i> ${escapeHtml(p.fono)}</a>` : ''}
+        ${p.mail ? `<span><a href="mailto:${escapeHtml(p.mail)}"><i class="ti ti-mail" aria-hidden="true"></i> ${escapeHtml(p.mail)}</a> ${copiarBtnContacto(p.mail)}</span>` : ''}
+      </div>
+      <div class="hosp-contacto-oc">Última OC ${fDate(p.ultima)} · ${p.n} OC</div>
+    </div>`).join('')}</div>`;
+}
+const copiarBtnContacto = v => `<button type="button" class="panel-copiar-mini" title="Copiar correo" onclick="copiarTexto(${escapeHtml(JSON.stringify(v))}, this)"><i class="ti ti-copy"></i></button>`;
 
 function hospBuscarEnFicha(q) {
   const ficha = window.__hospFicha;
@@ -18499,6 +18552,7 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Buscar orden de compra', page: 'oc' },
     { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
+    { icon: '<i class="ti ti-radar"></i>', label: 'Oportunidades', page: 'oportunidades' },
   ] },
   // Precios: solo los precios facturados (los de OC se quitaron). El menú
   // entra directo; "Por cliente" es la otra vista de la misma pantalla.
@@ -18715,6 +18769,7 @@ function showPage(id, el) {
   if (pageEl) pageEl.classList.add('active');
   if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
   if (id === 'guias-cot') gcInit();
+  if (id === 'oportunidades') opInit();
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
   // agrupa Por producto y Por cliente): así queda marcado en las dos.
@@ -18908,6 +18963,15 @@ function renderInicio() {
     const n = fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
     if (n > 0) items.push({ texto: `${n} envío${n===1?'':'s'} con retraso`, tipo: 'warn', modulo: 'fedex', pagina: 'fedex' });
   }
+  // OC que el hospital envió y Bulfor todavía no acepta en Mercado Público
+  // (estado 4 "Enviada al proveedor"; la sincronización lo revisa cada 2 horas).
+  if (Array.isArray(oc) && oc.length) {
+    const n = oc.filter(r => String(r.estadooc) === '4').length;
+    if (n > 0) items.push({ texto: `${n} orden${n===1?'':'es'} de compra por aceptar en Mercado Público`, tipo: 'err', modulo: 'oc-modulo', pagina: 'oc' });
+  }
+  // Licitaciones y compras ágiles nuevas que esta cuenta no ha visto (oportunidades.js)
+  const opRes = typeof opResumenInicio === 'function' ? opResumenInicio() : null;
+  if (opRes && opRes.nuevas) items.push({ texto: `${opRes.nuevas} oportunidad${opRes.nuevas===1?'':'es'} nueva${opRes.nuevas===1?'':'s'} en Mercado Público${opRes.alta ? ` · ${opRes.alta} de prioridad alta` : ''}`, tipo: opRes.alta ? 'err' : 'warn', modulo: 'oc-modulo', pagina: 'oportunidades' });
 
   // Solo avisos de menús que la cuenta ve.
   items = items.filter(it => paginaPermitida(it.pagina));

@@ -8,7 +8,7 @@
 >
 > **Mantenlo al día:** cada vez que termines un cambio, agrega una línea en la
 > "Bitácora" (sección 9) y actualiza "Pendientes" (sección 10) y lo que haya
-> cambiado de las demás secciones. Última actualización: 29-10-2026.
+> cambiado de las demás secciones. Última actualización: 26-11-2026.
 
 ---
 
@@ -70,7 +70,7 @@ El código está dividido con comentarios `// ─── TÍTULO ───`. Busc
 | Módulo (menú) | Páginas (`page-…`) | Dónde buscar |
 |---|---|---|
 | Inicio | `inicio` | `Pantalla Inicio: "Requiere atención"` |
-| Órdenes de compra | `oc`, `hospitales`, `estadisticas` | `Listado de OC`, `RENDER OC`, `Ficha de un hospital`, `STATS` |
+| Órdenes de compra | `oc`, `hospitales`, `estadisticas`, `oportunidades` | `Listado de OC`, `RENDER OC`, `Ficha de un hospital` (pestaña Contactos: `hospContactosHtml`, `HOSP_PESTANAS`), `STATS`; Oportunidades y campana de Novedades: `oportunidades.js` / `oportunidades.css` (todo `op*`) |
 | Precios | `facturas-productos` | `Precios: productos base`, `Precios → Por cliente`, `grupoDeProductos` |
 | Facturas Bulfor (menú `facturas`) | `facturas` (Buscar documentos), `guias-cot`, `pagos` (Cobranza; botón "Gráficos de cobros" → `pagos-graficos`, oculto en el submenú), `facturas-rechazadas`; bajo el separador "Creación de documentos": `doc-factura`, `doc-multiple`, `doc-guia`, `doc-nc` (`documentos.js`) | `BUSCADOR DE DOCUMENTOS`, `Ficha de un documento`, `SEGUIMIENTO PAGO DE FACTURAS`, `Cobranza por cliente`, `FACTURAS RECHAZADAS`, `Casos de facturas rechazadas`, `GRÁFICOS DE PAGOS` |
 | Facturas de proveedores | `facturas-por-pagar` (botón "Gráficos de pagos" → `facturas-prov-graficos`, oculto en el submenú), `facturas-prov-productos` | `FACTURAS POR PAGAR`, `PRODUCTOS DE FACTURAS PROVEEDOR`, `Fichas de Productos de proveedores` |
@@ -120,7 +120,8 @@ RLS en todo. Patrón de políticas: `leer_autenticados` (select, authenticated) 
 
 | Área | Tablas / vistas / funciones principales |
 |---|---|
-| OC Mercado Público | `ordenes_compra`, `items_oc`, `hospitales`, `hospitales_maestro` (nombre estándar + RUT), `productos`, `diccionario_normalizacion`, `equivalencias_costo` |
+| Oportunidades (26-11-2026) | `mp_oportunidades` (licitaciones y compras ágiles detectadas por el radar; `prioridad` alta/media/baja o vacía = revisada y no calza, la app no la muestra; solo la escribe la sincronización), `mp_oportunidades_vistas` (user_id + codigo + `descartada`: qué vio o descartó cada cuenta; RLS solo filas propias). `mp_oportunidades_gestion` (codigo + `participamos` + `participante` Sebastián/Javiera/Christian/Genoveva + quién lo anotó; dato compartido, lo leen y escriben todas las cuentas con sesión). Ambas con la política restrictiva `sin_trabajadores` |
+| OC Mercado Público | `ordenes_compra` (desde 26-11-2026 también `contacto_nombre/cargo/fono/mail` y `fecha_ultima_modificacion`; respaldo previo `ordenes_compra_backup_20261126`), `items_oc`, `hospitales`, `hospitales_maestro` (nombre estándar + RUT), `productos`, `diccionario_normalizacion`, `equivalencias_costo` |
 | Documentos emitidos (GDExpress) | `documentos_gdexpress` (tipo_dte 33 factura, 52 guía, 61 NC; `xml_completo`, `orden_compra_ref`, `estado_aceptacion`), `documentos_gdexpress_items` (**`codigo_tipo`='RM' + `codigo_valor`= N° de RM** del producto magistral), `dte_borradores` |
 | Cobranza | `facturas_pago`, `feriados`, `sync_estado` |
 | Proveedores | `facturas_por_pagar`, `facturas_por_pagar_items`, `notas_credito_recibidas`, `proveedores_cuentas` |
@@ -141,7 +142,8 @@ esperando una confirmación que no llega. En ese caso se le entrega a Seba un ar
 
 | Qué | Dónde corre | Frecuencia | Notas |
 |---|---|---|---|
-| OC Mercado Público (`actualizar_oc_final.py`) | GitHub Actions | cada 2 h | |
+| OC Mercado Público (`actualizar_oc_final.py`) | GitHub Actions | cada 2 h | Desde 26-11-2026 guarda el contacto del comprador y, al final, vuelve a consultar las OC del último año que siguen en estado intermedio (4, 5, 6, 13, 14, 15) y actualiza **solo** estado, fechas y contacto. `--rellenar` = carga única de todas. |
+| Radar de oportunidades (`radar_oportunidades.py`) | GitHub Actions (`radar_oportunidades.yml`) | cada 2 h (:10) | Compras ágiles: API nueva `api2.mercadopublico.cl/v2/compra-agil` (ticket `MP_TICKET` en el header `ticket`; probado el 26-11-2026); trae todas las publicadas desde la última revisión y abre en detalle las que calzan por nombre o son de clientes con nombre de medicamentos. Licitaciones: `licitaciones.json?estado=activas` (solo código/nombre/cierre) y detalle una vez de las que suenan a medicamentos. Palabras clave y prioridad al inicio del script. La API de Compra Ágil **no** filtra por organismo; las fechas sin zona son hora de Chile. Solo lee de Mercado Público y escribe en `mp_oportunidades`. |
 | `sincronizar_gdexpress.py` | GitHub Actions | cada 2 h (:20) | **Ojo:** hoy su código trae facturas RECIBIDAS de proveedores (GRUPO=R), igual que `sincronizar_facturas_recibidas.py`; parece una copia antigua. Revisar si sobra (no tocar sin consultar a Seba). |
 | Documentos emitidos (`sincronizar_documentos_gdexpress.py`) | GitHub Actions | cada 2 h (:35) + **rápida cada 15 min** (`sincronizar_documentos_rapido.yml`, últimos 3 días) | Al final llama `rec_formulas_refrescar()` |
 | Facturas recibidas (`sincronizar_facturas_recibidas.py`) | GitHub Actions | cada 2 h (:50) | |
@@ -170,6 +172,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - **Precios**: agrupación compartida `grupoDeProductos` (ZIMC=ZINC, PITASIO=POTASIO, ENOBARBITAL→FENOBARBITAL; OCARBAMAZEPINA es oxcarbazepina, va aparte).
 
 ## 9. Bitácora (lo último arriba)
+
+- 26-11-2026 · Claude · **Integrado en main mediante PR #33 (probado y aprobado por Seba el 26-11-2026):** a pedido de Seba (ideas 1, 4 y 6 de la conversación sobre la API de Mercado Público). **(1) Radar de oportunidades:** script `radar_oportunidades.py` + `radar_oportunidades.yml` (cada 2 h, todo Chile, sin monto mínimo, licitaciones y compras ágiles); página Órdenes de compra › **Oportunidades** (pestañas Abiertas / Nuevas / Cerradas del último mes / Descartadas; filtros tipo, solo clientes, incluir prioridad baja; títulos de columna que ordenan al apretarlos (`opOrdenarPor`, otra vez = al revés); botón Descartar en cada fila; en la ficha "¿Participamos?" (Sí / No / Sin responder) y, si es Sí, quién participó (Sebastián, Javiera, Christian o Genoveva, se elige de la lista; dato compartido del equipo en `mp_oportunidades_gestion`, creada con autorización de Seba el 26-11-2026) y pestaña Participamos; ficha con productos, botón a Mercado Público y Descartar) y **campana roja "Novedades"** en la barra superior (las abiertas de prioridad alta/media que la cuenta no ha visto; ventana con la lista y "Marcar todas como vistas"); aviso en Inicio. **(4)** La sincronización de OC revisa las OC sin terminar del último año (había 180 "Aceptada" con más de 60 días que la app no actualizaba) y aviso en Inicio "OC por aceptar" (estado 4). **(6)** Contacto del comprador en cada OC y pestaña **Contactos** en la ficha del hospital. **Aplicado en Supabase con autorización de Seba ("autorizo todo"):** respaldo `ordenes_compra_backup_20261126` (3.218 filas), columnas nuevas en `ordenes_compra`, tablas `mp_oportunidades` y `mp_oportunidades_vistas` con RLS (sin avisos nuevos del linter salvo el esperado del respaldo sin políticas). Carga inicial hecha con workflows temporales desde la rama (ya borrados): 3.218 OC con contacto; 38 OC cambiaron de estado (33 de Aceptada a Recepción conforme); siguen 159 "Aceptada" con más de 60 días, que en Mercado Público siguen así (el hospital no registró la recepción). Radar: 8.564 compras ágiles revisadas (56 en detalle, 35 calzan) y 143 licitaciones (86 calzan). Las 143 licitaciones de la primera corrida se borraron y recargaron con las palabras clave corregidas (autorizado por Seba). Prueba de solo lectura previa: el ticket sirve para la API de Compra Ágil. Pantalla probada con datos simulados en 1280 px y celular. **Al integrar:** dar acceso a la página `oportunidades` a las cuentas que la necesiten (la campana solo se ve con ese permiso; el administrador ya la ve).
 
 - 26-11-2026 · Claude · **Integrado en main mediante PR #36 (aprobado por Seba el 26-11-2026):** botón "ver contraseña" (ojo) en todos los campos de contraseña de la app. Archivo nuevo `ver-contrasena.js` (cargado en index.html después de `portal-trabajador.js`): agrega el botón a cada `input[type=password]`, también a los que aparecen después (MutationObserver); ícono SVG propio. Estilo `.ver-clave-btn` al final de styles.css. Hoy aplica al login y a "Cambiar clave" del portal.
 
@@ -231,6 +235,8 @@ Las sincronizaciones solo corren lo que está en **`main`**.
 - 28-10-2026 — Etapa 2 pasada a main (Precios, Creación de documentos con refacturación, Documentos, Cobranza, Rechazadas, Gráficos de cobros, Facturas por pagar, Productos de proveedores, FedEx, Chilexpress, títulos fijos, paginación). Edge Function `buscar-factura` y sincronización rápida de documentos.
 
 ## 10. Pendientes
+
+- [ ] **Oportunidades (integrado 26-11, PR #33)**: dar permiso de la página `oportunidades` en Usuarios y permisos y confirmar que corra `radar_oportunidades.yml`. Ajustar palabras clave según lo que aparezca (están al inicio de `radar_oportunidades.py`). Ideas para después: cruzar "Recepción conforme" con Cobranza (la API no trae la fecha exacta de recepción; `fecha_ultima_modificacion` es aproximada), y usar las cotizaciones recibidas de Compra Ágil para la competencia (PR #24).
 
 - [ ] **Portal de vacaciones (integrado 26-11, PR #32):** Seba da acceso a los 6 trabajadores con el botón "Dar acceso". Las pruebas de José se borraron (solicitud 13 y su bitácora) y su cuenta de prueba quedó sin acceso; al darle acceso se reactiva con contraseña nueva. Nuevo diseño del portal integrado mediante PR #34.
 - [ ] **Correos a trabajadores:** Resend usa el remitente de prueba `onboarding@resend.dev`, que solo entrega a la casilla dueña de la cuenta de Resend. Para avisar a los trabajadores hay que verificar `farmaciabulfor.cl` en Resend (registros DNS) y poner `RESEND_FROM` en Vercel. El aviso a Seba funciona igual que el de recetas.

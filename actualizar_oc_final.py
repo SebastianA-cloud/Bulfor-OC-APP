@@ -14,7 +14,7 @@ Funciones M de origen verificadas:
   se puede mejorar más adelante para usar el mismo sistema de reglas "contiene".)
 """
 
-import os, requests, time
+import os, sys, requests, time
 from datetime import datetime, timedelta
 from supabase import create_client
 
@@ -145,6 +145,12 @@ def transformar_oc(detalle, codigo_oc, hospitales_por_rut=None):
         "fechaaceptacion":   parse_fecha(fechas.get("FechaAceptacion")),
         "fechaenvio":        parse_fecha(fechas.get("FechaEnvio")),
         "fechacancelacion":  parse_fecha(fechas.get("FechaCancelacion")),
+        # Contacto del comprador (26-11-2026): se muestra en la ficha del hospital
+        "contacto_nombre":   comprador.get("NombreContacto"),
+        "contacto_cargo":    comprador.get("CargoContacto"),
+        "contacto_fono":     comprador.get("FonoContacto"),
+        "contacto_mail":     comprador.get("MailContacto"),
+        "fecha_ultima_modificacion": parse_fecha(fechas.get("FechaUltimaModificacion")),
     }
 
 
@@ -229,8 +235,87 @@ def obtener_ultima_fecha_guardada():
     return datetime.now() - timedelta(days=7)
 
 
+# ─── OC QUE AÚN NO TERMINAN (26-11-2026) ────────────────────────────────────
+# La sincronización normal solo revisa las OC desde la última fecha guardada, así
+# que si una OC antigua pasaba a "Recepción conforme" o se cancelaba, la app no se
+# enteraba. Ahora, en cada corrida, se vuelven a consultar las OC que siguen en un
+# estado intermedio y se actualizan SOLO su estado, sus fechas y el contacto (no se
+# tocan el hospital, los montos ni los productos).
+ESTADOS_PENDIENTES = ["4", "5", "6", "13", "14", "15"]  # enviada, en proceso, aceptada, recepciones parciales
+
+
+def campos_estado(detalle):
+    fechas = detalle.get("Fechas", {}) or {}
+    comprador = detalle.get("Comprador", {}) or {}
+    return {
+        "estadooc":          detalle.get("CodigoEstado"),
+        "estadoproveedor":   detalle.get("EstadoProveedor"),
+        "fechaaceptacion":   parse_fecha(fechas.get("FechaAceptacion")),
+        "fechaenvio":        parse_fecha(fechas.get("FechaEnvio")),
+        "fechacancelacion":  parse_fecha(fechas.get("FechaCancelacion")),
+        "fecha_ultima_modificacion": parse_fecha(fechas.get("FechaUltimaModificacion")),
+        "contacto_nombre":   comprador.get("NombreContacto"),
+        "contacto_cargo":    comprador.get("CargoContacto"),
+        "contacto_fono":     comprador.get("FonoContacto"),
+        "contacto_mail":     comprador.get("MailContacto"),
+    }
+
+
+def leer_codigos(filtro):
+    """Lee códigos de OC en lotes de 1000 (la tabla tiene más de 1000 filas)."""
+    codigos, desde = [], 0
+    while True:
+        q = supabase.table("ordenes_compra").select("codigooc,estadooc")
+        res = filtro(q).order("codigooc").range(desde, desde + 999).execute()
+        codigos += res.data or []
+        if len(res.data or []) < 1000:
+            return codigos
+        desde += 1000
+
+
+def refrescar_oc(filas, ya_revisadas=()):
+    cambios = 0
+    for i, fila in enumerate(filas, 1):
+        codigo = fila["codigooc"]
+        if codigo in ya_revisadas:
+            continue
+        detalle = obtener_detalle_oc(codigo)
+        time.sleep(1)
+        if not detalle:
+            continue
+        datos = campos_estado(detalle)
+        if str(datos["estadooc"]) != str(fila.get("estadooc")):
+            cambios += 1
+            print(f"    ↻ {codigo}: estado {fila.get('estadooc')} → {datos['estadooc']}")
+        supabase.table("ordenes_compra").update(datos).eq("codigooc", codigo).execute()
+        if i % 200 == 0:
+            print(f"    … {i}/{len(filas)} revisadas")
+    return cambios
+
+
+def refrescar_pendientes(ya_revisadas):
+    hace_un_anio = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+    filas = leer_codigos(lambda q: q.in_("estadooc", ESTADOS_PENDIENTES).gte("fechaoc", hace_un_anio))
+    print(f"\nRevisando {len(filas)} OC que aún no terminan (último año)...")
+    cambios = refrescar_oc(filas, ya_revisadas)
+    print(f"  ✔ {cambios} OC cambiaron de estado")
+
+
+def rellenar_todo():
+    """Carga única (autorizada por Seba el 26-11-2026): contacto y estado de las
+    OC antiguas. Respaldo previo: ordenes_compra_backup_20261126."""
+    filas = leer_codigos(lambda q: q.or_("contacto_nombre.is.null,estadooc.in.(" + ",".join(ESTADOS_PENDIENTES) + ")"))
+    print(f"Carga única: {len(filas)} OC sin contacto o sin terminar")
+    cambios = refrescar_oc(filas)
+    print(f"✔ Listo. {cambios} OC cambiaron de estado.")
+
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────
 def main():
+    if "--rellenar" in sys.argv:
+        rellenar_todo()
+        return
+
     print(f"\n{'=' * 50}")
     print(f"Actualización OC Bulfor — {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     print(f"{'=' * 50}\n")
@@ -248,6 +333,7 @@ def main():
     total_ocs = 0
     total_items = 0
     fecha_actual = ultima_fecha
+    revisadas = set()  # OC ya consultadas en esta corrida (no repetirlas al refrescar)
 
     while fecha_actual.date() <= hoy.date():
         codigos_basicos = obtener_codigos_oc_del_dia(fecha_actual)
@@ -266,6 +352,7 @@ def main():
 
             oc_transf = transformar_oc(detalle, codigo, hospitales_por_rut)
             ocs_para_guardar.append(oc_transf)
+            revisadas.add(codigo)
 
             items_listado = (detalle.get("Items", {}) or {}).get("Listado", [])
             if items_listado:
@@ -284,6 +371,12 @@ def main():
         fecha_actual += timedelta(days=1)
 
     print(f"\n✔ Actualización completada. Total: {total_ocs} OC, {total_items} ítems.\n")
+
+    # Si falla la revisión de pendientes no se pierde lo ya guardado arriba
+    try:
+        refrescar_pendientes(revisadas)
+    except Exception as e:
+        print(f"⚠ No se pudieron revisar las OC pendientes: {e}")
 
 
 if __name__ == "__main__":
