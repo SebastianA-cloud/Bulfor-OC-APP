@@ -21,6 +21,7 @@
 
 <link rel="stylesheet" href="guias-cot.css">
 <link rel="stylesheet" href="oportunidades.css">
+<link rel="stylesheet" href="contactos.css">
 <link rel="stylesheet" href="competencia.css">
 </head>
 <body>
@@ -1476,6 +1477,7 @@
 <script src="competencia.js"></script>
 <script src="permisos.js"></script>
 <script src="oportunidades.js"></script>
+<script src="contactos.js"></script>
 <script src="portal-trabajador.js"></script>
 <script src="ver-contrasena.js"></script>
 <script>
@@ -13839,36 +13841,8 @@ function hospVistaHtml(ficha) {
     <div id="hosp-ficha-resultados">${hospResultadosHtml(ficha)}</div>`;
 }
 
-// Contactos del hospital: uno por persona (mismo nombre o correo), con su
-// cargo, unidad, teléfono y correo de la OC más reciente.
-function hospContactosHtml(ficha) {
-  const porPersona = {};
-  ficha.ordenes.forEach(r => {
-    const nombre = (r.contacto_nombre || '').trim();
-    const mail = (r.contacto_mail || '').trim().toLowerCase();
-    if (!nombre && !mail) return;
-    const clave = mail || nombre.toLowerCase();
-    const fecha = String(r.fechaenvio || r.fechaoc || '');
-    const p = porPersona[clave] || (porPersona[clave] = { n: 0, ultima: '', primera: fecha });
-    p.n++;
-    if (fecha < p.primera) p.primera = fecha;
-    if (fecha >= p.ultima) Object.assign(p, { ultima: fecha, nombre, mail: r.contacto_mail, cargo: r.contacto_cargo,
-      fono: r.contacto_fono, unidad: r.unidadcompradora, codigo: r.codigooc });
-  });
-  const lista = Object.values(porPersona).sort((a, b) => b.ultima.localeCompare(a.ultima));
-  if (!lista.length) return '<div class="fpp-empty"><p>Todavía no hay contactos guardados para este hospital. Se completan con la sincronización de Mercado Público.</p></div>';
-  // Tarjetas (no tabla) para que en el celular no se salga de la pantalla
-  return `<p style="color:var(--text-2);font-size:12px;margin:4px 0 10px">Personas que han emitido órdenes de compra a Bulfor, la más reciente primero. Datos de Mercado Público.</p>
-    <div class="hosp-contactos">${lista.map(p => `<div class="hosp-contacto">
-      <div class="hosp-contacto-nombre"><b>${escapeHtml(p.nombre || '—')}</b>${p.cargo ? `<span>${escapeHtml(p.cargo)}</span>` : ''}${p.unidad ? `<span>${escapeHtml(p.unidad)}</span>` : ''}</div>
-      <div class="hosp-contacto-datos">
-        ${p.fono ? `<a href="tel:${escapeHtml(p.fono.replace(/[^0-9+]/g, ''))}"><i class="ti ti-phone" aria-hidden="true"></i> ${escapeHtml(p.fono)}</a>` : ''}
-        ${p.mail ? `<span><a href="mailto:${escapeHtml(p.mail)}"><i class="ti ti-mail" aria-hidden="true"></i> ${escapeHtml(p.mail)}</a> ${copiarBtnContacto(p.mail)}</span>` : ''}
-      </div>
-      <div class="hosp-contacto-oc">Última OC ${fDate(p.ultima)} · ${p.n} OC</div>
-    </div>`).join('')}</div>`;
-}
-const copiarBtnContacto = v => `<button type="button" class="panel-copiar-mini" title="Copiar correo" onclick="copiarTexto(${escapeHtml(JSON.stringify(v))}, this)"><i class="ti ti-copy"></i></button>`;
+// Contactos del hospital: ahora en contactos.js (hospContactosHtml), con los
+// correos/teléfonos de las observaciones de las OC y la edición manual.
 
 function hospBuscarEnFicha(q) {
   const ficha = window.__hospFicha;
