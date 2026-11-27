@@ -1,0 +1,21 @@
+name: TEMPORAL - Probar teléfono y correo de la OC (solo lectura)
+
+# Prueba temporal pedida por Seba el 27-11-2026. Corre al hacer push a la rama
+# de Claude y no escribe en ninguna parte. Se borra después de la prueba.
+on:
+  push:
+    branches: [claude/gracious-cray-bpmg45]
+    paths: [probar_contacto_oc.py, .github/workflows/probar_contacto_oc.yml]
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - env:
+          MP_TICKET: ${{ secrets.MP_TICKET }}
+        run: python -u probar_contacto_oc.py
