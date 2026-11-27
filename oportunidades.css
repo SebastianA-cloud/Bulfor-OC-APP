@@ -1,0 +1,81 @@
+/* Oportunidades (licitaciones y compras ágiles) y campana de Novedades.
+   Todo con prefijo op- (ver oportunidades.js). */
+
+/* Campana de la barra superior */
+.op-campana { position: relative; display: none; align-items: center; justify-content: center; background: none;
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 11px; color: var(--text-2);
+  cursor: pointer; gap: 5px; }
+.op-campana i { font-size: 14px; }
+.op-campana:hover { border-color: var(--red); color: var(--red); }
+.op-campana-n { display: none; align-items: center; justify-content: center; background: var(--red); color: #fff;
+  font-size: 11px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; padding: 0 4px; }
+
+/* Lista */
+#page-oportunidades .op-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2);
+  white-space: nowrap; cursor: pointer; }
+#page-oportunidades .op-info { padding: 8px 16px; font-size: 12px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.op-nota { color: var(--text-3); font-size: 12px; }
+.op-tabla td { vertical-align: top; }
+.op-tabla .op-td-cierre { white-space: nowrap; }
+.op-cierre { display: block; font-weight: 600; }
+.op-cierre + small, .op-sub { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
+.op-urgente { color: var(--red); }
+.op-pronto { color: var(--amber); }
+.op-cerrada { color: var(--text-3); }
+.op-cliente { display: inline-block; font-size: 11px; font-weight: 600; color: var(--green); background: var(--green-light);
+  border-radius: 4px; padding: 0 5px; vertical-align: 1px; }
+.op-punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-right: 6px; vertical-align: 1px; }
+tr.op-nueva td { background: #FFF8F6; }
+
+/* Ficha */
+.op-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.op-nota-cliente { color: var(--green); font-weight: 500; }
+.op-desc { white-space: pre-wrap; }
+
+/* Ventana de Novedades */
+.op-nov-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.op-nov { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  cursor: pointer; display: flex; flex-direction: column; gap: 4px; font: inherit; color: inherit; }
+.op-nov:hover { border-color: var(--red); }
+.op-nov-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.op-nov-top .op-cierre { display: inline; font-size: 12px; }
+.op-nov-top .op-cierre + small { display: inline; margin: 0; }
+
+@media (max-width: 760px) {
+  .op-campana .op-campana-tx { display: none; }
+  #page-oportunidades .toolbar { flex-wrap: wrap; }
+}
+
+/* Contactos en la ficha del hospital (index.html, hospContactosHtml) */
+.hosp-contactos { display: flex; flex-direction: column; gap: 8px; }
+.hosp-contacto { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto; gap: 6px 16px; align-items: center;
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; background: var(--surface); }
+.hosp-contacto-nombre { display: flex; flex-direction: column; }
+.hosp-contacto-nombre span, .hosp-contacto-oc { font-size: 12px; color: var(--text-3); }
+.hosp-contacto-datos { display: flex; flex-direction: column; gap: 3px; font-size: 13px; overflow-wrap: anywhere; }
+.hosp-contacto-oc { white-space: nowrap; }
+@media (max-width: 760px) {
+  .hosp-contacto { grid-template-columns: 1fr; }
+  .op-tabla td > div { min-width: 0; text-align: right; }
+}
+
+/* Títulos de la lista que ordenan al apretarlos */
+.op-th button { background: none; border: 0; padding: 0; font: inherit; color: inherit; letter-spacing: inherit;
+  text-transform: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.op-th button:hover { text-decoration: underline; }
+.op-th .op-flecha { opacity: .45; font-size: 11px; }
+.op-th-activo .op-flecha { opacity: 1; }
+
+/* Descartar desde la lista */
+.op-td-acc { white-space: nowrap; text-align: right; }
+.op-btn-desc { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font: inherit;
+  font-size: 12px; color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.op-btn-desc:hover { border-color: var(--red); color: var(--red); }
+
+/* Participación */
+.op-part { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.op-part-si { color: var(--green); }
+.op-part-no { color: var(--text-3); font-weight: 500; }
+.op-part-caja { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface); }
+.op-part-quien { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-weight: 600; font-size: 13px; }
+.op-part-quien select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: #fff; }

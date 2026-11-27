@@ -60,6 +60,7 @@ Estas reglas reemplazan cualquier indicación anterior de usar una rama comparti
 - Antes de cambiar el esquema, revisa las tablas y columnas actuales.
 - Los cambios de base de datos van directo a producción: explícale a Seba qué vas a cambiar antes de aplicarlo. Antes de modificar o borrar datos en masa, crea una tabla de respaldo (`<tabla>_backup_AAAAMMDD`).
 - Toda tabla nueva lleva RLS activado con sus políticas. Después de cambios de esquema, revisa los avisos de seguridad de Supabase.
+- Toda tabla nueva de `public` lleva además la política restrictiva `sin_trabajadores` (bloquea a las cuentas del portal de vacaciones; ver `supabase/migrations/20261126_portal_vacaciones.sql`). Sin ella, un trabajador podría leer esa tabla.
 
 ## Documentos tributarios (emitir-dte)
 

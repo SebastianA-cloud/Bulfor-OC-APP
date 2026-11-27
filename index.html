@@ -18,6 +18,8 @@
 <link rel="stylesheet" href="styles.css">
 
 <link rel="stylesheet" href="guias-cot.css">
+<link rel="stylesheet" href="oportunidades.css">
+<link rel="stylesheet" href="competencia.css">
 </head>
 <body>
 
@@ -76,6 +78,10 @@
 
 <div class="system-bar">
   <span class="system-bar-brand"><span class="system-bar-brand-main">Bulfor OC</span><span class="system-bar-brand-sub"> — Sistema de gestión farmacéutica</span></span>
+  <!-- Campana de Novedades: licitaciones y compras ágiles nuevas (oportunidades.js) -->
+  <button id="op-campana" class="op-campana" onclick="opAbrirNovedades()" title="Novedades de Mercado Público" aria-label="Novedades de Mercado Público">
+    <i class="ti ti-bell" aria-hidden="true"></i><span class="op-campana-tx">Novedades</span><span class="op-campana-n" id="op-campana-n"></span>
+  </button>
   <button id="header-kebab-btn" class="header-kebab-btn" onclick="toggleHeaderMenu()" title="Más opciones" aria-label="Más opciones" aria-expanded="false">
     <i class="ti ti-dots-vertical" aria-hidden="true"></i>
   </button>
@@ -430,6 +436,15 @@
     <div id="stats-content"></div>
   </div>
 
+  <!-- OPORTUNIDADES: licitaciones y compras ágiles abiertas (oportunidades.js) -->
+  <div class="page" id="page-oportunidades">
+    <div class="page-header">
+      <div class="page-title">Oportunidades <span class="info-tip" tabindex="0" role="note" data-tip="Licitaciones y compras ágiles abiertas en todo Chile que calzan con lo que vende Bulfor (magistrales, recetario y los productos que más vendemos). Se revisa Mercado Público cada 2 horas. Prioridad alta: dice magistral, recetario magistral o preparado farmacéutico. Media: pide un producto que vendemos.">i</span></div>
+      <div class="page-sub">Licitaciones y compras ágiles abiertas que calzan con lo que vende Bulfor</div>
+    </div>
+    <div id="op-contenido"></div>
+  </div>
+
 
   <!-- MÓDULOS NUEVOS (placeholder "Próximamente") -->
   <div class="page" id="page-facturas">
@@ -454,6 +469,12 @@
       <button class="page-btn" id="doc-limpiar" style="padding:8px 14px;white-space:nowrap;display:none" onclick="limpiarFiltrosDoc()">✕ Limpiar filtros</button>
     </div>
     <div id="doc-contenido"></div>
+  </div>
+
+  <!-- Competencia en licitaciones (competencia.js): solo productos donde ofertó Bulfor. -->
+  <div class="page" id="page-competencia">
+    <div class="page-header"><div class="page-title">Competencia en licitaciones</div><div class="page-sub">Lo que ofertamos en licitaciones de Mercado Público y lo que ofertó la competencia en esos mismos productos.</div></div>
+    <div id="cmp-contenido"></div>
   </div>
 
   <!-- Guías por facturar: pantalla centrada en COT, sin cambios a otros módulos. -->
@@ -1212,7 +1233,11 @@
 <script src="panel.js"></script>
 <script src="documentos.js"></script>
 <script src="guias-cot.js"></script>
+<script src="competencia.js"></script>
 <script src="permisos.js"></script>
+<script src="oportunidades.js"></script>
+<script src="portal-trabajador.js"></script>
+<script src="ver-contrasena.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = window.SUPABASE_URL || 'https://uodijcksuqaaovohutkf.supabase.co';
@@ -1245,6 +1270,14 @@ function cargarSesionGuardada() {
   } catch (e) { return null; }
 }
 
+// Rol de la cuenta. "trabajador" se lee de app_metadata, que solo el servidor
+// puede escribir (user_metadata la puede cambiar el propio usuario): esas
+// cuentas van al portal "Mis vacaciones" y no a la app de la oficina.
+function rolDesdeUsuario(u) {
+  if (u?.app_metadata?.rol === 'trabajador') return 'trabajador';
+  return u?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+}
+
 async function iniciarSesion(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -1253,7 +1286,7 @@ async function iniciarSesion(email, password) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(res.status === 400 ? 'Usuario o contraseña incorrectos.' : (data.error_description || data.msg || 'No se pudo iniciar sesión.'));
-  const rol = data.user?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+  const rol = rolDesdeUsuario(data.user);
   guardarSesion({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
@@ -1273,7 +1306,7 @@ async function refrescarSesion() {
     });
     if (!res.ok) throw new Error('refresh falló');
     const data = await res.json();
-    const rol = data.user?.user_metadata?.rol === 'editor' ? 'editor' : 'viewer';
+    const rol = rolDesdeUsuario(data.user);
     guardarSesion({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
@@ -1769,6 +1802,7 @@ async function init() {
     const rrhhListo = cargarRRHH().catch(() => {});
     cargarSolicitudesWeb().catch(() => {});
     cargarRecResumen().catch(() => {});
+    opIniciarAviso();  // campana de Novedades (oportunidades.js)
     if (!window.__swTimer) window.__swTimer = setInterval(() => { if (sesionActual) cargarSolicitudesWeb().catch(() => {}); }, 5 * 60 * 1000);
     oc = Array.isArray(ocR) ? ocR : [];
     items = Array.isArray(itemsR) ? itemsR : [];
@@ -9001,6 +9035,29 @@ function saldoDeTrabajador(personalId, excluirSolicitud) {
   };
 }
 
+// Separa el saldo en lo que se puede usar HOY y lo de períodos que todavía
+// no empiezan (disponible_desde en el futuro). Usar estos últimos antes de
+// su fecha es un adelanto acordado. Sin fecha registrada = usable.
+function saldoHoyYProximos(personalId) {
+  const s = saldoDeTrabajador(personalId);
+  const hoy = vacHoy();
+  const desdeDe = id => ((vacPeriodos.find(x => x.id === id) || {}).disponible_desde) || null;
+  const hoyPeriodos = s.periodos.filter(p => { const d = desdeDe(p.id); return !d || d <= hoy; });
+  const proximos = s.periodos.filter(p => { const d = desdeDe(p.id); return d && d > hoy && p.disponibles > 0; })
+    .map(p => ({ periodo: p.periodo, disponibles: p.disponibles, desde: desdeDe(p.id) }));
+  return {
+    saldo: s,
+    hoy: redondear(hoyPeriodos.reduce((n, p) => n + p.disponibles, 0)),
+    hoyPeriodos: hoyPeriodos.filter(p => p.disponibles > 0),
+    proximos,
+  };
+}
+
+// Las mismas dos líneas en el listado y en la ficha: "del 25/26" y "+15 del 26/27 desde el 01-12-2026".
+function htmlProximosPeriodos(sh) {
+  return sh.proximos.map(x => `<div style="color:var(--amber)">+${x.disponibles} del ${escapeHtml(x.periodo)} desde el ${fDate(x.desde)}</div>`).join('');
+}
+
 // ─── Estados derivados ─────────────────────────────────────────────────────
 function estadoVisualSolicitud(s) {
   if (s.estado !== 'aprobado') return s.estado;
@@ -9359,7 +9416,8 @@ function renderVacResumen(cont) {
     .filter(s => (s.estado === 'aprobado' || s.estado === 'pendiente') && s.fecha_inicio > hoy)
     .sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
   const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
-  const diasDisponibles = redondear(activos.reduce((s,p) => s + saldoDeTrabajador(p.id).disponibles, 0));
+  const diasDisponibles = redondear(activos.reduce((s,p) => s + saldoHoyYProximos(p.id).hoy, 0));
+  const diasProximos = redondear(activos.reduce((s,p) => s + saldoHoyYProximos(p.id).proximos.reduce((n,x) => n + x.disponibles, 0), 0));
 
   const tarjetas = `
     <div class="fpp-resumen" style="grid-template-columns:repeat(5,1fr)">
@@ -9367,7 +9425,7 @@ function renderVacResumen(cont) {
       <div class="stat${deVacacionesHoy.length ? ' destacado' : ''}"><div class="stat-label">De vacaciones hoy</div><div class="stat-val">${deVacacionesHoy.length}</div><div class="stat-sub">${deVacacionesHoy.length ? escapeHtml(deVacacionesHoy.map(p => p.nombre.split(' ')[0]).join(', ')) : 'nadie'}</div></div>
       <div class="stat"><div class="stat-label">Próximas vacaciones</div><div class="stat-val">${proximas.length}</div><div class="stat-sub">${proximas.length ? 'la más cercana, ' + rangoLegible(proximas[0].fecha_inicio, proximas[0].fecha_fin) : 'nada programado'}</div></div>
       <div class="stat"><div class="stat-label">Solicitudes pendientes</div><div class="stat-val" style="color:${pendientes.length ? 'var(--amber)' : 'var(--text)'}">${pendientes.length}</div><div class="stat-sub">${pendientes.length ? 'esperan aprobación' : 'nada por aprobar'}</div></div>
-      <div class="stat"><div class="stat-label">Días disponibles</div><div class="stat-val">${diasDisponibles}</div><div class="stat-sub">suma de todo el personal activo</div></div>
+      <div class="stat"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${diasDisponibles}</div><div class="stat-sub">suma del personal activo${diasProximos ? ` · +${diasProximos} de próximos períodos` : ''}</div></div>
     </div>`;
 
   const alertas = alertasVacaciones();
@@ -9410,6 +9468,11 @@ function alertasVacaciones() {
   const anioActual = anioPeriodoActual();
 
   const pendientes = vacSolicitudes.filter(s => s.estado === 'pendiente');
+  // Las pedidas por el propio trabajador desde el portal van una por una,
+  // para abrirlas y responder directo.
+  pendientes.filter(s => s.origen === 'portal').forEach(s => out.push({ tipo: 'warn',
+    texto: `<strong>${escapeHtml(nombreDe(s.personal_id))}</strong> pidió vacaciones desde el portal: ${rangoLegible(s.fecha_inicio, s.fecha_fin)} · ${s.dias_habiles} día${Number(s.dias_habiles) === 1 ? '' : 's'}${adelantoDeSolicitud(s).length ? ' · <strong>adelanto</strong>' : ''}.`,
+    onclick: `navReset();abrirDetalleSolicitud(${s.id})` }));
   if (pendientes.length) out.push({ tipo: 'warn',
     texto: `Hay <strong>${pendientes.length}</strong> solicitud${pendientes.length === 1 ? '' : 'es'} pendiente${pendientes.length === 1 ? '' : 's'} de aprobación.`,
     onclick: `cambiarTabVac('historial');setTimeout(()=>{const s=document.getElementById('vac-f-estado');if(s){s.value='pendiente';filtrarHistorialVac()}},50)` });
@@ -9474,7 +9537,7 @@ function renderVacPersonal(cont) {
     <div class="table-card"><table>
       <thead><tr>
         <th>Trabajador</th>
-        <th style="text-align:center">Días disponibles</th>
+        <th style="text-align:center">Disponibles hoy</th>
         <th style="text-align:center">Días utilizados</th>
         <th style="text-align:center">Pendientes</th>
         <th>Próximas vacaciones</th>
@@ -9485,16 +9548,19 @@ function renderVacPersonal(cont) {
         const prox = proximasVacacionesDe(p.id);
         const est = estadoTrabajador(p.id);
         const vigente = vacacionesVigentes(p.id);
-        const detallePeriodos = s.periodos.filter(x => x.disponibles > 0)
-          .map(x => `${x.periodo}: ${x.disponibles}`).join(' · ');
+        const sh = saldoHoyYProximos(p.id);
+        const detalleHoy = sh.hoyPeriodos.map(x => x.periodo).join(' + ');
         return `<tr onclick="navReset();abrirPerfilVacaciones(${p.id})">
           <td>
             <div style="font-weight:500">${escapeHtml(p.nombre)}</div>
             ${p.cargo ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${escapeHtml(p.cargo)}</div>` : ''}
           </td>
           <td style="text-align:center">
-            <div style="font-size:15px;font-weight:600;color:${s.disponibles > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? s.disponibles : '—'}</div>
-            ${detallePeriodos ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${detallePeriodos}</div>` : ''}
+            <div style="font-size:15px;font-weight:600;color:${sh.hoy > 0 ? 'var(--text)' : 'var(--text-3)'}">${s.periodos.length ? sh.hoy : '—'}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.5">
+              ${detalleHoy ? `<div>del ${escapeHtml(detalleHoy)}</div>` : ''}
+              ${htmlProximosPeriodos(sh)}
+            </div>
           </td>
           <td style="text-align:center;color:var(--text-2)">${s.periodos.length ? s.utilizados : '—'}</td>
           <td style="text-align:center;color:${s.pendientes ? 'var(--amber)' : 'var(--text-3)'}">${s.pendientes || '—'}</td>
@@ -9713,8 +9779,10 @@ function abrirPerfilVacaciones(id) {
       </div>
       <div class="modal-body">
 
+        ${portalBloqueAcceso(p)}
         <div class="fpp-resumen" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
-          <div class="stat destacado"><div class="stat-label">Disponibles</div><div class="stat-val">${s.periodos.length ? s.disponibles : '—'}</div><div class="stat-sub">${s.periodos.length ? 'días' : 'sin períodos asignados'}</div></div>
+          <div class="stat destacado"><div class="stat-label">Disponibles hoy</div><div class="stat-val">${s.periodos.length ? saldoHoyYProximos(id).hoy : '—'}</div><div class="stat-sub" style="line-height:1.5">${!s.periodos.length ? 'sin períodos asignados'
+            : (saldoHoyYProximos(id).proximos.length ? htmlProximosPeriodos(saldoHoyYProximos(id)) : 'días')}</div></div>
           <div class="stat"><div class="stat-label">Utilizados</div><div class="stat-val">${s.utilizados}</div><div class="stat-sub">días aprobados</div></div>
           <div class="stat"><div class="stat-label">Programados</div><div class="stat-val">${programados}</div><div class="stat-sub">aún no los toma</div></div>
           <div class="stat"><div class="stat-label">Progresivos</div><div class="stat-val">${s.progresivos}</div><div class="stat-sub">sobre los días base</div></div>
@@ -9833,6 +9901,8 @@ function abrirFormPeriodo(personalId, periodoId) {
           <span style="font-size:13px;color:var(--accent);font-weight:500">Total del período</span>
           <span style="font-size:19px;font-weight:700;color:var(--accent)" id="vp-total">—</span>
         </div>
+        ${campoRRHH('vp-desde', 'Se puede usar desde', `<input type="date" id="vp-desde" value="${per && per.disponible_desde ? per.disponible_desde : ''}" style="padding-left:12px">`)}
+        <div style="font-size:11.5px;color:var(--text-3);margin:-6px 0 14px">Normalmente el aniversario de ingreso en que se gana el período. Usar días antes de esta fecha cuenta como adelanto. Si lo dejas vacío, se calcula solo.</div>
         ${campoRRHH('vp-obs', 'Motivo del ajuste u observación', `<input type="text" id="vp-obs" value="${escapeHtml((per && per.observacion) || '')}" placeholder="Queda registrado en la bitácora" style="padding-left:12px">`)}
         <div style="font-size:11.5px;color:var(--text-3);margin-bottom:14px">
           El ajuste sirve para correcciones puntuales: días arrastrados, un acuerdo particular, un error del control anterior. Todo cambio queda con fecha, valor anterior, valor nuevo y usuario.
@@ -9862,11 +9932,19 @@ async function guardarPeriodoVac(personalId, periodoId, periodoTexto, btn) {
   const original = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
-    await rpcVac('vac_guardar_periodo', {
+    const idPeriodo = await rpcVac('vac_guardar_periodo', {
       p_personal_id: personalId, p_periodo: periodo, p_anio_inicio: anio,
       p_base: n('vp-base'), p_progresivos: n('vp-prog'), p_ajuste: n('vp-ajuste'),
       p_usuario: usuarioActualVac(), p_obs: document.getElementById('vp-obs').value.trim() || null,
     });
+    // "Se puede usar desde": vacío en un período nuevo = lo calcula la base
+    // (aniversario de ingreso); si se escribió, se guarda tal cual.
+    const desdeEl = document.getElementById('vp-desde');
+    const desdeAntes = periodoId ? (vacPeriodos.find(p => p.id === periodoId).disponible_desde || '') : '';
+    if (idPeriodo && desdeEl && desdeEl.value && desdeEl.value !== desdeAntes) {
+      const r = await sb(`vacaciones_periodos?id=eq.${idPeriodo}`, { method: 'PATCH', body: JSON.stringify({ disponible_desde: desdeEl.value }) });
+      if (!r.ok) toast('El período se guardó, pero no la fecha "Se puede usar desde".', 'err');
+    }
     await recargarVacaciones();
     cerrarTodosLosModales();
     abrirPerfilVacaciones(personalId);
@@ -10178,6 +10256,8 @@ function abrirDetalleSolicitud(id) {
           ${s.observaciones ? `<div style="margin-top:6px"><strong>Observación:</strong> ${escapeHtml(s.observaciones)}</div>` : ''}
           ${s.excepcion_saldo ? `<div style="margin-top:6px;color:var(--amber)"><strong>Autorizada como excepción por sobre el saldo.</strong> ${escapeHtml(s.motivo_excepcion || '')}</div>` : ''}
           ${s.origen === 'excel' ? '<div style="margin-top:6px;color:var(--text-3)">Registro migrado desde el control en Excel.</div>' : ''}
+          ${s.origen === 'portal' ? '<div style="margin-top:6px;color:var(--text-3)">Pedida por el trabajador desde el portal. Al aprobar o rechazar se le avisa por correo.</div>' : ''}
+          ${adelantoDeSolicitud(s).length ? `<div style="margin-top:6px;color:var(--amber)"><strong>Adelanto:</strong> ${textoAdelanto(adelantoDeSolicitud(s))}.</div>` : ''}
         </div>
 
         ${otros.length ? `<div style="background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--amber)">
@@ -10205,10 +10285,20 @@ function abrirDetalleSolicitud(id) {
 }
 
 async function cambiarEstadoSolicitud(id, estado, btn) {
+  const sol = vacSolicitudes.find(x => x.id === id);
+  const delPortal = sol && sol.origen === 'portal';
+  // Si la pidió el trabajador desde el portal, el motivo del rechazo le llega
+  // a él (lo ve en el portal y en el correo de aviso).
+  let motivo = null;
+  if (delPortal && estado === 'rechazado') {
+    motivo = await promptModal(`Motivo del rechazo (opcional).\n\n${escapeHtml(nombreDe(sol.personal_id))} lo verá en su portal y en el correo de aviso.`, '');
+    if (motivo === null) return;
+  }
   const original = btn.textContent;
   btn.disabled = true; btn.textContent = '…';
   try {
-    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: estado, p_usuario: usuarioActualVac() });
+    await rpcVac('vac_cambiar_estado', { p_id: id, p_estado: estado, p_usuario: usuarioActualVac(), p_motivo: (motivo || '').trim() || null });
+    if (delPortal && (estado === 'aprobado' || estado === 'rechazado')) avisarVacacionesPorCorreo('respuesta', id);
     await recargarVacaciones();
     cerrarTodosLosModales();
     abrirDetalleSolicitud(id);
@@ -10332,7 +10422,7 @@ function exportarVacaciones() {
       'Días hábiles': Number(s.dias_habiles), 'Período utilizado': textoDistribucion(s.id),
       'Estado': ESTADOS_VAC[s.estado].label, 'Observación': s.observaciones || '',
       'Excepción de saldo': s.excepcion_saldo ? 'Sí' : '', 'Motivo de la excepción': s.motivo_excepcion || '',
-      'Origen': s.origen === 'excel' ? 'Migrado del Excel' : 'Registrado en la app',
+      'Origen': s.origen === 'excel' ? 'Migrado del Excel' : s.origen === 'portal' ? 'Pedida en el portal' : 'Registrado en la app',
     }))), 'Historial');
 
   // Vacaciones programadas
@@ -13602,7 +13692,7 @@ function fichaHospital(hospital) {
     get cuerpo() {
       const volver = document.getElementById('page-hospitales').classList.contains('active')
         ? '<button type="button" class="panel-volver" onclick="panelCerrar()">← Volver a Hospitales</button>' : '';
-      const pestañas = [['productos', 'Productos que compra'], ['ordenes', 'Órdenes de compra']];
+      const pestañas = HOSP_PESTANAS;
       return `${volver}<div class="fpp-status-tabs" role="group" aria-label="Contenido de la ficha del hospital">
         ${pestañas.map(([vista, label]) => `<button type="button" class="fpp-status-tab${ficha.vista === vista ? ' active' : ''}" aria-pressed="${ficha.vista === vista}" onclick="hospCambiarVista('${vista}')">${label}</button>`).join('')}
       </div><div id="hosp-ficha-vista">${hospVistaHtml(ficha)}</div>`;
@@ -13610,13 +13700,17 @@ function fichaHospital(hospital) {
   };
 }
 
+// Pestañas de la ficha del hospital. "Contactos" (26-11-2026): las personas que
+// firman las OC del hospital en Mercado Público (lo guarda la sincronización).
+const HOSP_PESTANAS = [['productos', 'Productos que compra'], ['ordenes', 'Órdenes de compra'], ['contactos', 'Contactos']];
+
 function hospCambiarVista(vista) {
   const ficha = window.__hospFicha;
   if (ficha.vista === vista) return;
   ficha.vista = vista;
   const botones = document.querySelectorAll('#panel-lateral [aria-label="Contenido de la ficha del hospital"] button');
   botones.forEach((boton, i) => {
-    const activo = i === (vista === 'productos' ? 0 : 1);
+    const activo = i === HOSP_PESTANAS.findIndex(p => p[0] === vista);
     boton.classList.toggle('active', activo);
     boton.setAttribute('aria-pressed', activo);
   });
@@ -13624,6 +13718,7 @@ function hospCambiarVista(vista) {
 }
 
 function hospVistaHtml(ficha) {
+  if (ficha.vista === 'contactos') return hospContactosHtml(ficha);
   const productos = ficha.vista === 'productos';
   const q = ficha.consultas[ficha.vista];
   return `<label for="hosp-ficha-buscar" class="panel-h">${productos ? 'Buscar producto' : 'Buscar por número de orden'}</label>
@@ -13632,6 +13727,37 @@ function hospVistaHtml(ficha) {
     </div>
     <div id="hosp-ficha-resultados">${hospResultadosHtml(ficha)}</div>`;
 }
+
+// Contactos del hospital: uno por persona (mismo nombre o correo), con su
+// cargo, unidad, teléfono y correo de la OC más reciente.
+function hospContactosHtml(ficha) {
+  const porPersona = {};
+  ficha.ordenes.forEach(r => {
+    const nombre = (r.contacto_nombre || '').trim();
+    const mail = (r.contacto_mail || '').trim().toLowerCase();
+    if (!nombre && !mail) return;
+    const clave = mail || nombre.toLowerCase();
+    const fecha = String(r.fechaenvio || r.fechaoc || '');
+    const p = porPersona[clave] || (porPersona[clave] = { n: 0, ultima: '', primera: fecha });
+    p.n++;
+    if (fecha < p.primera) p.primera = fecha;
+    if (fecha >= p.ultima) Object.assign(p, { ultima: fecha, nombre, mail: r.contacto_mail, cargo: r.contacto_cargo,
+      fono: r.contacto_fono, unidad: r.unidadcompradora, codigo: r.codigooc });
+  });
+  const lista = Object.values(porPersona).sort((a, b) => b.ultima.localeCompare(a.ultima));
+  if (!lista.length) return '<div class="fpp-empty"><p>Todavía no hay contactos guardados para este hospital. Se completan con la sincronización de Mercado Público.</p></div>';
+  // Tarjetas (no tabla) para que en el celular no se salga de la pantalla
+  return `<p style="color:var(--text-2);font-size:12px;margin:4px 0 10px">Personas que han emitido órdenes de compra a Bulfor, la más reciente primero. Datos de Mercado Público.</p>
+    <div class="hosp-contactos">${lista.map(p => `<div class="hosp-contacto">
+      <div class="hosp-contacto-nombre"><b>${escapeHtml(p.nombre || '—')}</b>${p.cargo ? `<span>${escapeHtml(p.cargo)}</span>` : ''}${p.unidad ? `<span>${escapeHtml(p.unidad)}</span>` : ''}</div>
+      <div class="hosp-contacto-datos">
+        ${p.fono ? `<a href="tel:${escapeHtml(p.fono.replace(/[^0-9+]/g, ''))}"><i class="ti ti-phone" aria-hidden="true"></i> ${escapeHtml(p.fono)}</a>` : ''}
+        ${p.mail ? `<span><a href="mailto:${escapeHtml(p.mail)}"><i class="ti ti-mail" aria-hidden="true"></i> ${escapeHtml(p.mail)}</a> ${copiarBtnContacto(p.mail)}</span>` : ''}
+      </div>
+      <div class="hosp-contacto-oc">Última OC ${fDate(p.ultima)} · ${p.n} OC</div>
+    </div>`).join('')}</div>`;
+}
+const copiarBtnContacto = v => `<button type="button" class="panel-copiar-mini" title="Copiar correo" onclick="copiarTexto(${escapeHtml(JSON.stringify(v))}, this)"><i class="ti ti-copy"></i></button>`;
 
 function hospBuscarEnFicha(q) {
   const ficha = window.__hospFicha;
@@ -18324,6 +18450,8 @@ const SUBMENUS = {
     { icon: '<i class="ti ti-shopping-cart"></i>', label: 'Buscar orden de compra', page: 'oc' },
     { icon: '<i class="ti ti-building-hospital"></i>', label: 'Hospitales', page: 'hospitales' },
     { icon: '<i class="ti ti-chart-bar"></i>', label: 'Estadísticas', page: 'estadisticas' },
+    { icon: '<i class="ti ti-radar"></i>', label: 'Oportunidades', page: 'oportunidades' },
+    { icon: '<i class="ti ti-scale"></i>', label: 'Competencia en licitaciones', page: 'competencia' },
   ] },
   // Precios: solo los precios facturados (los de OC se quitaron). El menú
   // entra directo; "Por cliente" es la otra vista de la misma pantalla.
@@ -18684,6 +18812,8 @@ function showPage(id, el) {
   if (pageEl) pageEl.classList.add('active');
   if (id === 'solicitudes-web') cargarSolicitudesWeb().catch(() => {});
   if (id === 'guias-cot') gcInit();
+  if (id === 'oportunidades') opInit();
+  if (id === 'competencia') cmpInit();
   document.querySelectorAll(`.nav-subitem[data-page="${id}"]`).forEach(n => n.classList.add('active'));
   // Un ítem del menú puede cubrir más de una página (ej. "Precios", que
   // agrupa Por producto y Por cliente): así queda marcado en las dos.
@@ -18877,6 +19007,15 @@ function renderInicio() {
     const n = fedex.filter(f => ['retraso','entrega reprogramada'].includes((f.estado_envio||'').toLowerCase())).length;
     if (n > 0) items.push({ texto: `${n} envío${n===1?'':'s'} con retraso`, tipo: 'warn', modulo: 'fedex', pagina: 'fedex' });
   }
+  // OC que el hospital envió y Bulfor todavía no acepta en Mercado Público
+  // (estado 4 "Enviada al proveedor"; la sincronización lo revisa cada 2 horas).
+  if (Array.isArray(oc) && oc.length) {
+    const n = oc.filter(r => String(r.estadooc) === '4').length;
+    if (n > 0) items.push({ texto: `${n} orden${n===1?'':'es'} de compra por aceptar en Mercado Público`, tipo: 'err', modulo: 'oc-modulo', pagina: 'oc' });
+  }
+  // Licitaciones y compras ágiles nuevas que esta cuenta no ha visto (oportunidades.js)
+  const opRes = typeof opResumenInicio === 'function' ? opResumenInicio() : null;
+  if (opRes && opRes.nuevas) items.push({ texto: `${opRes.nuevas} oportunidad${opRes.nuevas===1?'':'es'} nueva${opRes.nuevas===1?'':'s'} en Mercado Público${opRes.alta ? ` · ${opRes.alta} de prioridad alta` : ''}`, tipo: opRes.alta ? 'err' : 'warn', modulo: 'oc-modulo', pagina: 'oportunidades' });
 
   // Solo avisos de menús que la cuenta ve.
   items = items.filter(it => paginaPermitida(it.pagina));
@@ -19021,6 +19160,13 @@ function mostrarPantallaLogin(mensaje) {
 }
 
 async function arrancarApp() {
+  // Las cuentas de trabajador solo ven su portal de vacaciones
+  // (portal-trabajador.js): no se carga nada de la app de la oficina.
+  if (sesionActual?.rol === 'trabajador') {
+    document.getElementById('login-overlay').style.display = 'none';
+    arrancarPortalTrabajador();
+    return;
+  }
   // Primero el perfil: qué menús ve esta cuenta (permisos.js).
   await cargarPerfil();
   if (perfilActual && perfilActual.activo === false) {
