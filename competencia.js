@@ -243,7 +243,7 @@ function cmpHtmlOfertas() {
   }).join('');
   return `
     <div class="toolbar cmp-toolbar">
-      <div class="search-wrap"><span class="search-icon">🔍</span>
+      <div class="search-wrap"><span class="search-icon"><i class="ti ti-search"></i></span>
         <input type="text" id="cmp-q" placeholder="Buscar producto, hospital, licitación o empresa…" value="${cmpEsc(cmpState.q)}" oninput="cmpBuscar(this.value)">
       </div>
       <div class="cmp-fechas" role="group" aria-label="Rango de fechas de publicación">

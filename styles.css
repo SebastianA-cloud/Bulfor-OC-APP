@@ -5,7 +5,7 @@
     --border-strong: #C8C5BC;
     --text: #1A1917;
     --text-2: #6B6860;
-    --text-3: #9E9B94;
+    --text-3: #726F68;   /* gris de ayudas: contraste 4,6:1 sobre el fondo (antes #9E9B94, 2,6:1) */
     --accent: #C0392B;
     --accent-light: #FBEAE9;
     --green: #2D6A4F;
@@ -39,7 +39,7 @@
   .logo-badge { width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 3px 8px rgba(192,57,43,.3); }
   .logo-text { flex: 1; min-width: 0; }
   .logo-title { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .logo-sub { font-size: 10.5px; color: var(--text-3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .logo-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav { padding: 12px 10px; flex: 1; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; color: var(--text-2); font-size: 13px; transition: all .15s; margin-bottom: 2px; }
   .nav-item:hover { background: var(--bg); color: var(--text); }
@@ -156,7 +156,7 @@
   .modulo-placeholder p { font-size: 14px; max-width: 360px; }
   .nav-icon { font-size: 16px; width: 20px; text-align: center; }
   .nav-icon i { font-size: 16px; vertical-align: -3px; }
-  .nav-section-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; color: var(--text-3); text-transform: uppercase; padding: 14px 10px 6px; }
+  .nav-section-label { font-size: 11px; font-weight: 600; letter-spacing: .6px; color: var(--text-3); text-transform: uppercase; padding: 14px 10px 6px; }
   .nav-section-label:first-child { padding-top: 4px; }
 
   /* Toasts */
@@ -293,7 +293,7 @@
   .alfabetico-wrap { display: flex; gap: 0; }
   .alfabetico-tabla { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
   .alfabetico-jump { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg); }
-  .alfabetico-jump button { border: none; background: none; font-size: 10px; font-weight: 600; color: var(--text-3); cursor: pointer; padding: 1px 5px; border-radius: 3px; font-family: var(--font); line-height: 1.5; }
+  .alfabetico-jump button { border: none; background: none; font-size: 11px; font-weight: 600; color: var(--text-3); cursor: pointer; padding: 1px 5px; border-radius: 3px; font-family: var(--font); line-height: 1.5; }
   .alfabetico-jump button:hover { background: var(--surface); color: var(--accent); }
   .alfabetico-jump button:disabled { color: var(--border); cursor: default; }
   .alfabetico-jump button:disabled:hover { background: none; }
@@ -384,9 +384,9 @@
   .vac-cal-dia.hoy     { box-shadow: inset 0 0 0 2px var(--accent); }
   .vac-cal-num { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
   .vac-cal-dia.hoy .vac-cal-num { color: var(--accent); }
-  .vac-cal-feriado { font-size: 9.5px; color: #1E4E8C; margin-top: 2px; line-height: 1.3;
+  .vac-cal-feriado { font-size: 11px; color: #1E4E8C; margin-top: 2px; line-height: 1.3;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vac-cal-chip { display: block; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; margin-top: 3px;
+  .vac-cal-chip { display: block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 3px;
     background: var(--green-light); color: var(--green); cursor: pointer; font-weight: 500;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vac-cal-chip:hover { filter: brightness(.95); }
@@ -527,7 +527,7 @@
       background: var(--surface); border-top: 1px solid var(--border); z-index: 100;
       padding-bottom: env(safe-area-inset-bottom, 0); }
     .tab-item { flex: 1 0 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; font-size: 10px; color: var(--text-2); cursor: pointer; min-height: 44px; }
+      gap: 2px; font-size: 11px; color: var(--text-2); cursor: pointer; min-height: 44px; }
     /* Con todos los módulos la barra no cabe: se desliza hacia el lado. */
     .bottom-tabbar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
     .bottom-tabbar::-webkit-scrollbar { display: none; }
@@ -729,7 +729,7 @@
     border-bottom: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
   .modulos-logo .logo-badge { width: 30px; height: 30px; font-size: 13px; box-shadow: none; }
   .modulos-logo-titulo { font-size: 13px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.2px; line-height: 1.2; white-space: nowrap; }
-  .modulos-logo-sub { font-size: 10px; color: #B9B4AA; white-space: nowrap; margin-top: 1px; }
+  .modulos-logo-sub { font-size: 11px; color: #B9B4AA; white-space: nowrap; margin-top: 1px; }
   .modulo-tab { display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 13px; font-weight: 500;
     color: #B9B4AA; cursor: pointer; white-space: nowrap; border-left: 3px solid transparent; position: relative;
     transition: color .12s, background .12s; }
@@ -757,10 +757,10 @@
   #nav-submenu .nav-item:focus-visible { background: var(--accent-light); color: var(--text); }
   #nav-submenu .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   #nav-submenu .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
-  #nav-submenu .submenu-sep { display: block; font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+  #nav-submenu .submenu-sep { display: block; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
     color: var(--text-3); padding: 10px 12px 4px; }
   #nav-submenu .submenu-sep:first-child { padding-top: 4px; }
-  .modulos-grupo { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #7D786E;
+  .modulos-grupo { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #7D786E;
     padding: 16px 18px 6px; white-space: nowrap; }
 }
 
@@ -1189,7 +1189,7 @@ body.con-panel { overflow: hidden; }
 .panel-destacado { font-size: 25px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .panel-ids { display: flex; flex-wrap: wrap; gap: 8px; }
 .panel-id { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; padding: 4px 5px 4px 10px; font-size: 12.5px; }
-.panel-id-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
+.panel-id-l { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
 .panel-id b { font-family: var(--mono); font-size: 13px; }
 .panel-id-copiar, .panel-id-ver { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 3px 8px; font: 600 11.5px var(--font); color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .panel-id-copiar.ok { background: var(--green-light); border-color: var(--green-light); color: var(--green); }
@@ -1212,7 +1212,7 @@ body.con-panel { overflow: hidden; }
 
 /* Contenido del panel lateral */
 .panel-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.panel-tabla th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); background: var(--bg); padding: 7px 8px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
+.panel-tabla th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); background: var(--bg); padding: 7px 8px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
 .panel-tabla td { padding: 7px 8px; border-bottom: 1px solid #F1EFEA; vertical-align: top; }
 .panel-tabla tr:last-child td { border-bottom: 0; }
 .panel-tabla small, .panel-muted { display: block; color: var(--text-3); font-size: 11.5px; margin-top: 2px; }
@@ -1604,7 +1604,7 @@ tr.fila-abierta td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .rz-dias { display: block; font-size: 11px; color: var(--text-3); }
 .rz-dias-ambar { color: #B45309; font-weight: 600; }
 .rz-dias-rojo { color: var(--accent); font-weight: 700; }
-.rz-nuevo { font-size: 10px; padding: 1px 6px; vertical-align: middle; }
+.rz-nuevo { font-size: 11px; padding: 1px 6px; vertical-align: middle; }
 .rz-estado-celda { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .rz-btn-fila { padding: 4px 10px !important; font-size: 12px !important; }
 
@@ -1724,7 +1724,7 @@ tr.letra-plegable:hover td { color: var(--accent); }
 
 /* FedEx: factura y OC junto a "Editar", del mismo tamaño */
 .fx-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 2px 6px 2px 10px; font: 500 12px var(--font); color: var(--text-2); vertical-align: middle; margin-left: 4px; letter-spacing: 0; white-space: nowrap; }
-.fx-chip-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); font-weight: 700; }
+.fx-chip-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-3); font-weight: 700; }
 .fx-chip b { font-size: 12.5px; color: var(--accent); }
 .fx-chip .panel-copiar-mini { font-size: 13px; padding: 0 2px; }
 .fx-chip a { color: var(--accent); text-decoration: none; font-weight: 600; border-left: 1px solid var(--border); padding-left: 6px; display: inline-flex; align-items: center; gap: 3px; }
@@ -1818,7 +1818,7 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .rec-cm-franja-lote { display: contents; }
 .rec-cm-celda { padding: 9px 14px; min-width: 0; border-left: 1px solid var(--border); }
 .rec-cm-franja > .rec-cm-celda:first-child { border-left: 0; }
-.rec-cm-celda > span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
+.rec-cm-celda > span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 700; }
 .rec-cm-celda > b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rec-cm-celda > b small { font-size: 11.5px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
 .rec-cm-celda > b .mono { font-size: 14px; color: var(--text); }
@@ -1967,6 +1967,109 @@ tr:hover .rec-nombrar-lapiz { visibility: visible; }
 .btn-volver-graficos { justify-self: start; width: auto; margin-top: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px; color: var(--accent); border-color: var(--accent); background: var(--surface); }
 .btn-volver-graficos:hover { background: var(--accent); color: #fff; }
+
+/* ═══ Auditoría UI/UX (nov-2026) ═══════════════════════════════════════════ */
+
+/* ─── Menús generados desde NAV_MODULOS (index.html, pintarNavegacion) ───── */
+/* Los avisos con número (rojo; azul para Solicitudes web) antes llevaban todo
+   el estilo escrito en cada etiqueta. El "display" lo sigue manejando el código. */
+.nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-badge { flex-shrink: 0; margin-left: 4px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 9px; align-items: center; justify-content: center; padding: 0 5px; }
+.nav-badge.azul { background: #1E40AF; }
+/* Módulos de una sola página: su página existe en el menú (para enlaces y
+   permisos) pero no se despliega como lista. */
+.nav-subgroup-unico { display: none !important; }
+
+/* ─── Barra del celular: 4 módulos fijos + "Más" ─────────────────────────── */
+.tab-hoja { display: none; }
+@media (max-width: 640px) {
+  .bottom-tabbar { overflow: visible; }
+  .bottom-tabbar > .tab-item { flex: 1 1 0; min-width: 0; position: relative; }
+  .tab-badge-m { position: absolute; top: 2px; right: calc(50% - 22px); background: var(--red); color: #fff; font-size: 11px;
+    font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; align-items: center; justify-content: center; padding: 0 4px; }
+  /* Hoja que sube desde la barra con el resto de los módulos, agrupados. */
+  .tab-hoja { position: fixed; left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0));
+    max-height: calc(100dvh - 140px); overflow-y: auto; background: var(--surface); border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -12px 32px rgba(26,25,23,.16); padding: 8px 12px 12px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+    transform: translateY(110%); visibility: hidden; transition: transform .2s ease, visibility .2s; z-index: -1; }
+  .bottom-tabbar.hoja-abierta .tab-hoja { transform: translateY(0); visibility: visible; }
+  .tab-hoja-grupo { grid-column: 1 / -1; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--text-3); padding: 10px 4px 2px; }
+  .tab-hoja .tab-item { position: relative; padding: 10px 4px; border-radius: 10px; font-size: 12px; text-align: center; }
+  .tab-hoja .tab-item.active { background: var(--accent-light); }
+  .tab-hoja .tab-item.active::before { display: none; }
+  .tab-hoja .tab-badge-m { right: 8px; }
+  /* "Más" queda marcado si el módulo abierto está dentro de la hoja… */
+  .bottom-tabbar:has(.tab-hoja .tab-item.active) .tab-mas { color: var(--accent); font-weight: 600; }
+  .bottom-tabbar:has(.tab-hoja .tab-item.active) .tab-mas::before { content: ''; position: absolute; top: 2px; width: 18px; height: 2px;
+    border-radius: 2px; background: var(--accent); }
+  /* …y muestra un punto rojo si algún módulo de la hoja tiene avisos. */
+  .bottom-tabbar:has(.tab-hoja .tab-badge-m[style*="flex"]) .tab-mas::after { content: ''; position: absolute; top: 6px;
+    right: calc(50% - 16px); width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+
+  /* ─── Pestañas de estado: pasan a una segunda línea en vez de quedar cortadas ── */
+  .fpp-status-tabs { flex-wrap: wrap !important; overflow: visible !important; height: auto !important; }
+  .fpp-status-tab { flex: 0 0 auto; }
+}
+
+/* ─── Teclado: anillo visible al llegar con Tab a cualquier elemento clicable ── */
+[role="button"]:focus-visible, tr[tabindex]:focus-visible, .tab-item:focus-visible,
+.modulo-tab:focus-visible, .inicio-acceso:focus-visible, .nav-item:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px; }
+.modulo-tab:focus-visible { outline-color: #E0574A; }
+.panel-lateral:focus, .panel-lateral:focus-visible { outline: none; box-shadow: var(--shadow-lg); border-color: #ECEAE4; }
+
+/* ─── Ventana con campos (formularioModal, ej. gestión de cobro) ─────────── */
+.fm-shell { padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.fm-titulo { font-size: 16px; font-weight: 600; }
+.fm-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; }
+.fm-campo small { font-weight: 400; color: var(--text-2); font-size: 12px; }
+.fm-input { width: 100%; box-sizing: border-box; font: 14px var(--font); padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.fm-input.fm-error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(153,27,27,.15); }
+.fm-botones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.fm-botones .page-btn { padding: 8px 16px; }
+.fm-ok { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Celular: si el texto de ejemplo de un buscador no cabe, termina en "…"
+   (antes quedaba cortado a mitad de palabra). */
+@media (max-width: 640px) {
+  input[type=text], input[type=search] { text-overflow: ellipsis; }
+}
+
+/* Botones chicos de la barra superior (Actualizar, Instalar app, Salir). */
+.sb-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 11px; color: var(--text-2);
+  cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: var(--font); }
+.sb-btn i { font-size: 13px; }
+.sb-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+/* ─── Pantallas medianas (641–900 px, ej. tablet o ventana angosta) ─────────
+   El menú lateral queda solo con íconos y ahí no caben las páginas de cada
+   módulo: antes, al tocar un módulo con varias páginas no pasaba nada. Ahora
+   se entra al módulo y sus páginas aparecen como pestañas arriba (igual que
+   en el celular). También se ocultan los títulos de sección, que en la
+   columna angosta quedaban partidos en tres líneas. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .nav-section-label { display: none; }
+  #nav-submenu { position: fixed; top: 34px; left: 60px; right: 0; z-index: 95; background: var(--surface);
+    border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; white-space: nowrap; padding: 6px 10px; gap: 6px; }
+  #nav-submenu:empty { display: none; }
+  #nav-submenu .nav-item { flex-shrink: 0; margin-bottom: 0; padding: 6px 12px; border-radius: 20px; }
+  #nav-submenu .nav-item span:not(.nav-icon) { display: inline !important; }
+  #nav-submenu .nav-icon { width: auto; font-size: 14px; }
+  #nav-submenu .submenu-sep { display: none; }
+  body:has(#nav-submenu:not(:empty)) .main { margin-top: 78px; }
+}
+/* El reloj de la barra superior no se parte en varias líneas. */
+#systemClock { white-space: nowrap; }
+.sb-btn { white-space: nowrap; }
+/* El aviso de "Facturas rechazadas" en las pestañas de arriba (celular y
+   tablet) se veía como un punto rojo vacío aunque no hubiera rechazadas:
+   la regla que muestra los textos de la pestaña le ganaba a su "display:none". */
+#nav-submenu .nav-item span.badge-rechazadas-sub[style*="display:none"],
+#nav-submenu .nav-item span.badge-rechazadas-sub[style*="display: none"] { display: none !important; }
+#nav-submenu .nav-item span.badge-rechazadas-sub { display: inline-flex !important; }
 
 /* ─── Portal del trabajador ("Mis vacaciones", portal-trabajador.js) ───────
    Las cuentas de trabajador solo ven este portal: con body.modo-portal se
@@ -2122,3 +2225,98 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
   display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 8px;
   color: var(--text-3); cursor: pointer; }
 .ver-clave-btn:hover { color: var(--text); background: rgba(0,0,0,.05); }
+
+/* ═══ Estilo "portal" para toda la app (pedido de Seba, 27-11-2026) ═════════
+   La app de la oficina toma el aspecto del portal "Mis vacaciones": cabecera
+   roja con degradado, tarjetas blancas redondeadas con sombra suave, botones
+   rojos grandes y menú claro. Es solo apariencia (CSS) y vale para todas las
+   cuentas por igual. Va al final para ganarle a las reglas anteriores; para
+   volver al aspecto anterior basta con borrar este bloque. */
+:root {
+  --hero-grad: linear-gradient(135deg, #C0392B 0%, #96281B 100%);
+  --hero-sombra: 0 8px 24px rgba(150,40,27,.22);
+  --tarjeta-sombra: 0 4px 14px rgba(26,25,23,.06);
+  --tarjeta-borde: #ECE8E1;
+}
+
+/* ─── Cabecera de cada página: franja roja como la del portal ───────────── */
+.page-header.decorado { background: var(--hero-grad); color: #fff; border-radius: 20px; padding: 18px 20px;
+  box-shadow: var(--hero-sombra); margin-bottom: 18px; }
+.page-header.decorado .page-title { color: #fff; }
+.page-header.decorado .page-sub { color: rgba(255,255,255,.88); }
+.page-header.decorado .page-sub b, .page-header.decorado .page-sub strong { color: #fff; }
+.page-header.decorado .ph-ruta, .page-header.decorado .ph-ruta b { color: rgba(255,255,255,.85); }
+.page-header.decorado .ph-ico { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; }
+.page-header.decorado .info-tip { color: #fff; border-color: rgba(255,255,255,.6); background: transparent; }
+.page-header.decorado .info-tip:hover, .page-header.decorado .info-tip:focus { color: #fff; border-color: #fff; }
+.page-header.decorado a { color: #fff; }
+/* Botones dentro de la cabecera (ej. "Volver a Cobranza"): píldora translúcida, como "Clave"/"Salir" del portal. */
+.page-header.decorado .page-btn, .page-header.decorado button { background: rgba(255,255,255,.15); color: #fff;
+  border: 1px solid rgba(255,255,255,.35); border-radius: 999px; }
+.page-header.decorado .page-btn:hover, .page-header.decorado button:hover { background: rgba(255,255,255,.25); color: #fff; }
+/* Con la cabecera fija al bajar, la franja de fondo no debe tapar el degradado. */
+.page-sticky { padding-top: 12px; }
+
+/* ─── Tarjetas: blancas, más redondeadas y con sombra suave ─────────────── */
+.table-card, .stat, .kpi, .doc-caja, .inicio-acceso, .fpp-resumen > *, .portal-tarjeta, .usr-modulo {
+  border-color: var(--tarjeta-borde); border-radius: 14px; box-shadow: var(--tarjeta-sombra); }
+.inicio-acceso:hover { border-color: #E3C9C4; box-shadow: 0 6px 18px rgba(150,40,27,.10); }
+.inicio-acceso .nav-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-light); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+
+/* ─── Botones principales: rojo con sombra, como "Pedir vacaciones" ────── */
+.import-btn, .dte-btn-principal, .page-btn-pri, .login-btn, .fm-ok {
+  border-radius: 12px; font-weight: 700; box-shadow: 0 6px 16px rgba(192,57,43,.28); }
+.import-btn:hover, .dte-btn-principal:hover, .page-btn-pri:hover, .login-btn:hover { box-shadow: 0 8px 20px rgba(192,57,43,.36); }
+
+/* ─── Pestañas, buscadores y selectores: más redondos ─────────────────── */
+.fpp-status-tabs { border-radius: 999px; background: var(--surface); border-color: var(--tarjeta-borde); box-shadow: var(--tarjeta-sombra); }
+.fpp-status-tab { border-radius: 999px; }
+.fpp-status-tab.active { background: var(--accent-light); color: var(--accent); font-weight: 600; box-shadow: none; }
+.search-wrap input, .toolbar select, .fpp-period select, .fpp-period-btn { border-radius: 12px; }
+
+/* ─── Menú de escritorio: claro, con el módulo abierto en rojo suave ───── */
+@media (min-width: 901px) {
+  .modulos-bar { background: var(--surface); border-right: 1px solid var(--tarjeta-borde); box-shadow: 2px 0 12px rgba(26,25,23,.03); }
+  .modulos-logo { border-bottom-color: var(--tarjeta-borde); }
+  .modulos-logo-titulo { color: var(--text); }
+  .modulos-logo-sub { color: var(--text-3); }
+  .modulos-logo .logo-badge { background: var(--hero-grad); border-radius: 10px; }
+  .modulos-grupo { color: var(--text-3); }
+  .modulo-tab { color: var(--text-2); margin: 1px 10px; padding: 9px 12px; border-left: 0; border-radius: 10px; }
+  .modulo-tab i { color: var(--text-3); }
+  .modulo-tab:hover { color: var(--text); background: var(--bg); }
+  .modulo-tab.active { color: var(--accent); background: var(--accent-light); font-weight: 600; }
+  .modulo-tab.active i { color: var(--accent); }
+  .modulo-tab:focus-visible { outline-color: var(--accent); }
+  #nav-submenu { border-radius: 14px; box-shadow: 0 12px 32px rgba(26,25,23,.14); }
+}
+
+/* ─── Celular: la cabecera ocupa todo el ancho y se curva abajo, como el portal ── */
+@media (max-width: 640px) {
+  .page-header.decorado { margin: -16px -12px 16px; border-radius: 0 0 22px 22px; padding: 16px 16px 20px; }
+  .page-sticky { padding-top: 0; }   /* en celular no es fija: la cabecera llega hasta arriba */
+  .tab-item.active, .tab-item.active::before { color: var(--accent); }
+  /* Pestañas en dos líneas: esquinas redondeadas, no una píldora deformada. */
+  .fpp-status-tabs { border-radius: 16px; }
+  /* Páginas del módulo (fila de arriba): la elegida en rojo suave, no azul. */
+  #nav-submenu .nav-item.active { background: var(--accent-light); color: var(--accent); }
+}
+
+/* ─── Inicio: saludo como en el portal ("Hola, Seba · Hoy es…") ────────── */
+#page-inicio .page-header.decorado { padding-bottom: 46px; }
+#page-inicio #inicio-kpis { position: relative; margin-top: -40px; padding: 0 12px; }
+@media (max-width: 640px) { #page-inicio #inicio-kpis { padding: 0 4px; } }
+
+/* Interruptores de vista (Lista/Tablero, Por factura/Por cliente…): la opción elegida en rojo. */
+.vista-switch button.active, .vista-switch .active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Lo que quedaba en azul para "elegido" (menú lateral de pantallas medianas,
+   pestañas de las ventanas) pasa al rojo de la marca, como en el portal. */
+.nav-item.active, .nav-item-modulo.active { background: var(--accent-light); color: var(--accent); }
+.nav-subitem.active { border-left-color: var(--accent); }
+.modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* Títulos de las tablas en rojo (pedido de Seba, 27-11-2026; antes casi negros).
+   Un tono apenas más oscuro que el rojo de la marca para que se distinga de los
+   botones; el texto blanco se lee con contraste 6:1. */
+.page .table-card table > thead th { background: #A93226; color: #fff; }
+.rec-vistas button.active { background: var(--accent); color: #fff; }

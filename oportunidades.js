@@ -172,7 +172,7 @@ function opInit() {
       </div>
       <div class="toolbar">
         <div class="search-wrap">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon"><i class="ti ti-search"></i></span>
           <input type="text" id="op-buscar" placeholder="Buscar hospital, producto, palabra o código…" oninput="opFiltro.q=this.value;opRender()">
         </div>
         <label class="op-check"><input type="checkbox" onchange="opFiltro.soloClientes=this.checked;opRender()"> Solo hospitales cliente</label>
@@ -252,7 +252,7 @@ function opRender() {
     + ' · <span class="op-nota">Se revisa Mercado Público cada 2 horas, en todo Chile. Para postular se entra a Mercado Público.</span>';
   const body = document.getElementById('op-body');
   if (!filas.length) {
-    body.innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon">🔍</div><p>${
+    body.innerHTML = `<tr><td colspan="7"><div class="fpp-empty"><div class="fpp-empty-icon"><i class="ti ti-search"></i></div><p>${
       opFiltro.vista === 'nuevas' ? 'No hay oportunidades nuevas. Ya revisaste todo.' : 'No hay oportunidades con estos filtros.'}</p></div></td></tr>`;
     return;
   }

@@ -190,7 +190,7 @@ async function ctGuardar(form) {
 }
 
 async function ctBorrar(id, esNuevo) {
-  if (!confirm(esNuevo ? '¿Quitar este contacto?' : '¿Borrar lo escrito a mano y volver a los datos de Mercado Público?')) return;
+  if (!await confirmModal(esNuevo ? '¿Quitar este contacto?' : '¿Borrar lo escrito a mano y volver a los datos de Mercado Público?')) return;
   const res = await sb(`contactos_hospital?id=eq.${id}`, { method: 'DELETE' });
   if (!res.ok) { toast('No se pudo borrar. Intenta de nuevo.', 'err'); return; }
   ctManual = (ctManual || []).filter(c => c.id !== id);

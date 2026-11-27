@@ -83,6 +83,9 @@ function aplicarPermisosNav() {
     }
     t.classList.toggle('sin-permiso', !alguno);
   });
+  // Barra del celular: si a la hoja "Más" no le queda ningún módulo, el botón no se muestra.
+  const mas = document.querySelector('#bottom-tabbar .tab-mas');
+  if (mas) mas.classList.toggle('sin-permiso', !document.querySelector('#tab-hoja-mas .tab-item:not(.sin-permiso)'));
   document.querySelectorAll('.inicio-seccion').forEach(s => {
     const accesos = s.querySelectorAll('.inicio-acceso');
     if (accesos.length) s.classList.toggle('sin-permiso', [...accesos].every(a => a.classList.contains('sin-permiso')));
@@ -213,7 +216,7 @@ async function usrFuncion(datos) {
 async function usrRenombrar(id) {
   const u = usrLista.find(x => x.user_id === id);
   if (!u) return;
-  const nombre = prompt('Nuevo nombre para ' + u.email, u.nombre || '');
+  const nombre = await promptModal('Nuevo nombre para ' + escapeHtml(u.email), u.nombre || '');
   if (nombre == null || !nombre.trim()) return;
   try { await usrFuncion({ accion: 'renombrar', user_id: id, nombre: nombre.trim() }); u.nombre = nombre.trim(); toast('Nombre actualizado'); }
   catch (e) { toast(e.message, 'err'); return; }
@@ -276,7 +279,7 @@ async function usrGuardarUsuario(u, usuario) {
 async function usrCambiarUsuario(id) {
   const u = usrLista.find(x => x.user_id === id);
   if (!u) return;
-  const nuevo = prompt('Usuario para entrar de ' + (u.nombre || u.email) + ' (sin espacios):', u.usuario || '');
+  const nuevo = await promptModal('Usuario para entrar de ' + escapeHtml(u.nombre || u.email) + ' (sin espacios):', u.usuario || '');
   if (nuevo == null) return;
   const usuario = usrNormalizarUsuario(nuevo);
   if (!usuario || usuario === u.usuario) return;
