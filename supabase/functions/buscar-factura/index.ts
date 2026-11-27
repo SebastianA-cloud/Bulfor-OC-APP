@@ -1,6 +1,7 @@
-// buscar-factura — busca en GDExpress, en el momento, facturas (33) recién
-// emitidas que la app todavía no tiene (la sincronización corre cada cierto
-// rato). Devuelve el cliente, su RUT, la fecha, el neto y la OC.
+// buscar-factura — busca en GDExpress, en el momento, facturas (33) o guías
+// de despacho (52) recién emitidas que la app todavía no tiene (la
+// sincronización corre cada cierto rato). Devuelve el tipo, el cliente, su
+// RUT, la fecha, el neto y la OC.
 //
 // Solo lee: no emite ni modifica nada en GDExpress ni en la base de datos.
 //
@@ -47,10 +48,16 @@ const campo = (xml: string, tag: string) => {
   return m ? m[1].replace(/&amp;/g, "&").trim() : "";
 };
 
+// Primero como factura; si no existe, como guía de despacho (las dos series
+// de folios no se cruzan).
 async function buscarFolio(folio: string) {
+  return (await buscarFolioTipo(folio, "33")) || (await buscarFolioTipo(folio, "52"));
+}
+
+async function buscarFolioTipo(folio: string, tipo: string) {
   const ip = Deno.env.get("DTEBOX_IP");
   const key = Deno.env.get("GDEXPRESS_API_KEY");
-  const q = btoa(`(RUTEmisor:${RUT_EMISOR} AND TipoDTE:33 AND Folio:${folio})`);
+  const q = btoa(`(RUTEmisor:${RUT_EMISOR} AND TipoDTE:${tipo} AND Folio:${folio})`);
   const r = await fetch(`http://${ip}/api/Core.svc/core/PaginatedSearch/P/E/${q}/1/5`, {
     headers: { AuthKey: key || "", Accept: "application/json" },
   });
@@ -62,6 +69,7 @@ async function buscarFolio(folio: string) {
   const fecha = (campo(doc, "FchEmis") || campo(doc, "EmissionDate") || campo(doc, "DocumentDate")).slice(0, 10);
   return {
     folio,
+    tipo_dte: tipo,
     rut: campo(doc, "RUTRecep"),
     hospital: campo(doc, "RznSocRecep"),
     fecha_emision: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null,
@@ -81,7 +89,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* cuerpo vacío */ }
   // Hasta 5 folios por consulta (un envío rara vez lleva más).
   const folios = [...new Set((Array.isArray(body.folios) ? body.folios : []).map((f) => String(f).replace(/\D/g, "")).filter((f) => f.length >= 3))].slice(0, 5);
-  if (!folios.length) return json({ ok: false, error: "Indica al menos un N° de factura." }, 400);
+  if (!folios.length) return json({ ok: false, error: "Indica al menos un N° de factura o guía." }, 400);
 
   try {
     const facturas = (await Promise.all(folios.map(buscarFolio))).filter(Boolean);
