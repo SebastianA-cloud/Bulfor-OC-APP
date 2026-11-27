@@ -19159,6 +19159,21 @@ function mostrarPantallaLogin(mensaje) {
   }
 }
 
+// Saludo de Inicio, como el del portal de vacaciones: "Hola, Genoveva" y
+// "Hoy es jueves 27 de noviembre". El nombre sale del perfil de la cuenta
+// (Usuarios y permisos); si no hay, del usuario o del correo.
+function saludoInicio() {
+  const titulo = document.querySelector('#page-inicio .page-title');
+  const sub = document.querySelector('#page-inicio .page-sub');
+  if (!titulo || !sub) return;
+  const crudo = (perfilActual && (perfilActual.nombre || perfilActual.usuario)) || (sesionActual?.email || '').split('@')[0].split('.')[0];
+  const nombre = (crudo || '').trim().split(/\s+/)[0];
+  titulo.textContent = nombre ? `Hola, ${nombre.charAt(0).toUpperCase()}${nombre.slice(1)}` : 'Inicio';
+  const hoy = new Date();
+  const fecha = hoy.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Santiago' });
+  sub.textContent = `Hoy es ${fecha} · esto es lo que requiere atención`;
+}
+
 async function arrancarApp() {
   // Las cuentas de trabajador solo ven su portal de vacaciones
   // (portal-trabajador.js): no se carga nada de la app de la oficina.
@@ -19174,6 +19189,7 @@ async function arrancarApp() {
     mostrarPantallaLogin('Esta cuenta está desactivada. Habla con Sebastián.');
     return;
   }
+  saludoInicio();
   aplicarPermisosNav();
   document.getElementById('login-overlay').style.display = 'none';
   const cont = document.getElementById('usuario-sesion');

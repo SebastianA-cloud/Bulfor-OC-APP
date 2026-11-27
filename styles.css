@@ -2225,3 +2225,93 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
   display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 8px;
   color: var(--text-3); cursor: pointer; }
 .ver-clave-btn:hover { color: var(--text); background: rgba(0,0,0,.05); }
+
+/* ═══ Estilo "portal" para toda la app (pedido de Seba, 27-11-2026) ═════════
+   La app de la oficina toma el aspecto del portal "Mis vacaciones": cabecera
+   roja con degradado, tarjetas blancas redondeadas con sombra suave, botones
+   rojos grandes y menú claro. Es solo apariencia (CSS) y vale para todas las
+   cuentas por igual. Va al final para ganarle a las reglas anteriores; para
+   volver al aspecto anterior basta con borrar este bloque. */
+:root {
+  --hero-grad: linear-gradient(135deg, #C0392B 0%, #96281B 100%);
+  --hero-sombra: 0 8px 24px rgba(150,40,27,.22);
+  --tarjeta-sombra: 0 4px 14px rgba(26,25,23,.06);
+  --tarjeta-borde: #ECE8E1;
+}
+
+/* ─── Cabecera de cada página: franja roja como la del portal ───────────── */
+.page-header.decorado { background: var(--hero-grad); color: #fff; border-radius: 20px; padding: 18px 20px;
+  box-shadow: var(--hero-sombra); margin-bottom: 18px; }
+.page-header.decorado .page-title { color: #fff; }
+.page-header.decorado .page-sub { color: rgba(255,255,255,.88); }
+.page-header.decorado .page-sub b, .page-header.decorado .page-sub strong { color: #fff; }
+.page-header.decorado .ph-ruta, .page-header.decorado .ph-ruta b { color: rgba(255,255,255,.85); }
+.page-header.decorado .ph-ico { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; }
+.page-header.decorado .info-tip { color: #fff; border-color: rgba(255,255,255,.6); background: transparent; }
+.page-header.decorado .info-tip:hover, .page-header.decorado .info-tip:focus { color: #fff; border-color: #fff; }
+.page-header.decorado a { color: #fff; }
+/* Botones dentro de la cabecera (ej. "Volver a Cobranza"): píldora translúcida, como "Clave"/"Salir" del portal. */
+.page-header.decorado .page-btn, .page-header.decorado button { background: rgba(255,255,255,.15); color: #fff;
+  border: 1px solid rgba(255,255,255,.35); border-radius: 999px; }
+.page-header.decorado .page-btn:hover, .page-header.decorado button:hover { background: rgba(255,255,255,.25); color: #fff; }
+/* Con la cabecera fija al bajar, la franja de fondo no debe tapar el degradado. */
+.page-sticky { padding-top: 12px; }
+
+/* ─── Tarjetas: blancas, más redondeadas y con sombra suave ─────────────── */
+.table-card, .stat, .kpi, .doc-caja, .inicio-acceso, .fpp-resumen > *, .portal-tarjeta, .usr-modulo {
+  border-color: var(--tarjeta-borde); border-radius: 14px; box-shadow: var(--tarjeta-sombra); }
+.inicio-acceso:hover { border-color: #E3C9C4; box-shadow: 0 6px 18px rgba(150,40,27,.10); }
+.inicio-acceso .nav-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-light); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+
+/* ─── Botones principales: rojo con sombra, como "Pedir vacaciones" ────── */
+.import-btn, .dte-btn-principal, .page-btn-pri, .login-btn, .fm-ok {
+  border-radius: 12px; font-weight: 700; box-shadow: 0 6px 16px rgba(192,57,43,.28); }
+.import-btn:hover, .dte-btn-principal:hover, .page-btn-pri:hover, .login-btn:hover { box-shadow: 0 8px 20px rgba(192,57,43,.36); }
+
+/* ─── Pestañas, buscadores y selectores: más redondos ─────────────────── */
+.fpp-status-tabs { border-radius: 999px; background: var(--surface); border-color: var(--tarjeta-borde); box-shadow: var(--tarjeta-sombra); }
+.fpp-status-tab { border-radius: 999px; }
+.fpp-status-tab.active { background: var(--accent-light); color: var(--accent); font-weight: 600; box-shadow: none; }
+.search-wrap input, .toolbar select, .fpp-period select, .fpp-period-btn { border-radius: 12px; }
+
+/* ─── Menú de escritorio: claro, con el módulo abierto en rojo suave ───── */
+@media (min-width: 901px) {
+  .modulos-bar { background: var(--surface); border-right: 1px solid var(--tarjeta-borde); box-shadow: 2px 0 12px rgba(26,25,23,.03); }
+  .modulos-logo { border-bottom-color: var(--tarjeta-borde); }
+  .modulos-logo-titulo { color: var(--text); }
+  .modulos-logo-sub { color: var(--text-3); }
+  .modulos-logo .logo-badge { background: var(--hero-grad); border-radius: 10px; }
+  .modulos-grupo { color: var(--text-3); }
+  .modulo-tab { color: var(--text-2); margin: 1px 10px; padding: 9px 12px; border-left: 0; border-radius: 10px; }
+  .modulo-tab i { color: var(--text-3); }
+  .modulo-tab:hover { color: var(--text); background: var(--bg); }
+  .modulo-tab.active { color: var(--accent); background: var(--accent-light); font-weight: 600; }
+  .modulo-tab.active i { color: var(--accent); }
+  .modulo-tab:focus-visible { outline-color: var(--accent); }
+  #nav-submenu { border-radius: 14px; box-shadow: 0 12px 32px rgba(26,25,23,.14); }
+}
+
+/* ─── Celular: la cabecera ocupa todo el ancho y se curva abajo, como el portal ── */
+@media (max-width: 640px) {
+  .page-header.decorado { margin: -16px -12px 16px; border-radius: 0 0 22px 22px; padding: 16px 16px 20px; }
+  .page-sticky { padding-top: 0; }   /* en celular no es fija: la cabecera llega hasta arriba */
+  .tab-item.active, .tab-item.active::before { color: var(--accent); }
+  /* Pestañas en dos líneas: esquinas redondeadas, no una píldora deformada. */
+  .fpp-status-tabs { border-radius: 16px; }
+  /* Páginas del módulo (fila de arriba): la elegida en rojo suave, no azul. */
+  #nav-submenu .nav-item.active { background: var(--accent-light); color: var(--accent); }
+}
+
+/* ─── Inicio: saludo como en el portal ("Hola, Seba · Hoy es…") ────────── */
+#page-inicio .page-header.decorado { padding-bottom: 46px; }
+#page-inicio #inicio-kpis { position: relative; margin-top: -40px; padding: 0 12px; }
+@media (max-width: 640px) { #page-inicio #inicio-kpis { padding: 0 4px; } }
+
+/* Interruptores de vista (Lista/Tablero, Por factura/Por cliente…): la opción elegida en rojo. */
+.vista-switch button.active, .vista-switch .active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Lo que quedaba en azul para "elegido" (menú lateral de pantallas medianas,
+   pestañas de las ventanas) pasa al rojo de la marca, como en el portal. */
+.nav-item.active, .nav-item-modulo.active { background: var(--accent-light); color: var(--accent); }
+.nav-subitem.active { border-left-color: var(--accent); }
+.modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
