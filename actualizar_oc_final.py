@@ -151,6 +151,9 @@ def transformar_oc(detalle, codigo_oc, hospitales_por_rut=None):
         "contacto_fono":     comprador.get("FonoContacto"),
         "contacto_mail":     comprador.get("MailContacto"),
         "fecha_ultima_modificacion": parse_fecha(fechas.get("FechaUltimaModificacion")),
+        # Observaciones de la OC (27-11-2026): ahí el hospital suele dejar el
+        # correo o teléfono de la encargada; la app los muestra en Contactos.
+        "observaciones":     detalle.get("Descripcion"),
     }
 
 
@@ -258,6 +261,7 @@ def campos_estado(detalle):
         "contacto_cargo":    comprador.get("CargoContacto"),
         "contacto_fono":     comprador.get("FonoContacto"),
         "contacto_mail":     comprador.get("MailContacto"),
+        "observaciones":     detalle.get("Descripcion"),
     }
 
 
@@ -314,6 +318,13 @@ def rellenar_todo():
 def main():
     if "--rellenar" in sys.argv:
         rellenar_todo()
+        return
+    if "--observaciones" in sys.argv:
+        # Carga única (autorizada por Seba el 27-11-2026; respaldo previo
+        # ordenes_compra_backup_20261127): observaciones de las OC antiguas.
+        filas = leer_codigos(lambda q: q.is_("observaciones", "null"))
+        print(f"Carga única: {len(filas)} OC sin observaciones")
+        print(f"✔ Listo. {refrescar_oc(filas)} OC cambiaron de estado.")
         return
 
     print(f"\n{'=' * 50}")

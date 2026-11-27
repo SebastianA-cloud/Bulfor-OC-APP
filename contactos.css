@@ -1,0 +1,30 @@
+/* Pestaña Contactos de la ficha del hospital (contactos.js, prefijo ct-) */
+.ct-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 4px 0 10px; }
+.ct-cabecera p { margin: 0; color: var(--text-2); font-size: 12px; }
+.ct-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12px;
+  color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ct-btn:hover { border-color: var(--red); color: var(--red); }
+.ct-btn-rojo { background: var(--red); border-color: var(--red); color: #fff; }
+.ct-btn-rojo:hover { color: #fff; opacity: .9; }
+.ct-btn-borrar { margin-left: auto; color: var(--text-3); }
+.ct-botones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ct-falta { color: var(--text-3); font-size: 12px; font-style: italic; }
+.ct-nota { color: var(--text-2) !important; font-style: italic; }
+.ct-quien { font-size: 11px; }
+.ct-ayuda { color: var(--text-2); font-size: 12px; margin: 2px 0 10px; }
+.ct-datos { display: flex; flex-direction: column; gap: 8px; }
+.ct-dato { border: 1px solid var(--border); border-radius: 10px; padding: 9px 13px; background: var(--surface); }
+.ct-dato-valor { font-weight: 600; overflow-wrap: anywhere; }
+.ct-frase { font-size: 12px; color: var(--text-2); margin: 3px 0; overflow-wrap: anywhere; }
+.ct-frase b { color: var(--text); }
+.ct-form { border: 1px solid var(--red); border-radius: 10px; padding: 12px 14px; background: #FFF8F6; margin-bottom: 8px; }
+.ct-form-tit { font-weight: 600; margin-bottom: 8px; }
+.ct-form-tit small { font-weight: 400; color: var(--text-3); }
+.ct-form-grilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+.ct-form-grilla label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-2); }
+.ct-form-grilla input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; color: var(--text); }
+.ct-form-grilla .ct-ancho { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .ct-cabecera { flex-direction: column; }
+  .ct-form-grilla { grid-template-columns: 1fr; }
+}
