@@ -2315,3 +2315,8 @@ body.modo-portal > *:not(#portal-trabajador):not(#toast-container):not(.modal-ov
 .nav-item.active, .nav-item-modulo.active { background: var(--accent-light); color: var(--accent); }
 .nav-subitem.active { border-left-color: var(--accent); }
 .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* Títulos de las tablas en rojo (pedido de Seba, 27-11-2026; antes casi negros).
+   Un tono apenas más oscuro que el rojo de la marca para que se distinga de los
+   botones; el texto blanco se lee con contraste 6:1. */
+.page .table-card table > thead th { background: #A93226; color: #fff; }
+.rec-vistas button.active { background: var(--accent); color: #fff; }
